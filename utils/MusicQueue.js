@@ -11,6 +11,8 @@ class MusicQueue {
         this.disconnectTimer = null;
         this.nowPlayingMessage = null;
         this.readyLock = false;
+        this.volume = 0.5; // Default volume 50%
+        this.currentResource = null;
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             this.playNext();
@@ -120,6 +122,12 @@ class MusicQueue {
                 inputType: require('@discordjs/voice').StreamType.Arbitrary
             });
 
+            this.currentResource = resource;
+            // Set the volume on the resource
+            if (resource.volume) {
+                resource.volume.setVolume(this.volume);
+            }
+
             this.player.play(resource);
             this.connection.subscribe(this.player);
         } catch (error) {
@@ -145,6 +153,23 @@ class MusicQueue {
 
     resume() {
         this.player.unpause();
+    }
+
+    setVolume(volume) {
+        // Clamp volume between 0 and 2 (0% to 200%)
+        this.volume = Math.max(0, Math.min(2, volume));
+        if (this.currentResource && this.currentResource.volume) {
+            this.currentResource.volume.setVolume(this.volume);
+        }
+        return Math.round(this.volume * 100); // Return percentage
+    }
+
+    increaseVolume() {
+        return this.setVolume(this.volume + 0.1);
+    }
+
+    decreaseVolume() {
+        return this.setVolume(this.volume - 0.1);
     }
 }
 

@@ -31,6 +31,14 @@ module.exports = {
                     queue.stop();
                     await message.channel.send('⏹️ Stopped music and cleared queue!').then(msg => setTimeout(() => msg.delete(), 3000));
                     break;
+                case '🔉': // Volume down
+                    const volumeDown = queue.decreaseVolume();
+                    await message.channel.send(`🔉 Volume: ${volumeDown}%`).then(msg => setTimeout(() => msg.delete(), 3000));
+                    break;
+                case '🔊': // Volume up
+                    const volumeUp = queue.increaseVolume();
+                    await message.channel.send(`🔊 Volume: ${volumeUp}%`).then(msg => setTimeout(() => msg.delete(), 3000));
+                    break;
             }
             
             // Remove user's reaction
