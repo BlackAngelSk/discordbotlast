@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const settingsManager = require('./settingsManager');
 
 class CommandHandler {
     constructor(client) {
@@ -31,8 +32,13 @@ class CommandHandler {
         }
     }
 
-    async handleCommand(message, prefix = '!') {
-        if (!message.content.startsWith(prefix) || message.author.bot) return;
+    async handleCommand(message) {
+        if (message.author.bot) return;
+
+        // Get custom prefix for this server
+        const prefix = settingsManager.getPrefix(message.guild.id);
+        
+        if (!message.content.startsWith(prefix)) return;
 
         const args = message.content.slice(prefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();

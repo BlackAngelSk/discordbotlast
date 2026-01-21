@@ -13,6 +13,7 @@ class MusicQueue {
         this.readyLock = false;
         this.volume = 0.5; // Default volume 50%
         this.currentResource = null;
+        this.autoplay = false; // Autoplay feature
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             this.playNext();
@@ -62,6 +63,12 @@ class MusicQueue {
 
     async playNext() {
         if (this.songs.length === 0) {
+            // Try autoplay if enabled
+            if (this.autoplay && this.currentSong) {
+                await this.getRelatedSong();
+                return;
+            }
+            
             this.isPlaying = false;
             this.currentSong = null;
             
@@ -170,6 +177,39 @@ class MusicQueue {
 
     decreaseVolume() {
         return this.setVolume(this.volume - 0.1);
+    }
+
+    async getRelatedSong() {
+        if (!this.currentSong || !this.currentSong.url) return;
+        
+        try {
+            const ytsr = require('ytsr');
+            // Search for related content based on current song title
+            const searchResults = await ytsr(this.currentSong.title, { limit: 5 });
+            const videos = searchResults.items.filter(item => item.type === 'video');
+            
+            // Get a random video from results (not the same as current)
+            const relatedVideos = videos.filter(v => v.url !== this.currentSong.url);
+            if (relatedVideos.length === 0) return;
+            
+            const randomVideo = relatedVideos[Math.floor(Math.random() * relatedVideos.length)];
+            const { parseDuration } = require('./helpers');
+            
+            const song = {
+                title: randomVideo.title,
+                url: randomVideo.url,
+                duration: randomVideo.duration ? parseDuration(randomVideo.duration) : 0,
+                thumbnail: randomVideo.bestThumbnail?.url,
+                requester: 'Autoplay'
+            };
+            
+            this.addSong(song);
+            console.log('🎵 Autoplay added:', song.title);
+            this.playNext();
+        } catch (error) {
+            console.error('Error getting related song:', error);
+            this.isPlaying = false;
+        }
     }
 }
 

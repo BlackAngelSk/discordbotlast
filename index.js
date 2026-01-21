@@ -2,6 +2,7 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const CommandHandler = require('./utils/commandHandler');
 const EventHandler = require('./utils/eventHandler');
+const settingsManager = require('./utils/settingsManager');
 
 // Create a new Discord client instance
 const client = new Client({
@@ -22,6 +23,10 @@ const eventHandler = new EventHandler(client);
 // Load all commands and events
 async function loadHandlers() {
     try {
+        // Initialize settings manager first
+        await settingsManager.init();
+        console.log('✅ Settings manager initialized!');
+        
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();
         console.log('✅ All handlers loaded successfully!');
