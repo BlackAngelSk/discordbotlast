@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Bot Dashboard</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🎵 Music Bot</h1>
+            </div>
+            <div class="nav-links">
+                <% if (user) { %>
+                    <a href="/dashboard">Dashboard</a>
+                    <span class="user-info">
+                        <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
+                        <%= user.username %>
+                    </span>
+                    <a href="/logout" class="btn-logout">Logout</a>
+                <% } else { %>
+                    <a href="/login" class="btn-login">Login with Discord</a>
+                <% } %>
+            </div>
+        </div>
+    </nav>
+
+    <div class="hero">
+        <div class="container">
+            <h1>Welcome to Music Bot Dashboard</h1>
+            <p>Manage your Discord music bot settings from a beautiful web interface</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <h3><%= client.guilds.cache.size %></h3>
+                    <p>Servers</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= client.users.cache.size %></h3>
+                    <p>Users</p>
+                </div>
+                <div class="stat-card">
+                    <h3><%= client.channels.cache.size %></h3>
+                    <p>Channels</p>
+                </div>
+            </div>
+
+            <% if (!user) { %>
+                <a href="/login" class="btn-primary">Get Started</a>
+            <% } else { %>
+                <a href="/dashboard" class="btn-primary">Go to Dashboard</a>
+            <% } %>
+        </div>
+    </div>
+
+    <div class="features">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <span class="icon">🎵</span>
+                    <h3>Music Control</h3>
+                    <p>Play, pause, skip, and manage your music queue</p>
+                </div>
+                <div class="feature-card">
+                    <span class="icon">⚙️</span>
+                    <h3>Easy Configuration</h3>
+                    <p>Configure bot settings with a simple web interface</p>
+                </div>
+                <div class="feature-card">
+                    <span class="icon">🔐</span>
+                    <h3>Secure Access</h3>
+                    <p>Discord OAuth2 authentication for safe access</p>
+                </div>
+                <div class="feature-card">
+                    <span class="icon">📊</span>
+                    <h3>Server Management</h3>
+                    <p>Manage multiple servers from one place</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

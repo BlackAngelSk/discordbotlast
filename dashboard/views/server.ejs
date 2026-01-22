@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> - Settings</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🎵 Music Bot</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/dashboard">Dashboard</a>
+                <span class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
+                    <%= user.username %>
+                </span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <div class="server-header">
+            <% if (guild.icon) { %>
+                <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+            <% } else { %>
+                <div class="server-icon-default large"><%= guild.name.charAt(0) %></div>
+            <% } %>
+            <div>
+                <h1><%= guild.name %></h1>
+                <p><%= guild.memberCount %> members</p>
+            </div>
+        </div>
+
+        <div id="message" class="message hidden"></div>
+
+        <form id="settingsForm" class="settings-form">
+            <!-- Basic Settings -->
+            <div class="settings-section">
+                <h2>⚙️ Basic Settings</h2>
+                
+                <div class="form-group">
+                    <label for="prefix">Command Prefix</label>
+                    <input type="text" id="prefix" name="prefix" value="<%= settings.prefix %>" maxlength="5">
+                    <small>The prefix used to trigger bot commands</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="djRole">DJ Role</label>
+                    <select id="djRole" name="djRole">
+                        <% roles.forEach(role => { %>
+                            <option value="<%= role.name %>" <%= settings.djRole === role.name ? 'selected' : '' %>>
+                                <%= role.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                    <small>Role required for DJ commands (skip, pause, etc.)</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="autoRole">Auto Role</label>
+                    <select id="autoRole" name="autoRole">
+                        <option value="">None</option>
+                        <% roles.forEach(role => { %>
+                            <option value="<%= role.name %>" <%= settings.autoRole === role.name ? 'selected' : '' %>>
+                                <%= role.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                    <small>Role automatically assigned to new members</small>
+                </div>
+            </div>
+
+            <!-- Welcome Messages -->
+            <div class="settings-section">
+                <h2>👋 Welcome Messages</h2>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="welcomeEnabled" name="welcomeEnabled" <%= settings.welcomeEnabled ? 'checked' : '' %>>
+                        Enable Welcome Messages
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeChannel">Welcome Channel</label>
+                    <select id="welcomeChannel" name="welcomeChannel">
+                        <option value="">Select Channel</option>
+                        <% channels.forEach(channel => { %>
+                            <option value="<%= channel.name %>" <%= settings.welcomeChannel === channel.name ? 'selected' : '' %>>
+                                #<%= channel.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="welcomeMessage">Welcome Message</label>
+                    <textarea id="welcomeMessage" name="welcomeMessage" rows="3"><%= settings.welcomeMessage %></textarea>
+                    <small>Use {user} for username, {server} for server name</small>
+                </div>
+            </div>
+
+            <!-- Leave Messages -->
+            <div class="settings-section">
+                <h2>👋 Leave Messages</h2>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="leaveEnabled" name="leaveEnabled" <%= settings.leaveEnabled ? 'checked' : '' %>>
+                        Enable Leave Messages
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="leaveChannel">Leave Channel</label>
+                    <select id="leaveChannel" name="leaveChannel">
+                        <option value="">Select Channel</option>
+                        <% channels.forEach(channel => { %>
+                            <option value="<%= channel.name %>" <%= settings.leaveChannel === channel.name ? 'selected' : '' %>>
+                                #<%= channel.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="leaveMessage">Leave Message</label>
+                    <textarea id="leaveMessage" name="leaveMessage" rows="3"><%= settings.leaveMessage %></textarea>
+                    <small>Use {user} for username, {server} for server name</small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">Save Changes</button>
+                <button type="button" class="btn-danger" onclick="resetSettings()">Reset to Defaults</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        const guildId = '<%= guild.id %>';
+        const form = document.getElementById('settingsForm');
+        const messageDiv = document.getElementById('message');
+
+        function showMessage(text, type = 'success') {
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            setTimeout(() => {
+                messageDiv.className = 'message hidden';
+            }, 5000);
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(form);
+            const data = {};
+            
+            // Convert form data to object
+            for (let [key, value] of formData.entries()) {
+                if (key === 'welcomeEnabled' || key === 'leaveEnabled') {
+                    data[key] = true;
+                } else {
+                    data[key] = value;
+                }
+            }
+
+            // Handle unchecked checkboxes
+            if (!formData.has('welcomeEnabled')) data.welcomeEnabled = false;
+            if (!formData.has('leaveEnabled')) data.leaveEnabled = false;
+
+            try {
+                const response = await fetch(`/api/settings/${guildId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Settings saved successfully!', 'success');
+                } else {
+                    showMessage('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Failed to save settings: ' + error.message, 'error');
+            }
+        });
+
+        async function resetSettings() {
+            if (!confirm('Are you sure you want to reset all settings to default? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/settings/${guildId}/reset`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Settings reset successfully! Reloading...', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showMessage('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('Failed to reset settings: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

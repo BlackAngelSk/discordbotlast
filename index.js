@@ -3,6 +3,7 @@ const { Client, GatewayIntentBits, Events } = require('discord.js');
 const CommandHandler = require('./utils/commandHandler');
 const EventHandler = require('./utils/eventHandler');
 const settingsManager = require('./utils/settingsManager');
+const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
 const client = new Client({
@@ -45,4 +46,12 @@ loadHandlers().then(() => {
 
     // Login to Discord with your bot token
     client.login(process.env.DISCORD_TOKEN);
+
+    // Start dashboard when bot is ready
+    client.once(Events.ClientReady, () => {
+        if (process.env.DASHBOARD_ENABLED === 'true') {
+            const dashboard = new Dashboard(client);
+            dashboard.start();
+        }
+    });
 });

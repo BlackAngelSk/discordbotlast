@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Select Server</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🎵 Music Bot</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/dashboard">Dashboard</a>
+                <span class="user-info">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
+                    <%= user.username %>
+                </span>
+                <a href="/logout" class="btn-logout">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <h1>Select a Server</h1>
+        <p class="subtitle">Choose a server to manage its settings</p>
+
+        <div class="server-grid">
+            <% if (guilds.length === 0) { %>
+                <div class="no-servers">
+                    <p>No servers found. Make sure the bot is in your server!</p>
+                    <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.CLIENT_ID %>&permissions=8&scope=bot" target="_blank" class="btn-primary">
+                        Invite Bot
+                    </a>
+                </div>
+            <% } else { %>
+                <% guilds.forEach(guild => { %>
+                    <a href="/dashboard/<%= guild.id %>" class="server-card">
+                        <% if (guild.icon) { %>
+                            <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+                        <% } else { %>
+                            <div class="server-icon-default"><%= guild.name.charAt(0) %></div>
+                        <% } %>
+                        <h3><%= guild.name %></h3>
+                        <p>Click to manage</p>
+                    </a>
+                <% }); %>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>
