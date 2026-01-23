@@ -85,6 +85,18 @@ This bot now includes advanced queue management, DJ permissions, autoplay, lyric
 
 **Usage**: `!setup`
 
+### 8. Simme Mini Games ✅
+**File**: `commands/simme.js`
+
+- Quick mini games: Rock-Paper-Scissors, Guess the Number, Quick Trivia
+- Uses buttons/collectors so only the requester can play the round
+- Works alongside existing prefix and permissions
+
+**Usage**:
+- `!simme rps` — play Rock-Paper-Scissors
+- `!simme guess` — guess a number between 1-100 in 6 tries
+- `!simme trivia` — answer a quick multiple-choice question
+
 ## Commands Quick Reference
 
 ### For Everyone
@@ -96,6 +108,7 @@ This bot now includes advanced queue management, DJ permissions, autoplay, lyric
 - `!help` - Show commands
 - `!ping` - Bot latency
 - `!leave` - Bot leaves voice
+- `!simme <rps|guess|trivia>` - Mini games
 
 ### DJ Only (or Admin/Owner)
 - `!pause` - Pause playback

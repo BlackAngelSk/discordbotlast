@@ -42,6 +42,10 @@ const getCommandCategories = (p) => [
         value: '⏸️ Pause | ▶️ Resume | ⏭️ Skip | ⏹️ Stop | 🔉/🔊 Volume'
     },
     {
+        name: '🎯 Mini Games',
+        cmds: ['simme rps', 'simme guess', 'simme trivia']
+    },
+    {
         name: '🛠️ General',
         cmds: ['help', 'ping', 'hello', 'server', 'dashboard']
     }

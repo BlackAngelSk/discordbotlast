@@ -33,6 +33,7 @@ A feature-rich Discord music bot built with discord.js v14 and @discordjs/voice.
 - **Auto-Role** - Automatically assign roles to new members
 - **Custom Prefix** - Set different command prefix per server
 - **Welcome/Leave Messages** - Configurable messages for member join/leave
+- **Simme Mini Games** - Play quick RPS, number-guess, and trivia games
 - **Per-Server Settings** - Each server has independent configuration
 - Server information command
 
@@ -77,6 +78,7 @@ A feature-rich Discord music bot built with discord.js v14 and @discordjs/voice.
 - `!server` - Show server info
 - `!setup` - Setup DJ and Member roles (Admin only)
 - `!leave` - Make bot leave voice channel
+- `!simme <rps|guess|trivia>` - Play mini games (aliases: !minigame, !games)
 
 **Note:** Default prefix is `!` but can be changed per server with `!config prefix`
 
