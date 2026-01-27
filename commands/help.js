@@ -4,23 +4,58 @@ const settingsManager = require('../utils/settingsManager');
 // Command categories - easy to expand
 const getCommandCategories = (p) => [
     {
-        name: '🎵 Music',
+        name: '🎵 Music (Prefix & Slash)',
         cmds: [
             'play <url/query>', 'pause (DJ)', 'resume (DJ)', 'skip (DJ)', 
-            'stop (DJ)', 'volume <0-200> (DJ)', 'nowplaying', 'queue', 
+            'stop (DJ)', 'volume <0-200> (DJ)', 'loop <off|song|queue> (DJ)', 
+            'previous (DJ)', 'jump <pos> (DJ)', 'nowplaying', 'queue', 
             'autoplay', 'lyrics [song]', 'leave'
         ]
     },
     {
-        name: '📋 Queue (DJ)',
+        name: '📋 Queue Management (DJ)',
         cmds: ['clear', 'remove <pos>', 'move <from> <to>', 'swap <pos1> <pos2>', 'shuffle']
     },
     {
-        name: '🛡️ Moderation',
+        name: '🛡️ Moderation (Prefix & Slash)',
         cmds: [
-            'kick @user [reason]', 'ban @user [reason]', 'unban <userId> [reason]',
-            'timeout @user <1m/1h/1d> [reason]', 'untimeout @user',
-            'warn @user <reason>', 'purge <amount>', 'lock', 'unlock'
+            'kick @user [reason]', 'ban @user [reason]', 'unban <userId>',
+            'timeout @user <mins> [reason]', 'untimeout @user',
+            'warn @user <reason>', 'purge <amount>', 'lock', 'unlock',
+            'mute @user <mins> [reason]', 'softban @user [reason]'
+        ]
+    },
+    {
+        name: '⚠️ Warnings & Logs (Slash)',
+        cmds: [
+            'warnings add @user <reason>', 'warnings list @user',
+            'warnings remove @user <id>', 'warnings clear @user', 'modlog #channel'
+        ]
+    },
+    {
+        name: '🤖 Auto-Moderation (Slash)',
+        cmds: [
+            'automod enable/disable', 'automod antiinvite <true|false>',
+            'automod antispam <true|false>', 'automod badwords add/remove/list <word>',
+            'automod settings'
+        ]
+    },
+    {
+        name: '💰 Economy (Slash)',
+        cmds: [
+            'balance [user]', 'daily', 'weekly', 'leaderboard [type]', 'shop'
+        ]
+    },
+    {
+        name: '🎮 Entertainment (Slash)',
+        cmds: [
+            'poll <question> <options>', '8ball <question>', 'meme'
+        ]
+    },
+    {
+        name: '🔧 Utility (Slash)',
+        cmds: [
+            'avatar [user]', 'userinfo [user]', 'roleinfo <role>'
         ]
     },
     {
@@ -43,7 +78,7 @@ const getCommandCategories = (p) => [
     },
     {
         name: '🎯 Mini Games',
-        cmds: ['simme rps', 'simme guess', 'simme trivia']
+        cmds: ['minigame rps', 'minigame guess', 'minigame trivia']
     },
     {
         name: '🛠️ General',
@@ -61,8 +96,8 @@ module.exports = {
 
         const helpEmbed = new EmbedBuilder()
             .setColor('#5865F2')
-            .setTitle('🎵 Music Bot Commands')
-            .setDescription(`Prefix: \`${p}\``)
+            .setTitle('🎵 Discord Bot - Complete Command List')
+            .setDescription(`**Prefix:** \`${p}\`\n**Slash Commands:** Type \`/\` to see all!\n\n**Legend:**\n✨ Slash & Prefix | 🔵 Slash Only | 📌 Prefix Only | (DJ) = DJ Role Required`)
             .setTimestamp();
 
         categories.forEach(cat => {
@@ -71,7 +106,7 @@ module.exports = {
         });
 
         helpEmbed.setFooter({ 
-            text: `DJ requires "${settings.djRole}" role | Use ${p}config for detailed settings` 
+            text: `DJ requires "${settings.djRole}" role | Use ${p}config for settings | Read QUICKSTART.md for setup!` 
         });
 
         await message.channel.send({ embeds: [helpEmbed] });

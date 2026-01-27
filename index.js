@@ -2,7 +2,10 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const CommandHandler = require('./utils/commandHandler');
 const EventHandler = require('./utils/eventHandler');
+const SlashCommandHandler = require('./utils/slashCommandHandler');
 const settingsManager = require('./utils/settingsManager');
+const economyManager = require('./utils/economyManager');
+const moderationManager = require('./utils/moderationManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -20,16 +23,24 @@ const client = new Client({
 // Initialize handlers
 const commandHandler = new CommandHandler(client);
 const eventHandler = new EventHandler(client);
+const slashCommandHandler = new SlashCommandHandler(client);
 
 // Load all commands and events
 async function loadHandlers() {
     try {
-        // Initialize settings manager first
+        // Initialize managers first
         await settingsManager.init();
         console.log('✅ Settings manager initialized!');
         
+        await economyManager.init();
+        console.log('✅ Economy manager initialized!');
+        
+        await moderationManager.init();
+        console.log('✅ Moderation manager initialized!');
+        
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();
+        await slashCommandHandler.loadSlashCommands();
         console.log('✅ All handlers loaded successfully!');
     } catch (error) {
         console.error('❌ Error loading handlers:', error);
@@ -44,11 +55,21 @@ loadHandlers().then(() => {
         await commandHandler.handleCommand(message);
     });
 
+    // Handle slash commands
+    client.on(Events.InteractionCreate, async (interaction) => {
+        await slashCommandHandler.handleInteraction(interaction);
+    });
+
     // Login to Discord with your bot token
     client.login(process.env.DISCORD_TOKEN);
 
-    // Start dashboard when bot is ready
-    client.once(Events.ClientReady, () => {
+    // Start dashboard and register slash commands when bot is ready
+    client.once(Events.ClientReady, async () => {
+        console.log(`✅ Bot is ready! Logged in as ${client.user.tag}`);
+        
+        // Register slash commands
+        await slashCommandHandler.registerCommands();
+        
         if (process.env.DASHBOARD_ENABLED === 'true') {
             const dashboard = new Dashboard(client);
             dashboard.start();

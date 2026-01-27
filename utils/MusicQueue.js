@@ -14,6 +14,9 @@ class MusicQueue {
         this.volume = 0.5; // Default volume 50%
         this.currentResource = null;
         this.autoplay = false; // Autoplay feature
+        this.loop = 'off'; // 'off', 'song', or 'queue'
+        this.previousSongs = []; // Track song history
+        this.filters = {}; // Audio filters
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             this.playNext();
@@ -62,6 +65,28 @@ class MusicQueue {
     }
 
     async playNext() {
+        // Handle loop modes
+        if (this.loop === 'song' && this.currentSong) {
+            // Loop the current song
+            const songToLoop = { ...this.currentSong };
+            this.playSong(songToLoop);
+            return;
+        }
+
+        if (this.loop === 'queue' && this.currentSong) {
+            // Add current song to end of queue
+            this.songs.push({ ...this.currentSong });
+        }
+
+        // Save current song to history
+        if (this.currentSong) {
+            this.previousSongs.push({ ...this.currentSong });
+            // Keep only last 10 songs
+            if (this.previousSongs.length > 10) {
+                this.previousSongs.shift();
+            }
+        }
+
         if (this.songs.length === 0) {
             // Try autoplay if enabled
             if (this.autoplay && this.currentSong) {
@@ -97,13 +122,17 @@ class MusicQueue {
         }
 
         this.currentSong = this.songs.shift();
+        await this.playSong(this.currentSong);
+    }
+
+    async playSong(song) {
         this.isPlaying = true;
 
-        console.log('Playing song:', this.currentSong);
+        console.log('Playing song:', song);
 
         try {
-            if (!this.currentSong || !this.currentSong.url) {
-                console.error('❌ Invalid song URL, currentSong:', this.currentSong);
+            if (!song || !song.url) {
+                console.error('❌ Invalid song URL, song:', song);
                 this.playNext();
                 return;
             }
@@ -112,7 +141,7 @@ class MusicQueue {
             const { createAudioResource } = require('@discordjs/voice');
 
             // Get stream URL from yt-dlp
-            const info = await youtubedl(this.currentSong.url, {
+            const info = await youtubedl(song.url, {
                 dumpSingleJson: true,
                 noWarnings: true,
                 noCheckCertificate: true,
@@ -141,6 +170,45 @@ class MusicQueue {
             console.error('❌ Error playing song:', error);
             this.playNext();
         }
+    }
+
+    playPrevious() {
+        if (this.previousSongs.length === 0) {
+            return false;
+        }
+
+        const previousSong = this.previousSongs.pop();
+        // Add current song back to front of queue if it exists
+        if (this.currentSong) {
+            this.songs.unshift(this.currentSong);
+        }
+        
+        this.player.stop();
+        // Manually set current song and play
+        this.currentSong = null;
+        this.songs.unshift(previousSong);
+        return true;
+    }
+
+    setLoop(mode) {
+        const validModes = ['off', 'song', 'queue'];
+        if (!validModes.includes(mode)) {
+            return false;
+        }
+        this.loop = mode;
+        return true;
+    }
+
+    jump(position) {
+        if (position < 1 || position > this.songs.length) {
+            return false;
+        }
+
+        // Remove all songs before the position
+        const skipped = position - 1;
+        this.songs.splice(0, skipped);
+        this.player.stop();
+        return true;
     }
 
     stop() {

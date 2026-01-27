@@ -1,0 +1,85 @@
+const { REST, Routes, Collection, MessageFlags } = require('discord.js');
+const fs = require('fs').promises;
+const path = require('path');
+
+class SlashCommandHandler {
+    constructor(client) {
+        this.client = client;
+        this.commands = new Collection();
+    }
+
+    async loadSlashCommands() {
+        const slashCommandsPath = path.join(__dirname, '..', 'slashCommands');
+        
+        try {
+            const commandFiles = await fs.readdir(slashCommandsPath);
+            const jsFiles = commandFiles.filter(file => file.endsWith('.js'));
+
+            for (const file of jsFiles) {
+                const filePath = path.join(slashCommandsPath, file);
+                const command = require(filePath);
+                
+                if ('data' in command && 'execute' in command) {
+                    this.commands.set(command.data.name, command);
+                    console.log(`✅ Loaded slash command: ${command.data.name}`);
+                } else {
+                    console.log(`⚠️ [WARNING] The slash command at ${file} is missing required "data" or "execute" property.`);
+                }
+            }
+            
+            console.log(`✅ Loaded ${this.commands.size} slash commands!`);
+        } catch (error) {
+            console.error('Error loading slash commands:', error);
+        }
+    }
+
+    async registerCommands() {
+        const commands = [];
+        this.commands.forEach(command => {
+            commands.push(command.data.toJSON());
+        });
+
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+        try {
+            console.log(`🔄 Started refreshing ${commands.length} application (/) commands.`);
+
+            // Register commands globally
+            const data = await rest.put(
+                Routes.applicationCommands(this.client.user.id),
+                { body: commands }
+            );
+
+            console.log(`✅ Successfully reloaded ${data.length} application (/) commands.`);
+        } catch (error) {
+            console.error('Error registering slash commands:', error);
+        }
+    }
+
+    async handleInteraction(interaction) {
+        if (!interaction.isChatInputCommand()) return;
+
+        const command = this.commands.get(interaction.commandName);
+
+        if (!command) {
+            console.error(`No command matching ${interaction.commandName} was found.`);
+            return;
+        }
+
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(`Error executing ${interaction.commandName}:`, error);
+            
+            const errorMessage = { content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral };
+            
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(errorMessage);
+            } else {
+                await interaction.reply(errorMessage);
+            }
+        }
+    }
+}
+
+module.exports = SlashCommandHandler;
