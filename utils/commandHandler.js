@@ -10,26 +10,38 @@ class CommandHandler {
 
     async loadCommands() {
         const commandsPath = path.join(__dirname, '../commands');
-        const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-        for (const file of commandFiles) {
-            const filePath = path.join(commandsPath, file);
-            const command = require(filePath);
+        
+        // Recursively load commands from all subdirectories
+        const loadCommandsRecursive = (dir) => {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
             
-            if ('name' in command && 'execute' in command) {
-                this.commands.set(command.name, command);
-                console.log(`✅ Loaded command: ${command.name}`);
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
                 
-                // Load aliases if they exist
-                if (command.aliases) {
-                    for (const alias of command.aliases) {
-                        this.commands.set(alias, command);
+                if (entry.isDirectory()) {
+                    // Recursively load from subdirectories
+                    loadCommandsRecursive(fullPath);
+                } else if (entry.name.endsWith('.js')) {
+                    const command = require(fullPath);
+                    
+                    if ('name' in command && 'execute' in command) {
+                        this.commands.set(command.name, command);
+                        console.log(`✅ Loaded command: ${command.name}`);
+                        
+                        // Load aliases if they exist
+                        if (command.aliases) {
+                            for (const alias of command.aliases) {
+                                this.commands.set(alias, command);
+                            }
+                        }
+                    } else {
+                        console.warn(`⚠️ Command at ${fullPath} is missing required "name" or "execute" property.`);
                     }
                 }
-            } else {
-                console.warn(`⚠️ Command at ${filePath} is missing required "name" or "execute" property.`);
             }
-        }
+        };
+        
+        loadCommandsRecursive(commandsPath);
     }
 
     async handleCommand(message) {

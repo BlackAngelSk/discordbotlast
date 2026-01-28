@@ -12,21 +12,30 @@ class SlashCommandHandler {
         const slashCommandsPath = path.join(__dirname, '..', 'slashCommands');
         
         try {
-            const commandFiles = await fs.readdir(slashCommandsPath);
-            const jsFiles = commandFiles.filter(file => file.endsWith('.js'));
-
-            for (const file of jsFiles) {
-                const filePath = path.join(slashCommandsPath, file);
-                const command = require(filePath);
+            // Recursively load slash commands from all subdirectories
+            const loadCommandsRecursive = async (dir) => {
+                const entries = await fs.readdir(dir, { withFileTypes: true });
                 
-                if ('data' in command && 'execute' in command) {
-                    this.commands.set(command.data.name, command);
-                    console.log(`✅ Loaded slash command: ${command.data.name}`);
-                } else {
-                    console.log(`⚠️ [WARNING] The slash command at ${file} is missing required "data" or "execute" property.`);
+                for (const entry of entries) {
+                    const fullPath = path.join(dir, entry.name);
+                    
+                    if (entry.isDirectory()) {
+                        // Recursively load from subdirectories
+                        await loadCommandsRecursive(fullPath);
+                    } else if (entry.name.endsWith('.js')) {
+                        const command = require(fullPath);
+                        
+                        if ('data' in command && 'execute' in command) {
+                            this.commands.set(command.data.name, command);
+                            console.log(`✅ Loaded slash command: ${command.data.name}`);
+                        } else {
+                            console.log(`⚠️ [WARNING] The slash command at ${entry.name} is missing required "data" or "execute" property.`);
+                        }
+                    }
                 }
-            }
+            };
             
+            await loadCommandsRecursive(slashCommandsPath);
             console.log(`✅ Loaded ${this.commands.size} slash commands!`);
         } catch (error) {
             console.error('Error loading slash commands:', error);
