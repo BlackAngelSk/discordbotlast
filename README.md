@@ -1,18 +1,26 @@
-# Discord Bot - Feature-Complete Edition
+# Discord Bot - Ultimate Edition
 
-A **feature-rich** Discord bot built with discord.js v14, featuring slash commands, advanced music playback, moderation tools, economy system, and much more!
+A **comprehensive** Discord bot built with discord.js v14, featuring slash commands, advanced music playback, moderation tools, economy system, mini games with statistics, and much more!
 
 ## 🌟 Highlights
 
 ### ⚡ Modern Interface
 - **Slash Commands (/)** - Modern Discord command interface
-- **Prefix Commands (!)** - Classic command support
-- **Interactive Menus** - Button and select menu interactions
+- **Prefix Commands (!)** - Classic command support with custom prefixes
+- **Interactive Menus** - Button-based games and controls
 
 ### 🎵 Advanced Music System
-- Multi-platform support (YouTube, Spotify, SoundCloud)
+- Multi-platform support (YouTube)
+- High-quality FFmpeg audio streaming
 - Loop modes (song/queue), previous track, jump to position
 - Queue management, autoplay, lyrics, and more
+- Reaction-based controls for easy playback management
+
+### 🎮 Mini Games & Statistics
+- **6 Interactive Games**: Rock Paper Scissors, Number Guessing, Trivia, Tic-Tac-Toe, Blackjack, Roulette
+- **Statistics Tracking**: Win/loss records with win rates
+- **Casino-Style Blackjack**: Accurate dealer rules with natural blackjack
+- **Full Roulette**: Red/Black/Green/Odd/Even/High/Low/Number betting with 35:1 payouts
 
 ### 🛡️ Complete Moderation Suite
 - Warnings system, mod logs, auto-moderation
@@ -24,25 +32,49 @@ A **feature-rich** Discord bot built with discord.js v14, featuring slash comman
 - Daily/weekly rewards, leaderboards
 - Virtual shop with purchasable items
 
-### 🎮 Entertainment & Utility
+### 🎯 Entertainment & Utility
 - Polls, 8-ball, memes from Reddit
-- User/role info, avatars, and more
+- User/role info, avatars, server statistics
+- Web-based dashboard for server management
 
 ---
 
-## Features
+## ✨ Features
+
+### 🎮 Mini Games System
+
+**Available Games:**
+1. **Rock Paper Scissors** - Classic RPS with button controls
+2. **Number Guessing** - Guess a number between 1-100 in 6 tries
+3. **Trivia** - 16 questions across Bot/General/Gaming/Music categories
+4. **Tic-Tac-Toe** - Strategic 3x3 grid game with AI opponent
+5. **Blackjack** - Casino-accurate 21 with dealer AI
+   - Dealer hits on 16 or less, stands on 17+
+   - Natural blackjack detection
+   - Player avatar display
+6. **Roulette** - Full casino roulette with 37 numbers (0-36)
+   - Bet types: Red, Black, Green (0), Odd, Even, High, Low, Specific Number
+   - Payouts: 2:1 (colors/odd/even/high/low), 35:1 (number/green)
+
+**Statistics Tracking:**
+- Track wins, losses, and ties for Blackjack and Roulette
+- View your win rate percentage
+- Check other players' stats with `@mentions`
+
+**Commands:**
+- `!minigames` or `!minigame` - Open game selection menu
+- `!gamestats [@user]` - View game statistics
 
 ### 🎵 Music Playback
 - Play music from **YouTube** (URLs and search queries)
-- **Spotify Support** - Play tracks from Spotify
-- **SoundCloud Support** - Full SoundCloud integration
 - **YouTube Playlist Support** - Add entire playlists at once
-- High-quality audio streaming
+- High-quality audio streaming via FFmpeg with Opus encoding
+- Direct yt-dlp to FFmpeg pipeline (no URL expiration issues)
 - Queue management system
-- Auto-disconnect after inactivity
+- Auto-disconnect after 15 seconds of inactivity
 - **Autoplay Mode** - Automatically play related songs
 - **Loop/Repeat** - Loop current song or entire queue
-- **Previous Track** - Go back to previous songs
+- **Previous Track** - Go back through last 10 played songs
 - **Jump Command** - Skip to specific position in queue
 
 ### 🎮 Playback Controls
@@ -113,7 +145,7 @@ A **feature-rich** Discord bot built with discord.js v14, featuring slash comman
 ### 🎵 Music Commands (Slash & Prefix)
 
 **Slash Commands:**
-- `/play <query>` - Play from YouTube/Spotify/SoundCloud or search
+- `/play <query>` - Play from YouTube or search
 - `/pause` - Pause playback (DJ only)
 - `/resume` - Resume playback (DJ only)
 - `/skip` - Skip current song (DJ only)
@@ -163,10 +195,12 @@ A **feature-rich** Discord bot built with discord.js v14, featuring slash comman
 - `/leaderboard [type]` - View rankings (balance/level/xp)
 - `/shop` - Open shop and buy items
 
-### 🎮 Entertainment Commands (Slash)
+### 🎮 Entertainment Commands (Slash & Prefix)
 - `/poll <question> <options>` - Create poll (separate options with |)
 - `/8ball <question>` - Ask magic 8-ball
 - `/meme` - Get random meme from Reddit
+- `!minigames` or `!minigame` - Play interactive mini games
+- `!gamestats [@user]` - View game win/loss statistics
 
 ### 🔧 Utility Commands (Slash)
 - `/avatar [user]` - Show user avatar
@@ -205,7 +239,6 @@ A **feature-rich** Discord bot built with discord.js v14, featuring slash comman
 - `!server` - Show server info
 - `!setup` - Setup DJ and Member roles (Admin only)
 - `!leave` - Make bot leave voice channel
-- `!minigame <rps|guess|trivia>` - Play mini games
 - `!dashboard` - Get dashboard link
 
 ---
@@ -213,54 +246,103 @@ A **feature-rich** Discord bot built with discord.js v14, featuring slash comman
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 16.9.0 or higher
-- Discord Bot Token
-- FFmpeg installed
+- **Node.js** 20.16.0 or higher
+- **Discord Bot Token**
+- **@distube/yt-dlp** (automatically installed)
+- **FFmpeg** (via ffmpeg-static package)
 
 ### Installation
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone <your-repo-url>
 cd discordbotlast
 ```
 
-2. Install dependencies:
+2. **Install dependencies:**
 ```bash
 npm install
 ```
 
-3. Create `.env` file:
+3. **Create `.env` file:**
 ```env
 DISCORD_TOKEN=your_bot_token_here
 DASHBOARD_ENABLED=false
+CLIENT_ID=your_bot_client_id
+CLIENT_SECRET=your_bot_client_secret
 ```
 
-4. Start the bot:
+4. **Start the bot:**
 ```bash
 npm start
 ```
 
 ### First-Time Setup
 
-1. Invite bot to your server with proper permissions
-2. Run `/setup` or `!setup` to create DJ and Member roles
-3. Configure auto-moderation: `/automod enable`
-4. Set mod log channel: `/modlog #channel`
-5. Customize settings with `!config`
+1. **Invite bot to your server** with proper permissions (Administrator recommended)
+2. **Run** `/setup` or `!setup` to create DJ and Member roles
+3. **Configure auto-moderation:** `/automod enable`
+4. **Set mod log channel:** `/modlog #channel`
+5. **Customize settings** with `!config` commands
+6. **Try the mini games:** `!minigames`
 
 ---
 
 ## 🎯 Key Systems
 
-### DJ Role System
+### Mini Games System
 
-Commands marked as "DJ only" require one of:
-- **DJ role** (created with `/setup` or `!setup`)
-- **Administrator** permission
-- **Being alone** in voice channel with the bot
+**How It Works:**
+- Use `!minigames` to open the game selection menu
+- Click buttons to choose a game
+- Play against the bot or AI opponents
+- Wins, losses, and ties are automatically tracked
+- View your statistics with `!gamestats`
 
-The DJ system prevents users from disrupting music playback while allowing control when alone with the bot.
+**Game Details:**
+
+**Blackjack (21):**
+- Casino-accurate dealer rules
+- Dealer hits on 16 or less, stands on 17+
+- Natural blackjack (Ace + 10/face) pays 3:2
+- Your avatar displayed in game embed
+- Hit or Stand buttons for gameplay
+
+**Roulette:**
+- Full 37-number wheel (0-36)
+- Multiple bet types available
+- Payouts:
+  - Red/Black/Odd/Even/High/Low: 2:1
+  - Specific Number: 35:1
+  - Green (0): 35:1
+
+**Trivia:**
+- 16 questions across 4 categories
+- Bot/Discord, General Knowledge, Gaming, Music
+- Multiple choice format
+
+**Tic-Tac-Toe:**
+- Strategic 3x3 grid gameplay
+- AI opponent that tries to win
+- Button-based moves
+
+### Music System
+
+**How It Works:**
+1. Join a voice channel
+2. Use `!play <song name>` or `/play <song name>`
+3. Bot joins and starts streaming via yt-dlp → FFmpeg → Discord
+4. Control playback with commands or reaction emojis
+5. Bot auto-disconnects after 15 seconds when queue is empty
+
+**Technical Details:**
+- Uses `@distube/yt-dlp` for YouTube downloading
+- FFmpeg processes audio stream with Opus encoding
+- Direct pipeline prevents URL expiration issues
+- Supports YouTube video URLs, playlist URLs, and search queries
+
+**DJ Permissions:**
+Commands require DJ role, Administrator permission, or being alone with bot in voice channel
 
 ### Economy & Leveling
 
@@ -294,26 +376,11 @@ The DJ system prevents users from disrupting music playback while allowing contr
 **Setup:**
 1. `/automod enable`
 2. `/automod antiinvite true`
-3. `/automod badwords add <word>`
-4. `/modlog #mod-logs`
+3. `/automod antispam true`
+4. `/automod badwords add <word>`
+5. `/modlog #mod-logs`
 
 All violations are auto-deleted with temporary warning messages and logged to mod log channel.
-
-### Music Features
-
-**Loop Modes:**
-- `off` - Normal playback
-- `song` - Repeat current song
-- `queue` - Loop entire queue
-
-**Previous Track:**
-- Keeps history of last 10 songs
-- Use `/previous` or `!previous` to go back
-
-**Multi-Platform Support:**
-- YouTube videos and playlists
-- Spotify tracks (converts to YouTube search)
-- SoundCloud tracks and playlists
 
 ---
 
@@ -321,73 +388,65 @@ All violations are auto-deleted with temporary warning messages and logged to mo
 
 ```
 discordbotlast/
-├── slashCommands/        # Slash command files
-│   ├── play.js          # Music playback
-│   ├── loop.js          # Loop control
-│   ├── previous.js      # Previous track
-│   ├── jump.js          # Jump to position
-│   ├── slowmode.js      # Channel slowmode
-│   ├── mute.js          # Member timeout
-│   ├── softban.js       # Softban command
-│   ├── warnings.js      # Warnings system
-│   ├── modlog.js        # Mod log config
-│   ├── automod.js       # Auto-mod config
-│   ├── balance.js       # Economy balance
-│   ├── daily.js         # Daily rewards
-│   ├── weekly.js        # Weekly rewards
-│   ├── leaderboard.js   # Server rankings
-│   ├── shop.js          # Virtual shop
-│   ├── poll.js          # Poll creation
-│   ├── 8ball.js         # Magic 8-ball
-│   ├── meme.js          # Meme generator
-│   ├── avatar.js        # User avatars
-│   ├── userinfo.js      # User information
-│   └── roleinfo.js      # Role information
-├── commands/            # Prefix command files
-│   ├── play.js         # Music playback
-│   ├── pause.js        # Pause music
-│   ├── resume.js       # Resume music
-│   ├── skip.js         # Skip song
-│   ├── stop.js         # Stop music
-│   ├── volume.js       # Volume control
-│   ├── queue.js        # View queue
-│   ├── loop.js         # Loop control
-│   ├── previous.js     # Previous track
-│   ├── jump.js         # Jump to position
-│   ├── clear.js        # Clear queue
-│   ├── remove.js       # Remove from queue
-│   ├── move.js         # Move in queue
-│   ├── swap.js         # Swap in queue
-│   ├── shuffle.js      # Shuffle queue
-│   ├── lyrics.js       # Song lyrics
-│   ├── autoplay.js     # Autoplay toggle
-│   ├── nowplaying.js   # Now playing info
-│   ├── ban.js          # Ban members
-│   ├── unban.js        # Unban members
-│   ├── kick.js         # Kick members
-│   ├── timeout.js      # Timeout members
-│   ├── untimeout.js    # Remove timeout
-│   ├── warn.js         # Warn members
-│   ├── purge.js        # Delete messages
-│   ├── lock.js         # Lock channels
-│   ├── unlock.js       # Unlock channels
-│   ├── config.js       # Server config
-│   ├── setup.js        # Initial setup
-│   ├── help.js         # Help command
-│   ├── ping.js         # Latency check
-│   ├── server.js       # Server info
-│   ├── minigame.js     # Mini games
-│   └── dashboard.js    # Dashboard link
+├── commands/fun/          # Entertainment commands
+│   ├── minigame.js       # 6 interactive mini games
+│   ├── gamestats.js      # Game statistics display
+│   └── hello.js          # Greeting command
+├── commands/music/        # Music playback commands
+│   ├── play.js           # Play music
+│   ├── pause.js          # Pause playback
+│   ├── resume.js         # Resume playback
+│   ├── skip.js           # Skip song
+│   ├── stop.js           # Stop playback
+│   ├── volume.js         # Volume control
+│   ├── queue.js          # View queue
+│   ├── nowplaying.js     # Current song info
+│   ├── lyrics.js         # Song lyrics
+│   ├── autoplay.js       # Autoplay toggle
+│   ├── loop.js           # Loop modes
+│   ├── previous.js       # Previous track
+│   ├── jump.js           # Jump in queue
+│   ├── clear.js          # Clear queue
+│   ├── remove.js         # Remove from queue
+│   ├── move.js           # Move in queue
+│   ├── swap.js           # Swap songs
+│   └── shuffle.js        # Shuffle queue
+├── commands/moderation/   # Moderation commands
+│   ├── ban.js            # Ban members
+│   ├── unban.js          # Unban members
+│   ├── kick.js           # Kick members
+│   ├── timeout.js        # Timeout members
+│   ├── untimeout.js      # Remove timeout
+│   ├── warn.js           # Warn members
+│   ├── purge.js          # Delete messages
+│   ├── lock.js           # Lock channels
+│   ├── unlock.js         # Unlock channels
+│   └── clear.js          # Clear messages
+├── commands/utility/      # Utility commands
+│   ├── config.js         # Server configuration
+│   ├── setup.js          # Initial bot setup
+│   ├── help.js           # Command list
+│   ├── ping.js           # Latency check
+│   ├── server.js         # Server info
+│   ├── leave.js          # Leave voice
+│   └── dashboard.js      # Dashboard link
+├── slashCommands/         # Slash command files
+│   ├── music/            # Music slash commands
+│   ├── moderation/       # Moderation slash commands
+│   ├── economy/          # Economy slash commands
+│   ├── fun/              # Entertainment slash commands
+│   └── utility/          # Utility slash commands
 ├── utils/
 │   ├── commandHandler.js        # Prefix command handler
 │   ├── slashCommandHandler.js   # Slash command handler
 │   ├── eventHandler.js          # Event loader
-│   ├── MusicQueue.js           # Enhanced music queue
+│   ├── MusicQueue.js           # Music queue with FFmpeg streaming
 │   ├── economyManager.js       # Economy & XP system
 │   ├── moderationManager.js    # Warnings & auto-mod
 │   ├── settingsManager.js      # Server settings
-│   ├── permissions.js          # DJ permissions
-│   ├── queues.js               # Queue storage
+│   ├── gameStatsManager.js     # Mini game statistics
+│   ├── permissions.js          # DJ permissions checker
+│   ├── queues.js               # Queue storage Map
 │   └── helpers.js              # Utility functions
 ├── events/
 │   ├── ready.js              # Bot ready event
@@ -399,17 +458,21 @@ discordbotlast/
 ├── data/
 │   ├── settings.json         # Server settings
 │   ├── economy.json          # Economy & XP data
-│   └── moderation.json       # Warnings & auto-mod
+│   ├── moderation.json       # Warnings & auto-mod
+│   └── gameStats.json        # Mini game statistics
 ├── dashboard/               # Web dashboard (optional)
-│   ├── server.js
+│   ├── server.js           # Express server
 │   ├── public/
+│   │   └── style.css
 │   └── views/
+│       ├── index.ejs
+│       ├── dashboard.ejs
+│       └── server.ejs
 ├── index.js                # Main bot file
 ├── package.json            # Dependencies
 ├── .env                    # Environment variables
 ├── README.md              # This file
 ├── FEATURES.md            # Feature documentation
-├── NEW_FEATURES.md        # New features guide
 ├── CONFIG_GUIDE.md        # Configuration guide
 └── DASHBOARD_GUIDE.md     # Dashboard guide
 ```
@@ -418,7 +481,6 @@ discordbotlast/
 
 ## 📚 Documentation
 
-- **[NEW_FEATURES.md](NEW_FEATURES.md)** - Complete guide to all new features
 - **[FEATURES.md](FEATURES.md)** - Detailed feature documentation
 - **[CONFIG_GUIDE.md](CONFIG_GUIDE.md)** - Configuration guide
 - **[DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md)** - Dashboard setup
@@ -429,7 +491,7 @@ discordbotlast/
 
 ### Server Settings
 Use `!config` to view and modify server-specific settings:
-- Command prefix
+- Command prefix (default: `!`)
 - Welcome/leave messages and channels
 - Auto-role for new members
 - DJ role name
@@ -453,42 +515,6 @@ this.data.shops[guildId] = [
 
 ---
 
-## 🎨 Customization
-
-### Auto-Role System
-
-New members automatically receive a role when joining. Customize in `events/guildMemberAdd.js`:
-- `DEFAULT_ROLE_NAME` - The role name to assign
-- `WELCOME_CHANNEL_NAME` - Channel for welcome messages
-
-### XP & Economy Rates
-
-Modify XP gains and rewards in `events/messageCreate.js`:
-```javascript
-const xpGain = Math.floor(Math.random() * 11) + 5; // 5-15 XP
-const reward = result.level * 100; // Level up reward
-```
-
-Modify daily/weekly rewards in `utils/economyManager.js`:
-```javascript
-const amount = 1000; // Daily reward
-const amount = 5000; // Weekly reward
-```
-
----
-
-## 🎮 Reaction Controls
-
-When a song plays, the bot adds emoji reactions for quick controls:
-- ⏸️ **Pause** - Pause playback
-- ▶️ **Resume** - Resume playback
-- ⏭️ **Skip** - Skip to next song
-- ⏹️ **Stop** - Stop and clear queue
-- 🔉 **Volume Down** - Decrease volume by 10%
-- 🔊 **Volume Up** - Increase volume by 10%
-
----
-
 ## 🛠️ Troubleshooting
 
 ### Common Issues:
@@ -503,9 +529,20 @@ When a song plays, the bot adds emoji reactions for quick controls:
 - Check bot has Applications.Commands scope
 
 **Music not playing:**
-- Verify FFmpeg is installed
+- Ensure `@distube/yt-dlp` is installed: `npm install @distube/yt-dlp`
 - Check voice channel permissions (Connect, Speak)
-- Ensure yt-dlp/youtube-dl-exec is working
+- Verify FFmpeg is available (installed via ffmpeg-static)
+- Bot logs show "yt-dlp binary path" - should not be undefined
+
+**Mini games not responding:**
+- Check bot has Send Messages and Add Reactions permissions
+- Ensure Message Content Intent is enabled
+- Try different game modes if one fails
+
+**Statistics not saving:**
+- Check write permissions for `data/` folder
+- Verify `gameStats.json` exists and is writable
+- Check console for JSON save errors
 
 **Auto-role not working:**
 - Enable Server Members Intent
@@ -520,8 +557,7 @@ When a song plays, the bot adds emoji reactions for quick controls:
 
 ## 📋 Requirements
 
-- **Node.js** 16.9.0 or higher
-- **FFmpeg** installed on system
+- **Node.js** 20.16.0 or higher (v22.12.0+ recommended)
 - **Discord Bot** with required intents:
   - Server Members Intent
   - Message Content Intent
@@ -533,18 +569,24 @@ When a song plays, the bot adds emoji reactions for quick controls:
 
 ## 📦 Dependencies
 
-- discord.js v14
-- @discordjs/voice
-- @discordjs/opus
-- youtube-dl-exec
-- ytsr
-- ytdl-core (optional)
-- ffmpeg-static
-- dotenv
-- express (dashboard)
-- ejs (dashboard)
-- passport-discord (dashboard)
-- undici (for web requests)
+**Core:**
+- `discord.js` ^14.14.1 - Discord API wrapper
+- `@discordjs/voice` ^0.19.0 - Voice connection handling
+- `@discordjs/opus` ^0.10.0 - Opus audio codec
+- `dotenv` ^16.3.1 - Environment variable loading
+
+**Music System:**
+- `@distube/yt-dlp` ^5.2.3 - YouTube downloader binary
+- `youtube-dl-exec` ^3.0.29 - yt-dlp wrapper for Node.js
+- `ffmpeg-static` ^5.3.0 - FFmpeg binary for audio processing
+
+**Web & Utilities:**
+- `express` ^5.2.1 - Web dashboard server
+- `ejs` ^4.0.1 - Template engine
+- `express-session` ^1.18.2 - Session management
+- `passport` ^0.7.0 - Authentication
+- `passport-discord` ^0.1.4 - Discord OAuth2
+- `undici` ^7.18.2 - HTTP client
 
 ---
 
@@ -562,10 +604,12 @@ ISC License
 
 ## ⭐ Features at a Glance
 
-✅ **40+ Commands** (prefix + slash)  
-✅ **Multi-Platform Music** (YouTube, Spotify, SoundCloud)  
+✅ **45+ Commands** (prefix + slash)  
+✅ **YouTube Music Streaming** (FFmpeg + yt-dlp pipeline)  
+✅ **6 Interactive Mini Games** (RPS, Guess, Trivia, Tic-Tac-Toe, Blackjack, Roulette)  
+✅ **Game Statistics Tracking** (wins/losses/ties with win rates)  
 ✅ **Loop & Repeat** (song/queue modes)  
-✅ **Previous Track** with history  
+✅ **Previous Track** with 10-song history  
 ✅ **Jump Command** for queue navigation  
 ✅ **Complete Moderation Suite**  
 ✅ **Auto-Moderation** (spam, invites, bad words)  
@@ -587,24 +631,39 @@ ISC License
 
 ---
 
-## 🎉 What's New
+## 🎉 Recent Updates
 
-See **[NEW_FEATURES.md](NEW_FEATURES.md)** for a complete guide to all new features added in this massive update!
+**Music System Overhaul:**
+- Implemented direct yt-dlp → FFmpeg → Discord pipeline
+- Added @distube/yt-dlp for reliable binary handling
+- FFmpeg Opus encoding for optimal Discord audio quality
+- Fixed URL expiration issues with streaming approach
+- Enhanced error logging and debugging
 
-**Major additions:**
-- ✨ Slash commands for all features
-- 🎵 Enhanced music (loop, previous, jump, multi-platform)
-- 🛡️ Complete moderation suite with auto-mod
-- 💰 Full economy & leveling system
-- 🎮 Entertainment commands
-- 🔧 Utility commands
+**Mini Games Addition:**
+- 6 fully interactive button-based games
+- Persistent statistics tracking system
+- Casino-accurate Blackjack with proper dealer AI
+- Full Roulette with 37 numbers and multiple bet types
+- Player avatar display in Blackjack
+- Win rate calculations and leaderboard-ready stats
+
+**System Improvements:**
+- Fixed all module path errors across 45+ files
+- Added DM protection to command handler
+- Enhanced interaction timeout handling
+- Improved error recovery and logging
+- Better voice connection management
 
 ---
 
 **Made with ❤️ using discord.js v14**
-- **DJ commands fail**: Run `!setup` to create DJ role or be alone with bot in voice
 
-## License
+## 📄 License
 
-ISC
+ISC License
+
+---
+
+**Need Help?** Join our support server or check the documentation files!
 

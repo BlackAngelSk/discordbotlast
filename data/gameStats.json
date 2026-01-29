@@ -1,0 +1,46 @@
+{
+  "396685113804587009": {
+    "blackjack": {
+      "wins": 1,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 1
+    }
+  },
+  "195140009748201472": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 1
+    }
+  },
+  "534769701297979392": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 1,
+      "losses": 0
+    }
+  },
+  "349649557896036354": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 2,
+      "ties": 1
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    }
+  }
+}

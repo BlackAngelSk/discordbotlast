@@ -6,6 +6,7 @@ const path = require('path');
 require('dotenv').config();
 
 const settingsManager = require('../utils/settingsManager');
+const moderationManager = require('../utils/moderationManager');
 
 class Dashboard {
     constructor(client) {
@@ -100,11 +101,13 @@ class Dashboard {
         this.app.get('/dashboard/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
             const guild = this.client.guilds.cache.get(req.params.guildId);
             const settings = settingsManager.get(req.params.guildId);
+            const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
             
             res.render('server', {
                 user: req.user,
                 guild: guild,
                 settings: settings,
+                modSettings: modSettings,
                 roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
                 channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
             });
@@ -134,7 +137,21 @@ class Dashboard {
 
                 settingsManager.save();
 
-                res.json({ success: true, settings });
+                // Handle auto-moderation settings
+                const modSettings = moderationManager.getAutomodSettings(guildId);
+                
+                // Update auto-mod settings
+                if (updates.autoModEnabled !== undefined) modSettings.enabled = updates.autoModEnabled;
+                if (updates.antiSpam !== undefined) modSettings.antiSpam = updates.antiSpam;
+                if (updates.antiInvite !== undefined) modSettings.antiInvite = updates.antiInvite;
+                if (updates.maxMentions !== undefined) modSettings.maxMentions = updates.maxMentions;
+                if (updates.maxEmojis !== undefined) modSettings.maxEmojis = updates.maxEmojis;
+                if (updates.modLogChannel !== undefined) modSettings.modLogChannel = updates.modLogChannel;
+                if (updates.badWords !== undefined) modSettings.badWords = updates.badWords;
+
+                moderationManager.save();
+
+                res.json({ success: true, settings, modSettings });
             } catch (error) {
                 console.error('Error updating settings:', error);
                 res.status(500).json({ success: false, error: error.message });

@@ -19,6 +19,7 @@ class MusicQueue {
         this.filters = {}; // Audio filters
 
         this.player.on(AudioPlayerStatus.Idle, () => {
+            console.log('🔄 Player entered Idle state');
             this.playNext();
         });
 
@@ -26,10 +27,18 @@ class MusicQueue {
             console.error('❌ Audio player error:', error);
             this.playNext();
         });
+
+        this.player.on(AudioPlayerStatus.Playing, () => {
+            console.log('▶️ Player is now playing');
+        });
     }
 
     async setupConnection(connection) {
         this.connection = connection;
+        
+        // Subscribe the connection to the player immediately
+        this.connection.subscribe(this.player);
+        
         this.connection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
                 try {
@@ -65,9 +74,12 @@ class MusicQueue {
     }
 
     async playNext() {
+        console.log(`🔄 playNext called - Loop: ${this.loop}, Songs in queue: ${this.songs.length}`);
+        
         // Handle loop modes
         if (this.loop === 'song' && this.currentSong) {
             // Loop the current song
+            console.log('🔁 Looping current song');
             const songToLoop = { ...this.currentSong };
             this.playSong(songToLoop);
             return;
@@ -75,6 +87,7 @@ class MusicQueue {
 
         if (this.loop === 'queue' && this.currentSong) {
             // Add current song to end of queue
+            console.log('🔁 Adding song to end of queue');
             this.songs.push({ ...this.currentSong });
         }
 
@@ -88,8 +101,11 @@ class MusicQueue {
         }
 
         if (this.songs.length === 0) {
+            console.log('⏹️ No more songs in queue');
+            
             // Try autoplay if enabled
             if (this.autoplay && this.currentSong) {
+                console.log('🎲 Attempting autoplay...');
                 await this.getRelatedSong();
                 return;
             }
@@ -98,6 +114,7 @@ class MusicQueue {
             this.currentSong = null;
             
             // Set a timer to disconnect after 15 seconds of inactivity
+            console.log('⏱️ Setting 15 second disconnect timer');
             this.disconnectTimer = setTimeout(() => {
                 if (this.connection && !this.isPlaying && this.songs.length === 0) {
                     try {
@@ -117,18 +134,20 @@ class MusicQueue {
 
         // Clear disconnect timer if we're playing again
         if (this.disconnectTimer) {
+            console.log('⏱️ Clearing disconnect timer');
             clearTimeout(this.disconnectTimer);
             this.disconnectTimer = null;
         }
 
         this.currentSong = this.songs.shift();
+        console.log(`⏭️ Playing next song: ${this.currentSong.title}`);
         await this.playSong(this.currentSong);
     }
 
     async playSong(song) {
         this.isPlaying = true;
 
-        console.log('Playing song:', song);
+        console.log('🎵 Playing song:', song);
 
         try {
             if (!song || !song.url) {
@@ -138,34 +157,144 @@ class MusicQueue {
             }
 
             const youtubedl = require('youtube-dl-exec');
-            const { createAudioResource } = require('@discordjs/voice');
+            const { createAudioResource, StreamType } = require('@discordjs/voice');
+            const { spawn } = require('child_process');
+            const ffmpegPath = require('ffmpeg-static');
+            const path = require('path');
+            
+            // Get yt-dlp binary path - try multiple methods
+            let ytdlpPath;
+            try {
+                // Try distube's yt-dlp first
+                const ytdlp = require('@distube/yt-dlp');
+                ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || ytdlp.default;
+            } catch (e) {
+                console.log('Failed to load @distube/yt-dlp, trying alternatives...');
+            }
+            
+            // Fallback to looking for it in node_modules
+            if (!ytdlpPath) {
+                ytdlpPath = path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+            }
 
-            // Get stream URL from yt-dlp
-            const info = await youtubedl(song.url, {
-                dumpSingleJson: true,
-                noWarnings: true,
-                noCheckCertificate: true,
-                format: 'bestaudio[ext=webm]/bestaudio/best'
+            // Make sure connection is ready before playing
+            if (!this.connection || this.connection.state.status === VoiceConnectionStatus.Destroyed) {
+                console.error('❌ Connection is destroyed, cannot play');
+                this.playNext();
+                return;
+            }
+
+            console.log('🎧 Using yt-dlp binary to download and pipe to FFmpeg...');
+            console.log('yt-dlp binary path:', ytdlpPath);
+            
+            // Use yt-dlp to pipe directly to FFmpeg
+            const ytdlp = spawn(ytdlpPath, [
+                '-f', 'bestaudio[ext=webm]/bestaudio/best',
+                '-o', '-',
+                '--no-warnings',
+                '--no-playlist',
+                '--no-check-certificate',
+                '--quiet',
+                '--no-part',
+                '--buffer-size', '16K',
+                song.url
+            ], {
+                windowsHide: true,
+                stdio: ['ignore', 'pipe', 'pipe']
             });
 
-            const audioUrl = info.url;
+            // Pipe to FFmpeg for Opus encoding
+            const ffmpeg = spawn(ffmpegPath, [
+                '-i', 'pipe:0',
+                '-analyzeduration', '0',
+                '-loglevel', 'error',
+                '-f', 'opus',
+                '-ar', '48000',
+                '-ac', '2',
+                '-b:a', '128k',
+                'pipe:1'
+            ], {
+                windowsHide: true,
+                stdio: ['pipe', 'pipe', 'pipe']
+            });
+
+            let errorOccurred = false;
+
+            ytdlp.on('error', (error) => {
+                if (!errorOccurred) {
+                    console.error('❌ yt-dlp process error:', error);
+                    console.error('yt-dlp path used:', ytdlpPath);
+                    errorOccurred = true;
+                    ffmpeg.kill();
+                    this.playNext();
+                }
+            });
+
+            ytdlp.on('close', (code) => {
+                if (code !== 0 && !errorOccurred) {
+                    console.error(`⚠️ yt-dlp exited with code ${code}`);
+                }
+            });
+
+            ytdlp.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (msg.includes('ERROR') || msg.includes('error')) {
+                    console.error('yt-dlp stderr:', msg);
+                }
+            });
+
+            ffmpeg.on('error', (error) => {
+                if (!errorOccurred) {
+                    console.error('❌ FFmpeg process error:', error);
+                    errorOccurred = true;
+                    ytdlp.kill();
+                    this.playNext();
+                }
+            });
+
+            ffmpeg.on('close', (code) => {
+                if (code !== 0 && !errorOccurred) {
+                    console.error(`⚠️ FFmpeg exited with code ${code}`);
+                }
+            });
+
+            ffmpeg.stderr.on('data', (data) => {
+                const msg = data.toString();
+                if (msg.includes('Error') || msg.includes('error')) {
+                    console.error('FFmpeg stderr:', msg);
+                }
+            });
+
+            // Pipe yt-dlp stdout to FFmpeg stdin
+            ytdlp.stdout.pipe(ffmpeg.stdin);
+
+            console.log('📦 Creating audio resource from pipeline...');
             
-            console.log('Streaming from URL');
-            
-            // Create audio resource directly from URL
-            const resource = createAudioResource(audioUrl, {
+            // Create audio resource from FFmpeg stdout
+            const resource = createAudioResource(ffmpeg.stdout, {
+                inputType: StreamType.OggOpus,
                 inlineVolume: true,
-                inputType: require('@discordjs/voice').StreamType.Arbitrary
+                metadata: {
+                    title: song.title
+                }
             });
 
             this.currentResource = resource;
-            // Set the volume on the resource
+            
+            // Set volume
             if (resource.volume) {
                 resource.volume.setVolume(this.volume);
             }
 
-            this.player.play(resource);
+            // Subscribe and play
+            console.log('🔌 Subscribing player to connection...');
             this.connection.subscribe(this.player);
+            
+            console.log('▶️ Starting playback...');
+            this.player.play(resource);
+            
+            console.log('✅ Playback pipeline started');
+            
         } catch (error) {
             console.error('❌ Error playing song:', error);
             this.playNext();

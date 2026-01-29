@@ -1,6 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
-const ytsr = require('ytsr');
 const youtubedl = require('youtube-dl-exec');
 const MusicQueue = require('../../utils/MusicQueue');
 const queues = require('../../utils/queues');
@@ -127,20 +126,23 @@ module.exports = {
                     thumbnail: info.thumbnail
                 };
             } else {
-                // Search for the video
-                const searchResults = await ytsr(query, { limit: 1 });
-                const videos = searchResults.items.filter(item => item.type === 'video');
+                // Search using youtube-dl-exec instead of ytsr
+                const info = await youtubedl(`ytsearch1:${query}`, {
+                    dumpSingleJson: true,
+                    noWarnings: true,
+                    noCheckCertificate: true,
+                    defaultSearch: 'ytsearch',
+                });
                 
-                if (videos.length === 0) {
+                if (!info || !info.url) {
                     return message.reply('❌ No results found!');
                 }
                 
-                const video = videos[0];
-                videoUrl = video.url;
+                videoUrl = info.webpage_url || info.url;
                 songInfo = {
-                    title: video.title,
-                    duration: video.duration ? parseDuration(video.duration) : 0,
-                    thumbnail: video.bestThumbnail?.url
+                    title: info.title,
+                    duration: Math.floor(info.duration || 0),
+                    thumbnail: info.thumbnail
                 };
             }
 

@@ -82,10 +82,14 @@ class SlashCommandHandler {
             
             const errorMessage = { content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral };
             
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage);
-            } else {
-                await interaction.reply(errorMessage);
+            try {
+                if (interaction.deferred) {
+                    await interaction.editReply(errorMessage);
+                } else if (!interaction.replied) {
+                    await interaction.reply(errorMessage);
+                }
+            } catch (e) {
+                console.error('Failed to send error response:', e.message);
             }
         }
     }

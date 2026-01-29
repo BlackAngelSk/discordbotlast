@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
-const ytsr = require('ytsr');
 const youtubedl = require('youtube-dl-exec');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
@@ -16,22 +15,24 @@ module.exports = {
                 .setRequired(true)),
     
     async execute(interaction) {
-        await interaction.deferReply();
-
-        const query = interaction.options.getString('query');
-        const member = interaction.member;
-        const voiceChannel = member.voice.channel;
-
-        if (!voiceChannel) {
-            return interaction.editReply('❌ You need to be in a voice channel to play music!');
-        }
-
-        const permissions = voiceChannel.permissionsFor(interaction.client.user);
-        if (!permissions.has('Connect') || !permissions.has('Speak')) {
-            return interaction.editReply('❌ I need permissions to join and speak in your voice channel!');
-        }
-
         try {
+            // Defer IMMEDIATELY - must happen within 3 seconds
+            await interaction.deferReply().catch(err => {
+                console.error('Failed to defer reply:', err.message);
+            });
+
+            const query = interaction.options.getString('query');
+            const member = interaction.member;
+            const voiceChannel = member.voice.channel;
+
+            if (!voiceChannel) {
+                return interaction.editReply('❌ You need to be in a voice channel to play music!').catch(() => {});
+            }
+
+            const permissions = voiceChannel.permissionsFor(interaction.client.user);
+            if (!permissions.has('Connect') || !permissions.has('Speak')) {
+                return interaction.editReply('❌ I need permissions to join and speak in your voice channel!').catch(() => {});
+            }
             let queue = queues.get(interaction.guildId);
 
             if (!queue) {
@@ -75,7 +76,11 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in play command:', error);
-            await interaction.editReply('❌ An error occurred while trying to play the song!');
+            try {
+                await interaction.editReply('❌ An error occurred while trying to play the song!');
+            } catch (e) {
+                console.error('Failed to send error message:', e.message);
+            }
         }
     },
 };
@@ -156,44 +161,49 @@ async function handleYouTubePlaylist(url, queue, interaction) {
 }
 
 async function handleYouTubeSearch(query, queue, interaction) {
-    const searchResults = await ytsr(query, { limit: 1 });
-    const video = searchResults.items.find(item => item.type === 'video');
+    try {
+        // Use youtube-dl-exec to search directly instead of ytsr
+        const info = await youtubedl(`ytsearch1:${query}`, {
+            dumpSingleJson: true,
+            noWarnings: true,
+            noCheckCertificate: true,
+            defaultSearch: 'ytsearch',
+        });
 
-    if (!video) {
-        return interaction.editReply('❌ No results found!');
+        if (!info || !info.url) {
+            return interaction.editReply('❌ No results found!');
+        }
+
+        const song = {
+            title: info.title,
+            url: info.webpage_url || info.url,
+            duration: info.duration || 0,
+            thumbnail: info.thumbnail,
+            requester: interaction.user.tag
+        };
+
+        queue.addSong(song);
+
+        const embed = new EmbedBuilder()
+            .setColor('#00FF00')
+            .setTitle('🎵 Added to Queue')
+            .setDescription(`**[${song.title}](${song.url})**`)
+            .addFields(
+                { name: 'Duration', value: formatTime(song.duration), inline: true },
+                { name: 'Position', value: `${queue.songs.length}`, inline: true }
+            )
+            .setThumbnail(song.thumbnail)
+            .setFooter({ text: `Requested by ${interaction.user.tag}` });
+
+        if (!queue.isPlaying) {
+            queue.playNext();
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+    } catch (error) {
+        console.error('Search error:', error);
+        await interaction.editReply('❌ Failed to search for the song!');
     }
-
-    const info = await youtubedl(video.url, {
-        dumpSingleJson: true,
-        noWarnings: true,
-    });
-
-    const song = {
-        title: info.title,
-        url: info.webpage_url,
-        duration: info.duration,
-        thumbnail: info.thumbnail,
-        requester: interaction.user.tag
-    };
-
-    queue.addSong(song);
-
-    const embed = new EmbedBuilder()
-        .setColor('#00FF00')
-        .setTitle('🎵 Added to Queue')
-        .setDescription(`**[${song.title}](${song.url})**`)
-        .addFields(
-            { name: 'Duration', value: formatTime(song.duration), inline: true },
-            { name: 'Position', value: `${queue.songs.length}`, inline: true }
-        )
-        .setThumbnail(song.thumbnail)
-        .setFooter({ text: `Requested by ${interaction.user.tag}` });
-
-    if (!queue.isPlaying) {
-        queue.playNext();
-    }
-
-    await interaction.editReply({ embeds: [embed] });
 }
 
 async function handleSpotify(url, queue, interaction) {

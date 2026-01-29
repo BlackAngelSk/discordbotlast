@@ -135,7 +135,67 @@
                 </div>
             </div>
 
-            <div class="form-actions">
+            <!-- Auto-Moderation -->
+            <div class="settings-section">
+                <h2>🛡️ Auto-Moderation</h2>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="autoModEnabled" name="autoModEnabled" <%= modSettings && modSettings.enabled ? 'checked' : '' %>>
+                        Enable Auto-Moderation
+                    </label>
+                    <small>Automatically moderate spam, invites, and bad words</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="antiSpam" name="antiSpam" <%= modSettings && modSettings.antiSpam ? 'checked' : '' %>>
+                        Anti-Spam Protection
+                    </label>
+                    <small>Timeout users sending 5+ messages in 5 seconds</small>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="antiInvite" name="antiInvite" <%= modSettings && modSettings.antiInvite ? 'checked' : '' %>>
+                        Block Discord Invites
+                    </label>
+                    <small>Delete messages containing Discord invite links</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxMentions">Max Mentions Per Message</label>
+                    <input type="number" id="maxMentions" name="maxMentions" value="<%= modSettings && modSettings.maxMentions !== undefined ? modSettings.maxMentions : 5 %>" min="1" max="20">
+                    <small>Maximum user mentions allowed in a single message</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="maxEmojis">Max Emojis Per Message</label>
+                    <input type="number" id="maxEmojis" name="maxEmojis" value="<%= modSettings && modSettings.maxEmojis !== undefined ? modSettings.maxEmojis : 10 %>" min="1" max="50">
+                    <small>Maximum emojis allowed in a single message</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="modLogChannel">Mod Log Channel</label>
+                    <select id="modLogChannel" name="modLogChannel">
+                        <option value="">None</option>
+                        <% channels.forEach(channel => { %>
+                            <option value="<%= channel.name %>" <%= modSettings && modSettings.modLogChannel === channel.name ? 'selected' : '' %>>
+                                #<%= channel.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                    <small>Channel for logging moderation actions</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="badWords">Bad Words (comma separated)</label>
+                    <textarea id="badWords" name="badWords" rows="3" placeholder="word1, word2, word3"><%= modSettings && modSettings.badWords ? modSettings.badWords.join(', ') : '' %></textarea>
+                    <small>Words that will be automatically filtered and deleted</small>
+                </div>
+            </div>
+
+            <div class="form-actions"
                 <button type="submit" class="btn-primary">Save Changes</button>
                 <button type="button" class="btn-danger" onclick="resetSettings()">Reset to Defaults</button>
             </div>
@@ -163,8 +223,13 @@
             
             // Convert form data to object
             for (let [key, value] of formData.entries()) {
-                if (key === 'welcomeEnabled' || key === 'leaveEnabled') {
+                if (key === 'welcomeEnabled' || key === 'leaveEnabled' || key === 'autoModEnabled' || key === 'antiSpam' || key === 'antiInvite') {
                     data[key] = true;
+                } else if (key === 'badWords') {
+                    // Convert comma-separated string to array
+                    data[key] = value.split(',').map(w => w.trim()).filter(w => w.length > 0);
+                } else if (key === 'maxMentions' || key === 'maxEmojis') {
+                    data[key] = parseInt(value);
                 } else {
                     data[key] = value;
                 }
@@ -173,6 +238,9 @@
             // Handle unchecked checkboxes
             if (!formData.has('welcomeEnabled')) data.welcomeEnabled = false;
             if (!formData.has('leaveEnabled')) data.leaveEnabled = false;
+            if (!formData.has('autoModEnabled')) data.autoModEnabled = false;
+            if (!formData.has('antiSpam')) data.antiSpam = false;
+            if (!formData.has('antiInvite')) data.antiInvite = false;
 
             try {
                 const response = await fetch(`/api/settings/${guildId}`, {

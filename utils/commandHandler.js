@@ -46,6 +46,9 @@ class CommandHandler {
 
     async handleCommand(message) {
         if (message.author.bot) return;
+        
+        // Ignore DMs - only work in servers
+        if (!message.guild) return;
 
         // Get custom prefix for this server
         const prefix = settingsManager.getPrefix(message.guild.id);
