@@ -1,7 +1,7 @@
-const { requireDJ } = require('../utils/permissions');
+const { requireDJ } = require('../../utils/permissions');
 
-async function removeSongCommand(message, args, client) {
-    const queues = require('../utils/queues');
+async function removeCommand(message, args, client) {
+    const queues = require('../../utils/queues');
     const queue = queues.get(message.guild.id);
     
     if (!queue) {
@@ -26,5 +26,5 @@ async function removeSongCommand(message, args, client) {
 module.exports = {
     name: 'remove',
     description: 'Remove a song from the queue by position (requires DJ role)',
-    execute: requireDJ(removeSongCommand)
+    execute: requireDJ(removeCommand)
 };

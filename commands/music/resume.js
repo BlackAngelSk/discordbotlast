@@ -1,5 +1,5 @@
-const queues = require('../utils/queues');
-const { requireDJ } = require('../utils/permissions');
+const queues = require('../../utils/queues');
+const { requireDJ } = require('../../utils/permissions');
 
 async function resumeCommand(message, args, client) {
     const queue = queues.get(message.guild.id);

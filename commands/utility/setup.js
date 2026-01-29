@@ -1,5 +1,5 @@
 const { PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const settingsManager = require('../utils/settingsManager');
+const settingsManager = require('../../utils/settingsManager');
 
 module.exports = {
     name: 'setup',

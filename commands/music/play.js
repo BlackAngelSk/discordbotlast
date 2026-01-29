@@ -2,9 +2,9 @@ const { EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const ytsr = require('ytsr');
 const youtubedl = require('youtube-dl-exec');
-const MusicQueue = require('../utils/MusicQueue');
-const queues = require('../utils/queues');
-const { parseDuration, formatDuration } = require('../utils/helpers');
+const MusicQueue = require('../../utils/MusicQueue');
+const queues = require('../../utils/queues');
+const { parseDuration, formatDuration } = require('../../utils/helpers');
 
 module.exports = {
     name: 'play',

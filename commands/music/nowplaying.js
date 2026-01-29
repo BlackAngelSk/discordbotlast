@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
-const queues = require('../utils/queues');
-const { formatDuration } = require('../utils/helpers');
+const queues = require('../../utils/queues');
+const { formatDuration } = require('../../utils/helpers');
 
 module.exports = {
     name: 'nowplaying',

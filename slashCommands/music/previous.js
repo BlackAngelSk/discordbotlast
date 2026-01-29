@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const queues = require('../utils/queues');
-const { isDJ } = require('../utils/permissions');
+const queues = require('../../utils/queues');
+const { isDJ } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()

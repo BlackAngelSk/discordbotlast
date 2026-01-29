@@ -1,8 +1,40 @@
 {
   "users": {
     "421968526547353601_349649557896036354": {
+      "balance": 200,
+      "xp": 152,
+      "level": 2,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "421968526547353601_692862875865186344": {
       "balance": 0,
-      "xp": 8,
+      "xp": 17,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "421968526547353601_195140009748201472": {
+      "balance": 0,
+      "xp": 13,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "421968526547353601_534769701297979392": {
+      "balance": 0,
+      "xp": 15,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "421968526547353601_373827871212568576": {
+      "balance": 0,
+      "xp": 5,
       "level": 1,
       "lastDaily": null,
       "lastWeekly": null,

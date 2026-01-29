@@ -1,5 +1,5 @@
-const queues = require('../utils/queues');
-const { isDJ } = require('../utils/permissions');
+const queues = require('../../utils/queues');
+const { isDJ } = require('../../utils/permissions');
 
 module.exports = {
     name: 'jump',

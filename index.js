@@ -6,6 +6,7 @@ const SlashCommandHandler = require('./utils/slashCommandHandler');
 const settingsManager = require('./utils/settingsManager');
 const economyManager = require('./utils/economyManager');
 const moderationManager = require('./utils/moderationManager');
+const gameStatsManager = require('./utils/gameStatsManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -37,6 +38,9 @@ async function loadHandlers() {
         
         await moderationManager.init();
         console.log('✅ Moderation manager initialized!');
+        
+        await gameStatsManager.init();
+        console.log('✅ Game stats manager initialized!');
         
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();

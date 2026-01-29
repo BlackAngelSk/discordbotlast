@@ -2,9 +2,9 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const ytsr = require('ytsr');
 const youtubedl = require('youtube-dl-exec');
-const queues = require('../utils/queues');
-const MusicQueue = require('../utils/MusicQueue');
-const { parseDuration } = require('../utils/helpers');
+const queues = require('../../utils/queues');
+const MusicQueue = require('../../utils/MusicQueue');
+const { parseDuration } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()

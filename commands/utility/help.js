@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const settingsManager = require('../utils/settingsManager');
+const settingsManager = require('../../utils/settingsManager');
 
 // Command categories - easy to expand
 const getCommandCategories = (p) => [
@@ -78,7 +78,7 @@ const getCommandCategories = (p) => [
     },
     {
         name: '🎯 Mini Games',
-        cmds: ['minigame rps', 'minigame guess', 'minigame trivia']
+        cmds: ['minigame rps', 'minigame guess', 'minigame trivia', 'minigame tictactoe', 'minigame blackjack', 'minigame roulette', 'gamestats [@user]']
     },
     {
         name: '🛠️ General',

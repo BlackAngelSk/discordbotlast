@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
-const moderationManager = require('../utils/moderationManager');
+const moderationManager = require('../../utils/moderationManager');
 
 module.exports = {
     data: new SlashCommandBuilder()

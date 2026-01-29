@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const queues = require('../utils/queues');
+const queues = require('../../utils/queues');
 
 module.exports = {
     name: 'lyrics',
