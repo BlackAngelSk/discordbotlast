@@ -35,7 +35,13 @@ module.exports = {
 
             // Send welcome message if enabled
             if (settings.welcomeEnabled && settings.welcomeChannel) {
-                const channel = member.guild.channels.cache.get(settings.welcomeChannel);
+                // Try to get channel by ID first, then by name
+                let channel = member.guild.channels.cache.get(settings.welcomeChannel);
+                if (!channel) {
+                    channel = member.guild.channels.cache.find(
+                        ch => ch.name === settings.welcomeChannel && ch.isTextBased()
+                    );
+                }
                 
                 if (channel && channel.isTextBased()) {
                     // Format welcome message with placeholders

@@ -18,7 +18,14 @@ module.exports = {
                 return;
             }
 
-            const channel = member.guild.channels.cache.get(channelId);
+            // Try to get channel by ID first, then by name
+            let channel = member.guild.channels.cache.get(channelId);
+            if (!channel) {
+                channel = member.guild.channels.cache.find(
+                    ch => ch.name === channelId && ch.isTextBased()
+                );
+            }
+            
             if (!channel || !channel.isTextBased()) {
                 console.log(`⚠️ Leave channel not found or not text-based in guild ${member.guild.name}`);
                 return;

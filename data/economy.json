@@ -1,12 +1,31 @@
 {
   "users": {
     "421968526547353601_349649557896036354": {
-      "balance": 6200,
-      "xp": 202,
+      "balance": 0,
+      "xp": 306,
       "level": 2,
       "lastDaily": 1769713729260,
       "lastWeekly": 1769713756916,
-      "inventory": []
+      "inventory": [
+        {
+          "id": "custom_role",
+          "name": "Custom Role Color",
+          "price": 5000,
+          "type": "role"
+        },
+        {
+          "id": "vip",
+          "name": "VIP Role",
+          "price": 10000,
+          "type": "role"
+        },
+        {
+          "id": "premium",
+          "name": "Premium Badge",
+          "price": 15000,
+          "type": "badge"
+        }
+      ]
     },
     "421968526547353601_692862875865186344": {
       "balance": 0,
@@ -17,11 +36,11 @@
       "inventory": []
     },
     "421968526547353601_195140009748201472": {
-      "balance": 0,
-      "xp": 27,
+      "balance": 6000,
+      "xp": 37,
       "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
+      "lastDaily": 1769790960184,
+      "lastWeekly": 1769790955387,
       "inventory": []
     },
     "421968526547353601_534769701297979392": {
@@ -49,13 +68,34 @@
       "inventory": []
     },
     "421968526547353601_396685113804587009": {
-      "balance": 0,
-      "xp": 40,
+      "balance": 6340,
+      "xp": 90,
       "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
+      "lastDaily": 1769791022535,
+      "lastWeekly": 1769791021622,
       "inventory": []
     }
   },
-  "shops": {}
+  "shops": {
+    "421968526547353601": [
+      {
+        "id": "vip",
+        "name": "VIP Role",
+        "price": 10000,
+        "type": "role"
+      },
+      {
+        "id": "custom_role",
+        "name": "Custom Role Color",
+        "price": 5000,
+        "type": "role"
+      },
+      {
+        "id": "premium",
+        "name": "Premium Badge",
+        "price": 15000,
+        "type": "badge"
+      }
+    ]
+  }
 }
