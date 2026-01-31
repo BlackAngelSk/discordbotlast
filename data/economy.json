@@ -2,9 +2,9 @@
   "users": {
     "421968526547353601_349649557896036354": {
       "balance": 0,
-      "xp": 306,
-      "level": 2,
-      "lastDaily": 1769713729260,
+      "xp": 790,
+      "level": 3,
+      "lastDaily": 1769808764284,
       "lastWeekly": 1769713756916,
       "inventory": [
         {
@@ -29,16 +29,16 @@
     },
     "421968526547353601_692862875865186344": {
       "balance": 0,
-      "xp": 17,
+      "xp": 43,
       "level": 1,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": []
     },
     "421968526547353601_195140009748201472": {
-      "balance": 6000,
-      "xp": 37,
-      "level": 1,
+      "balance": 10000000,
+      "xp": 507,
+      "level": 3,
       "lastDaily": 1769790960184,
       "lastWeekly": 1769790955387,
       "inventory": []
@@ -68,11 +68,43 @@
       "inventory": []
     },
     "421968526547353601_396685113804587009": {
-      "balance": 6340,
-      "xp": 90,
-      "level": 1,
+      "balance": 0,
+      "xp": 268,
+      "level": 2,
       "lastDaily": 1769791022535,
       "lastWeekly": 1769791021622,
+      "inventory": []
+    },
+    "421968526547353601_664130274094743572": {
+      "balance": 0,
+      "xp": 7,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "865544990625497088_349649557896036354": {
+      "balance": 0,
+      "xp": 11,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "421968526547353601_650056654926381066": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": []
+    },
+    "null_396685113804587009": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
       "inventory": []
     }
   },
@@ -92,9 +124,15 @@
       },
       {
         "id": "premium",
-        "name": "Premium Badge",
+        "name": "Premium Role",
         "price": 15000,
-        "type": "badge"
+        "type": "role"
+      },
+      {
+        "id": "retard",
+        "name": "Gambler ",
+        "price": 2000,
+        "type": "role"
       }
     ]
   }

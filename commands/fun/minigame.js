@@ -179,7 +179,13 @@ async function playRps(message) {
         (outcome === 'win' ? '🎉 You win!' : outcome === 'lose' ? '😅 Bot wins this round.' : "🤝 It's a tie!")
       );
 
-    await interaction.update({ embeds: [resultEmbed], components: [disableRow(row)] });
+    try {
+      await interaction.update({ embeds: [resultEmbed], components: [disableRow(row)] });
+    } catch (error) {
+      if (error.code === 10062) {
+        await msg.edit({ embeds: [resultEmbed], components: [disableRow(row)] }).catch(() => {});
+      }
+    }
     collector.stop('answered');
   });
 
@@ -345,7 +351,14 @@ async function playTicTacToe(message) {
           renderBoard() + '\n\n' +
           (winner === 'X' ? '🎉 You win!' : winner === 'O' ? '🤖 Bot wins!' : "🤝 It's a tie!")
         );
-      await interaction.update({ embeds: [result], components: createButtons(true) });
+      
+      try {
+        await interaction.update({ embeds: [result], components: createButtons(true) });
+      } catch (error) {
+        if (error.code === 10062) {
+          await msg.edit({ embeds: [result], components: createButtons(true) }).catch(() => {});
+        }
+      }
       collector.stop('finished');
       return;
     }
@@ -363,7 +376,13 @@ async function playTicTacToe(message) {
         (winner === 'O' ? '🤖 Bot wins!' : winner === 'tie' ? "🤝 It's a tie!" : 'Your turn!')
       );
 
-    await interaction.update({ embeds: [statusEmbed], components: createButtons(!!winner) });
+    try {
+      await interaction.update({ embeds: [statusEmbed], components: createButtons(!!winner) });
+    } catch (error) {
+      if (error.code === 10062) {
+        await msg.edit({ embeds: [statusEmbed], components: createButtons(!!winner) }).catch(() => {});
+      }
+    }
     if (winner) collector.stop('finished');
   });
 
@@ -495,7 +514,7 @@ async function playBlackjack(message) {
   
   const prompt = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle('🃏 Blackjack')
+    .setTitle('🃏 Blackjack (Demo)')
     .setThumbnail(message.author.displayAvatarURL())
     .addFields(
       { name: `${message.author.username}'s Hand (${handValue(playerHand)})`, value: formatHand(playerHand) },
@@ -531,14 +550,20 @@ async function playBlackjack(message) {
           .setDescription('💥 You busted! Dealer wins.')
           .setFooter({ text: `Player ID: ${message.author.id}` });
         
-        await interaction.update({ embeds: [bust], components: [createButtons(true)] });
+        try {
+          await interaction.update({ embeds: [bust], components: [createButtons(true)] });
+        } catch (error) {
+          if (error.code === 10062) {
+            await msg.edit({ embeds: [bust], components: [createButtons(true)] }).catch(() => {});
+          }
+        }
         collector.stop('bust');
         return;
       }
       
       const updated = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setTitle('🃏 Blackjack')
+        .setTitle('🃏 Blackjack (Demo)')
         .setThumbnail(message.author.displayAvatarURL())
         .addFields(
           { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
@@ -547,7 +572,13 @@ async function playBlackjack(message) {
         .setDescription('Hit or Stand?')
         .setFooter({ text: `Player ID: ${message.author.id}` });
       
-      await interaction.update({ embeds: [updated], components: [createButtons()] });
+      try {
+        await interaction.update({ embeds: [updated], components: [createButtons()] });
+      } catch (error) {
+        if (error.code === 10062) {
+          await msg.edit({ embeds: [updated], components: [createButtons()] }).catch(() => {});
+        }
+      }
       
     } else if (interaction.customId === 'bj_stand') {
       // Dealer reveals hole card and plays according to rules
@@ -585,7 +616,7 @@ async function playBlackjack(message) {
       
       const final = new EmbedBuilder()
         .setColor(color)
-        .setTitle('🃏 Blackjack - Final')
+        .setTitle('🃏 Blackjack - Final (Demo)')
         .setThumbnail(message.author.displayAvatarURL())
         .addFields(
           { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
@@ -594,7 +625,13 @@ async function playBlackjack(message) {
         .setDescription(outcome)
         .setFooter({ text: `Player ID: ${message.author.id}` });
       
-      await interaction.update({ embeds: [final], components: [createButtons(true)] });
+      try {
+        await interaction.update({ embeds: [final], components: [createButtons(true)] });
+      } catch (error) {
+        if (error.code === 10062) {
+          await msg.edit({ embeds: [final], components: [createButtons(true)] }).catch(() => {});
+        }
+      }
       collector.stop('finished');
     }
   });
@@ -656,7 +693,13 @@ async function playTrivia(message) {
       return btn.setStyle(ButtonStyle.Secondary);
     });
 
-    await interaction.update({ embeds: [result], components: [styledRow] });
+    try {
+      await interaction.update({ embeds: [result], components: [styledRow] });
+    } catch (error) {
+      if (error.code === 10062) {
+        await msg.edit({ embeds: [result], components: [styledRow] }).catch(() => {});
+      }
+    }
     collector.stop('answered');
   });
 
@@ -679,7 +722,7 @@ async function playRoulette(message) {
   
   const prompt = new EmbedBuilder()
     .setColor(0x5865f2)
-    .setTitle('🎰 Roulette')
+    .setTitle('🎰 Roulette (Demo)')
     .setDescription('Place your bet! Choose from the options below:')
     .addFields(
       { name: 'Number Bet', value: 'Pick 0-36 (pays 35:1)', inline: true },
@@ -768,7 +811,7 @@ async function playRoulette(message) {
         
         const resultEmbed = new EmbedBuilder()
           .setColor(won ? 0x57f287 : 0xed4245)
-          .setTitle('🎰 Roulette - Result')
+          .setTitle('🎰 Roulette - Result (Demo)')
           .setDescription(`The ball landed on: ${color} **${result}**`)
           .addFields(
             { name: 'Your Bet', value: `Number ${chosenNum}`, inline: true },
@@ -833,14 +876,20 @@ async function playRoulette(message) {
     
     const resultEmbed = new EmbedBuilder()
       .setColor(won ? 0x57f287 : 0xed4245)
-      .setTitle('🎰 Roulette - Result')
+      .setTitle('🎰 Roulette - Result (Demo)')
       .setDescription(`The ball landed on: ${color} **${result}**`)
       .addFields(
         { name: 'Your Bet', value: betDescription, inline: true },
         { name: 'Result', value: won ? `✅ Won! (${payout})` : '❌ Lost', inline: true }
       );
     
-    await interaction.update({ embeds: [resultEmbed], components: [] });
+    try {
+      await interaction.update({ embeds: [resultEmbed], components: [] });
+    } catch (error) {
+      if (error.code === 10062) {
+        await msg.edit({ embeds: [resultEmbed], components: [] }).catch(() => {});
+      }
+    }
     collector.stop('finished');
   });
   
@@ -849,6 +898,62 @@ async function playRoulette(message) {
       await msg.edit({ content: '⏰ Roulette timed out.', components: [] });
     }
   });
+}
+
+async function playSlots(message) {
+  const slotSymbols = ['🍎', '🍊', '🍋', '🍌', '🍇', '⭐', '💎', '🔔'];
+  
+  const spinSlots = () => {
+    return [
+      slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
+      slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
+      slotSymbols[Math.floor(Math.random() * slotSymbols.length)]
+    ];
+  };
+
+  const checkWin = (symbols) => {
+    const [slot1, slot2, slot3] = symbols;
+    
+    // Check for three of a kind
+    if (slot1 === slot2 && slot2 === slot3) {
+      return true;
+    }
+    
+    // Check for two of a kind
+    if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) {
+      return true;
+    }
+    
+    return false;
+  };
+
+  const spinEmbed = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle('🎰 Slots Machine (Demo)')
+    .setDescription('Spinning the reels...\n\n🎰 | 🎰 | 🎰');
+
+  const msg = await message.reply({ embeds: [spinEmbed] });
+
+  // Simulate spinning
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  const result = spinSlots();
+  const won = checkWin(result);
+
+  let resultDescription = `**${result[0]} | ${result[1]} | ${result[2]}**\n\n`;
+  
+  if (won) {
+    resultDescription += '✨ **You got a match!**';
+  } else {
+    resultDescription += '😢 No matches. Better luck next time!';
+  }
+
+  const resultEmbed = new EmbedBuilder()
+    .setColor(won ? 0x57f287 : 0xed4245)
+    .setTitle('🎰 Slots Machine - Result (Demo)')
+    .setDescription(resultDescription + '\n\n💡 Want to play for real coins? Try `!slots <bet>`');
+
+  await msg.edit({ embeds: [resultEmbed] });
 }
 
 module.exports = {
@@ -860,7 +965,7 @@ module.exports = {
     const prefix = settings.prefix;
     const sub = (args[0] || '').toLowerCase();
 
-    if (!sub || !['rps', 'guess', 'trivia', 'tictactoe', 'ttt', 'blackjack', 'bj', 'roulette', 'roul'].includes(sub)) {
+    if (!sub || !['rps', 'guess', 'trivia', 'tictactoe', 'ttt', 'blackjack', 'bj', 'roulette', 'roul', 'slots', 'slot'].includes(sub)) {
       const usage = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('Mini Games')
@@ -871,7 +976,8 @@ module.exports = {
           { name: '❓ Quick Trivia', value: `${prefix}minigame trivia` },
           { name: '⭕ Tic-Tac-Toe', value: `${prefix}minigame tictactoe (or ttt)` },
           { name: '🃏 Blackjack', value: `${prefix}minigame blackjack (or bj)` },
-          { name: '🎰 Roulette', value: `${prefix}minigame roulette (or roul)` }
+          { name: '🎰 Roulette', value: `${prefix}minigame roulette (or roul)` },
+          { name: '🎰 Slots', value: `${prefix}minigame slots (or slot)` }
         );
 
       await message.reply({ embeds: [usage] });
@@ -890,6 +996,8 @@ module.exports = {
       await playBlackjack(message);
     } else if (sub === 'roulette' || sub === 'roul') {
       await playRoulette(message);
+    } else if (sub === 'slots' || sub === 'slot') {
+      await playSlots(message);
     }
   }
 };

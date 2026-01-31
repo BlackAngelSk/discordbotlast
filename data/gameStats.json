@@ -1,24 +1,32 @@
 {
   "396685113804587009": {
     "blackjack": {
-      "wins": 1,
-      "losses": 0,
+      "wins": 7,
+      "losses": 11,
       "ties": 0
     },
     "roulette": {
-      "wins": 1,
-      "losses": 2
+      "wins": 2,
+      "losses": 3
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
     }
   },
   "195140009748201472": {
     "blackjack": {
-      "wins": 0,
-      "losses": 1,
-      "ties": 0
+      "wins": 14,
+      "losses": 14,
+      "ties": 3
     },
     "roulette": {
-      "wins": 0,
-      "losses": 1
+      "wins": 3,
+      "losses": 11
+    },
+    "slots": {
+      "wins": 44,
+      "losses": 84
     }
   },
   "534769701297979392": {
@@ -40,7 +48,11 @@
     },
     "roulette": {
       "wins": 0,
-      "losses": 2
+      "losses": 3
+    },
+    "slots": {
+      "wins": 5,
+      "losses": 5
     }
   }
 }

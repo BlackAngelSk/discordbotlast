@@ -17,6 +17,7 @@ class MusicQueue {
         this.loop = 'off'; // 'off', 'song', or 'queue'
         this.previousSongs = []; // Track song history
         this.filters = {}; // Audio filters
+        this.ffmpegProcess = null;
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔄 Player entered Idle state');
@@ -156,26 +157,10 @@ class MusicQueue {
                 return;
             }
 
-            const youtubedl = require('youtube-dl-exec');
             const { createAudioResource, StreamType } = require('@discordjs/voice');
             const { spawn } = require('child_process');
             const ffmpegPath = require('ffmpeg-static');
             const path = require('path');
-            
-            // Get yt-dlp binary path - try multiple methods
-            let ytdlpPath;
-            try {
-                // Try distube's yt-dlp first
-                const ytdlp = require('@distube/yt-dlp');
-                ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || ytdlp.default;
-            } catch (e) {
-                console.log('Failed to load @distube/yt-dlp, trying alternatives...');
-            }
-            
-            // Fallback to looking for it in node_modules
-            if (!ytdlpPath) {
-                ytdlpPath = path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
-            }
 
             // Make sure connection is ready before playing
             if (!this.connection || this.connection.state.status === VoiceConnectionStatus.Destroyed) {
@@ -184,95 +169,79 @@ class MusicQueue {
                 return;
             }
 
-            console.log('🎧 Using yt-dlp binary to download and pipe to FFmpeg...');
-            console.log('yt-dlp binary path:', ytdlpPath);
-            
-            // Use yt-dlp to pipe directly to FFmpeg
-            const ytdlp = spawn(ytdlpPath, [
-                '-f', 'bestaudio[ext=webm]/bestaudio/best',
-                '-o', '-',
-                '--no-warnings',
+            console.log('🎧 Streaming with yt-dlp → FFmpeg pipeline...');
+
+            // Clean up any previous processes
+            if (this.ffmpegProcess) {
+                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
+                this.ffmpegProcess = null;
+            }
+            if (this.ytdlpProcess) {
+                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
+                this.ytdlpProcess = null;
+            }
+
+            // Get yt-dlp path
+            const ytdlp = require('@distube/yt-dlp');
+            const ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+
+            // Spawn yt-dlp to download and output audio to stdout
+            const ytdlpProcess = spawn(ytdlpPath, [
+                '--format', 'bestaudio',
                 '--no-playlist',
-                '--no-check-certificate',
+                '--no-warnings',
                 '--quiet',
-                '--no-part',
-                '--buffer-size', '16K',
+                '--output', '-',
                 song.url
             ], {
                 windowsHide: true,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
 
-            // Pipe to FFmpeg for Opus encoding
-            const ffmpeg = spawn(ffmpegPath, [
+            // Spawn FFmpeg to convert audio to Opus
+            const ffmpegProcess = spawn(ffmpegPath, [
                 '-i', 'pipe:0',
                 '-analyzeduration', '0',
-                '-loglevel', 'error',
-                '-f', 'opus',
+                '-loglevel', '0',
+                '-f', 's16le',
                 '-ar', '48000',
                 '-ac', '2',
-                '-b:a', '128k',
                 'pipe:1'
             ], {
                 windowsHide: true,
-                stdio: ['pipe', 'pipe', 'pipe']
+                stdio: ['pipe', 'pipe', 'ignore']
             });
 
-            let errorOccurred = false;
+            // Store process references
+            this.ytdlpProcess = ytdlpProcess;
+            this.ffmpegProcess = ffmpegProcess;
 
-            ytdlp.on('error', (error) => {
-                if (!errorOccurred) {
-                    console.error('❌ yt-dlp process error:', error);
-                    console.error('yt-dlp path used:', ytdlpPath);
-                    errorOccurred = true;
-                    ffmpeg.kill();
-                    this.playNext();
-                }
+            // Pipe yt-dlp output to FFmpeg input
+            ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+
+            // Prevent stream errors from crashing the bot
+            ytdlpProcess.stdout.on('error', () => {});
+            ffmpegProcess.stdin.on('error', () => {});
+            ffmpegProcess.stdout.on('error', () => {});
+
+            // Error handling
+            ytdlpProcess.on('error', (err) => {
+                console.error('❌ yt-dlp error:', err);
+                this.playNext();
             });
 
-            ytdlp.on('close', (code) => {
-                if (code !== 0 && !errorOccurred) {
-                    console.error(`⚠️ yt-dlp exited with code ${code}`);
-                }
+            ffmpegProcess.on('error', (err) => {
+                console.error('❌ FFmpeg error:', err);
+                this.playNext();
             });
 
-            ytdlp.stderr.on('data', (data) => {
-                const msg = data.toString();
-                if (msg.includes('ERROR') || msg.includes('error')) {
-                    console.error('yt-dlp stderr:', msg);
-                }
+            ytdlpProcess.stderr.on('data', (data) => {
+                console.error('yt-dlp stderr:', data.toString());
             });
 
-            ffmpeg.on('error', (error) => {
-                if (!errorOccurred) {
-                    console.error('❌ FFmpeg process error:', error);
-                    errorOccurred = true;
-                    ytdlp.kill();
-                    this.playNext();
-                }
-            });
-
-            ffmpeg.on('close', (code) => {
-                if (code !== 0 && !errorOccurred) {
-                    console.error(`⚠️ FFmpeg exited with code ${code}`);
-                }
-            });
-
-            ffmpeg.stderr.on('data', (data) => {
-                const msg = data.toString();
-                if (msg.includes('Error') || msg.includes('error')) {
-                    console.error('FFmpeg stderr:', msg);
-                }
-            });
-
-            // Pipe yt-dlp stdout to FFmpeg stdin
-            ytdlp.stdout.pipe(ffmpeg.stdin);
-
-            console.log('📦 Creating audio resource from pipeline...');
-            
-            // Create audio resource from FFmpeg stdout
-            const resource = createAudioResource(ffmpeg.stdout, {
-                inputType: StreamType.OggOpus,
+            // Create audio resource from FFmpeg output
+            const resource = createAudioResource(ffmpegProcess.stdout, {
+                inputType: StreamType.Raw,
                 inlineVolume: true,
                 metadata: {
                     title: song.title
@@ -293,7 +262,7 @@ class MusicQueue {
             console.log('▶️ Starting playback...');
             this.player.play(resource);
             
-            console.log('✅ Playback pipeline started');
+            console.log('✅ Playback started successfully');
             
         } catch (error) {
             console.error('❌ Error playing song:', error);
@@ -342,13 +311,55 @@ class MusicQueue {
 
     stop() {
         this.songs = [];
+        
+        // Stop the player first
         this.player.stop();
+        
+        // Close FFmpeg stdin to prevent write errors
+        if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
+            try { 
+                this.ffmpegProcess.stdin.end();
+            } catch (_) {}
+        }
+        
+        // Kill processes after a short delay
+        setTimeout(() => {
+            if (this.ffmpegProcess) {
+                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
+                this.ffmpegProcess = null;
+            }
+            if (this.ytdlpProcess) {
+                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
+                this.ytdlpProcess = null;
+            }
+        }, 100);
+        
         this.isPlaying = false;
         this.currentSong = null;
     }
 
     skip() {
+        // Stop the player first
         this.player.stop();
+        
+        // Close FFmpeg stdin to prevent write errors
+        if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
+            try { 
+                this.ffmpegProcess.stdin.end();
+            } catch (_) {}
+        }
+        
+        // Kill processes after a short delay
+        setTimeout(() => {
+            if (this.ffmpegProcess) {
+                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
+                this.ffmpegProcess = null;
+            }
+            if (this.ytdlpProcess) {
+                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
+                this.ytdlpProcess = null;
+            }
+        }, 100);
     }
 
     pause() {

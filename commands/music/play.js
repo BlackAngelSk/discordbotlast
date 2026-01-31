@@ -1,6 +1,7 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
-const youtubedl = require('youtube-dl-exec');
+const play = require('play-dl');
+const https = require('https');
 const MusicQueue = require('../../utils/MusicQueue');
 const queues = require('../../utils/queues');
 const { parseDuration, formatDuration } = require('../../utils/helpers');
@@ -9,12 +10,78 @@ module.exports = {
     name: 'play',
     description: 'Play music from YouTube',
     async execute(message, args, client) {
+        const fetchSpotifyMetadata = (url) => new Promise((resolve, reject) => {
+            const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
+            https.get(oembedUrl, res => {
+                let data = '';
+                res.on('data', chunk => (data += chunk));
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        resolve(parsed);
+                    } catch (error) {
+                        reject(error);
+                    }
+                });
+            }).on('error', reject);
+        });
+
+        const createMusicControls = (disabled = false) => {
+            const row1 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('music_previous')
+                    .setEmoji('⏮️')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_pause')
+                    .setEmoji('⏸️')
+                    .setStyle(ButtonStyle.Primary)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_resume')
+                    .setEmoji('▶️')
+                    .setStyle(ButtonStyle.Success)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_skip')
+                    .setEmoji('⏭️')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_stop')
+                    .setEmoji('⏹️')
+                    .setStyle(ButtonStyle.Danger)
+                    .setDisabled(disabled)
+            );
+
+            const row2 = new ActionRowBuilder().addComponents(
+                new ButtonBuilder()
+                    .setCustomId('music_vol_down')
+                    .setEmoji('🔉')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_vol_up')
+                    .setEmoji('🔊')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(disabled),
+                new ButtonBuilder()
+                    .setCustomId('music_loop')
+                    .setLabel('Loop: Off')
+                    .setEmoji('🔁')
+                    .setStyle(ButtonStyle.Secondary)
+                    .setDisabled(disabled)
+            );
+
+            return [row1, row2];
+        };
         const voiceChannel = message.member.voice.channel;
         if (!voiceChannel) {
             return message.reply('❌ You need to be in a voice channel to play music!');
         }
 
-        const query = args.join(' ');
+        let query = args.join(' ');
         if (!query) {
             return message.reply('❌ Please provide a YouTube URL or search query!\nExample: `!play never gonna give you up`');
         }
@@ -26,22 +93,42 @@ module.exports = {
             let videoUrl;
             
             // Check if it's a YouTube URL
-            const isUrl = query.startsWith('http://') || query.startsWith('https://');
+            let isUrl = query.startsWith('http://') || query.startsWith('https://');
             
             // Check if it's a playlist
             const isPlaylist = query.includes('list=');
             
+            // Convert Spotify URLs to YouTube search queries
+            if (isUrl && query.includes('spotify.com')) {
+                try {
+                    const meta = await fetchSpotifyMetadata(query);
+                    const title = meta?.title || '';
+                    const author = meta?.author_name || '';
+                    const searchQuery = `${title} ${author}`.trim();
+
+                    if (!searchQuery) {
+                        return message.reply('❌ Could not read Spotify metadata. Try a YouTube link instead!');
+                    }
+
+                    query = searchQuery;
+                    isUrl = false;
+                } catch (error) {
+                    console.error('Spotify error:', error);
+                    return message.reply('❌ Could not process Spotify URL. Try a YouTube link instead!');
+                }
+            }
+
             if (isUrl && isPlaylist) {
-                // Handle playlist
-                const playlistInfo = await youtubedl(query, {
-                    dumpSingleJson: true,
-                    flatPlaylist: true,
-                    noWarnings: true,
-                    noCheckCertificate: true
-                });
+                // Handle playlist with play-dl
+                const playlistInfo = await play.playlist_info(query, { incomplete: true });
                 
-                const entries = playlistInfo.entries || [];
-                if (entries.length === 0) {
+                if (!playlistInfo) {
+                    return message.reply('❌ Could not fetch playlist information!');
+                }
+
+                const videos = await playlistInfo.all_videos();
+                
+                if (videos.length === 0) {
                     return message.reply('❌ No videos found in playlist!');
                 }
                 
@@ -61,12 +148,12 @@ module.exports = {
                 
                 // Add all songs from playlist
                 const songs = [];
-                for (const entry of entries.slice(0, 50)) { // Limit to 50 songs
+                for (const video of videos.slice(0, 50)) { // Limit to 50 songs
                     const song = {
-                        title: entry.title,
-                        url: entry.url,
-                        duration: Math.floor(entry.duration || 0),
-                        thumbnail: entry.thumbnail,
+                        title: video.title,
+                        url: video.url,
+                        duration: video.durationInSec || 0,
+                        thumbnail: video.thumbnails?.[0]?.url,
                         requester: message.author.tag
                     };
                     queue.addSong(song);
@@ -97,52 +184,45 @@ module.exports = {
                         )
                         .setThumbnail(songs[0].thumbnail);
 
-                    const msg = await message.channel.send({ embeds: [nowPlayingEmbed] });
+                    const msg = await message.channel.send({
+                        embeds: [nowPlayingEmbed],
+                        components: createMusicControls()
+                    });
                     queue.nowPlayingMessage = msg;
-                    
-                    // Add reaction controls
-                    await msg.react('⏸️');
-                    await msg.react('▶️');
-                    await msg.react('⏭️');
-                    await msg.react('⏹️');
-                    await msg.react('🔉');
-                    await msg.react('🔊');
                 }
                 
                 return;
             }
             
             if (isUrl) {
-                videoUrl = query;
-                // Get info using youtube-dl-exec
-                const info = await youtubedl(videoUrl, {
-                    dumpSingleJson: true,
-                    noWarnings: true,
-                    noCheckCertificate: true
-                });
-                songInfo = {
-                    title: info.title,
-                    duration: Math.floor(info.duration || 0),
-                    thumbnail: info.thumbnail
-                };
+                // Validate YouTube URL with play-dl
+                const isValid = play.yt_validate(query);
+                if (isValid === 'video') {
+                    videoUrl = query;
+                    const info = await play.video_info(query);
+                    const video = info.video_details;
+                    songInfo = {
+                        title: video.title,
+                        duration: video.durationInSec || 0,
+                        thumbnail: video.thumbnails?.[0]?.url
+                    };
+                } else {
+                    return message.reply('❌ Invalid YouTube URL!');
+                }
             } else {
-                // Search using youtube-dl-exec instead of ytsr
-                const info = await youtubedl(`ytsearch1:${query}`, {
-                    dumpSingleJson: true,
-                    noWarnings: true,
-                    noCheckCertificate: true,
-                    defaultSearch: 'ytsearch',
-                });
+                // Search using play-dl
+                const searchResults = await play.search(query, { limit: 1 });
                 
-                if (!info || !info.url) {
+                if (!searchResults || searchResults.length === 0) {
                     return message.reply('❌ No results found!');
                 }
                 
-                videoUrl = info.webpage_url || info.url;
+                const video = searchResults[0];
+                videoUrl = video.url;
                 songInfo = {
-                    title: info.title,
-                    duration: Math.floor(info.duration || 0),
-                    thumbnail: info.thumbnail
+                    title: video.title,
+                    duration: video.durationInSec || 0,
+                    thumbnail: video.thumbnails?.[0]?.url
                 };
             }
 
@@ -191,16 +271,11 @@ module.exports = {
                     )
                     .setThumbnail(song.thumbnail);
 
-                const msg = await message.channel.send({ embeds: [nowPlayingEmbed] });
+                const msg = await message.channel.send({
+                    embeds: [nowPlayingEmbed],
+                    components: createMusicControls()
+                });
                 queue.nowPlayingMessage = msg;
-                
-                // Add reaction controls
-                await msg.react('⏸️'); // Pause
-                await msg.react('▶️');  // Resume
-                await msg.react('⏭️');  // Skip
-                await msg.react('⏹️');  // Stop
-                await msg.react('🔉');  // Volume down
-                await msg.react('🔊');  // Volume up
             } else {
                 const queueEmbed = new EmbedBuilder()
                     .setColor(0x00ff00)
@@ -213,7 +288,11 @@ module.exports = {
                     )
                     .setThumbnail(song.thumbnail);
 
-                await message.channel.send({ embeds: [queueEmbed] });
+                const msg = await message.channel.send({
+                    embeds: [queueEmbed],
+                    components: createMusicControls()
+                });
+                queue.nowPlayingMessage = msg;
             }
         } catch (error) {
             console.error('Error playing song:', error);

@@ -1,9 +1,77 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
-const youtubedl = require('youtube-dl-exec');
+const play = require('play-dl');
+const https = require('https');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
 const { parseDuration } = require('../../utils/helpers');
+
+const createMusicControls = (disabled = false) => {
+    const row1 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('music_previous')
+            .setEmoji('⏮️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_pause')
+            .setEmoji('⏸️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_resume')
+            .setEmoji('▶️')
+            .setStyle(ButtonStyle.Success)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_skip')
+            .setEmoji('⏭️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_stop')
+            .setEmoji('⏹️')
+            .setStyle(ButtonStyle.Danger)
+            .setDisabled(disabled)
+    );
+
+    const row2 = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId('music_vol_down')
+            .setEmoji('🔉')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_vol_up')
+            .setEmoji('🔊')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled),
+        new ButtonBuilder()
+            .setCustomId('music_loop')
+            .setLabel('Loop: Off')
+            .setEmoji('🔁')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(disabled)
+    );
+
+    return [row1, row2];
+};
+
+const fetchSpotifyMetadata = (url) => new Promise((resolve, reject) => {
+    const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
+    https.get(oembedUrl, res => {
+        let data = '';
+        res.on('data', chunk => (data += chunk));
+        res.on('end', () => {
+            try {
+                const parsed = JSON.parse(data);
+                resolve(parsed);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }).on('error', reject);
+});
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -86,61 +154,70 @@ module.exports = {
 };
 
 async function handleYouTubeVideo(url, queue, interaction) {
-    const info = await youtubedl(url, {
-        dumpSingleJson: true,
-        noWarnings: true,
-        noCheckCertificate: true,
-    });
+    try {
+        const isValid = play.yt_validate(url);
+        if (isValid !== 'video') {
+            await interaction.editReply('❌ Invalid YouTube video URL!');
+            return;
+        }
 
-    const song = {
-        title: info.title,
-        url: info.webpage_url,
-        duration: info.duration,
-        thumbnail: info.thumbnail,
-        requester: interaction.user.tag
-    };
+        const info = await play.video_info(url);
+        const video = info.video_details;
 
-    queue.addSong(song);
+        const song = {
+            title: video.title,
+            url: video.url,
+            duration: video.durationInSec,
+            thumbnail: video.thumbnails?.[0]?.url,
+            requester: interaction.user.tag
+        };
 
-    const embed = new EmbedBuilder()
-        .setColor('#00FF00')
-        .setTitle('🎵 Added to Queue')
-        .setDescription(`**[${song.title}](${song.url})**`)
-        .addFields(
-            { name: 'Duration', value: formatTime(song.duration), inline: true },
-            { name: 'Position', value: `${queue.songs.length}`, inline: true }
-        )
-        .setThumbnail(song.thumbnail)
-        .setFooter({ text: `Requested by ${interaction.user.tag}` });
+        queue.addSong(song);
 
-    if (!queue.isPlaying) {
-        queue.playNext();
-        await interaction.editReply({ embeds: [embed] });
-    } else {
-        await interaction.editReply({ embeds: [embed] });
+        const embed = new EmbedBuilder()
+            .setColor('#00FF00')
+            .setTitle('🎵 Added to Queue')
+            .setDescription(`**[${song.title}](${song.url})**`)
+            .addFields(
+                { name: 'Duration', value: formatTime(song.duration), inline: true },
+                { name: 'Position', value: `${queue.songs.length}`, inline: true }
+            )
+            .setThumbnail(song.thumbnail)
+            .setFooter({ text: `Requested by ${interaction.user.tag}` });
+
+        if (!queue.isPlaying) {
+            queue.playNext();
+            await interaction.editReply({ embeds: [embed], components: createMusicControls() });
+        } else {
+            await interaction.editReply({ embeds: [embed], components: createMusicControls() });
+        }
+    } catch (error) {
+        console.error('Error handling YouTube video:', error);
+        await interaction.editReply('❌ Failed to process video!');
     }
 }
 
 async function handleYouTubePlaylist(url, queue, interaction) {
     await interaction.editReply('🔍 Fetching playlist...');
 
-    const playlistInfo = await youtubedl(url, {
-        dumpSingleJson: true,
-        flatPlaylist: true,
-        noWarnings: true,
-    });
+    const playlistInfo = await play.playlist_info(url, { incomplete: true });
+    
+    if (!playlistInfo) {
+        await interaction.editReply('❌ Could not fetch playlist information!');
+        return;
+    }
 
-    const entries = playlistInfo.entries || [];
-    const maxSongs = Math.min(entries.length, 50);
+    const videos = await playlistInfo.all_videos();
+    const maxSongs = Math.min(videos.length, 50);
 
     for (let i = 0; i < maxSongs; i++) {
-        const entry = entries[i];
-        if (entry && entry.url) {
+        const video = videos[i];
+        if (video && video.url) {
             const song = {
-                title: entry.title,
-                url: entry.url,
-                duration: entry.duration || 0,
-                thumbnail: entry.thumbnail,
+                title: video.title,
+                url: video.url,
+                duration: video.durationInSec || 0,
+                thumbnail: video.thumbnails?.[0]?.url,
                 requester: interaction.user.tag
             };
             queue.addSong(song);
@@ -157,28 +234,25 @@ async function handleYouTubePlaylist(url, queue, interaction) {
         queue.playNext();
     }
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply({ embeds: [embed], components: createMusicControls() });
 }
 
 async function handleYouTubeSearch(query, queue, interaction) {
     try {
-        // Use youtube-dl-exec to search directly instead of ytsr
-        const info = await youtubedl(`ytsearch1:${query}`, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCheckCertificate: true,
-            defaultSearch: 'ytsearch',
-        });
-
-        if (!info || !info.url) {
+        // Use play-dl to search
+        const searchResults = await play.search(query, { limit: 1 });
+        
+        if (!searchResults || searchResults.length === 0) {
             return interaction.editReply('❌ No results found!');
         }
 
+        const video = searchResults[0];
+
         const song = {
-            title: info.title,
-            url: info.webpage_url || info.url,
-            duration: info.duration || 0,
-            thumbnail: info.thumbnail,
+            title: video.title,
+            url: video.url,
+            duration: video.durationInSec || 0,
+            thumbnail: video.thumbnails?.[0]?.url,
             requester: interaction.user.tag
         };
 
@@ -199,7 +273,7 @@ async function handleYouTubeSearch(query, queue, interaction) {
             queue.playNext();
         }
 
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed], components: createMusicControls() });
     } catch (error) {
         console.error('Search error:', error);
         await interaction.editReply('❌ Failed to search for the song!');
@@ -207,7 +281,6 @@ async function handleYouTubeSearch(query, queue, interaction) {
 }
 
 async function handleSpotify(url, queue, interaction) {
-    // Convert Spotify to YouTube search
     try {
         const spotifyRegex = /spotify\.com\/(track|playlist|album)\/([a-zA-Z0-9]+)/;
         const match = url.match(spotifyRegex);
@@ -216,12 +289,18 @@ async function handleSpotify(url, queue, interaction) {
             return interaction.editReply('❌ Invalid Spotify URL!');
         }
 
-        // For now, we'll use a simple search approach
-        // In production, you'd want to use Spotify API
+        await interaction.editReply('🎵 Spotify support: Fetching details...');
+
+        const meta = await fetchSpotifyMetadata(url);
+        const title = meta?.title || '';
+        const author = meta?.author_name || '';
+        const searchQuery = `${title} ${author}`.trim();
+
+        if (!searchQuery) {
+            return interaction.editReply('❌ Could not read Spotify metadata. Try a YouTube link instead!');
+        }
+
         await interaction.editReply('🎵 Spotify support: Searching on YouTube...');
-        
-        // Extract track info from URL if possible, otherwise generic search
-        const searchQuery = url;
         await handleYouTubeSearch(searchQuery, queue, interaction);
     } catch (error) {
         console.error('Spotify error:', error);
@@ -231,15 +310,17 @@ async function handleSpotify(url, queue, interaction) {
 
 async function handleSoundCloud(url, queue, interaction) {
     try {
-        const info = await youtubedl(url, {
-            dumpSingleJson: true,
-            noWarnings: true,
-        });
+        const isValid = play.so_validate(url);
+        if (!isValid) {
+            return interaction.editReply('❌ Invalid SoundCloud URL!');
+        }
+
+        const info = await play.soundcloud(url);
 
         const song = {
-            title: info.title,
-            url: info.webpage_url,
-            duration: info.duration,
+            title: info.name,
+            url: info.url,
+            duration: info.durationInSec,
             thumbnail: info.thumbnail,
             requester: interaction.user.tag
         };
@@ -261,7 +342,7 @@ async function handleSoundCloud(url, queue, interaction) {
             queue.playNext();
         }
 
-        await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed], components: createMusicControls() });
     } catch (error) {
         console.error('SoundCloud error:', error);
         await interaction.editReply('❌ Could not play SoundCloud track!');

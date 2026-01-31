@@ -22,3 +22,6 @@ Thumbs.db
 # Bot data
 data/settings.json
 .idea/
+data/gameStats.json
+# Generator scripts
+generate_commands_list.js

@@ -51,10 +51,24 @@ class GameStatsManager {
         if (!this.stats.has(userId)) {
             this.stats.set(userId, {
                 blackjack: { wins: 0, losses: 0, ties: 0 },
-                roulette: { wins: 0, losses: 0 }
+                roulette: { wins: 0, losses: 0 },
+                slots: { wins: 0, losses: 0 }
             });
         }
-        return this.stats.get(userId);
+        
+        // Ensure all game properties exist for existing users
+        const stats = this.stats.get(userId);
+        if (!stats.blackjack) {
+            stats.blackjack = { wins: 0, losses: 0, ties: 0 };
+        }
+        if (!stats.roulette) {
+            stats.roulette = { wins: 0, losses: 0 };
+        }
+        if (!stats.slots) {
+            stats.slots = { wins: 0, losses: 0 };
+        }
+        
+        return stats;
     }
 
     async recordBlackjack(userId, result) {
@@ -79,11 +93,22 @@ class GameStatsManager {
         await this.save();
     }
 
+    async recordSlots(userId, won) {
+        const stats = this.getStats(userId);
+        if (won) {
+            stats.slots.wins++;
+        } else {
+            stats.slots.losses++;
+        }
+        await this.save();
+    }
+
     getTotalGames(userId) {
         const stats = this.getStats(userId);
         return {
             blackjack: stats.blackjack.wins + stats.blackjack.losses + stats.blackjack.ties,
-            roulette: stats.roulette.wins + stats.roulette.losses
+            roulette: stats.roulette.wins + stats.roulette.losses,
+            slots: stats.slots.wins + stats.slots.losses
         };
     }
 
