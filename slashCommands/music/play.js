@@ -193,6 +193,19 @@ async function handleYouTubeVideo(url, queue, interaction) {
         }
     } catch (error) {
         console.error('Error handling YouTube video:', error);
+        
+        // Handle age-restricted content
+        if (error.message && error.message.includes('Sign in to confirm your age')) {
+            await interaction.editReply('❌ This video is age-restricted and cannot be played through this bot. Please provide a different video.');
+            return;
+        }
+        
+        // Handle other errors
+        if (error.message && error.message.includes('This video is unavailable')) {
+            await interaction.editReply('❌ This video is unavailable (may be deleted or region-locked).');
+            return;
+        }
+        
         await interaction.editReply('❌ Failed to process video!');
     }
 }

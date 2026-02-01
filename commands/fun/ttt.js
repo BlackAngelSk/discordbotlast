@@ -33,6 +33,7 @@ module.exports = {
 async function playTicTacToeWithBet(message, bet) {
     const board = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '];
     let finished = false;
+    let botDifficulty = Math.random(); // Random difficulty between 0-1
 
     const checkWinner = (b) => {
         const lines = [
@@ -49,6 +50,14 @@ async function playTicTacToeWithBet(message, bet) {
     };
 
     const botMove = () => {
+        // Random difficulty - only 15% chance of making a bad move (harder)
+        if (botDifficulty < 0.1) {
+            // 15% chance of making a random move (bad play)
+            const available = board.map((v, i) => v === ' ' ? i : null).filter(x => x !== null);
+            return available[Math.floor(Math.random() * available.length)];
+        }
+
+        // Smart play
         const findMove = (symbol) => {
             const lines = [
                 [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -64,24 +73,39 @@ async function playTicTacToeWithBet(message, bet) {
             return null;
         };
 
+        // Always try to win first (highest priority)
         let move = findMove('O');
         if (move !== null) return move;
+
+        // Always block player threats (very high priority)
         move = findMove('X');
         if (move !== null) return move;
+
+        // Take center if available
         if (board[4] === ' ') return 4;
+
+        // Take corners strategically
+        const corners = [0, 2, 6, 8].filter(i => board[i] === ' ');
+        if (corners.length > 0) return corners[Math.floor(Math.random() * corners.length)];
+
+        // Take any remaining space
         const available = board.map((v, i) => v === ' ' ? i : null).filter(x => x !== null);
         return available[Math.floor(Math.random() * available.length)];
     };
 
     const renderBoard = () => {
-        const emojis = { 'X': '❌', 'O': '⭕', ' ': '⬜' };
-        return board.map((cell, i) => {
-            if (i % 3 === 0 && i !== 0) return '\n';
-            return emojis[cell];
-        }).join('');
+        let display = '';
+        for (let i = 0; i < 9; i++) {
+            if (i % 3 === 0 && i !== 0) display += '\n';
+            if (board[i] === 'X') display += '❌';
+            else if (board[i] === 'O') display += '⭕';
+            else display += '⬜';
+        }
+        return display;
     };
 
     const createButtons = (disabled = false) => {
+        const emojis = { 'X': '❌', 'O': '⭕', ' ': ' ' };
         const rows = [];
         for (let i = 0; i < 3; i++) {
             const row = new ActionRowBuilder().addComponents(
@@ -89,8 +113,8 @@ async function playTicTacToeWithBet(message, bet) {
                     const idx = i * 3 + j;
                     return new ButtonBuilder()
                         .setCustomId(`tttbet_${idx}`)
-                        .setLabel(board[idx] === ' ' ? `${idx + 1}` : board[idx])
-                        .setStyle(board[idx] === ' ' ? ButtonStyle.Secondary : ButtonStyle.Primary)
+                        .setLabel(board[idx] === ' ' ? `${idx + 1}` : emojis[board[idx]])
+                        .setStyle(board[idx] === ' ' ? ButtonStyle.Secondary : (board[idx] === 'X' ? ButtonStyle.Danger : ButtonStyle.Primary))
                         .setDisabled(disabled || board[idx] !== ' ');
                 })
             );
@@ -102,7 +126,7 @@ async function playTicTacToeWithBet(message, bet) {
     const prompt = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('Tic-Tac-Toe (Betting)')
-        .setDescription(`You are ❌ | Bot is ⭕\nBet: **${bet} coins**\nYour turn!`);
+        .setDescription(`You are ❌ | Bot is ⭕\n\nBet: **${bet}** | Payout: **${bet * 2}**\n\nYour turn!`);
 
     const msg = await message.reply({ embeds: [prompt], components: createButtons() });
 
@@ -123,11 +147,12 @@ async function playTicTacToeWithBet(message, bet) {
         if (winner === 'X') {
             resultText = '🎉 You win!';
             color = 0x57f287;
-            payout = bet * 2;
+            payout = Math.floor(bet * 2);
             await economyManager.addMoney(message.guild.id, message.author.id, payout);
         } else if (winner === 'O') {
             resultText = '🤖 Bot wins!';
             color = 0xed4245;
+            payout = 0;
         } else {
             resultText = "🤝 It's a tie!";
             color = 0xf1c40f;
@@ -140,7 +165,7 @@ async function playTicTacToeWithBet(message, bet) {
             .setTitle('Tic-Tac-Toe (Betting)')
             .setDescription(
                 renderBoard() + '\n\n' + resultText +
-                `\n\nBet: **${bet}** | Payout: **${payout}**`
+                `\n\nBet: ${bet} | Payout: **${payout}**`
             );
 
         if (interaction) {
@@ -171,7 +196,7 @@ async function playTicTacToeWithBet(message, bet) {
             .setDescription(
                 renderBoard() + '\n\n' +
                 (winner === 'O' ? '🤖 Bot wins!' : winner === 'tie' ? "🤝 It's a tie!" : 'Your turn!') +
-                `\n\nBet: **${bet} coins**`
+                `\n\nBet: ${bet} | Payout: **${bet * 2}**`
             );
 
         await interaction.update({ embeds: [statusEmbed], components: createButtons(!!winner) });

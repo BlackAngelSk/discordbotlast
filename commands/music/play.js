@@ -199,13 +199,29 @@ module.exports = {
                 const isValid = play.yt_validate(query);
                 if (isValid === 'video') {
                     videoUrl = query;
-                    const info = await play.video_info(query);
-                    const video = info.video_details;
-                    songInfo = {
-                        title: video.title,
-                        duration: video.durationInSec || 0,
-                        thumbnail: video.thumbnails?.[0]?.url
-                    };
+                    try {
+                        const info = await play.video_info(query);
+                        const video = info.video_details;
+                        songInfo = {
+                            title: video.title,
+                            duration: video.durationInSec || 0,
+                            thumbnail: video.thumbnails?.[0]?.url
+                        };
+                    } catch (videoError) {
+                        console.error('Error getting video info:', videoError);
+                        
+                        // Handle age-restricted content
+                        if (videoError.message && videoError.message.includes('Sign in to confirm your age')) {
+                            return message.reply('❌ This video is age-restricted and cannot be played through this bot. Please provide a different video.');
+                        }
+                        
+                        // Handle other video errors
+                        if (videoError.message && videoError.message.includes('This video is unavailable')) {
+                            return message.reply('❌ This video is unavailable (may be deleted or region-locked).');
+                        }
+                        
+                        throw videoError;
+                    }
                 } else {
                     return message.reply('❌ Invalid YouTube URL!');
                 }
