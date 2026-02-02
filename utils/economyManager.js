@@ -40,7 +40,10 @@ class EconomyManager {
                 level: 1,
                 lastDaily: null,
                 lastWeekly: null,
-                inventory: []
+                inventory: [],
+                dailyStreak: 0,
+                streakBonusMultiplier: 1,
+                seasonalCoins: 0
             };
         }
         return this.data.users[key];
@@ -97,12 +100,25 @@ class EconomyManager {
             return { success: false, timeLeft };
         }
 
-        const amount = 1000;
+        // Check if streak is still active (within 48 hours)
+        if (userData.lastDaily && (now - userData.lastDaily) < (2 * oneDay)) {
+            userData.dailyStreak = (userData.dailyStreak || 0) + 1;
+        } else {
+            userData.dailyStreak = 1;
+        }
+
+        // Calculate multiplier based on streak (caps at 3x after 7 days)
+        userData.streakBonusMultiplier = Math.min(1 + (userData.dailyStreak * 0.2), 3);
+        
+        const baseAmount = 1000;
+        const amount = Math.floor(baseAmount * userData.streakBonusMultiplier);
+        
         userData.lastDaily = now;
         userData.balance += amount;
+        userData.seasonalCoins = (userData.seasonalCoins || 0) + amount;
         await this.save();
         
-        return { success: true, amount };
+        return { success: true, amount, streak: userData.dailyStreak, multiplier: userData.streakBonusMultiplier };
     }
 
     async claimWeekly(guildId, userId) {

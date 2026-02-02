@@ -37,8 +37,21 @@ class MusicQueue {
     async setupConnection(connection) {
         this.connection = connection;
         
-        // Subscribe the connection to the player immediately
+        // Wait for connection to be ready before subscribing
+        try {
+            await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+            console.log('✅ Connection is ready');
+        } catch (error) {
+            console.error('❌ Connection failed to become ready:', error);
+            this.connection.destroy();
+            const queues = require('./queues');
+            queues.delete(this.guildId);
+            throw new Error('Failed to establish voice connection');
+        }
+        
+        // Subscribe the connection to the player after connection is ready
         this.connection.subscribe(this.player);
+        console.log('✅ Player subscribed to connection');
         
         this.connection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
@@ -255,14 +268,17 @@ class MusicQueue {
                 resource.volume.setVolume(this.volume);
             }
 
-            // Subscribe and play
-            console.log('🔌 Subscribing player to connection...');
-            this.connection.subscribe(this.player);
+            // Make sure we're still subscribed (redundancy check)
+            if (this.connection) {
+                this.connection.subscribe(this.player);
+            }
             
             console.log('▶️ Starting playback...');
             this.player.play(resource);
             
-            console.log('✅ Playback started successfully');
+            // Wait a moment to confirm playback started
+            await new Promise(resolve => setTimeout(resolve, 100));
+            console.log(`✅ Player status: ${this.player.state.status}`);
             
         } catch (error) {
             console.error('❌ Error playing song:', error);

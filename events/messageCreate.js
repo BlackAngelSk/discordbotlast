@@ -1,6 +1,8 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
+const statsManager = require('../utils/statsManager');
+const customCommandManager = require('../utils/customCommandManager');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
@@ -83,6 +85,13 @@ module.exports = {
             }
         }
 
+        // Track message statistics
+        try {
+            await statsManager.recordMessage(message.guildId, message.author.id, message.channelId);
+        } catch (error) {
+            console.error('Stats tracking error:', error);
+        }
+
         // Add XP (5-15 XP per message, with cooldown)
         try {
             const xpCooldown = 60000; // 1 minute cooldown
@@ -110,6 +119,21 @@ module.exports = {
             }
         } catch (error) {
             console.error('XP tracking error:', error);
+        }
+
+        // Check for custom commands
+        if (message.content.startsWith('!')) {
+            const args = message.content.slice(1).split(/ +/);
+            const commandName = args[0].toLowerCase();
+            const customCommand = customCommandManager.getCommand(message.guildId, commandName);
+            
+            if (customCommand) {
+                try {
+                    return message.reply(customCommand);
+                } catch (error) {
+                    console.error('Custom command error:', error);
+                }
+            }
         }
 
         // Command handling is done in index.js through CommandHandler

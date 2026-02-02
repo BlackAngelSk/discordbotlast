@@ -1,5 +1,8 @@
-const { Events } = require('discord.js');
+const { Events, EmbedBuilder } = require('discord.js');
 const settingsManager = require('../utils/settingsManager');
+const statsManager = require('../utils/statsManager');
+const fs = require('fs').promises;
+const path = require('path');
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -33,6 +36,13 @@ module.exports = {
                 }
             }
 
+            // Update server stats
+            try {
+                await statsManager.recordMemberUpdate(member.guild.id, member.guild.memberCount);
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+
             // Send welcome message if enabled
             if (settings.welcomeEnabled && settings.welcomeChannel) {
                 // Try to get channel by ID first, then by name
@@ -56,6 +66,43 @@ module.exports = {
                     console.log(`⚠️ Welcome channel not found or not text-based in guild ${member.guild.name}`);
                 }
             }
+
+            // Send welcome card if enabled
+            try {
+                const settingsPath = path.join(__dirname, '..', 'data', 'settings.json');
+                let settingsData = {};
+                try {
+                    const data = await fs.readFile(settingsPath, 'utf8');
+                    settingsData = JSON.parse(data);
+                } catch (error) {
+                    settingsData = {};
+                }
+
+                const welcomeCardChannelId = settingsData[member.guild.id]?.welcomeCardChannel;
+                if (welcomeCardChannelId) {
+                    const welcomeChannel = await client.channels.fetch(welcomeCardChannelId).catch(() => null);
+                    
+                    if (welcomeChannel) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0x5865f2)
+                            .setTitle('👋 Welcome!')
+                            .setDescription(`Welcome to **${member.guild.name}**, ${member}!`)
+                            .addFields(
+                                { name: 'Member Count', value: `You are member #${member.guild.memberCount}`, inline: true },
+                                { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
+                            )
+                            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                            .setImage(member.guild.iconURL({ dynamic: true }))
+                            .setFooter({ text: 'Welcome to our community!' })
+                            .setTimestamp();
+
+                        await welcomeChannel.send({ embeds: [embed] });
+                    }
+                }
+            } catch (error) {
+                console.error('Error sending welcome card:', error);
+            }
+
         } catch (error) {
             console.error('Error in guildMemberAdd event:', error);
         }

@@ -7,6 +7,11 @@ const settingsManager = require('./utils/settingsManager');
 const economyManager = require('./utils/economyManager');
 const moderationManager = require('./utils/moderationManager');
 const gameStatsManager = require('./utils/gameStatsManager');
+const statsManager = require('./utils/statsManager');
+const reactionRoleManager = require('./utils/reactionRoleManager');
+const starboardManager = require('./utils/starboardManager');
+const customCommandManager = require('./utils/customCommandManager');
+const ticketManager = require('./utils/ticketManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -41,6 +46,21 @@ async function loadHandlers() {
         
         await gameStatsManager.init();
         console.log('✅ Game stats manager initialized!');
+
+        await statsManager.init();
+        console.log('✅ Stats manager initialized!');
+
+        await reactionRoleManager.init();
+        console.log('✅ Reaction role manager initialized!');
+
+        await starboardManager.init();
+        console.log('✅ Starboard manager initialized!');
+
+        await customCommandManager.init();
+        console.log('✅ Custom command manager initialized!');
+
+        await ticketManager.init();
+        console.log('✅ Ticket manager initialized!');
         
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();

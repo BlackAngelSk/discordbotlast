@@ -29,39 +29,59 @@ module.exports = {
                 .replace(/official|video|audio|lyrics|hd|4k/gi, '')
                 .trim();
 
-            // Try lyrics.ovh API (free, no key required)
-            const [artist, ...songParts] = cleanQuery.split(' - ');
-            const song = songParts.join(' - ') || cleanQuery;
-            
-            let response;
             let lyrics;
-            
-            if (artist && songParts.length > 0) {
-                // If we have artist - song format
-                response = await fetch(
-                    `https://api.lyrics.ovh/v1/${encodeURIComponent(artist.trim())}/${encodeURIComponent(song.trim())}`
-                );
-            } else {
-                // Try to split by common patterns
-                const parts = cleanQuery.split(/\s+-\s+|\s+by\s+/i);
-                if (parts.length >= 2) {
-                    response = await fetch(
-                        `https://api.lyrics.ovh/v1/${encodeURIComponent(parts[0].trim())}/${encodeURIComponent(parts[1].trim())}`
+            let foundLyrics = false;
+
+            // Try multiple API approaches
+            async function tryLyricsOVH(artist, song) {
+                try {
+                    const response = await fetch(
+                        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist.trim())}/${encodeURIComponent(song.trim())}`
                     );
-                } else {
-                    return message.reply(`❌ Couldn't find lyrics! Try using format: \`!lyrics Artist - Song Name\``);
+                    if (response.ok) {
+                        const data = await response.json();
+                        return data.lyrics || null;
+                    }
+                    return null;
+                } catch (e) {
+                    return null;
                 }
             }
 
-            if (!response.ok) {
-                return message.reply(`❌ Couldn't find lyrics for "${cleanQuery}"!\nTry using format: \`!lyrics Artist - Song Name\``);
+            // First, try direct artist - song format
+            if (cleanQuery.includes(' - ')) {
+                const [artist, ...songParts] = cleanQuery.split(' - ');
+                const song = songParts.join(' - ').trim();
+                if (artist.trim()) {
+                    lyrics = await tryLyricsOVH(artist, song);
+                    if (lyrics) foundLyrics = true;
+                }
             }
 
-            const data = await response.json();
-            lyrics = data.lyrics;
+            // Try by/feat patterns
+            if (!foundLyrics && cleanQuery.match(/\s+by\s+|\s+feat\s+/i)) {
+                const parts = cleanQuery.split(/\s+by\s+|\s+feat\s+/i);
+                if (parts.length >= 2) {
+                    lyrics = await tryLyricsOVH(parts[1], parts[0]);
+                    if (lyrics) foundLyrics = true;
+                }
+            }
 
-            if (!lyrics) {
-                return message.reply(`❌ No lyrics found for "${cleanQuery}"!`);
+            // Try as-is (lyrics.ovh will attempt to parse it)
+            if (!foundLyrics) {
+                lyrics = await tryLyricsOVH(cleanQuery, cleanQuery);
+                if (lyrics) foundLyrics = true;
+            }
+
+            // Last resort: try swapping common separators
+            if (!foundLyrics && cleanQuery.includes('/')) {
+                const parts = cleanQuery.split('/');
+                lyrics = await tryLyricsOVH(parts[0], parts[1]);
+                if (lyrics) foundLyrics = true;
+            }
+
+            if (!foundLyrics || !lyrics) {
+                return message.reply(`❌ Couldn't find lyrics for "${cleanQuery}"!\n**Try using format:** \`!lyrics Artist - Song Name\`\n**Example:** \`!lyrics Metallica - Nothing Else Matters\``);
             }
 
             // Split lyrics into chunks (Discord embed has 4096 char limit)
@@ -86,8 +106,11 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setColor(0x0099ff)
                 .setTitle(`🎤 Lyrics: ${cleanQuery}`)
-                .setDescription(chunks[0])
-                .setFooter({ text: chunks.length > 1 ? `Page 1/${chunks.length}` : '' });
+                .setDescription(chunks[0]);
+            
+            if (chunks.length > 1) {
+                embed.setFooter({ text: `Page 1/${chunks.length}` });
+            }
 
             await message.channel.send({ embeds: [embed] });
 
@@ -107,7 +130,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error fetching lyrics:', error);
-            message.reply(`❌ An error occurred while fetching lyrics!\nTry format: \`!lyrics Artist - Song Name\``);
+            message.reply(`❌ An error occurred while fetching lyrics!\nTry format: \`!lyrics Artist - Song Name\`\nExample: \`!lyrics Metallica - Nothing Else Matters\``);
         }
     }
 };
