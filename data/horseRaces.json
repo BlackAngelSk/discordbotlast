@@ -1,0 +1,92 @@
+[
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 2,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:43:13.798Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 5,
+    "winner": 2,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:42:25.317Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 1,
+    "winner": 3,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:41:32.871Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:40:14.042Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 2,
+    "winner": 5,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:37:46.925Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:37:26.800Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:35:49.747Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 5,
+    "winner": 1,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:32:13.623Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 10000,
+    "payout": 0,
+    "choice": 4,
+    "winner": 5,
+    "course": "medium",
+    "timestamp": "2026-02-04T20:31:44.088Z"
+  }
+]

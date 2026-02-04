@@ -1,17 +1,17 @@
 {
   "396685113804587009": {
     "blackjack": {
-      "wins": 14,
-      "losses": 16,
-      "ties": 0
+      "wins": 16,
+      "losses": 17,
+      "ties": 1
     },
     "roulette": {
-      "wins": 2,
-      "losses": 3
+      "wins": 16,
+      "losses": 40
     },
     "slots": {
-      "wins": 0,
-      "losses": 1
+      "wins": 18,
+      "losses": 74
     },
     "dice": {
       "wins": 0,
@@ -19,7 +19,7 @@
     },
     "coinflip": {
       "wins": 0,
-      "losses": 0
+      "losses": 1
     },
     "rps": {
       "wins": 0,
@@ -27,9 +27,9 @@
       "ties": 0
     },
     "ttt": {
-      "wins": 14,
+      "wins": 27,
       "losses": 0,
-      "ties": 31
+      "ties": 75
     }
   },
   "195140009748201472": {
@@ -58,8 +58,26 @@
       "losses": 0
     },
     "slots": {
-      "wins": 3,
-      "losses": 1
+      "wins": 5,
+      "losses": 2
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "349649557896036354": {
@@ -74,7 +92,7 @@
     },
     "slots": {
       "wins": 8,
-      "losses": 18
+      "losses": 19
     },
     "dice": {
       "wins": 0,
@@ -92,7 +110,7 @@
     "ttt": {
       "wins": 6,
       "losses": 1,
-      "ties": 3
+      "ties": 4
     }
   },
   "481017558376382464": {
