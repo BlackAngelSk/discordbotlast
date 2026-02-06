@@ -81,15 +81,7 @@ module.exports = {
             let courseInfo = `**Course: ${course.toUpperCase()}**\n`;
             courseInfo += `🏇 Track Length: ${trackLen}\n`;
             courseInfo += `💰 Payout Multiplier: ${payoutMultiplier}x\n\n`;
-            courseInfo += `**Horse Records & Win Rate:**\n`;
-            for (let h = 1; h <= 5; h++) {
-                const w = horseStats[h].wins;
-                const l = horseStats[h].losses;
-                const total = w + l;
-                const wr = total > 0 ? ((w / total) * 100).toFixed(1) : 'N/A';
-                courseInfo += `${emojis[h]} Horse ${h}: ${w}W-${l}L (${wr}%)\n`;
-            }
-            courseInfo += `\n**Chances (This Course):**\n`;
+            courseInfo += `**Chances (This Course):**\n`;
             courseInfo += `✅ Best chance: ${emojis[bestHorse]} Horse ${bestHorse}\n`;
             courseInfo += `⚠️ Worst chance: ${emojis[worstHorse]} Horse ${worstHorse}\n`;
             courseInfo += `\n**Payout Odds Bonus:**\n`;

@@ -12,6 +12,7 @@ const reactionRoleManager = require('./utils/reactionRoleManager');
 const starboardManager = require('./utils/starboardManager');
 const customCommandManager = require('./utils/customCommandManager');
 const ticketManager = require('./utils/ticketManager');
+const relationshipManager = require('./utils/relationshipManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -61,6 +62,9 @@ async function loadHandlers() {
 
         await ticketManager.init();
         console.log('✅ Ticket manager initialized!');
+
+        await relationshipManager.init();
+        console.log('✅ Relationship manager initialized!');
         
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();

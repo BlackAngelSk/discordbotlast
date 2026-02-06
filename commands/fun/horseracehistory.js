@@ -46,8 +46,8 @@ module.exports = {
             const embed = new EmbedBuilder()
                 .setTitle('🏇 Horse Race History')
                 .setColor(0x5865f2)
-                .addFields({ name: 'Stats', value: statsText, inline: false })
-                .setFooter({ text: `Showing last ${recent.length} races${filterCourse ? ` (${filterCourse})` : ''}` });
+                //.addFields({ name: 'Stats', value: statsText, inline: false })
+               // .setFooter({ text: `Showing last ${recent.length} races${filterCourse ? ` (${filterCourse})` : ''}` });
 
             const lines = recent.map(r => {
                 const time = new Date(r.timestamp).toLocaleString();

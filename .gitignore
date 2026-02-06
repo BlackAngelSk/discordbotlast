@@ -19,9 +19,9 @@ Thumbs.db
 # IDE
 .vscode/
 
-# Bot data
-data/settings.json
+# Bot data - Auto-generated at runtime
+data/
 .idea/
-data/gameStats.json
+
 # Generator scripts
 generate_commands_list.js

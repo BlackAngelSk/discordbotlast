@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
+const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
     name: 'profile',
@@ -11,6 +12,7 @@ module.exports = {
         try {
             const user = message.mentions.users.first() || message.author;
             const userData = economyManager.getUserData(message.guild.id, user.id);
+            const marriage = relationshipManager.getMarriage(message.guild.id, user.id);
 
             const xpForNextLevel = (userData.level * userData.level * 100);
             const xpForCurrentLevel = ((userData.level - 1) * (userData.level - 1) * 100);
@@ -31,8 +33,19 @@ module.exports = {
                     { name: '✖️ Streak Multiplier', value: `${(userData.streakBonusMultiplier || 1).toFixed(1)}x`, inline: true },
                     { name: '🏆 Seasonal Coins', value: `${userData.seasonalCoins || 0} coins`, inline: true },
                     { name: '🎮 Inventory', value: `${userData.inventory.length} items`, inline: true }
-                )
-                .setFooter({ text: 'Keep grinding to level up!' })
+                );
+
+            // Add spouse info if married
+            if (marriage) {
+                const spouse = await message.client.users.fetch(marriage.spouse);
+                const daysMarried = Math.floor((Date.now() - marriage.marriedAt) / (1000 * 60 * 60 * 24));
+                embed.addFields(
+                    { name: '💍 Spouse', value: `${spouse.username}`, inline: true },
+                    { name: '💕 Days Married', value: `${daysMarried} days`, inline: true }
+                );
+            }
+
+            embed.setFooter({ text: 'Keep grinding to level up!' })
                 .setTimestamp();
 
             message.reply({ embeds: [embed] });

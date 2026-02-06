@@ -13,6 +13,10 @@ class ModerationManager {
 
     async init() {
         try {
+            // Ensure data directory exists
+            const dataDir = path.dirname(this.dataPath);
+            await fs.mkdir(dataDir, { recursive: true });
+
             const data = await fs.readFile(this.dataPath, 'utf8');
             this.data = JSON.parse(data);
         } catch (error) {

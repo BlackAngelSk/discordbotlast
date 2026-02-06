@@ -2,6 +2,126 @@
   {
     "guildId": "421968526547353601",
     "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 2,
+    "winner": 3,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:54:43.867Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 3200,
+    "choice": 4,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:42:42.553Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 2,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:41:10.605Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 1,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:39:12.090Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 3,
+    "winner": 1,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:38:22.583Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 1,
+    "winner": 3,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:38:04.554Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 1,
+    "winner": 4,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:37:46.254Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 1,
+    "winner": 5,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:37:28.631Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 100000000000000000000,
+    "payout": 320000000000000000000,
+    "choice": 1,
+    "winner": 1,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:37:02.332Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 100000000000000000000,
+    "payout": 0,
+    "choice": 4,
+    "winner": 1,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:36:47.051Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 100000000000000000000,
+    "payout": 0,
+    "choice": 4,
+    "winner": 5,
+    "course": "medium",
+    "timestamp": "2026-02-06T09:36:22.004Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
+    "bet": 1000,
+    "payout": 0,
+    "choice": 4,
+    "winner": 2,
+    "course": "medium",
+    "timestamp": "2026-02-05T19:28:58.040Z"
+  },
+  {
+    "guildId": "421968526547353601",
+    "userId": "349649557896036354",
     "bet": 1000000,
     "payout": 3200000,
     "choice": 4,
