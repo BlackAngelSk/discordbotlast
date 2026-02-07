@@ -50,12 +50,21 @@ class CommandHandler {
         // Ignore DMs - only work in servers
         if (!message.guild) return;
 
-        // Get custom prefix for this server
-        const prefix = settingsManager.getPrefix(message.guild.id);
+        // Get all prefixes for this server
+        const prefixes = settingsManager.getPrefixes(message.guild.id);
         
-        if (!message.content.startsWith(prefix)) return;
+        // Check if message starts with any prefix
+        let usedPrefix = null;
+        for (const prefix of prefixes) {
+            if (message.content.startsWith(prefix)) {
+                usedPrefix = prefix;
+                break;
+            }
+        }
 
-        const args = message.content.slice(prefix.length).trim().split(/ +/);
+        if (!usedPrefix) return;
+
+        const args = message.content.slice(usedPrefix.length).trim().split(/ +/);
         const commandName = args.shift().toLowerCase();
 
         const command = this.commands.get(commandName);

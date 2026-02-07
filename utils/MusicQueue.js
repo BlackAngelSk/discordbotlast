@@ -172,8 +172,20 @@ class MusicQueue {
 
             const { createAudioResource, StreamType } = require('@discordjs/voice');
             const { spawn } = require('child_process');
-            const ffmpegPath = require('ffmpeg-static');
+            const { execSync } = require('child_process');
             const path = require('path');
+            
+            // Try to use system ffmpeg first, fallback to ffmpeg-static
+            let ffmpegPath;
+            try {
+                ffmpegPath = execSync('which ffmpeg', { encoding: 'utf8' }).trim();
+                if (!ffmpegPath) throw new Error('ffmpeg not found');
+            } catch {
+                // Fallback to ffmpeg-static
+                ffmpegPath = require('ffmpeg-static');
+            }
+            
+            console.log(`🎬 Using FFmpeg from: ${ffmpegPath}`);
 
             // Make sure connection is ready before playing
             if (!this.connection || this.connection.state.status === VoiceConnectionStatus.Destroyed) {
@@ -195,8 +207,20 @@ class MusicQueue {
             }
 
             // Get yt-dlp path
-            const ytdlp = require('@distube/yt-dlp');
-            const ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+            const os = require('os');
+            const homeDir = os.homedir();
+            
+            // Try to use system yt-dlp first (Linux), fallback to bundled .exe (Windows)
+            let ytdlpPath = path.join(homeDir, '.local', 'bin', 'yt-dlp');
+            const fs = require('fs');
+            
+            if (!fs.existsSync(ytdlpPath)) {
+                // Fallback to bundled version
+                const ytdlp = require('@distube/yt-dlp');
+                ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+            }
+            
+            console.log(`📥 Using yt-dlp from: ${ytdlpPath}`);
 
             // Spawn yt-dlp to download and output audio to stdout
             const ytdlpProcess = spawn(ytdlpPath, [
@@ -204,6 +228,7 @@ class MusicQueue {
                 '--no-playlist',
                 '--no-warnings',
                 '--quiet',
+                '--buffer-size', '512K',
                 '--output', '-',
                 song.url
             ], {
@@ -215,10 +240,13 @@ class MusicQueue {
             const ffmpegProcess = spawn(ffmpegPath, [
                 '-i', 'pipe:0',
                 '-analyzeduration', '0',
+                '-probesize', '32',
                 '-loglevel', '0',
+                '-acodec', 'pcm_s16le',
                 '-f', 's16le',
                 '-ar', '48000',
                 '-ac', '2',
+                '-bufsize', '512k',
                 'pipe:1'
             ], {
                 windowsHide: true,
@@ -256,6 +284,7 @@ class MusicQueue {
             const resource = createAudioResource(ffmpegProcess.stdout, {
                 inputType: StreamType.Raw,
                 inlineVolume: true,
+                silencePaddingFrames: 5,
                 metadata: {
                     title: song.title
                 }

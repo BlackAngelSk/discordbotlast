@@ -5,7 +5,7 @@ const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
 
 // Default settings for new servers
 const DEFAULT_SETTINGS = {
-    prefix: '!',
+    prefixes: ['!', '.'],  // Support 2 prefixes
     welcomeEnabled: false,
     welcomeChannel: null,
     welcomeMessage: '🎉 Welcome to the server, {user}! Enjoy your stay!',
@@ -87,12 +87,56 @@ class SettingsManager {
         await this.save();
     }
 
+    getPrefixes(guildId) {
+        const settings = this.get(guildId);
+        // Support both old single prefix and new array of prefixes
+        if (Array.isArray(settings.prefixes)) {
+            return settings.prefixes;
+        }
+        // Fallback for old data format
+        return [settings.prefix || '!'];
+    }
+
     getPrefix(guildId) {
-        return this.get(guildId).prefix;
+        // For backwards compatibility, return first prefix
+        const prefixes = this.getPrefixes(guildId);
+        return prefixes[0] || '!';
+    }
+
+    async setPrefixes(guildId, prefixes) {
+        if (!Array.isArray(prefixes) || prefixes.length === 0) {
+            throw new Error('Prefixes must be a non-empty array');
+        }
+        if (prefixes.length > 5) {
+            throw new Error('Maximum 5 prefixes allowed');
+        }
+        await this.set(guildId, 'prefixes', prefixes);
     }
 
     async setPrefix(guildId, prefix) {
-        await this.set(guildId, 'prefix', prefix);
+        // Set single prefix (replaces all)
+        await this.setPrefixes(guildId, [prefix]);
+    }
+
+    async addPrefix(guildId, prefix) {
+        const prefixes = this.getPrefixes(guildId);
+        if (prefixes.includes(prefix)) {
+            throw new Error('This prefix already exists');
+        }
+        prefixes.push(prefix);
+        await this.setPrefixes(guildId, prefixes);
+    }
+
+    async removePrefix(guildId, prefix) {
+        const prefixes = this.getPrefixes(guildId);
+        if (prefixes.length === 1) {
+            throw new Error('You must have at least one prefix');
+        }
+        const filtered = prefixes.filter(p => p !== prefix);
+        if (filtered.length === prefixes.length) {
+            throw new Error('That prefix does not exist');
+        }
+        await this.setPrefixes(guildId, filtered);
     }
 
     async reset(guildId) {

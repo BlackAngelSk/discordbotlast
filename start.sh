@@ -33,7 +33,7 @@ fi
 case "${1:-}" in
   --bg)
     echo "Starting bot in background (nohup), output -> bot.log"
-    nohup node index.js > bot.log 2>&1 &
+    nohup node --no-deprecation index.js > bot.log 2>&1 &
     echo $! > bot.pid
     echo "PID $(cat bot.pid) written to bot.pid"
     ;;
@@ -43,10 +43,10 @@ case "${1:-}" in
       exit 1
     fi
     echo "Starting bot with pm2 (name: discord-bot)"
-    pm2 start index.js --name discord-bot
+    pm2 start index.js --name discord-bot -- --no-deprecation
     ;;
   *)
     echo "Starting bot in foreground (Ctrl-C to stop)"
-    exec node index.js
+    exec node --no-deprecation index.js
     ;;
 esac

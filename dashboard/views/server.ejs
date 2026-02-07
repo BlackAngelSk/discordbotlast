@@ -44,9 +44,17 @@
                 <h2>⚙️ Basic Settings</h2>
                 
                 <div class="form-group">
-                    <label for="prefix">Command Prefix</label>
-                    <input type="text" id="prefix" name="prefix" value="<%= settings.prefix %>" maxlength="5">
-                    <small>The prefix used to trigger bot commands</small>
+                    <label>Command Prefixes</label>
+                    <div id="prefixContainer" class="prefix-list">
+                        <% settings.prefixes.forEach((prefix, index) => { %>
+                            <div class="prefix-item">
+                                <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" data-index="<%= index %>">
+                                <button type="button" class="btn-small btn-danger" onclick="removePrefix(<%= index %>)">Remove</button>
+                            </div>
+                        <% }); %>
+                    </div>
+                    <button type="button" class="btn-small btn-secondary" onclick="addPrefix()">+ Add Prefix</button>
+                    <small>You can have multiple prefixes (up to 5). All prefixes will trigger bot commands.</small>
                 </div>
 
                 <div class="form-group">
@@ -135,6 +143,74 @@
                 </div>
             </div>
 
+            <!-- Logging System -->
+            <div class="settings-section">
+                <h2>📋 Server Logging</h2>
+                
+                <div class="form-group">
+                    <label for="loggingChannel">Logging Channel</label>
+                    <select id="loggingChannel" name="loggingChannel">
+                        <option value="">Disable Logging</option>
+                        <% channels.forEach(channel => { %>
+                            <option value="<%= channel.id %>" <%= loggingChannel === channel.id ? 'selected' : '' %>>
+                                #<%= channel.name %>
+                            </option>
+                        <% }); %>
+                    </select>
+                    <small>All server events will be logged here (messages, members, roles, channels)</small>
+                </div>
+
+                <div class="logging-info">
+                    <h4>📊 What Gets Logged:</h4>
+                    <ul>
+                        <li>✏️ Message edits and deletions</li>
+                        <li>👤 Member joins and leaves</li>
+                        <li>⭐ Role changes</li>
+                        <li>📂 Channel creation and deletion</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Invite Tracking -->
+            <div class="settings-section">
+                <h2>📊 Invite Analytics</h2>
+                
+                <div class="invite-info">
+                    <p>Track who invites new members to grow your server organically.</p>
+                    <h4>💡 Commands:</h4>
+                    <ul>
+                        <li><code>!invites [@user]</code> - View invite count for a user</li>
+                        <li><code>!invitestats</code> - See top inviters leaderboard</li>
+                        <li><code>/invites</code> - Slash command version</li>
+                        <li><code>/invitestats</code> - Slash command leaderboard</li>
+                    </ul>
+                </div>
+
+                <% if (topInviters && topInviters.length > 0) { %>
+                    <div class="leaderboard">
+                        <h4>🏆 Top 5 Inviters</h4>
+                        <table class="invite-table">
+                            <tr>
+                                <th>#</th>
+                                <th>User</th>
+                                <th>Invites</th>
+                            </tr>
+                            <% topInviters.forEach((inviter, index) => { %>
+                                <tr>
+                                    <td><%= index + 1 %></td>
+                                    <td><div class="user-tag"><%= inviter.userId %></div></td>
+                                    <td><strong><%= inviter.count %></strong></td>
+                                </tr>
+                            <% }); %>
+                        </table>
+                    </div>
+                <% } else { %>
+                    <div class="no-data">
+                        <p>No invite data yet. Start inviting members to see stats here!</p>
+                    </div>
+                <% } %>
+            </div>
+
             <!-- Auto-Moderation -->
             <div class="settings-section">
                 <h2>🛡️ Auto-Moderation</h2>
@@ -215,12 +291,59 @@
             }, 5000);
         }
 
+        function addPrefix() {
+            const container = document.getElementById('prefixContainer');
+            const count = container.children.length;
+            
+            if (count >= 5) {
+                showMessage('Maximum 5 prefixes allowed', 'error');
+                return;
+            }
+
+            const item = document.createElement('div');
+            item.className = 'prefix-item';
+            item.innerHTML = `
+                <input type="text" class="prefix-input" maxlength="5" data-index="${count}">
+                <button type="button" class="btn-small btn-danger" onclick="removePrefix(${count})">Remove</button>
+            `;
+            container.appendChild(item);
+        }
+
+        function removePrefix(index) {
+            const container = document.getElementById('prefixContainer');
+            const items = container.querySelectorAll('.prefix-item');
+            
+            if (items.length <= 1) {
+                showMessage('You must have at least one prefix', 'error');
+                return;
+            }
+
+            container.children[index].remove();
+        }
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const formData = new FormData(form);
             const data = {};
             
+            // Collect prefixes from input fields
+            const prefixInputs = document.querySelectorAll('.prefix-input');
+            const prefixes = [];
+            prefixInputs.forEach(input => {
+                const value = input.value.trim();
+                if (value) {
+                    prefixes.push(value);
+                }
+            });
+
+            if (prefixes.length === 0) {
+                showMessage('You must have at least one prefix', 'error');
+                return;
+            }
+
+            data.prefixes = prefixes;
+
             // Convert form data to object
             for (let [key, value] of formData.entries()) {
                 if (key === 'welcomeEnabled' || key === 'leaveEnabled' || key === 'autoModEnabled' || key === 'antiSpam' || key === 'antiInvite') {
@@ -230,7 +353,7 @@
                     data[key] = value.split(',').map(w => w.trim()).filter(w => w.length > 0);
                 } else if (key === 'maxMentions' || key === 'maxEmojis') {
                     data[key] = parseInt(value);
-                } else {
+                } else if (key !== 'prefix') {  // Skip old prefix field
                     data[key] = value;
                 }
             }

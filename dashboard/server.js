@@ -7,6 +7,8 @@ require('dotenv').config();
 
 const settingsManager = require('../utils/settingsManager');
 const moderationManager = require('../utils/moderationManager');
+const loggingManager = require('../utils/loggingManager');
+const inviteManager = require('../utils/inviteManager');
 
 class Dashboard {
     constructor(client) {
@@ -102,19 +104,23 @@ class Dashboard {
             const guild = this.client.guilds.cache.get(req.params.guildId);
             const settings = settingsManager.get(req.params.guildId);
             const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
+            const loggingChannel = loggingManager.getLoggingChannel(req.params.guildId);
+            const topInviters = inviteManager.getLeaderboard(req.params.guildId, 5);
             
             res.render('server', {
                 user: req.user,
                 guild: guild,
                 settings: settings,
                 modSettings: modSettings,
+                loggingChannel: loggingChannel,
+                topInviters: topInviters,
                 roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
                 channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
             });
         });
 
         // API: Update settings
-        this.app.post('/api/settings/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
+        this.app.post('/api/settings/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
                 const guildId = req.params.guildId;
                 const updates = req.body;
@@ -124,7 +130,7 @@ class Dashboard {
 
                 // Update allowed fields
                 const allowedFields = [
-                    'prefix', 'djRole', 'autoRole', 
+                    'djRole', 'autoRole', 
                     'welcomeChannel', 'welcomeMessage', 'welcomeEnabled',
                     'leaveChannel', 'leaveMessage', 'leaveEnabled'
                 ];
@@ -135,7 +141,19 @@ class Dashboard {
                     }
                 });
 
-                settingsManager.save();
+                // Handle prefixes (array)
+                if (updates.prefixes !== undefined && Array.isArray(updates.prefixes)) {
+                    await settingsManager.setPrefixes(guildId, updates.prefixes);
+                }
+
+                await settingsManager.save();
+
+                // Handle logging channel
+                if (updates.loggingChannel !== undefined) {
+                    if (updates.loggingChannel) {
+                        loggingManager.setLoggingChannel(guildId, updates.loggingChannel);
+                    }
+                }
 
                 // Handle auto-moderation settings
                 const modSettings = moderationManager.getAutomodSettings(guildId);
@@ -149,7 +167,7 @@ class Dashboard {
                 if (updates.modLogChannel !== undefined) modSettings.modLogChannel = updates.modLogChannel;
                 if (updates.badWords !== undefined) modSettings.badWords = updates.badWords;
 
-                moderationManager.save();
+                await moderationManager.save();
 
                 res.json({ success: true, settings, modSettings });
             } catch (error) {

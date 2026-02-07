@@ -17,7 +17,13 @@ class RelationshipManager {
             await fs.mkdir(dataDir, { recursive: true });
 
             const data = await fs.readFile(this.dataPath, 'utf8');
-            this.data = JSON.parse(data);
+            const loadedData = JSON.parse(data);
+            
+            // Ensure correct structure even if file is incomplete
+            this.data = {
+                marriages: loadedData.marriages || {},
+                proposals: loadedData.proposals || {}
+            };
         } catch (error) {
             if (error.code === 'ENOENT') {
                 await this.save();
@@ -126,6 +132,8 @@ class RelationshipManager {
 
     // Get marriage info
     getMarriage(guildId, userId) {
+        if (!this.data.marriages) return null;
+        
         for (const [key, marriage] of Object.entries(this.data.marriages)) {
             const keyPrefix = `${guildId}_`;
             if (!key.startsWith(keyPrefix)) continue;
@@ -154,6 +162,8 @@ class RelationshipManager {
     // Get pending proposals for a user
     getPendingProposals(guildId, userId) {
         const proposals = [];
+        if (!this.data.proposals) return proposals;
+        
         for (const [key, proposal] of Object.entries(this.data.proposals)) {
             if (key.startsWith(`${guildId}_`) && proposal.recipientId === userId) {
                 proposals.push({

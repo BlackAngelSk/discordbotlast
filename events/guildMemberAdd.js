@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const settingsManager = require('../utils/settingsManager');
 const statsManager = require('../utils/statsManager');
+const inviteManager = require('../utils/inviteManager');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -9,6 +10,43 @@ module.exports = {
     async execute(member, client) {
         try {
             console.log(`👋 New member joined: ${member.user.tag}`);
+
+            // Track invite
+            try {
+                const invites = await member.guild.invites.fetch();
+                const guildInvites = client.invites || new Map();
+                
+                if (!guildInvites.has(member.guild.id)) {
+                    guildInvites.set(member.guild.id, new Map());
+                }
+
+                const oldInvites = guildInvites.get(member.guild.id);
+                let inviter = null;
+
+                for (const invite of invites.values()) {
+                    const oldInvite = oldInvites.get(invite.code);
+                    
+                    if (!oldInvite || oldInvite.uses < invite.uses) {
+                        inviter = invite.inviter;
+                        break;
+                    }
+                }
+
+                // Update cached invites
+                const newInviteMap = new Map();
+                invites.forEach(invite => {
+                    newInviteMap.set(invite.code, invite);
+                });
+                guildInvites.set(member.guild.id, newInviteMap);
+
+                // Track the invite if we found an inviter
+                if (inviter) {
+                    inviteManager.trackInvite(member.guild.id, inviter.id, member.id, member.user.username);
+                    console.log(`📊 ${inviter.username} invited ${member.user.username}`);
+                }
+            } catch (error) {
+                console.error('Error tracking invite:', error);
+            }
             
             const settings = settingsManager.get(member.guild.id);
             

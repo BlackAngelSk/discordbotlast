@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, ActivityType } = require('discord.js');
 
 module.exports = {
     name: Events.ClientReady,
@@ -6,6 +6,33 @@ module.exports = {
     async execute(readyClient) {
         console.log(`✅ Logged in as ${readyClient.user.tag}!`);
         console.log(`🤖 Bot is ready and serving ${readyClient.guilds.cache.size} servers`);
+        
+        // Set bot presence/status
+        const activities = [
+            { name: '/help for commands', type: ActivityType.Playing },
+            { name: `${readyClient.guilds.cache.size} servers`, type: ActivityType.Watching },
+            { name: 'music 🎵', type: ActivityType.Listening },
+            { name: '/play to start', type: ActivityType.Playing },
+        ];
+
+        let currentActivity = 0;
+
+        // Set initial activity
+        readyClient.user.setPresence({
+            activities: [activities[currentActivity]],
+            status: 'online'
+        });
+
+        // Rotate activities every 30 seconds
+        setInterval(() => {
+            currentActivity = (currentActivity + 1) % activities.length;
+            readyClient.user.setPresence({
+                activities: [activities[currentActivity]],
+                status: 'online'
+            });
+        }, 30000); // 30 seconds
+
+        console.log('✅ Bot status set successfully');
         
         // Restart active giveaways
         try {

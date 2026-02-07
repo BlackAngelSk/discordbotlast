@@ -461,3 +461,183 @@ body {
         flex-direction: column;
     }
 }
+/* Prefix Styles */
+.prefix-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--card-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.prefix-item {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.prefix-input {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+}
+
+.prefix-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(88, 101, 242, 0.1);
+}
+
+.btn-small {
+    padding: 0.4rem 0.8rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+.btn-secondary {
+    background: var(--primary-color);
+    color: white;
+    margin-top: 0.5rem;
+}
+
+.btn-secondary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+}
+
+.btn-danger {
+    background: #ED4245;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #d83c31;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(237, 66, 69, 0.4);
+}
+
+/* Logging Styles */
+.logging-info {
+    background: var(--card-secondary);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.logging-info h4 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.logging-info ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.logging-info li {
+    padding: 0.4rem 0;
+    color: var(--text-light);
+}
+
+/* Invite Analytics Styles */
+.invite-info {
+    background: var(--card-secondary);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.invite-info p {
+    margin-bottom: 0.75rem;
+    color: var(--text-light);
+}
+
+.invite-info h4 {
+    color: var(--primary-color);
+    margin: 0.75rem 0 0.5rem 0;
+}
+
+.invite-info ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.invite-info li {
+    padding: 0.35rem 0;
+    color: var(--text-light);
+}
+
+.invite-info code {
+    background: var(--input-bg);
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    color: var(--primary-color);
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+}
+
+.leaderboard {
+    background: var(--card-secondary);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.leaderboard h4 {
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+}
+
+.invite-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.invite-table th {
+    background: var(--input-bg);
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.invite-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.invite-table tr:hover {
+    background: var(--input-bg);
+}
+
+.user-tag {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    background: var(--input-bg);
+    padding: 0.35rem 0.65rem;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.no-data {
+    background: var(--card-secondary);
+    padding: 2rem;
+    border-radius: 8px;
+    text-align: center;
+    color: var(--text-light);
+}
