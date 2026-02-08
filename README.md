@@ -2,6 +2,8 @@
 
 A **comprehensive** Discord bot built with discord.js v14, featuring slash commands, advanced music playback, moderation tools, economy system, mini games with statistics, and much more!
 
+**✅ Cross-Platform Support:** Works on Windows, macOS, and Linux!
+
 ## 🌟 Highlights
 
 ### ⚡ Modern Interface
@@ -246,10 +248,25 @@ A **comprehensive** Discord bot built with discord.js v14, featuring slash comma
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** 20.16.0 or higher
+- **Node.js** 20.16.0 or higher (v22.12.0+ recommended)
 - **Discord Bot Token**
-- **@distube/yt-dlp** (automatically installed)
 - **FFmpeg** (via ffmpeg-static package)
+- **Linux, macOS, or Windows**
+
+#### Linux-Specific Requirements
+If on **Linux**, you may need to install additional packages:
+```bash
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y build-essential python3
+
+# Fedora/RHEL
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y python3
+
+# Arch
+sudo pacman -S base-devel python
+```
 
 ### Installation
 
@@ -257,9 +274,33 @@ A **comprehensive** Discord bot built with discord.js v14, featuring slash comma
 ```bash
 git clone <your-repo-url>
 cd discordbotlast
+```Linux-only: Make startup scripts executable (optional)**
+```bash
+# For bash users
+chmod +x start.sh
+
+# For fish users
+chmod +x start.sh
+
+# For Windows, use start.bat instead
 ```
 
-2. **Install dependencies:**
+5. **Start the bot:**
+
+**Windows:**
+```bash
+npm start
+# OR
+start.bat
+```
+
+**macOS/Linux:**
+```bash
+npm start
+# OR
+./start.sh  # if you made it executable
+# OR (for fish shell)
+bash start.shall dependencies:**
 ```bash
 npm install
 ```

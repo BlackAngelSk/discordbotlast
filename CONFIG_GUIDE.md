@@ -1,15 +1,21 @@
 # Configuration System Guide
 
 ## Overview
-The bot now features a complete per-server configuration system with custom prefixes, welcome/leave messages, and role settings.
+The bot features a complete per-server configuration system with custom prefixes, welcome/leave messages, role settings, and **full support on Windows, macOS, and Linux!**
 
 ## Quick Start
 
 ### 1. Setup Your Server
 ```
+/setup
+```
+or
+```
 !setup
 ```
-Creates default DJ and Member roles
+This creates:
+- DJ role (for music permissions)
+- Member role (for auto-role)
 
 ### 2. View Current Settings
 ```
@@ -98,6 +104,77 @@ Example: `!config djrole DJ`
 ```
 !config reset
 ```
+
+## 🐧 Linux-Specific Configuration
+
+### Running as a Service (Advanced)
+
+If you want the bot to run automatically on Linux startup, you can create a systemd service:
+
+**Create `/etc/systemd/system/discord-bot.service`:**
+```ini
+[Unit]
+Description=Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/discordbotlast
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Then enable it:**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable discord-bot
+sudo systemctl start discord-bot
+```
+
+**Monitor the service:**
+```bash
+sudo systemctl status discord-bot
+sudo journalctl -u discord-bot -f  # View logs
+```
+
+### File Permissions on Linux
+
+Make sure the bot can write to the data folder:
+```bash
+chmod 755 /home/YOUR_USERNAME/discordbotlast/data
+chmod 644 /home/YOUR_USERNAME/discordbotlast/data/*.json
+```
+
+### Cross-Platform Compatibility Notes
+
+- **Settings File:** `data/settings.json` - Works on all platforms
+- **Line Endings:** Git should auto-convert line endings (CRLF ↔ LF)
+- **Paths:** Bot uses `/` which works on all platforms
+- **Environment Variables:** `.env` format works on Windows, macOS, and Linux
+
+### Troubleshooting Config Issues
+
+**Settings not saving:**
+```bash
+# Check file permissions
+ls -la data/settings.json
+
+# Check if data directory exists and is writable
+ls -ld data
+
+# Try restarting the bot
+npm start
+```
+
+**Config command not working:**
+- Ensure you're using `/config` (slash) or `!config` (prefix with correct prefix)
+- Check that you have Administrator permission
+- Check bot logs for error messages
 Resets all settings to default values
 
 ## Default Settings

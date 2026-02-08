@@ -4,16 +4,33 @@
 
 Before running your bot, verify:
 
-- [ ] Node.js 16.9.0+ installed
-- [ ] FFmpeg installed on system
+- [ ] Node.js 20.16.0+ installed
 - [ ] Discord bot token in `.env` file
 - [ ] `npm install` completed successfully
+- [ ] **Operating System:** Windows, macOS, or Linux ✅
+
+### For Linux Users:
+- [ ] Build tools installed (`build-essential` on Ubuntu/Debian, `Development Tools` on Fedora)
+- [ ] Python 3 installed (needed for some npm packages)
 
 ## 🎯 First Run
 
 1. **Start the bot:**
+
+   **Windows:**
    ```bash
    npm start
+   # OR
+   start.bat
+   ```
+
+   **macOS/Linux:**
+   ```bash
+   npm start
+   # OR
+   bash start.sh
+   # OR (make executable first)
+   chmod +x start.sh && ./start.sh
    ```
 
 2. **Wait for initialization:**
@@ -93,6 +110,49 @@ This creates:
 ### Change Command Prefix
 ```
 !config prefix ?
+```
+
+### Linux-Specific Tips
+
+**Running in Background (Linux/macOS):**
+```bash
+# Using nohup
+nohup npm start > bot.log 2>&1 &
+
+# Using screen
+screen -S discord-bot npm start
+# Detach: Ctrl+A then D
+# Reattach: screen -r discord-bot
+
+# Using tmux
+tmux new-session -d -s discord-bot npm start
+```
+
+**Setting Up as Systemd Service (Advanced Linux):**
+
+Create `/etc/systemd/system/discord-bot.service`:
+```ini
+[Unit]
+Description=Discord Bot Service
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/discordbotlast
+ExecStart=/usr/bin/npm start
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then run:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable discord-bot
+sudo systemctl start discord-bot
+sudo systemctl status discord-bot  # Check status
 ```
 
 ### Set Welcome Messages
