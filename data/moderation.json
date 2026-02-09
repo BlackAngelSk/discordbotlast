@@ -1,5 +1,21 @@
 {
   "warnings": {},
-  "modLogs": {},
-  "automod": {}
+  "modLogs": {
+    "421968526547353601": "817871935878463549"
+  },
+  "automod": {
+    "421968526547353601": {
+      "enabled": true,
+      "antiSpam": true,
+      "antiInvite": true,
+      "badWords": [
+        "nigger",
+        "NEG3R"
+      ],
+      "maxMentions": 5,
+      "maxEmojis": 10,
+      "modLogChannel": "",
+      "emojiOnly": true
+    }
+  }
 }

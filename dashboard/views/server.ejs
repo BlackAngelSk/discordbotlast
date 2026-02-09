@@ -240,6 +240,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="emojiOnly" name="emojiOnly" <%= modSettings && modSettings.emojiOnly ? 'checked' : '' %>>
+                        Delete Emoji-Only Messages
+                    </label>
+                    <small>Delete messages that contain only emojis (no letters or numbers)</small>
+                </div>
+
+                <div class="form-group">
                     <label for="maxMentions">Max Mentions Per Message</label>
                     <input type="number" id="maxMentions" name="maxMentions" value="<%= modSettings && modSettings.maxMentions !== undefined ? modSettings.maxMentions : 5 %>" min="1" max="20">
                     <small>Maximum user mentions allowed in a single message</small>
@@ -256,7 +264,7 @@
                     <select id="modLogChannel" name="modLogChannel">
                         <option value="">None</option>
                         <% channels.forEach(channel => { %>
-                            <option value="<%= channel.name %>" <%= modSettings && modSettings.modLogChannel === channel.name ? 'selected' : '' %>>
+                            <option value="<%= channel.id %>" <%= modLogChannel === channel.id ? 'selected' : '' %>>
                                 #<%= channel.name %>
                             </option>
                         <% }); %>
@@ -271,7 +279,7 @@
                 </div>
             </div>
 
-            <div class="form-actions"
+            <div class="form-actions">
                 <button type="submit" class="btn-primary">Save Changes</button>
                 <button type="button" class="btn-danger" onclick="resetSettings()">Reset to Defaults</button>
             </div>
@@ -346,7 +354,7 @@
 
             // Convert form data to object
             for (let [key, value] of formData.entries()) {
-                if (key === 'welcomeEnabled' || key === 'leaveEnabled' || key === 'autoModEnabled' || key === 'antiSpam' || key === 'antiInvite') {
+                if (key === 'welcomeEnabled' || key === 'leaveEnabled' || key === 'autoModEnabled' || key === 'antiSpam' || key === 'antiInvite' || key === 'emojiOnly') {
                     data[key] = true;
                 } else if (key === 'badWords') {
                     // Convert comma-separated string to array
@@ -364,6 +372,7 @@
             if (!formData.has('autoModEnabled')) data.autoModEnabled = false;
             if (!formData.has('antiSpam')) data.antiSpam = false;
             if (!formData.has('antiInvite')) data.antiInvite = false;
+            if (!formData.has('emojiOnly')) data.emojiOnly = false;
 
             try {
                 const response = await fetch(`/api/settings/${guildId}`, {

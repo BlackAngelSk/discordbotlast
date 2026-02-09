@@ -104,6 +104,7 @@ class Dashboard {
             const guild = this.client.guilds.cache.get(req.params.guildId);
             const settings = settingsManager.get(req.params.guildId);
             const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
+            const modLogChannel = moderationManager.getModLogChannel(req.params.guildId);
             const loggingChannel = loggingManager.getLoggingChannel(req.params.guildId);
             const topInviters = inviteManager.getLeaderboard(req.params.guildId, 5);
             
@@ -112,6 +113,7 @@ class Dashboard {
                 guild: guild,
                 settings: settings,
                 modSettings: modSettings,
+                modLogChannel: modLogChannel,
                 loggingChannel: loggingChannel,
                 topInviters: topInviters,
                 roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
@@ -148,27 +150,31 @@ class Dashboard {
 
                 await settingsManager.save();
 
-                // Handle logging channel
+                // Handle logging channel (allow clearing)
                 if (updates.loggingChannel !== undefined) {
-                    if (updates.loggingChannel) {
-                        loggingManager.setLoggingChannel(guildId, updates.loggingChannel);
-                    }
+                    loggingManager.setLoggingChannel(guildId, updates.loggingChannel || null);
                 }
 
                 // Handle auto-moderation settings
+                const autoModUpdates = {};
+                if (updates.autoModEnabled !== undefined) autoModUpdates.enabled = updates.autoModEnabled;
+                if (updates.antiSpam !== undefined) autoModUpdates.antiSpam = updates.antiSpam;
+                if (updates.antiInvite !== undefined) autoModUpdates.antiInvite = updates.antiInvite;
+                if (updates.emojiOnly !== undefined) autoModUpdates.emojiOnly = updates.emojiOnly;
+                if (updates.maxMentions !== undefined && Number.isFinite(updates.maxMentions)) autoModUpdates.maxMentions = updates.maxMentions;
+                if (updates.maxEmojis !== undefined && Number.isFinite(updates.maxEmojis)) autoModUpdates.maxEmojis = updates.maxEmojis;
+                if (updates.badWords !== undefined) autoModUpdates.badWords = updates.badWords;
+
+                if (Object.keys(autoModUpdates).length > 0) {
+                    await moderationManager.updateAutomodSettings(guildId, autoModUpdates);
+                }
+
+                // Handle mod log channel (auto-mod logs)
+                if (updates.modLogChannel !== undefined) {
+                    moderationManager.setModLogChannel(guildId, updates.modLogChannel || null);
+                }
+
                 const modSettings = moderationManager.getAutomodSettings(guildId);
-                
-                // Update auto-mod settings
-                if (updates.autoModEnabled !== undefined) modSettings.enabled = updates.autoModEnabled;
-                if (updates.antiSpam !== undefined) modSettings.antiSpam = updates.antiSpam;
-                if (updates.antiInvite !== undefined) modSettings.antiInvite = updates.antiInvite;
-                if (updates.maxMentions !== undefined) modSettings.maxMentions = updates.maxMentions;
-                if (updates.maxEmojis !== undefined) modSettings.maxEmojis = updates.maxEmojis;
-                if (updates.modLogChannel !== undefined) modSettings.modLogChannel = updates.modLogChannel;
-                if (updates.badWords !== undefined) modSettings.badWords = updates.badWords;
-
-                await moderationManager.save();
-
                 res.json({ success: true, settings, modSettings });
             } catch (error) {
                 console.error('Error updating settings:', error);

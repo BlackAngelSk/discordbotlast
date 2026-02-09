@@ -92,6 +92,7 @@ class ModerationManager {
                 enabled: false,
                 antiSpam: true,
                 antiInvite: true,
+                emojiOnly: false,
                 badWords: [],
                 maxMentions: 5,
                 maxEmojis: 10
@@ -112,19 +113,44 @@ class ModerationManager {
         const settings = this.getAutomodSettings(guildId);
         if (!settings.enabled) return { violation: false };
 
+        const emojiRegex = /<a?:\w+:\d+>|[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
+        const hasEmoji = (content.match(emojiRegex) || []).length > 0;
+        const hasLettersOrNumbers = /[\p{L}\p{N}]/u.test(content);
+
         // Check for Discord invites
         if (settings.antiInvite && /discord\.gg\/|discord\.com\/invite\//i.test(content)) {
             return { violation: true, reason: 'Discord invite link detected' };
         }
 
-        // Check for bad words
+        // Check for bad words (including obfuscation)
         if (settings.badWords.length > 0) {
             const lowerContent = content.toLowerCase();
+            const normalizedContent = lowerContent
+                .replace(/\s+/g, '')
+                .replace(/[@$!\|]/g, '')
+                .replace(/[0]/g, 'o')
+                .replace(/[1!|]/g, 'i')
+                .replace(/[3]/g, 'e')
+                .replace(/[4@]/g, 'a')
+                .replace(/[5$]/g, 's')
+                .replace(/[7]/g, 't')
+                .replace(/[8]/g, 'b')
+                .replace(/[^a-z0-9]/g, '')
+                .replace(/(.)\1{2,}/g, '$1$1');
+
             for (const word of settings.badWords) {
-                if (lowerContent.includes(word.toLowerCase())) {
+                const normalizedWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (normalizedWord.length === 0) continue;
+
+                if (lowerContent.includes(word.toLowerCase()) || normalizedContent.includes(normalizedWord)) {
                     return { violation: true, reason: 'Inappropriate language detected' };
                 }
             }
+        }
+
+        // Check for emoji-only messages
+        if (settings.emojiOnly && hasEmoji && !hasLettersOrNumbers) {
+            return { violation: true, reason: 'Emoji-only message detected' };
         }
 
         // Check for excessive mentions
@@ -133,7 +159,7 @@ class ModerationManager {
         }
 
         // Check for excessive emojis
-        const emojiCount = (content.match(/<a?:\w+:\d+>|[\u{1F300}-\u{1F9FF}]/gu) || []).length;
+        const emojiCount = (content.match(emojiRegex) || []).length;
         if (emojiCount > settings.maxEmojis) {
             return { violation: true, reason: `Excessive emojis (max ${settings.maxEmojis})` };
         }
