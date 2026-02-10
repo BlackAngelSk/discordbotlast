@@ -59,7 +59,16 @@ class SlashCommandHandler {
                 { body: commands }
             );
 
-            console.log(`✅ Successfully reloaded ${data.length} application (/) commands.`);
+            console.log(`✅ Successfully reloaded ${data.length} application (/) commands globally.`);
+
+            // Also register to test guild if TEST_GUILD_ID is set (for instant updates)
+            if (process.env.TEST_GUILD_ID) {
+                const guildData = await rest.put(
+                    Routes.applicationGuildCommands(this.client.user.id, process.env.TEST_GUILD_ID),
+                    { body: commands }
+                );
+                console.log(`✅ Successfully reloaded ${guildData.length} commands to test guild instantly.`);
+            }
         } catch (error) {
             console.error('Error registering slash commands:', error);
         }
