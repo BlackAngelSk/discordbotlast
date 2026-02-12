@@ -4,6 +4,7 @@ const CommandHandler = require('./utils/commandHandler');
 const EventHandler = require('./utils/eventHandler');
 const SlashCommandHandler = require('./utils/slashCommandHandler');
 const settingsManager = require('./utils/settingsManager');
+const languageManager = require('./utils/languageManager');
 const economyManager = require('./utils/economyManager');
 const moderationManager = require('./utils/moderationManager');
 const gameStatsManager = require('./utils/gameStatsManager');
@@ -38,6 +39,9 @@ async function loadHandlers() {
         // Initialize managers first
         await settingsManager.init();
         console.log('✅ Settings manager initialized!');
+        
+        await languageManager.init();
+        console.log('✅ Language manager initialized!');
         
         await economyManager.init();
         console.log('✅ Economy manager initialized!');

@@ -1,0 +1,84 @@
+{
+  "languageName": "Slovenčina",
+  "languageCode": "sk",
+  
+  "common": {
+    "error": "Vyskytla sa chyba",
+    "success": "Úspech!",
+    "noPermission": "Nemáš povolenie používať tento príkaz!",
+    "adminRequired": "Na použitie tohto príkazu potrebuješ práva Administrátora!",
+    "invalidArguments": "Neplatné argumenty!",
+    "enabled": "Zapnuté",
+    "disabled": "Vypnuté",
+    "none": "Žiadne",
+    "notSet": "Nenastavené"
+  },
+
+  "config": {
+    "title": "⚙️ Nastavenia Servera",
+    "description": "Aktuálne nastavenia bota pre tento server:",
+    "prefix": "🔧 Prefix",
+    "djRole": "🎵 DJ Rola",
+    "autoRole": "👥 Automatická Rola",
+    "language": "🌍 Jazyk",
+    "welcomeMessages": "👋 Uvítacie Správy",
+    "leaveMessages": "👋 Správy pri Odchode",
+    "status": "Stav",
+    "channel": "Kanál",
+    "message": "Správa",
+    "footer": "Použite {prefix}config <nastavenie> <hodnota> na zmenu nastavení",
+    "prefixChanged": "✅ Prefix zmenený na: `{value}`",
+    "prefixInvalid": "❌ Prosím zadaj platný prefix (1-5 znakov)!\nPríklad: `{prefix}config prefix !`",
+    "languageChanged": "✅ Jazyk zmenený na: **{language}** ({code})",
+    "languageInvalid": "❌ Neplatný jazyk! Dostupné jazyky: {languages}\nPríklad: `{prefix}config language sk`",
+    "languageList": "Dostupné jazyky: {languages}",
+    "welcomeChannelSet": "✅ Uvítací kanál nastavený na {channel}",
+    "welcomeChannelInvalid": "❌ Prosím označ kanál!\nPríklad: `{prefix}config welcomechannel #vitaj`",
+    "welcomeMessageSet": "✅ Uvítacia správa nastavená na: {message}",
+    "welcomeMessageInvalid": "❌ Prosím zadaj uvítaciu správu!\nPoužite {user} na označenie používateľa\nPríklad: `{prefix}config welcomemessage Vitaj {user}!`",
+    "welcomeEnabled": "✅ Uvítacie správy zapnuté!",
+    "welcomeDisabled": "❌ Uvítacie správy vypnuté!",
+    "leaveChannelSet": "✅ Kanál pre odchody nastavený na {channel}",
+    "leaveChannelInvalid": "❌ Prosím označ kanál!\nPríklad: `{prefix}config leavechannel #zbohom`",
+    "leaveMessageSet": "✅ Správa pri odchode nastavená na: {message}",
+    "leaveMessageInvalid": "❌ Prosím zadaj správu pri odchode!\nPoužite {user} pre meno používateľa\nPríklad: `{prefix}config leavemessage Zbohom {user}!`",
+    "leaveEnabled": "✅ Správy pri odchode zapnuté!",
+    "leaveDisabled": "❌ Správy pri odchode vypnuté!",
+    "autoRoleSet": "✅ Automatická rola nastavená na: {role}",
+    "autoRoleInvalid": "❌ Prosím zadaj názov roly!\nPríklad: `{prefix}config autorole Člen`",
+    "djRoleSet": "✅ DJ rola nastavená na: {role}",
+    "djRoleInvalid": "❌ Prosím zadaj názov roly!\nPríklad: `{prefix}config djrole DJ`",
+    "reset": "✅ Všetky nastavenia resetované na predvolené!",
+    "unknownSetting": "❌ Neznáme nastavenie! Dostupné nastavenia:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `reset`"
+  },
+
+  "help": {
+    "title": "📚 Ponuka Nápovedy",
+    "description": "Tu sú všetky dostupné príkazy:",
+    "usage": "Použitie",
+    "example": "Príklad",
+    "categories": {
+      "economy": "💰 Ekonomika",
+      "fun": "🎮 Zábava a Hry",
+      "moderation": "🛡️ Moderácia",
+      "music": "🎵 Hudba",
+      "utility": "🔧 Nástroje"
+    }
+  },
+
+  "welcome": {
+    "defaultMessage": "🎉 Vitaj na serveri, {user}! Užite si pobyt!",
+    "defaultLeaveMessage": "👋 {user} opustil server."
+  },
+
+  "commands": {
+    "ping": {
+      "description": "Skontroluj latenciu bota",
+      "response": "🏓 Pong! Latencia: {latency}ms"
+    },
+    "hello": {
+      "description": "Pozdrav bota",
+      "response": "👋 Ahoj, {user}! Ako sa máš dnes?"
+    }
+  }
+}

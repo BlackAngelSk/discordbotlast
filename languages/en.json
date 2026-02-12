@@ -1,0 +1,84 @@
+{
+  "languageName": "English",
+  "languageCode": "en",
+  
+  "common": {
+    "error": "An error occurred",
+    "success": "Success!",
+    "noPermission": "You don't have permission to use this command!",
+    "adminRequired": "You need Administrator permission to use this command!",
+    "invalidArguments": "Invalid arguments!",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "none": "None",
+    "notSet": "Not set"
+  },
+
+  "config": {
+    "title": "⚙️ Server Configuration",
+    "description": "Current bot settings for this server:",
+    "prefix": "🔧 Prefix",
+    "djRole": "🎵 DJ Role",
+    "autoRole": "👥 Auto Role",
+    "language": "🌍 Language",
+    "welcomeMessages": "👋 Welcome Messages",
+    "leaveMessages": "👋 Leave Messages",
+    "status": "Status",
+    "channel": "Channel",
+    "message": "Message",
+    "footer": "Use {prefix}config <setting> <value> to change settings",
+    "prefixChanged": "✅ Prefix changed to: `{value}`",
+    "prefixInvalid": "❌ Please provide a valid prefix (1-5 characters)!\nExample: `{prefix}config prefix !`",
+    "languageChanged": "✅ Language changed to: **{language}** ({code})",
+    "languageInvalid": "❌ Invalid language! Available languages: {languages}\nExample: `{prefix}config language en`",
+    "languageList": "Available languages: {languages}",
+    "welcomeChannelSet": "✅ Welcome channel set to {channel}",
+    "welcomeChannelInvalid": "❌ Please mention a channel!\nExample: `{prefix}config welcomechannel #welcome`",
+    "welcomeMessageSet": "✅ Welcome message set to: {message}",
+    "welcomeMessageInvalid": "❌ Please provide a welcome message!\nUse {user} to mention the user\nExample: `{prefix}config welcomemessage Welcome {user}!`",
+    "welcomeEnabled": "✅ Welcome messages enabled!",
+    "welcomeDisabled": "❌ Welcome messages disabled!",
+    "leaveChannelSet": "✅ Leave channel set to {channel}",
+    "leaveChannelInvalid": "❌ Please mention a channel!\nExample: `{prefix}config leavechannel #goodbye`",
+    "leaveMessageSet": "✅ Leave message set to: {message}",
+    "leaveMessageInvalid": "❌ Please provide a leave message!\nUse {user} for the username\nExample: `{prefix}config leavemessage Goodbye {user}!`",
+    "leaveEnabled": "✅ Leave messages enabled!",
+    "leaveDisabled": "❌ Leave messages disabled!",
+    "autoRoleSet": "✅ Auto-role set to: {role}",
+    "autoRoleInvalid": "❌ Please provide a role name!\nExample: `{prefix}config autorole Member`",
+    "djRoleSet": "✅ DJ role set to: {role}",
+    "djRoleInvalid": "❌ Please provide a role name!\nExample: `{prefix}config djrole DJ`",
+    "reset": "✅ All settings reset to default!",
+    "unknownSetting": "❌ Unknown setting! Available settings:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `reset`"
+  },
+
+  "help": {
+    "title": "📚 Help Menu",
+    "description": "Here are all available commands:",
+    "usage": "Usage",
+    "example": "Example",
+    "categories": {
+      "economy": "💰 Economy",
+      "fun": "🎮 Fun & Games",
+      "moderation": "🛡️ Moderation",
+      "music": "🎵 Music",
+      "utility": "🔧 Utility"
+    }
+  },
+
+  "welcome": {
+    "defaultMessage": "🎉 Welcome to the server, {user}! Enjoy your stay!",
+    "defaultLeaveMessage": "👋 {user} has left the server."
+  },
+
+  "commands": {
+    "ping": {
+      "description": "Check bot latency",
+      "response": "🏓 Pong! Latency: {latency}ms"
+    },
+    "hello": {
+      "description": "Say hello to the bot",
+      "response": "👋 Hello, {user}! How are you today?"
+    }
+  }
+}

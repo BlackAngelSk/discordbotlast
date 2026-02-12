@@ -6,6 +6,7 @@ const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
 // Default settings for new servers
 const DEFAULT_SETTINGS = {
     prefixes: ['!', '.'],  // Support 2 prefixes
+    language: 'en',  // Default language
     welcomeEnabled: false,
     welcomeChannel: null,
     welcomeMessage: '🎉 Welcome to the server, {user}! Enjoy your stay!',
