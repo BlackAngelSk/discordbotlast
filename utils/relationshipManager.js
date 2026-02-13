@@ -159,6 +159,12 @@ class RelationshipManager {
         return null;
     }
 
+    // Get spouse ID for a user
+    getSpouse(guildId, userId) {
+        const marriage = this.getMarriage(guildId, userId);
+        return marriage ? marriage.spouse : null;
+    }
+
     // Get pending proposals for a user
     getPendingProposals(guildId, userId) {
         const proposals = [];
