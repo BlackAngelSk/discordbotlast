@@ -14,7 +14,7 @@ module.exports = {
                 return message.reply('❌ Please provide a valid limit (1-50).');
             }
 
-            const topInviters = inviteManager.getLeaderboard(message.guild.id, limit);
+            const topInviters = await inviteManager.getLeaderboard(message.guild.id, limit);
 
             if (topInviters.length === 0) {
                 return message.reply('📊 No invitation data found for this server.');

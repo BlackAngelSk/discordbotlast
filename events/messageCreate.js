@@ -3,6 +3,9 @@ const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const statsManager = require('../utils/statsManager');
 const customCommandManager = require('../utils/customCommandManager');
+const afkManager = require('../utils/afkManager');
+const levelRewardsManager = require('../utils/levelRewardsManager');
+const raidProtectionManager = require('../utils/raidProtectionManager');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
@@ -12,6 +15,39 @@ module.exports = {
     async execute(message, client) {
         // Ignore bot messages
         if (message.author.bot) return;
+
+        // Check if user is AFK and remove status
+        try {
+            const afkData = await afkManager.removeAFK(message.guildId, message.author.id);
+            if (afkData) {
+                const duration = afkManager.getAFKTime(message.guildId, message.author.id);
+                const reply = await message.reply(`👋 Welcome back! You were AFK for ${duration || 'a while'}.`);
+                setTimeout(() => reply.delete().catch(() => {}), 5000);
+            }
+        } catch (error) {
+            console.error('AFK check error:', error);
+        }
+
+        // Check mentions for AFK users
+        try {
+            if (message.mentions.users.size > 0) {
+                const afkMentions = [];
+                for (const [userId, user] of message.mentions.users) {
+                    const afkData = afkManager.isAFK(message.guildId, userId);
+                    if (afkData) {
+                        const duration = afkManager.getAFKTime(message.guildId, userId);
+                        afkMentions.push(`${user} is AFK: **${afkData.reason}** (${duration})`);
+                    }
+                }
+                
+                if (afkMentions.length > 0) {
+                    const reply = await message.reply(afkMentions.join('\\n'));
+                    setTimeout(() => reply.delete().catch(() => {}), 10000);
+                }
+            }
+        } catch (error) {
+            console.error('AFK mention check error:', error);
+        }
 
         // Check auto-moderation
         const automodResult = moderationManager.checkMessage(
@@ -98,21 +134,58 @@ module.exports = {
             const lastXpKey = `${message.guildId}_${message.author.id}_lastXP`;
             
             if (!global[lastXpKey] || Date.now() - global[lastXpKey] > xpCooldown) {
-                const xpGain = Math.floor(Math.random() * 11) + 5; // 5-15 XP
+                // Apply channel XP multiplier
+                const multiplier = levelRewardsManager.getXPMultiplier(message.guildId, message.channelId);
+                const baseXP = Math.floor(Math.random() * 11) + 5; // 5-15 XP
+                const xpGain = Math.floor(baseXP * multiplier);
+                
                 const result = await economyManager.addXP(message.guildId, message.author.id, xpGain);
                 
                 if (result.leveledUp) {
                     const reward = result.level * 100;
                     await economyManager.addMoney(message.guildId, message.author.id, reward);
                     
-                    const embed = new EmbedBuilder()
-                        .setColor('#FFD700')
-                        .setTitle('🎉 Level Up!')
-                        .setDescription(`${message.author} reached level **${result.level}**!`)
-                        .addFields({ name: 'Reward', value: `💰 ${reward} coins` })
-                        .setThumbnail(message.author.displayAvatarURL());
+                    // Check for level role rewards
+                    const roleReward = levelRewardsManager.getRoleForLevel(message.guildId, result.level);
+                    let roleRewardText = '';
                     
-                    await message.channel.send({ embeds: [embed] });
+                    if (roleReward) {
+                        try {
+                            const role = await message.guild.roles.fetch(roleReward);
+                            if (role) {
+                                await message.member.roles.add(role);
+                                roleRewardText = `\\n🎭 You earned the **${role.name}** role!`;
+                                
+                                // Remove lower level roles if not stacking
+                                const settings = levelRewardsManager.getSettings(message.guildId);
+                                if (!settings.stackRoles) {
+                                    const allRewards = levelRewardsManager.getAllRewardsSorted(message.guildId);
+                                    for (const oldReward of allRewards) {
+                                        if (oldReward.level < result.level && oldReward.roleId !== roleReward) {
+                                            const oldRole = message.member.roles.cache.get(oldReward.roleId);
+                                            if (oldRole) {
+                                                await message.member.roles.remove(oldRole).catch(() => {});
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error assigning level role:', error);
+                        }
+                    }
+                    
+                    const settings = levelRewardsManager.getSettings(message.guildId);
+                    if (settings.notificationsEnabled) {
+                        const embed = new EmbedBuilder()
+                            .setColor('#FFD700')
+                            .setTitle('🎉 Level Up!')
+                            .setDescription(`${message.author} reached level **${result.level}**!${roleRewardText}`)
+                            .addFields({ name: 'Reward', value: `💰 ${reward} coins` })
+                            .setThumbnail(message.author.displayAvatarURL());
+                        
+                        await message.channel.send({ embeds: [embed] });
+                    }
                 }
                 
                 global[lastXpKey] = Date.now();

@@ -17,7 +17,7 @@ module.exports = {
         try {
             const limit = interaction.options.getInteger('limit') || 10;
 
-            const topInviters = inviteManager.getLeaderboard(interaction.guildId, limit);
+            const topInviters = await inviteManager.getLeaderboard(interaction.guildId, limit);
 
             if (topInviters.length === 0) {
                 return interaction.reply('📊 No invitation data found for this server.');

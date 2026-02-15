@@ -14,6 +14,13 @@ const starboardManager = require('./utils/starboardManager');
 const customCommandManager = require('./utils/customCommandManager');
 const ticketManager = require('./utils/ticketManager');
 const relationshipManager = require('./utils/relationshipManager');
+const levelRewardsManager = require('./utils/levelRewardsManager');
+const suggestionManager = require('./utils/suggestionManager');
+const shopManager = require('./utils/shopManager');
+const afkManager = require('./utils/afkManager');
+const voiceRewardsManager = require('./utils/voiceRewardsManager');
+const raidProtectionManager = require('./utils/raidProtectionManager');
+const scheduledMessagesManager = require('./utils/scheduledMessagesManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -69,6 +76,27 @@ async function loadHandlers() {
 
         await relationshipManager.init();
         console.log('✅ Relationship manager initialized!');
+        
+        await levelRewardsManager.init();
+        console.log('✅ Level rewards manager initialized!');
+        
+        await suggestionManager.init();
+        console.log('✅ Suggestion manager initialized!');
+        
+        await shopManager.init();
+        console.log('✅ Shop manager initialized!');
+        
+        await afkManager.init();
+        console.log('✅ AFK manager initialized!');
+        
+        await voiceRewardsManager.init();
+        console.log('✅ Voice rewards manager initialized!');
+        
+        await raidProtectionManager.init();
+        console.log('✅ Raid protection manager initialized!');
+        
+        await scheduledMessagesManager.init(client);
+        console.log('✅ Scheduled messages manager initialized!');
         
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();

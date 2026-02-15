@@ -11,7 +11,7 @@ module.exports = {
             // Get target user (mentioned user or command sender)
             const targetUser = message.mentions.users.first() || message.author;
 
-            const inviteData = inviteManager.getUserInvites(message.guild.id, targetUser.id);
+            const inviteData = await inviteManager.getUserInvites(message.guild.id, targetUser.id);
 
             const embed = new EmbedBuilder()
                 .setColor(0x5865f2)

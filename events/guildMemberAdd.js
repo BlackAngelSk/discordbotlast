@@ -2,6 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const settingsManager = require('../utils/settingsManager');
 const statsManager = require('../utils/statsManager');
 const inviteManager = require('../utils/inviteManager');
+const raidProtectionManager = require('../utils/raidProtectionManager');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -10,6 +11,67 @@ module.exports = {
     async execute(member, client) {
         try {
             console.log(`👋 New member joined: ${member.user.tag}`);
+
+            // Raid protection checks
+            const raidSettings = raidProtectionManager.getSettings(member.guild.id);
+            if (raidSettings.enabled) {
+                // Log the join
+                await raidProtectionManager.logJoin(member.guild.id, member.id);
+
+                // Check if server is locked
+                if (raidProtectionManager.isLocked(member.guild.id)) {
+                    try {
+                        await member.kick('Server is in lockdown mode');
+                        console.log(`🛡️ Kicked ${member.user.tag} - server locked`);
+                        return;
+                    } catch (error) {
+                        console.error('Error kicking during lockdown:', error);
+                    }
+                }
+
+                // Check account age
+                if (raidSettings.accountAgeRequired > 0) {
+                    const isTooNew = raidProtectionManager.isAccountTooNew(member, raidSettings.accountAgeRequired);
+                    if (isTooNew) {
+                        if (raidSettings.autoKickNewAccounts) {
+                            try {
+                                await member.send(`Your account is too new to join ${member.guild.name}. Required age: ${raidSettings.accountAgeRequired} days.`).catch(() => {});
+                                await member.kick(`Account age below ${raidSettings.accountAgeRequired} days`);
+                                console.log(`🛡️ Kicked ${member.user.tag} - account too new`);
+                                return;
+                            } catch (error) {
+                                console.error('Error kicking new account:', error);
+                            }
+                        }
+                    }
+                }
+
+                // Check for raid (mass joins)
+                const raidCheck = raidProtectionManager.checkRaidAlert(member.guild.id);
+                if (raidCheck.isRaid && raidSettings.autoKickRaiders) {
+                    try {
+                        await member.kick('Suspected raid detected');
+                        console.log(`🛡️ Kicked ${member.user.tag} - raid suspected`);
+                        
+                        // Alert admins
+                        const modLogChannel = member.guild.channels.cache.find(c => 
+                            c.name.includes('mod-log') || c.name.includes('admin')
+                        );
+                        if (modLogChannel) {
+                            const embed = new EmbedBuilder()
+                                .setColor('#FF0000')
+                                .setTitle('🚨 Raid Detected!')
+                                .setDescription(`${raidCheck.joinCount} users joined in ${raidCheck.timeWindow} seconds!`)
+                                .addFields({ name: 'Action', value: 'Auto-kicking new joins' })
+                                .setTimestamp();
+                            await modLogChannel.send({ embeds: [embed] });
+                        }
+                        return;
+                    } catch (error) {
+                        console.error('Error kicking raider:', error);
+                    }
+                }
+            }
 
             // Track invite
             try {
@@ -41,7 +103,7 @@ module.exports = {
 
                 // Track the invite if we found an inviter
                 if (inviter) {
-                    inviteManager.trackInvite(member.guild.id, inviter.id, member.id, member.user.username);
+                    await inviteManager.trackInvite(member.guild.id, inviter.id, member.id, member.user.username);
                     console.log(`📊 ${inviter.username} invited ${member.user.username}`);
                 }
             } catch (error) {

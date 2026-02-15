@@ -25,7 +25,7 @@ module.exports = {
             }
 
             // Set logging channel
-            loggingManager.setLoggingChannel(message.guild.id, channel.id);
+            await loggingManager.setLoggingChannel(message.guild.id, channel.id);
 
             const embed = new EmbedBuilder()
                 .setColor(0x57F287)

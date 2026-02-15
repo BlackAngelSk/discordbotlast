@@ -1,4 +1,5 @@
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const settingsManager = require('./settingsManager');
@@ -6,40 +7,51 @@ const settingsManager = require('./settingsManager');
 const LOGGING_SETTINGS_FILE = path.join(__dirname, '../data/logging.json');
 
 // Load logging settings
-function loadLoggingSettings() {
-  if (fs.existsSync(LOGGING_SETTINGS_FILE)) {
-    return JSON.parse(fs.readFileSync(LOGGING_SETTINGS_FILE, 'utf8'));
+async function loadLoggingSettings() {
+  try {
+    if (fsSync.existsSync(LOGGING_SETTINGS_FILE)) {
+      const data = await fs.readFile(LOGGING_SETTINGS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error loading logging settings:', error);
   }
   return {};
 }
 
 // Save logging settings
-function saveLoggingSettings(data) {
-  fs.writeFileSync(LOGGING_SETTINGS_FILE, JSON.stringify(data, null, 2));
+async function saveLoggingSettings(data) {
+  try {
+    const dir = path.dirname(LOGGING_SETTINGS_FILE);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(LOGGING_SETTINGS_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error saving logging settings:', error);
+  }
 }
 
 // Set logging channel
-function setLoggingChannel(guildId, channelId) {
-  const settings = loadLoggingSettings();
+async function setLoggingChannel(guildId, channelId) {
+  const settings = await loadLoggingSettings();
 
   if (!settings[guildId]) {
     settings[guildId] = {};
   }
 
   settings[guildId].loggingChannel = channelId;
-  saveLoggingSettings(settings);
+  await saveLoggingSettings(settings);
 }
 
 // Get logging channel
-function getLoggingChannel(guildId) {
-  const settings = loadLoggingSettings();
+async function getLoggingChannel(guildId) {
+  const settings = await loadLoggingSettings();
   return settings[guildId]?.loggingChannel || null;
 }
 
 // Send log to channel
 async function sendLog(guildId, embed, client) {
   try {
-    const channelId = getLoggingChannel(guildId);
+    const channelId = await getLoggingChannel(guildId);
 
     if (!channelId) {
       console.log(`[LOGGING] No logging channel set for guild ${guildId}`);

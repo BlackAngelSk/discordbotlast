@@ -1,24 +1,36 @@
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 
 const INVITES_FILE = path.join(__dirname, '../data/invites.json');
 
 // Load invites data
-function loadInvites() {
-  if (fs.existsSync(INVITES_FILE)) {
-    return JSON.parse(fs.readFileSync(INVITES_FILE, 'utf8'));
+async function loadInvites() {
+  try {
+    if (fsSync.existsSync(INVITES_FILE)) {
+      const data = await fs.readFile(INVITES_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error loading invites:', error);
   }
   return {};
 }
 
 // Save invites data
-function saveInvites(data) {
-  fs.writeFileSync(INVITES_FILE, JSON.stringify(data, null, 2));
+async function saveInvites(data) {
+  try {
+    const dir = path.dirname(INVITES_FILE);
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(INVITES_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Error saving invites:', error);
+  }
 }
 
 // Track an invite
-function trackInvite(guildId, inviterId, invitedUserId, invitedUsername) {
-  const invites = loadInvites();
+async function trackInvite(guildId, inviterId, invitedUserId, invitedUsername) {
+  const invites = await loadInvites();
 
   if (!invites[guildId]) {
     invites[guildId] = {};
@@ -41,12 +53,12 @@ function trackInvite(guildId, inviterId, invitedUserId, invitedUsername) {
   });
   invites[guildId][inviterId].lastUpdated = new Date().toISOString();
 
-  saveInvites(invites);
+  await saveInvites(invites);
 }
 
 // Get user's invites
-function getUserInvites(guildId, userId) {
-  const invites = loadInvites();
+async function getUserInvites(guildId, userId) {
+  const invites = await loadInvites();
 
   if (!invites[guildId] || !invites[guildId][userId]) {
     return {
@@ -59,8 +71,8 @@ function getUserInvites(guildId, userId) {
 }
 
 // Get top inviters for a guild
-function getTopInviters(guildId, limit = 10) {
-  const invites = loadInvites();
+async function getTopInviters(guildId, limit = 10) {
+  const invites = await loadInvites();
 
   if (!invites[guildId]) {
     return [];
@@ -78,8 +90,8 @@ function getTopInviters(guildId, limit = 10) {
 }
 
 // Get leaderboard for guild
-function getLeaderboard(guildId, limit = 10) {
-  return getTopInviters(guildId, limit);
+async function getLeaderboard(guildId, limit = 10) {
+  return await getTopInviters(guildId, limit);
 }
 
 module.exports = {

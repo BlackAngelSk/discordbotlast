@@ -9,6 +9,10 @@ const settingsManager = require('../utils/settingsManager');
 const moderationManager = require('../utils/moderationManager');
 const loggingManager = require('../utils/loggingManager');
 const inviteManager = require('../utils/inviteManager');
+const economyManager = require('../utils/economyManager');
+const customCommandManager = require('../utils/customCommandManager');
+const statsManager = require('../utils/statsManager');
+const ticketManager = require('../utils/ticketManager');
 
 class Dashboard {
     constructor(client) {
@@ -100,25 +104,39 @@ class Dashboard {
         });
 
         // Server settings page
-        this.app.get('/dashboard/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
-            const guild = this.client.guilds.cache.get(req.params.guildId);
-            const settings = settingsManager.get(req.params.guildId);
-            const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
-            const modLogChannel = moderationManager.getModLogChannel(req.params.guildId);
-            const loggingChannel = loggingManager.getLoggingChannel(req.params.guildId);
-            const topInviters = inviteManager.getLeaderboard(req.params.guildId, 5);
-            
-            res.render('server', {
-                user: req.user,
-                guild: guild,
-                settings: settings,
-                modSettings: modSettings,
-                modLogChannel: modLogChannel,
-                loggingChannel: loggingChannel,
-                topInviters: topInviters,
-                roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
-                channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
-            });
+        this.app.get('/dashboard/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId);
+                const settings = settingsManager.get(req.params.guildId);
+                const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
+                const modLogChannel = moderationManager.getModLogChannel(req.params.guildId);
+                const loggingChannel = await loggingManager.getLoggingChannel(req.params.guildId);
+                const topInviters = await inviteManager.getLeaderboard(req.params.guildId, 5);
+                const serverStats = await statsManager.getServerStats(req.params.guildId);
+                const economyLeaderboard = economyManager.getLeaderboard(req.params.guildId, 'balance', 10);
+                const customCommands = customCommandManager.getCommands(req.params.guildId);
+                const allTickets = ticketManager.getGuildTickets(req.params.guildId);
+                const activeTickets = Object.values(allTickets).filter(t => t.status === 'open').length;
+                
+                res.render('server', {
+                    user: req.user,
+                    guild: guild,
+                    settings: settings,
+                    modSettings: modSettings,
+                    modLogChannel: modLogChannel,
+                    loggingChannel: loggingChannel,
+                    topInviters: topInviters,
+                    serverStats: serverStats,
+                    economyLeaderboard: economyLeaderboard,
+                    customCommands: customCommands,
+                    activeTickets: activeTickets,
+                    roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
+                });
+            } catch (error) {
+                console.error('Error loading server dashboard:', error);
+                res.status(500).send('Error loading dashboard');
+            }
         });
 
         // API: Update settings
@@ -152,7 +170,7 @@ class Dashboard {
 
                 // Handle logging channel (allow clearing)
                 if (updates.loggingChannel !== undefined) {
-                    loggingManager.setLoggingChannel(guildId, updates.loggingChannel || null);
+                    await loggingManager.setLoggingChannel(guildId, updates.loggingChannel || null);
                 }
 
                 // Handle auto-moderation settings
@@ -189,6 +207,153 @@ class Dashboard {
                 const settings = settingsManager.get(req.params.guildId);
                 res.json({ success: true, settings });
             } catch (error) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Get server statistics
+        this.app.get('/api/stats/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const stats = await statsManager.getServerStats(req.params.guildId);
+                res.json({ success: true, stats });
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Get economy leaderboard
+        this.app.get('/api/economy/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
+            try {
+                const type = req.query.type || 'balance';
+                const limit = parseInt(req.query.limit) || 10;
+                const leaderboard = economyManager.getLeaderboard(req.params.guildId, type, limit);
+                res.json({ success: true, leaderboard });
+            } catch (error) {
+                console.error('Error fetching economy leaderboard:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Get custom commands
+        this.app.get('/api/commands/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
+            try {
+                const commands = customCommandManager.getCommands(req.params.guildId);
+                res.json({ success: true, commands });
+            } catch (error) {
+                console.error('Error fetching custom commands:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Add custom command
+        this.app.post('/api/commands/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { name, response } = req.body;
+                
+                if (!name || !response) {
+                    return res.status(400).json({ success: false, error: 'Name and response are required' });
+                }
+
+                if (name.length > 20) {
+                    return res.status(400).json({ success: false, error: 'Command name must be 20 characters or less' });
+                }
+
+                if (response.length > 2000) {
+                    return res.status(400).json({ success: false, error: 'Response must be 2000 characters or less' });
+                }
+
+                // Check if command already exists
+                const existing = customCommandManager.getCommand(req.params.guildId, name.toLowerCase());
+                if (existing) {
+                    return res.status(400).json({ success: false, error: 'Command already exists' });
+                }
+
+                await customCommandManager.addCommand(req.params.guildId, name.toLowerCase(), response);
+                res.json({ success: true, message: 'Command added successfully' });
+            } catch (error) {
+                console.error('Error adding custom command:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Delete custom command
+        this.app.delete('/api/commands/:guildId/:commandName', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const command = customCommandManager.getCommand(req.params.guildId, req.params.commandName);
+                
+                if (!command) {
+                    return res.status(404).json({ success: false, error: 'Command not found' });
+                }
+
+                await customCommandManager.removeCommand(req.params.guildId, req.params.commandName);
+                res.json({ success: true, message: 'Command deleted successfully' });
+            } catch (error) {
+                console.error('Error deleting custom command:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Get moderation warnings
+        this.app.get('/api/moderation/:guildId/warnings', this.checkAuth, this.checkGuildAccess, (req, res) => {
+            try {
+                const userId = req.query.userId;
+                let warnings;
+                
+                if (userId) {
+                    warnings = moderationManager.getUserWarnings(req.params.guildId, userId);
+                } else {
+                    warnings = moderationManager.getAllWarnings(req.params.guildId);
+                }
+                
+                res.json({ success: true, warnings });
+            } catch (error) {
+                console.error('Error fetching warnings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Get active tickets
+        this.app.get('/api/tickets/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
+            try {
+                const allTickets = ticketManager.getGuildTickets(req.params.guildId);
+                const tickets = Object.entries(allTickets)
+                    .map(([id, ticket]) => ({ id, ...ticket }))
+                    .filter(t => req.query.status ? t.status === req.query.status : t.status === 'open')
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                res.json({ success: true, tickets });
+            } catch (error) {
+                console.error('Error fetching tickets:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Update user balance (admin only)
+        this.app.post('/api/economy/:guildId/balance', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { userId, amount, action } = req.body;
+                
+                if (!userId || !amount || !action) {
+                    return res.status(400).json({ success: false, error: 'Missing required fields' });
+                }
+
+                const amountNum = parseInt(amount);
+                if (isNaN(amountNum) || amountNum <= 0) {
+                    return res.status(400).json({ success: false, error: 'Invalid amount' });
+                }
+
+                let result;
+                if (action === 'add') {
+                    result = await economyManager.addMoney(req.params.guildId, userId, amountNum);
+                } else if (action === 'remove') {
+                    result = await economyManager.removeMoney(req.params.guildId, userId, amountNum);
+                } else {
+                    return res.status(400).json({ success: false, error: 'Invalid action' });
+                }
+
+                res.json({ success: true, newBalance: result });
+            } catch (error) {
+                console.error('Error updating balance:', error);
                 res.status(500).json({ success: false, error: error.message });
             }
         });

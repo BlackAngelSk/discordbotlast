@@ -15,7 +15,7 @@ module.exports = {
         try {
             const targetUser = interaction.options.getUser('user') || interaction.user;
 
-            const inviteData = inviteManager.getUserInvites(interaction.guildId, targetUser.id);
+            const inviteData = await inviteManager.getUserInvites(interaction.guildId, targetUser.id);
 
             const embed = new EmbedBuilder()
                 .setColor(0x5865f2)
