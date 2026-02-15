@@ -29,6 +29,12 @@ module.exports = {
             return message.reply('❌ You cannot ban yourself!');
         }
 
+        // Prevent banning bot owner
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        if (botOwnerId && member.id === botOwnerId) {
+            return message.reply('❌ Cannot ban the bot owner! 🔑');
+        }
+
         // Get reason
         const reason = args.slice(1).join(' ') || 'No reason provided';
 

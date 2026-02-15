@@ -16,6 +16,15 @@ module.exports = {
         // Ignore bot messages
         if (message.author.bot) return;
 
+        // Bot owner bypass - skip all moderation for bot owner
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        const isBotOwner = botOwnerId && message.author.id === botOwnerId;
+        
+        // Log bot owner activity (optional)
+        if (isBotOwner && message.content.startsWith('!') || message.content.startsWith('/')) {
+            console.log(`🔑 Bot Owner command: ${message.author.tag} - ${message.content}`);
+        }
+
         // Check if user is AFK and remove status
         try {
             const afkData = await afkManager.removeAFK(message.guildId, message.author.id);
@@ -49,14 +58,15 @@ module.exports = {
             console.error('AFK mention check error:', error);
         }
 
-        // Check auto-moderation
-        const automodResult = moderationManager.checkMessage(
-            message.guildId,
-            message.content,
-            message.mentions.users.size
-        );
+        // Check auto-moderation (skip for bot owner)
+        if (!isBotOwner) {
+            const automodResult = moderationManager.checkMessage(
+                message.guildId,
+                message.content,
+                message.mentions.users.size
+            );
 
-        if (automodResult.violation) {
+            if (automodResult.violation) {
             try {
                 await message.delete();
                 const warning = await message.channel.send(`⚠️ ${message.author}, your message was deleted: ${automodResult.reason}`);
@@ -84,13 +94,15 @@ module.exports = {
                 console.error('Auto-mod error:', error);
             }
             return;
+            }
         }
 
-        // Anti-spam check
-        const settings = moderationManager.getAutomodSettings(message.guildId);
-        if (settings.enabled && settings.antiSpam) {
-            const userId = message.author.id;
-            const now = Date.now();
+        // Anti-spam check (skip for bot owner)
+        if (!isBotOwner) {
+            const settings = moderationManager.getAutomodSettings(message.guildId);
+            if (settings.enabled && settings.antiSpam) {
+                const userId = message.author.id;
+                const now = Date.now();
             
             if (!userMessageTimestamps.has(userId)) {
                 userMessageTimestamps.set(userId, []);
@@ -108,7 +120,34 @@ module.exports = {
                 try {
                     await message.delete();
                     const member = message.member;
-                    if (member) {
+                    const botMember = message.guild.members.me;
+                    
+                    if (member && botMember) {
+                        // Check if bot has permission to timeout members
+                        if (!botMember.permissions.has('ModerateMembers')) {
+                            console.log('Anti-spam: Bot missing ModerateMembers permission');
+                            const warning = await message.channel.send(`⚠️ ${message.author} is spamming! (Bot lacks timeout permission)`);
+                            setTimeout(() => warning.delete().catch(() => {}), 5000);
+                            userMessageTimestamps.delete(userId);
+                            return;
+                        }
+                        
+                        // Check role hierarchy - bot must be higher than target
+                        if (member.roles.highest.position >= botMember.roles.highest.position) {
+                            console.log('Anti-spam: Cannot timeout user with higher/equal role');
+                            const warning = await message.channel.send(`⚠️ ${message.author} is spamming!`);
+                            setTimeout(() => warning.delete().catch(() => {}), 5000);
+                            userMessageTimestamps.delete(userId);
+                            return;
+                        }
+                        
+                        // Check if target is server owner
+                        if (member.id === message.guild.ownerId) {
+                            console.log('Anti-spam: Cannot timeout server owner');
+                            userMessageTimestamps.delete(userId);
+                            return;
+                        }
+                        
                         await member.timeout(60000, 'Spam detected');
                         const warning = await message.channel.send(`⚠️ ${message.author} has been timed out for spamming!`);
                         setTimeout(() => warning.delete().catch(() => {}), 5000);
@@ -118,6 +157,7 @@ module.exports = {
                     console.error('Anti-spam error:', error);
                 }
                 return;
+                }
             }
         }
 

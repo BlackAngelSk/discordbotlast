@@ -28,7 +28,11 @@ module.exports = {
         if (member.id === message.author.id) {
             return message.reply('❌ You cannot timeout yourself!');
         }
-
+        // Prevent timing out bot owner
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        if (botOwnerId && member.id === botOwnerId) {
+            return message.reply('❌ Cannot timeout the bot owner! 🔑');
+        }
         const duration = args[1];
         if (!duration) {
             return message.reply('❌ Please specify duration. Usage: `!timeout @user <duration> [reason]`\nExamples: 1m, 5m, 10m, 1h, 1d');

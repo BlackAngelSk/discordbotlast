@@ -37,6 +37,12 @@ module.exports = {
             return interaction.reply({ content: '❌ You cannot mute the server owner!', flags: MessageFlags.Ephemeral });
         }
 
+        // Prevent muting bot owner
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        if (botOwnerId && target.id === botOwnerId) {
+            return interaction.reply({ content: '❌ Cannot mute the bot owner! 🔑', flags: MessageFlags.Ephemeral });
+        }
+
         if (target.roles.highest.position >= interaction.member.roles.highest.position) {
             return interaction.reply({ content: '❌ You cannot mute someone with a higher or equal role!', flags: MessageFlags.Ephemeral });
         }

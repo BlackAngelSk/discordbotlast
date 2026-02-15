@@ -19,6 +19,12 @@ module.exports = {
             return message.reply('❌ You cannot warn yourself!');
         }
 
+        // Prevent warning bot owner
+        const botOwnerId = process.env.BOT_OWNER_ID;
+        if (botOwnerId && member.id === botOwnerId) {
+            return message.reply('❌ Cannot warn the bot owner! 🔑');
+        }
+
         const reason = args.slice(1).join(' ');
         if (!reason) {
             return message.reply('❌ Please provide a reason. Usage: `!warn @user <reason>`');

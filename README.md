@@ -522,9 +522,9 @@ discordbotlast/
 
 ## 📚 Documentation
 
-- **[FEATURES.md](FEATURES.md)** - Detailed feature documentation
-- **[CONFIG_GUIDE.md](CONFIG_GUIDE.md)** - Configuration guide
-- **[DASHBOARD_GUIDE.md](DASHBOARD_GUIDE.md)** - Dashboard setup
+- **[SETUP.md](SETUP.md)** - Installation, configuration, and deployment guide
+- **[COMMANDS.md](COMMANDS.md)** - Complete command reference (117+ commands)
+- **[GUIDE.md](GUIDE.md)** - Features, configuration, and advanced usage
 
 ---
 
