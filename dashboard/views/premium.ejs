@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium - Discord Bot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            color: white;
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+        }
+        header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        .tiers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .tier-card {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: transform 0.3s;
+            position: relative;
+        }
+        .tier-card:hover {
+            transform: translateY(-10px);
+        }
+        .tier-card.active {
+            border: 3px solid #667eea;
+        }
+        .tier-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .tier-header h2 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .price {
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffda77;
+        }
+        .price-period {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .tier-body {
+            padding: 30px;
+        }
+        .features-list {
+            list-style: none;
+            margin: 20px 0;
+        }
+        .features-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #333;
+        }
+        .features-list li:before {
+            content: "✓ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .tier-body p {
+            color: #666;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        .subscribe-btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background 0.3s;
+        }
+        .subscribe-btn:hover {
+            background: #764ba2;
+        }
+        .status-card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        .status-card h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        .status-field {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .status-field label {
+            color: #666;
+        }
+        .status-field value {
+            font-weight: bold;
+            color: #333;
+        }
+        .badge-premium {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💎 Premium Membership</h1>
+            <p>Unlock exclusive features and boost your server</p>
+        </header>
+
+        <% if (premium && premium.isActive) { %>
+            <div class="status-card">
+                <h3>✅ Active Membership</h3>
+                <div class="status-field">
+                    <label>Current Tier</label>
+                    <span class="badge-premium"><%= premium.tier.toUpperCase() %></span>
+                </div>
+                <div class="status-field">
+                    <label>Expires</label>
+                    <value><%= new Date(premium.expiresAt).toLocaleDateString() %></value>
+                </div>
+                <div class="status-field">
+                    <label>Custom Commands</label>
+                    <value><%= premium.customCommands.length %>/<%= tiers[premium.tier].commandLimit %></value>
+                </div>
+                <div class="status-field">
+                    <label>Shop Slots</label>
+                    <value><%= premium.customShopItems.length %>/<%= tiers[premium.tier].customShopSlots %></value>
+                </div>
+            </div>
+        <% } %>
+
+        <div class="tiers-grid">
+            <% Object.entries(tiers).forEach(([key, tier]) => { %>
+                <div class="tier-card <%= premium?.tier === key ? 'active' : '' %>">
+                    <div class="tier-header">
+                        <h2><%= tier.name %></h2>
+                        <div class="price">$<%= tier.price %></div>
+                        <div class="price-period">/month</div>
+                    </div>
+                    <div class="tier-body">
+                        <ul class="features-list">
+                            <% tier.features.forEach(feature => { %>
+                                <li><%= feature.replace(/-/g, ' ') %></li>
+                            <% }); %>
+                        </ul>
+                        <p><strong>Command Limit:</strong> <%= tier.commandLimit %></p>
+                        <p><strong>Shop Slots:</strong> <%= tier.customShopSlots %></p>
+                        <p><strong>Monthly Bonus:</strong> 💵 <%= tier.monthlyBonus %></p>
+                        <% if (premium?.tier === key) { %>
+                            <button class="subscribe-btn" disabled>✓ Current Plan</button>
+                        <% } else { %>
+                            <button class="subscribe-btn">Subscribe Now</button>
+                        <% } %>
+                    </div>
+                </div>
+            <% }); %>
+        </div>
+    </div>
+</body>
+</html>

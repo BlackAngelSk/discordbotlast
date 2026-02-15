@@ -14,6 +14,11 @@ const starboardManager = require('./utils/starboardManager');
 const customCommandManager = require('./utils/customCommandManager');
 const ticketManager = require('./utils/ticketManager');
 const relationshipManager = require('./utils/relationshipManager');
+const databaseManager = require('./utils/databaseManager');
+const premiumManager = require('./utils/premiumManager');
+const analyticsManager = require('./utils/analyticsManager');
+const musicPlaylistManager = require('./utils/musicPlaylistManager');
+const enhancedAIManager = require('./utils/enhancedAIManager');
 const levelRewardsManager = require('./utils/levelRewardsManager');
 const suggestionManager = require('./utils/suggestionManager');
 const shopManager = require('./utils/shopManager');
@@ -43,6 +48,10 @@ const slashCommandHandler = new SlashCommandHandler(client);
 // Load all commands and events
 async function loadHandlers() {
     try {
+        // Initialize database first
+        await databaseManager.init();
+        console.log('✅ Database manager initialized!');
+
         // Initialize managers first
         await settingsManager.init();
         console.log('✅ Settings manager initialized!');
@@ -62,22 +71,7 @@ async function loadHandlers() {
         await statsManager.init();
         console.log('✅ Stats manager initialized!');
 
-        await reactionRoleManager.init();
-        console.log('✅ Reaction role manager initialized!');
-
-        await starboardManager.init();
-        console.log('✅ Starboard manager initialized!');
-
-        await customCommandManager.init();
-        console.log('✅ Custom command manager initialized!');
-
-        await ticketManager.init();
-        console.log('✅ Ticket manager initialized!');
-
-        await relationshipManager.init();
-        console.log('✅ Relationship manager initialized!');
-        
-        await levelRewardsManager.init();
+         await levelRewardsManager.init();
         console.log('✅ Level rewards manager initialized!');
         
         await suggestionManager.init();
@@ -97,6 +91,34 @@ async function loadHandlers() {
         
         await scheduledMessagesManager.init(client);
         console.log('✅ Scheduled messages manager initialized!');
+
+        await reactionRoleManager.init();
+        console.log('✅ Reaction role manager initialized!');
+
+        await starboardManager.init();
+        console.log('✅ Starboard manager initialized!');
+
+        await customCommandManager.init();
+        console.log('✅ Custom command manager initialized!');
+
+        await ticketManager.init();
+        console.log('✅ Ticket manager initialized!');
+
+        await relationshipManager.init();
+        console.log('✅ Relationship manager initialized!');
+
+        // Initialize new managers
+        await premiumManager.init();
+        console.log('✅ Premium manager initialized!');
+
+        await analyticsManager.init();
+        console.log('✅ Analytics manager initialized!');
+
+        await musicPlaylistManager.init();
+        console.log('✅ Music playlist manager initialized!');
+
+        await enhancedAIManager.init();
+        console.log('✅ Enhanced AI manager initialized!');
         
         await commandHandler.loadCommands();
         await eventHandler.loadEvents();

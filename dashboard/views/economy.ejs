@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Economy - Discord Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            color: #667eea;
+            font-weight: 600;
+        }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        table tr:hover {
+            background: #f8f9fa;
+        }
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/dashboard/<%= guildId %>" class="back-link">← Back to Dashboard</a>
+
+        <div class="section">
+            <h2>💰 Economy Leaderboard</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>User</th>
+                        <th>Balance</th>
+                        <th>Level</th>
+                        <th>Total XP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% leaderboard.forEach((user, index) => { %>
+                    <tr>
+                        <td><strong>#<%= index + 1 %></strong></td>
+                        <td><%= user.username %></td>
+                        <td>💵 <%= user.balance || 0 %></td>
+                        <td>Level <%= user.level || 0 %></td>
+                        <td><%= user.xp || 0 %> XP</td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>📊 Economy Statistics</h2>
+            <p>Total users with economy profile: <strong><%= leaderboard.length %></strong></p>
+            <p>Highest balance: <strong>💵 <%= leaderboard[0]?.balance || 0 %></strong></p>
+            <p>Average balance: <strong>💵 <%= Math.round(leaderboard.reduce((a, b) => a + (b.balance || 0), 0) / leaderboard.length) %></strong></p>
+        </div>
+    </div>
+</body>
+</html>

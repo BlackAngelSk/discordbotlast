@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics - Discord Bot Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-item .label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+        }
+        .stat-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            color: #667eea;
+            font-weight: 600;
+        }
+        table td {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/dashboard/<%= guildId %>" class="back-link">← Back to Dashboard</a>
+
+        <div class="section">
+            <h2>📊 Server Analytics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="label">Messages Today</div>
+                    <div class="value"><%= analytics.overview.messages %></div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">Commands Used</div>
+                    <div class="value"><%= analytics.overview.commands %></div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">Members</div>
+                    <div class="value"><%= analytics.overview.members %></div>
+                </div>
+                <div class="stat-item">
+                    <div class="label">Engagement</div>
+                    <div class="value"><%= Math.round(analytics.engagement.score) %>%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Top Commands</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Command</th>
+                        <th>Uses</th>
+                        <th>Success</th>
+                        <th>Failed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% analytics.topCommands.forEach(cmd => { %>
+                    <tr>
+                        <td><strong><%= cmd.command %></strong></td>
+                        <td><%= cmd.count %></td>
+                        <td><span style="color: #28a745;">✓ <%= cmd.success %></span></td>
+                        <td><span style="color: #dc3545;">✗ <%= cmd.failed %></span></td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>📈 Activity Trend</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Activity Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% Object.entries(analytics.dailyActivity || {}).forEach(([date, count]) => { %>
+                    <tr>
+                        <td><%= date %></td>
+                        <td><strong><%= count %></strong></td>
+                    </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

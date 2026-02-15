@@ -13,6 +13,8 @@ const economyManager = require('../utils/economyManager');
 const customCommandManager = require('../utils/customCommandManager');
 const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
+const analyticsManager = require('../utils/analyticsManager');
+const premiumManager = require('../utils/premiumManager');
 
 class Dashboard {
     constructor(client) {
@@ -355,6 +357,85 @@ class Dashboard {
             } catch (error) {
                 console.error('Error updating balance:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // ========== NEW DASHBOARD ROUTES ==========
+
+        // Analytics Dashboard
+        this.app.get('/dashboard/:guildId/analytics', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const analytics = await analyticsManager.getDashboardData(guildId);
+
+                res.render('analytics', {
+                    guild,
+                    analytics,
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Analytics page error:', error);
+                res.status(500).send('Error loading analytics');
+            }
+        });
+
+        // Economy Leaderboard
+        this.app.get('/dashboard/:guildId/economy', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
+
+                res.render('economy', {
+                    guildId,
+                    guild,
+                    leaderboard,
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Economy page error:', error);
+                res.status(500).send('Error loading economy');
+            }
+        });
+
+        // Premium Management
+        this.app.get('/premium', this.checkAuth, async (req, res) => {
+            try {
+                const premium = await premiumManager.getPremiumData(req.user.id);
+                const tiers = premiumManager.getAllTiers();
+
+                res.render('premium', {
+                    premium,
+                    tiers,
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Premium page error:', error);
+                res.status(500).send('Error loading premium');
+            }
+        });
+
+        // API: Get Analytics Data
+        this.app.get('/api/:guildId/analytics', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const analytics = await analyticsManager.getDashboardData(guildId);
+                res.json(analytics);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        // API: Get Leaderboard
+        this.app.get('/api/:guildId/leaderboard', async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const limit = req.query.limit || 50;
+                const leaderboard = economyManager.getLeaderboard(guildId, 'balance', parseInt(limit));
+                res.json(leaderboard);
+            } catch (error) {
+                res.status(500).json({ error: error.message });
             }
         });
     }
