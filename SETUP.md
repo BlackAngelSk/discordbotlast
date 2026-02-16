@@ -260,7 +260,6 @@ SESSION_SECRET=generated_secret_from_step_2
 - `/dashboard/:guildId` - Main overview
 - `/dashboard/:guildId/economy` - Leaderboard
 - `/dashboard/:guildId/analytics` - Server stats
-- `/premium` - Premium tiers
 
 ---
 

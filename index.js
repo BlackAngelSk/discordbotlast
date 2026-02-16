@@ -15,7 +15,6 @@ const customCommandManager = require('./utils/customCommandManager');
 const ticketManager = require('./utils/ticketManager');
 const relationshipManager = require('./utils/relationshipManager');
 const databaseManager = require('./utils/databaseManager');
-const premiumManager = require('./utils/premiumManager');
 const analyticsManager = require('./utils/analyticsManager');
 const musicPlaylistManager = require('./utils/musicPlaylistManager');
 const enhancedAIManager = require('./utils/enhancedAIManager');
@@ -106,10 +105,6 @@ async function loadHandlers() {
 
         await relationshipManager.init();
         console.log('✅ Relationship manager initialized!');
-
-        // Initialize new managers
-        await premiumManager.init();
-        console.log('✅ Premium manager initialized!');
 
         await analyticsManager.init();
         console.log('✅ Analytics manager initialized!');

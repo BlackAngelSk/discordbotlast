@@ -14,7 +14,7 @@ const customCommandManager = require('../utils/customCommandManager');
 const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
-const premiumManager = require('../utils/premiumManager');
+const dashboardRoutes = require('./routes');
 
 class Dashboard {
     constructor(client) {
@@ -69,6 +69,9 @@ class Dashboard {
     }
 
     setupRoutes() {
+        // Import the advanced dashboard routes
+        dashboardRoutes(this.app, this.client, this.checkAuth, this.checkGuildAccess);
+
         // Home page
         this.app.get('/', (req, res) => {
             res.render('index', {
@@ -396,23 +399,6 @@ class Dashboard {
             } catch (error) {
                 console.error('Economy page error:', error);
                 res.status(500).send('Error loading economy');
-            }
-        });
-
-        // Premium Management
-        this.app.get('/premium', this.checkAuth, async (req, res) => {
-            try {
-                const premium = await premiumManager.getPremiumData(req.user.id);
-                const tiers = premiumManager.getAllTiers();
-
-                res.render('premium', {
-                    premium,
-                    tiers,
-                    user: req.user
-                });
-            } catch (error) {
-                console.error('Premium page error:', error);
-                res.status(500).send('Error loading premium');
             }
         });
 

@@ -152,12 +152,51 @@ class EconomyManager {
     getShopItems(guildId) {
         if (!this.data.shops[guildId]) {
             this.data.shops[guildId] = [
-                { id: 'vip', name: 'VIP Role', price: 10000, type: 'role' },
-                { id: 'custom_role', name: 'Custom Role Color', price: 5000, type: 'role' },
-                { id: 'premium', name: 'Premium Badge', price: 15000, type: 'badge' }
+                { id: 'vip', name: 'VIP Role', price: 10000, type: 'role', description: 'Get VIP status in the server' },
+                { id: 'custom_role', name: 'Custom Role Color', price: 5000, type: 'role', description: 'Choose your own role color' },
+                { id: 'premium', name: 'Premium Badge', price: 15000, type: 'badge', description: 'Premium member badge' }
             ];
         }
         return this.data.shops[guildId];
+    }
+
+    addShopItem(guildId, item) {
+        if (!this.data.shops[guildId]) {
+            this.data.shops[guildId] = [];
+        }
+        this.data.shops[guildId].push(item);
+        this.saveData();
+    }
+
+    removeShopItem(guildId, itemId) {
+        if (this.data.shops[guildId]) {
+            this.data.shops[guildId] = this.data.shops[guildId].filter(item => item.id !== itemId);
+            this.saveData();
+        }
+    }
+
+    addBalance(guildId, userId, amount) {
+        if (!this.data.users[userId]) {
+            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
+        }
+        this.data.users[userId].balance += amount;
+        this.saveData();
+    }
+
+    removeBalance(guildId, userId, amount) {
+        if (!this.data.users[userId]) {
+            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
+        }
+        this.data.users[userId].balance = Math.max(0, this.data.users[userId].balance - amount);
+        this.saveData();
+    }
+
+    setBalance(guildId, userId, amount) {
+        if (!this.data.users[userId]) {
+            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
+        }
+        this.data.users[userId].balance = amount;
+        this.saveData();
     }
 }
 

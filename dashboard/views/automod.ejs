@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Mod Settings - <%= guild.name %></title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .automod-container { max-width: 900px; margin: 40px auto; padding: 20px; }
+        .settings-card { background: var(--card-bg); padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border-color); margin-bottom: 20px; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border-color); }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-info h3 { margin: 0 0 5px 0; color: var(--text-color); }
+        .setting-info p { margin: 0; color: var(--text-light); font-size: 14px; }
+        .toggle-switch { position: relative; width: 60px; height: 30px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #71717a; transition: .4s; border-radius: 30px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #57F287; }
+        input:checked + .slider:before { transform: translateX(30px); }
+        .badwords-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
+        .badword-tag { background: #ED4245; color: white; padding: 8px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; }
+        .badword-tag button { background: none; border: none; color: white; cursor: pointer; font-size: 18px; padding: 0; }
+        .add-word-form { display: flex; gap: 10px; margin-top: 15px; }
+        .add-word-form input { flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); }
+        .btn-add { background: #5865F2; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-add:hover { background: #4752c4; }
+        .limit-input { width: 100px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; margin-left: 10px; background: var(--input-bg); color: var(--text-color); }
+        .save-btn { background: #57F287; color: white; padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 20px; }
+        .save-btn:hover { background: #45c06d; }
+        .status-badge { padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; }
+        .status-on { background: #57F287; color: white; }
+        .status-off { background: #ED4245; color: white; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>🤖 <%= guild.name %> - Auto-Moderation</h1>
+            </div>
+            <div class="nav-links">
+                <a href="/dashboard/<%= guild.id %>" class="btn-back">← Back to Dashboard</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container main-content">
+        <!-- Quick Navigation -->
+        <div class="quick-nav">
+            <a href="/dashboard/<%= guild.id %>" class="nav-btn">⚙️ Settings</a>
+            <a href="/dashboard/<%= guild.id %>/economy" class="nav-btn">💰 Economy</a>
+            <a href="/dashboard/<%= guild.id %>/moderation" class="nav-btn">🛡️ Moderation</a>
+            <a href="/dashboard/<%= guild.id %>/automod" class="nav-btn active">🤖 Auto-Mod</a>
+            <a href="/dashboard/<%= guild.id %>/shop" class="nav-btn">🛒 Shop</a>
+        </div>
+
+    <div class="automod-container">
+        <div class="settings-card">
+            <h2>Auto-Moderation Settings</h2>
+            <p style="color: #666; margin-bottom: 30px;">Configure automatic moderation rules for your server</p>
+
+            <form id="automodForm">
+                <!-- Master Toggle -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Enable Auto-Moderation</h3>
+                        <p>Master switch for all auto-moderation features</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="enabled" <%= settings.enabled ? 'checked' : '' %>>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Anti-Invite -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Anti-Invite Links</h3>
+                        <p>Block Discord invite links (discord.gg/...)</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="antiInvite" <%= settings.antiInvite ? 'checked' : '' %>>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Anti-Spam -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Anti-Spam</h3>
+                        <p>Detect spam (5+ messages in 5 seconds = timeout)</p>
+                    </div>
+                    <label class="toggle-switch">
+                        <input type="checkbox" name="antiSpam" <%= settings.antiSpam ? 'checked' : '' %>>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Max Mentions -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Max Mentions Limit</h3>
+                        <p>Maximum user mentions allowed per message</p>
+                    </div>
+                    <input type="number" name="maxMentions" class="limit-input" value="<%= settings.maxMentions || 5 %>" min="1" max="50">
+                </div>
+
+                <!-- Max Emojis -->
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <h3>Max Emojis Limit</h3>
+                        <p>Maximum emojis allowed per message</p>
+                    </div>
+                    <input type="number" name="maxEmojis" class="limit-input" value="<%= settings.maxEmojis || 10 %>" min="1" max="100">
+                </div>
+
+                <button type="submit" class="save-btn">💾 Save Settings</button>
+            </form>
+        </div>
+
+        <!-- Bad Words Section -->
+        <div class="settings-card">
+            <h2>Bad Words Filter</h2>
+            <p style="color: #666; margin-bottom: 20px;">Manage your custom word blacklist</p>
+
+            <div class="add-word-form">
+                <input type="text" id="newBadWord" placeholder="Enter word to blacklist...">
+                <button class="btn-add" onclick="addBadWord()">➕ Add Word</button>
+            </div>
+
+            <div class="badwords-list" id="badwordsList">
+                <% if (settings.badWords && settings.badWords.length > 0) { %>
+                    <% settings.badWords.forEach(word => { %>
+                        <div class="badword-tag">
+                            <%= word %>
+                            <button onclick="removeBadWord('<%= word %>')">×</button>
+                        </div>
+                    <% }) %>
+                <% } else { %>
+                    <p style="color: #999;">No bad words added yet</p>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('automodForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                enabled: formData.get('enabled') === 'on',
+                antiInvite: formData.get('antiInvite') === 'on',
+                antiSpam: formData.get('antiSpam') === 'on',
+                maxMentions: parseInt(formData.get('maxMentions')),
+                maxEmojis: parseInt(formData.get('maxEmojis'))
+            };
+            
+            try {
+                const response = await fetch('/api/<%= guild.id %>/automod/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert('✅ Settings saved successfully!');
+                } else {
+                    alert('❌ Failed to save settings');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        async function addBadWord() {
+            const word = document.getElementById('newBadWord').value.trim();
+            if (!word) return alert('Please enter a word');
+            
+            try {
+                const response = await fetch('/api/<%= guild.id %>/automod/badwords', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word })
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to add word');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function removeBadWord(word) {
+            if (!confirm(`Remove "${word}" from blacklist?`)) return;
+            
+            try {
+                const response = await fetch('/api/<%= guild.id %>/automod/badwords', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word })
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to remove word');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

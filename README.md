@@ -138,7 +138,12 @@ A **comprehensive** Discord bot built with discord.js v14, featuring slash comma
 - **Custom Prefix** - Set different command prefix per server
 - **Welcome/Leave Messages** - Configurable messages for member join/leave
 - **Per-Server Settings** - Each server has independent configuration
-- **Dashboard** - Web-based control panel
+- **Dashboard** - Web-based control panel with:
+  - 🛡️ **Moderation Panel** - Manage warnings, bans, kicks, timeouts
+  - 🛡️ **Auto-Mod Config** - Visual auto-mod settings with toggles
+  - 💰 **Shop Manager** - Add/remove items, manage balances
+  - 📊 **Analytics** - Server statistics and insights
+  - 💎 **Premium** - Subscription management
 
 ---
 

@@ -9,13 +9,12 @@ Comprehensive guide to all features, configuration options, and advanced usage.
 1. [Features Overview](#-features-overview)
 2. [Configuration System](#-configuration-system)
 3. [Dashboard Usage](#-dashboard-usage)
-4. [Premium System](#-premium-system)
-5. [Music System](#-music-system)
-6. [Economy & Leveling](#-economy--leveling)
-7. [Moderation Suite](#-moderation-suite)
-8. [Analytics & Tracking](#-analytics--tracking)
-9. [Multi-Language Support](#-multi-language-support)
-10. [Advanced Features](#-advanced-features)
+4. [Music System](#-music-system)
+5. [Economy & Leveling](#-economy--leveling)
+6. [Moderation Suite](#-moderation-suite)
+7. [Analytics & Tracking](#-analytics--tracking)
+8. [Multi-Language Support](#-multi-language-support)
+9. [Advanced Features](#-advanced-features)
 
 ---
 
@@ -29,8 +28,7 @@ Your bot includes these major systems:
 - **💰 Economy & Leveling** - XP, coins, shop, leaderboards
 - **🛡️ Moderation Suite** - Auto-mod, warnings, logging
 - **🎮 Entertainment** - Mini-games, betting, relationships
-- **💎 Premium Tiers** - Subscription system with exclusive features
-- **📊 Analytics** - Real-time tracking and insights
+- ** Analytics** - Real-time tracking and insights
 - **🌐 Web Dashboard** - Manage server through web interface
 - **🤖 AI Integration** - Smart responses and content analysis
 - **🎵 Playlist System** - Save and share music playlists
@@ -188,7 +186,6 @@ When first using the bot:
 
 **Features:**
 - Real-time data
-- Premium status indicator
 - Quick settings access
 
 #### 2. Economy Page (`/dashboard/:guildId/economy`)
@@ -220,21 +217,7 @@ When first using the bot:
 - Export data
 - Detailed charts
 
-#### 4. Premium Page (`/premium`)
-
-**Shows:**
-- All 3 premium tiers
-- Feature comparison
-- Current subscription status
-- Monthly bonus info
-- Subscribe buttons
-
-**Features:**
-- Tier comparison table
-- Feature highlights
-- Subscription management
-
-#### 5. Settings Page (`/dashboard/:guildId/settings`)
+#### 4. Settings Page (`/dashboard/:guildId/settings`)
 
 **Features:**
 - Command prefix configuration
@@ -280,109 +263,6 @@ Returns:
   ]
 }
 ```
-
----
-
-## 💎 Premium System
-
-### Premium Tiers
-
-#### Basic - $2.99/month
-
-**Features:**
-- 10 custom commands
-- 5 shop item slots
-- Advanced economy features
-- 500 coin monthly bonus
-- Email support
-
-**Limits:**
-- Custom commands: 10
-- Shop slots: 5
-
-#### Pro - $5.99/month
-
-**Everything in Basic, plus:**
-- 25 custom commands
-- 15 shop item slots
-- 3 exclusive mini-games
-- Priority support
-- 1,500 coin monthly bonus
-- Advanced analytics
-
-**Limits:**
-- Custom commands: 25
-- Shop slots: 15
-
-#### Elite - $9.99/month
-
-**Everything in Pro, plus:**
-- 100 custom commands
-- 50 shop item slots
-- All mini-games
-- Custom bot slot
-- Premium badge
-- 3,000 coin monthly bonus
-- VIP support channel
-
-**Limits:**
-- Custom commands: 100
-- Shop slots: 50
-
-### Managing Premium
-
-**View Tiers:**
-```
-/premium info
-```
-
-**Subscribe:**
-```
-/premium subscribe basic
-/premium subscribe pro
-/premium subscribe elite
-```
-
-**Check Status:**
-```
-/premium status
-```
-
-**View Your Features:**
-```
-/premium features
-```
-
-**Admin Commands:**
-```
-!premium-setup info
-!premium-setup check @user
-```
-
-### Premium Features
-
-**Custom Commands:**
-```
-/customcommand add hello Hello {user}!
-/customcommand list
-/customcommand remove hello
-```
-
-**Extended Shop:**
-- More item slots
-- Custom pricing
-- Role rewards
-- Badge system
-
-**Exclusive Games:**
-- Pro: 3 special mini-games
-- Elite: All games unlocked
-
-**Monthly Bonus:**
-- Automatically credited
-- Basic: 500 coins
-- Pro: 1,500 coins
-- Elite: 3,000 coins
 
 ---
 
@@ -595,7 +475,6 @@ Or manually:
 
 **Default Items:**
 - VIP Role - 10,000 coins
-- Premium Badge - 15,000 coins
 - Custom Color Role - 5,000 coins
 
 ### Level Rewards
@@ -1026,9 +905,6 @@ Response includes:
 
 **Limits:**
 - Free: 5 commands
-- Basic Premium: 10 commands
-- Pro Premium: 25 commands
-- Elite Premium: 100 commands
 
 ### AI Integration
 
@@ -1360,7 +1236,6 @@ Located in `data/` folder:
 
 - `settings.json` - Server configurations
 - `economy.json` - User balances and levels
-- `premium.json` - Premium subscriptions
 - `analytics.json` - Usage statistics
 - `playlists.json` - Music playlists
 - `ai.json` - AI preferences

@@ -1,196 +1,210 @@
 /**
- * Dashboard Routes - Enhancements for Server Management
- * Extends the existing dashboard with new pages
+ * Dashboard Routes - Enhanced Features
  */
 
-const express = require('express');
 const settingsManager = require('../utils/settingsManager');
 const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const analyticsManager = require('../utils/analyticsManager');
-const premiumManager = require('../utils/premiumManager');
 
-const router = express.Router();
+module.exports = function(app, client, checkAuth, checkGuildAccess) {
 
-// Middleware to check authentication
-const requireAuth = (req, res, next) => {
-    if (!req.user) return res.redirect('/auth/login');
-    next();
+    // Moderation Panel
+    app.get('/dashboard/:guildId/moderation', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const guildId = req.params.guildId;
+            const guild = client.guilds.cache.get(guildId);
+            
+            if (!guild) {
+                return res.status(404).send('Guild not found');
+            }
+
+            // Get all warnings for the guild
+            const warnings = [];
+            if (moderationManager.data && moderationManager.data.warnings) {
+                Object.keys(moderationManager.data.warnings).forEach(key => {
+                    if (key.startsWith(guildId + '_')) {
+                        const userId = key.split('_')[1];
+                        moderationManager.data.warnings[key].forEach(warn => {
+                            warnings.push({ ...warn, userId });
+                        });
+                    }
+                });
+            }
+
+            res.render('moderation', {
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                warnings,
+                bans: [],
+                kicks: [],
+                timeouts: [],
+                user: req.user
+            });
+        } catch (error) {
+            console.error('Moderation page error:', error);
+            res.status(500).send('Server error');
+        }
+    });
+
+    // Auto-Mod Settings
+    app.get('/dashboard/:guildId/automod', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const guildId = req.params.guildId;
+            const guild = client.guilds.cache.get(guildId);
+            
+            if (!guild) {
+                return res.status(404).send('Guild not found');
+            }
+
+            const modSettings = moderationManager.getAutomodSettings(guildId);
+
+            res.render('automod', {
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                settings: modSettings,
+                user: req.user
+            });
+        } catch (error) {
+            console.error('Auto-mod page error:', error);
+            res.status(500).send('Server error');
+        }
+    });
+
+    // Shop Manager
+    app.get('/dashboard/:guildId/shop', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const guildId = req.params.guildId;
+            const guild = client.guilds.cache.get(guildId);
+            
+            if (!guild) {
+                return res.status(404).send('Guild not found');
+            }
+
+            const shopItems = economyManager.getShopItems(guildId);
+            const leaderboard = economyManager.getLeaderboard(guildId, 10);
+
+            res.render('shop', {
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                shopItems: shopItems || [],
+                leaderboard: leaderboard || [],
+                user: req.user
+            });
+        } catch (error) {
+            console.error('Shop page error:', error);
+            res.status(500).send('Server error');
+        }
+    });
+
+    // === API ENDPOINTS ===
+
+    // Add Warning
+    app.post('/api/:guildId/moderation/warnings', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { userId, reason, moderatorId } = req.body;
+            
+            moderationManager.addWarning(guildId, userId, reason, moderatorId);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Remove Warning
+    app.post('/api/:guildId/moderation/warnings/remove', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { warningId } = req.body;
+            
+            moderationManager.removeWarning(guildId, warningId);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Update Auto-Mod Settings
+    app.post('/api/:guildId/automod/settings', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const settings = req.body;
+            
+            moderationManager.updateAutoModSettings(guildId, settings);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Add Bad Word
+    app.post('/api/:guildId/automod/badwords', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { word } = req.body;
+            
+            moderationManager.addBadWord(guildId, word);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Remove Bad Word
+    app.post('/api/:guildId/automod/badwords/remove', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { word } = req.body;
+            
+            moderationManager.removeBadWord(guildId, word);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Add Shop Item
+    app.post('/api/:guildId/shop/items', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const item = req.body;
+            
+            economyManager.addShopItem(guildId, item);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Remove Shop Item
+    app.post('/api/:guildId/shop/items/remove', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { itemId } = req.body;
+            
+            economyManager.removeShopItem(guildId, itemId);
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Manage Balance
+    app.post('/api/:guildId/shop/balance', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId } = req.params;
+            const { userId, amount, action } = req.body;
+            
+            if (action === 'add') {
+                economyManager.addBalance(guildId, userId, amount);
+            } else if (action === 'remove') {
+                economyManager.removeBalance(guildId, userId, amount);
+            } else if (action === 'set') {
+                economyManager.setBalance(guildId, userId, amount);
+            }
+            
+            res.json({ success: true });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
 };
-
-// Dashboard Home
-router.get('/dashboard/:guildId', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const guild = req.user.guilds.find(g => g.id === guildId);
-
-        if (!guild || !(guild.permissions & 0x0000000020)) {
-            return res.status(403).send('Unauthorized');
-        }
-
-        const analytics = await analyticsManager.getDashboardData(guildId);
-        const settings = await settingsManager.getGuildSettings(guildId);
-        const isPremium = await premiumManager.getPremiumData(req.user.id);
-
-        res.render('dashboard', {
-            guild,
-            analytics,
-            settings,
-            isPremium: isPremium && isPremium.isActive,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Dashboard error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Economy Settings
-router.get('/dashboard/:guildId/economy', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const leaderboard = await economyManager.getLeaderboard(guildId, 50);
-        const settings = await settingsManager.getGuildSettings(guildId);
-
-        res.render('economy', {
-            guildId,
-            leaderboard,
-            settings,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Economy page error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Moderation Logs
-router.get('/dashboard/:guildId/moderation', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const guild = req.user.guilds.find(g => g.id === guildId);
-
-        if (!guild || !(guild.permissions & 0x0000000008)) { // ADMINISTRATOR
-            return res.status(403).send('Unauthorized');
-        }
-
-        const logs = await moderationManager.getModLogs(guildId, 100);
-
-        res.render('moderation', {
-            guildId,
-            logs,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Moderation page error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Server Settings
-router.get('/dashboard/:guildId/settings', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const guild = req.user.guilds.find(g => g.id === guildId);
-
-        if (!guild || !(guild.permissions & 0x0000000020)) { // MANAGE_GUILD
-            return res.status(403).send('Unauthorized');
-        }
-
-        const settings = await settingsManager.getGuildSettings(guildId);
-
-        res.render('settings', {
-            guildId,
-            settings,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Settings page error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Update Settings
-router.post('/dashboard/:guildId/settings', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const guild = req.user.guilds.find(g => g.id === guildId);
-
-        if (!guild || !(guild.permissions & 0x0000000020)) {
-            return res.status(403).send('Unauthorized');
-        }
-
-        const updates = req.body;
-        await settingsManager.updateGuildSettings(guildId, updates);
-
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Settings update error:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Analytics Page
-router.get('/dashboard/:guildId/analytics', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const guild = req.user.guilds.find(g => g.id === guildId);
-
-        if (!guild || !(guild.permissions & 0x0000000008)) {
-            return res.status(403).send('Unauthorized');
-        }
-
-        const analytics = await analyticsManager.getDashboardData(guildId);
-
-        res.render('analytics', {
-            guildId,
-            analytics,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Analytics page error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// Premium Page
-router.get('/premium', requireAuth, async (req, res) => {
-    try {
-        const premium = await premiumManager.getPremiumData(req.user.id);
-        const tiers = premiumManager.getAllTiers();
-
-        res.render('premium', {
-            premium,
-            tiers,
-            user: req.user
-        });
-    } catch (error) {
-        console.error('Premium page error:', error);
-        res.status(500).send('Server error');
-    }
-});
-
-// API: Get Analytics Data
-router.get('/api/:guildId/analytics', requireAuth, async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const analytics = await analyticsManager.getDashboardData(guildId);
-        res.json(analytics);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// API: Get Leaderboard
-router.get('/api/:guildId/leaderboard', async (req, res) => {
-    try {
-        const guildId = req.params.guildId;
-        const limit = req.query.limit || 50;
-        const leaderboard = await economyManager.getLeaderboard(guildId, parseInt(limit));
-        res.json(leaderboard);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-module.exports = router;

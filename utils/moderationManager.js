@@ -166,6 +166,23 @@ class ModerationManager {
 
         return { violation: false };
     }
+
+    addBadWord(guildId, word) {
+        if (!this.data.automod[guildId]) {
+            this.data.automod[guildId] = this.getAutomodSettings(guildId);
+        }
+        if (!this.data.automod[guildId].badWords.includes(word)) {
+            this.data.automod[guildId].badWords.push(word);
+            this.save();
+        }
+    }
+
+    removeBadWord(guildId, word) {
+        if (this.data.automod[guildId]) {
+            this.data.automod[guildId].badWords = this.data.automod[guildId].badWords.filter(w => w !== word);
+            this.save();
+        }
+    }
 }
 
 module.exports = new ModerationManager();
