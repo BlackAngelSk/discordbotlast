@@ -52,6 +52,7 @@
             <a href="/dashboard/<%= guild.id %>/moderation" class="nav-btn">🛡️ Moderation</a>
             <a href="/dashboard/<%= guild.id %>/automod" class="nav-btn">🤖 Auto-Mod</a>
             <a href="/dashboard/<%= guild.id %>/shop" class="nav-btn active">🛒 Shop</a>
+            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
         </div>
 
     <div class="shop-container">
@@ -161,7 +162,7 @@
                                 <tr style="border-bottom: 1px solid #eee;">
                                     <td style="padding: 12px;"><strong>#<%= index + 1 %></strong></td>
                                     <td style="padding: 12px;"><%= user.username || 'Unknown' %></td>
-                                    <td style="padding: 12px; text-align: right;"><strong>💵 <%= user.balance.toLocaleString() %></strong></td>
+                                    <td style="padding: 12px; text-align: right;"><strong>💵 <%= formatNumber(user.balance) %></strong></td>
                                     <td style="padding: 12px; text-align: center;">Lv <%= user.level %></td>
                                 </tr>
                             <% }) %>

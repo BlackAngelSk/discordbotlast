@@ -36,7 +36,7 @@
             <a href="/dashboard/<%= guildId %>/moderation" class="nav-btn">🛡️ Moderation</a>
             <a href="/dashboard/<%= guildId %>/automod" class="nav-btn">🤖 Auto-Mod</a>
             <a href="/dashboard/<%= guildId %>/shop" class="nav-btn">🛒 Shop</a>
-            <a href="/premium" class="nav-btn">✨ Premium</a>
+            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
         </div>
 
     <div class="economy-container">
@@ -58,9 +58,9 @@
                     <tr>
                         <td><strong>#<%= index + 1 %></strong></td>
                         <td><%= user.username %></td>
-                        <td>💵 <%= user.balance || 0 %></td>
+                        <td>💵 <%= formatNumber(user.balance || 0) %></td>
                         <td>Level <%= user.level || 0 %></td>
-                        <td><%= user.xp || 0 %> XP</td>
+                        <td><%= formatNumber(user.xp || 0) %> XP</td>
                     </tr>
                     <% }); %>
                 </tbody>
@@ -70,8 +70,8 @@
         <div class="section">
             <h2>📊 Economy Statistics</h2>
             <p>Total users with economy profile: <strong><%= leaderboard.length %></strong></p>
-            <p>Highest balance: <strong>💵 <%= leaderboard[0]?.balance || 0 %></strong></p>
-            <p>Average balance: <strong>💵 <%= Math.round(leaderboard.reduce((a, b) => a + (b.balance || 0), 0) / leaderboard.length) %></strong></p>
+            <p>Highest balance: <strong>💵 <%= formatNumber(leaderboard[0]?.balance || 0) %></strong></p>
+            <p>Average balance: <strong>💵 <%= formatNumber(Math.round(leaderboard.reduce((a, b) => a + (b.balance || 0), 0) / leaderboard.length)) %></strong></p>
         </div>
     </div>
 </body>

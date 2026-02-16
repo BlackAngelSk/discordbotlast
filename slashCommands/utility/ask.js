@@ -54,19 +54,14 @@ module.exports = {
                 topK: 40
             });
 
-            // Truncate response if it's too long for Discord
-            let displayResponse = response;
-            const maxLength = 4096; // Discord embed description limit
-
-            if (displayResponse.length > maxLength) {
-                displayResponse = displayResponse.substring(0, maxLength - 100) + '\n\n*[Response truncated - too long to display]*';
-            }
-
-            // Create response embed
-            const responseEmbed = new EmbedBuilder()
+            // Discord limits: embed description max is 4096 chars
+            // But we need space for fields, so use a smaller limit for the response content
+            const maxResponsePerEmbed = 3500; // Leave room for fields
+            
+            // Create main response embed with details
+            const mainEmbed = new EmbedBuilder()
                 .setColor(0x57f287)
                 .setTitle('🤖 AI Response')
-                .setDescription(displayResponse)
                 .addFields(
                     { name: 'Question', value: `\`\`\`${question}\`\`\``, inline: false },
                     { name: 'Model', value: 'Google Gemini 2.5 Flash', inline: true },
@@ -75,7 +70,35 @@ module.exports = {
                 .setFooter({ text: `Asked by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
                 .setTimestamp();
 
-            await interaction.editReply({ embeds: [responseEmbed] });
+            // Check if response needs to be split
+            if (response.length > maxResponsePerEmbed) {
+                // Add first chunk to main embed
+                const firstChunk = response.substring(0, maxResponsePerEmbed);
+                mainEmbed.setDescription(firstChunk);
+                await interaction.editReply({ embeds: [mainEmbed] });
+
+                // Send remaining chunks as separate messages with full space
+                let remaining = response.substring(maxResponsePerEmbed);
+                let chunkNumber = 2;
+                const maxChunkLength = 4096;
+
+                while (remaining.length > 0) {
+                    const chunk = remaining.substring(0, maxChunkLength);
+                    remaining = remaining.substring(maxChunkLength);
+
+                    const continuationEmbed = new EmbedBuilder()
+                        .setColor(0x57f287)
+                        .setTitle(`🤖 Continuation (Part ${chunkNumber})`)
+                        .setDescription(chunk)
+                        .setFooter({ text: `Asked by ${interaction.user.tag}` });
+
+                    await interaction.followUp({ embeds: [continuationEmbed] });
+                    chunkNumber++;
+                }
+            } else {
+                mainEmbed.setDescription(response);
+                await interaction.editReply({ embeds: [mainEmbed] });
+            }
         } catch (error) {
             console.error('Error in ask command:', error);
 

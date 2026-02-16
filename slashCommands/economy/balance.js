@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
+const { formatNumber } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,9 +19,9 @@ module.exports = {
             .setColor('#FFD700')
             .setTitle(`💰 ${target.username}'s Balance`)
             .addFields(
-                { name: 'Balance', value: `💵 ${userData.balance} coins`, inline: true },
+                { name: 'Balance', value: `💵 ${formatNumber(userData.balance)} coins`, inline: true },
                 { name: 'Level', value: `⭐ ${userData.level}`, inline: true },
-                { name: 'XP', value: `✨ ${userData.xp}`, inline: true }
+                { name: 'XP', value: `✨ ${formatNumber(userData.xp)}`, inline: true }
             )
             .setThumbnail(target.displayAvatarURL())
             .setTimestamp();

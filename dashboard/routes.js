@@ -6,6 +6,7 @@ const settingsManager = require('../utils/settingsManager');
 const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const analyticsManager = require('../utils/analyticsManager');
+const { formatNumber } = require('../utils/helpers');
 
 module.exports = function(app, client, checkAuth, checkGuildAccess) {
 
@@ -80,12 +81,29 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             }
 
             const shopItems = economyManager.getShopItems(guildId);
-            const leaderboard = economyManager.getLeaderboard(guildId, 10);
+            let leaderboard = economyManager.getLeaderboard(guildId, 10);
+
+            // Resolve usernames for leaderboard
+            leaderboard = await Promise.all(leaderboard.map(async (user) => {
+                try {
+                    const member = await guild.members.fetch(user.userId).catch(() => null);
+                    return {
+                        ...user,
+                        username: member ? member.user.username : `Unknown (${user.userId})`
+                    };
+                } catch {
+                    return {
+                        ...user,
+                        username: `Unknown (${user.userId})`
+                    };
+                }
+            }));
 
             res.render('shop', {
                 guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
                 shopItems: shopItems || [],
                 leaderboard: leaderboard || [],
+                formatNumber,
                 user: req.user
             });
         } catch (error) {

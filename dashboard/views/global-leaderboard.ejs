@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Economy Leaderboard</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .leaderboard-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
+        .leaderboard-header { text-align: center; margin-bottom: 40px; }
+        .leaderboard-header h1 { color: var(--text-color); font-size: 2.5em; margin-bottom: 10px; }
+        .leaderboard-header p { color: var(--text-light); font-size: 1.1em; }
+        
+        .leaderboard-section { 
+            background: var(--card-bg); 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 40px var(--shadow);
+            border: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+        
+        .leaderboard-section h2 { 
+            color: var(--primary-color); 
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .tab-btn {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 1em;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+        
+        .tab-btn:hover {
+            color: var(--text-color);
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        
+        table th { 
+            background: var(--card-secondary); 
+            padding: 15px; 
+            text-align: left; 
+            color: var(--text-color); 
+            font-weight: 600; 
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        table td { 
+            padding: 12px 15px; 
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        table tr:hover {
+            background: var(--card-secondary);
+        }
+        
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .rank-badge.gold {
+            background: #FFD700;
+            color: #000;
+        }
+        
+        .rank-badge.silver {
+            background: #C0C0C0;
+            color: #000;
+        }
+        
+        .rank-badge.bronze {
+            background: #CD7F32;
+        }
+        
+        .rank-badge.default {
+            background: var(--primary-color);
+        }
+        
+        .user-name {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .amount {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: var(--card-secondary);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .stat-card h4 {
+            color: var(--text-light);
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+        
+        .stat-card .value {
+            color: var(--primary-color);
+            font-size: 1.8em;
+            font-weight: bold;
+        }
+        
+        .no-data {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-size: 0.95em;
+            transition: color 0.3s;
+        }
+
+        .back-link:hover {
+            color: var(--primary-color-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="leaderboard-container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+
+        <div class="leaderboard-header">
+            <h1>🌍 Global Economy Leaderboard</h1>
+            <p>Top 100 users across all servers</p>
+        </div>
+
+        <div class="leaderboard-section">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h4>Total Users Ranked</h4>
+                    <div class="value"><%= leaderboard.length %></div>
+                </div>
+                <div class="stat-card">
+                    <h4>Top Balance</h4>
+                    <div class="value">💰 <%= formatNumber(leaderboard[0]?.balance || 0) %></div>
+                </div>
+                <div class="stat-card">
+                    <h4>Top XP</h4>
+                    <div class="value">✨ <%= formatNumber(leaderboard[0]?.xp || 0) %></div>
+                </div>
+                <div class="stat-card">
+                    <h4>Average Balance</h4>
+                    <div class="value">💵 <%= formatNumber(Math.round(leaderboard.reduce((a, b) => a + (b.balance || 0), 0) / leaderboard.length)) %></div>
+                </div>
+            </div>
+
+            <h2 style="margin-top: 30px;">💰 Balance Ranking</h2>
+            
+            <% if (leaderboard && leaderboard.length > 0) { %>
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Rank</th>
+                            <th style="width: 40%;">User</th>
+                            <th style="width: 25%; text-align: right;">Balance</th>
+                            <th style="width: 15%; text-align: center;">Level</th>
+                            <th style="text-align: right;">Total XP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% leaderboard.forEach((user, index) => { %>
+                            <tr>
+                                <td>
+                                    <% if (index === 0) { %>
+                                        <div class="rank-badge gold">🥇</div>
+                                    <% } else if (index === 1) { %>
+                                        <div class="rank-badge silver">🥈</div>
+                                    <% } else if (index === 2) { %>
+                                        <div class="rank-badge bronze">🥉</div>
+                                    <% } else { %>
+                                        <div class="rank-badge default">#<%= index + 1 %></div>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <div class="user-name">
+                                        <div class="user-avatar"><%= user.username.charAt(0).toUpperCase() %></div>
+                                        <span><strong><%= user.username %></strong></span>
+                                    </div>
+                                </td>
+                                <td style="text-align: right;">
+                                    <span class="amount">💵 <%= formatNumber(user.balance) %></span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <strong>Lv <%= user.level %></strong>
+                                </td>
+                                <td style="text-align: right;">
+                                    <%= formatNumber(user.xp) %> XP
+                                </td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } else { %>
+                <div class="no-data">
+                    <p>🤷 No leaderboard data available yet. Start earning coins to appear here!</p>
+                </div>
+            <% } %>
+        </div>
+
+        <div class="leaderboard-section">
+            <h2>📊 Leaderboard Statistics</h2>
+            <p style="color: var(--text-light); margin-top: 10px;">
+                This global leaderboard combines earnings across all servers. 
+                Users are ranked by their total balance, with their cumulative XP and level shown.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

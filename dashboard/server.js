@@ -14,6 +14,7 @@ const customCommandManager = require('../utils/customCommandManager');
 const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
+const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 
 class Dashboard {
@@ -228,11 +229,32 @@ class Dashboard {
         });
 
         // API: Get economy leaderboard
-        this.app.get('/api/economy/:guildId', this.checkAuth, this.checkGuildAccess, (req, res) => {
+        this.app.get('/api/economy/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
                 const type = req.query.type || 'balance';
                 const limit = parseInt(req.query.limit) || 10;
-                const leaderboard = economyManager.getLeaderboard(req.params.guildId, type, limit);
+                let leaderboard = economyManager.getLeaderboard(guildId, type, limit);
+                
+                // Resolve usernames for leaderboard
+                if (guild) {
+                    leaderboard = await Promise.all(leaderboard.map(async (user) => {
+                        try {
+                            const member = await guild.members.fetch(user.userId).catch(() => null);
+                            return {
+                                ...user,
+                                username: member ? member.user.username : `Unknown (${user.userId})`
+                            };
+                        } catch {
+                            return {
+                                ...user,
+                                username: `Unknown (${user.userId})`
+                            };
+                        }
+                    }));
+                }
+                
                 res.json({ success: true, leaderboard });
             } catch (error) {
                 console.error('Error fetching economy leaderboard:', error);
@@ -388,17 +410,67 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
-                const leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
+                let leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
+
+                // Resolve usernames for leaderboard
+                leaderboard = await Promise.all(leaderboard.map(async (user) => {
+                    try {
+                        const member = await guild.members.fetch(user.userId).catch(() => null);
+                        return {
+                            ...user,
+                            username: member ? member.user.username : `Unknown (${user.userId})`
+                        };
+                    } catch {
+                        return {
+                            ...user,
+                            username: `Unknown (${user.userId})`
+                        };
+                    }
+                }));
 
                 res.render('economy', {
                     guildId,
                     guild,
                     leaderboard,
+                    formatNumber,
                     user: req.user
                 });
             } catch (error) {
                 console.error('Economy page error:', error);
                 res.status(500).send('Error loading economy');
+            }
+        });
+
+        // Global Economy Leaderboard
+        this.app.get('/global-leaderboard', this.checkAuth, async (req, res) => {
+            try {
+                let leaderboard = economyManager.getGlobalLeaderboard('balance', 100);
+
+                // Resolve usernames for global leaderboard
+                leaderboard = await Promise.all(leaderboard.map(async (user) => {
+                    try {
+                        // Try to fetch user from Discord
+                        const discordUser = await this.client.users.fetch(user.userId).catch(() => null);
+                        return {
+                            ...user,
+                            username: discordUser ? discordUser.username : `Unknown (${user.userId})`
+                        };
+                    } catch {
+                        return {
+                            ...user,
+                            username: `Unknown (${user.userId})`
+                        };
+                    }
+                }));
+
+                res.render('global-leaderboard', {
+                    leaderboard,
+                    formatNumber,
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Global leaderboard error:', error);
+                res.status(500).send('Error loading global leaderboard');
             }
         });
 
@@ -418,7 +490,27 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const limit = req.query.limit || 50;
-                const leaderboard = economyManager.getLeaderboard(guildId, 'balance', parseInt(limit));
+                const guild = this.client.guilds.cache.get(guildId);
+                let leaderboard = economyManager.getLeaderboard(guildId, 'balance', parseInt(limit));
+                
+                // Resolve usernames for leaderboard
+                if (guild) {
+                    leaderboard = await Promise.all(leaderboard.map(async (user) => {
+                        try {
+                            const member = await guild.members.fetch(user.userId).catch(() => null);
+                            return {
+                                ...user,
+                                username: member ? member.user.username : `Unknown (${user.userId})`
+                            };
+                        } catch {
+                            return {
+                                ...user,
+                                username: `Unknown (${user.userId})`
+                            };
+                        }
+                    }));
+                }
+                
                 res.json(leaderboard);
             } catch (error) {
                 res.status(500).json({ error: error.message });

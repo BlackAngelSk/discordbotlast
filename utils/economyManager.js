@@ -94,6 +94,38 @@ class EconomyManager {
         return guildUsers;
     }
 
+    getGlobalLeaderboard(type = 'balance', limit = 100) {
+        const globalUsers = Object.entries(this.data.users)
+            .map(([key, data]) => ({
+                userId: key.split('_')[1],
+                guildId: key.split('_')[0],
+                ...data
+            }))
+            .reduce((acc, user) => {
+                const existing = acc.find(u => u.userId === user.userId);
+                if (existing) {
+                    // Combine stats across all guilds for the same user
+                    existing.balance += user.balance;
+                    existing.xp += user.xp;
+                    existing.level = Math.floor(Math.sqrt((existing.xp) / 100)) + 1;
+                    existing.totalCoins = (existing.totalCoins || 0) + (user.seasonalCoins || 0);
+                } else {
+                    acc.push({
+                        userId: user.userId,
+                        balance: user.balance,
+                        xp: user.xp,
+                        level: user.level,
+                        totalCoins: user.seasonalCoins || 0
+                    });
+                }
+                return acc;
+            }, [])
+            .sort((a, b) => b[type] - a[type])
+            .slice(0, limit);
+        
+        return globalUsers;
+    }
+
     async claimDaily(guildId, userId) {
         const userData = this.getUserData(guildId, userId);
         const now = Date.now();

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
+const { formatNumber } = require('../../utils/helpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -31,9 +32,9 @@ module.exports = {
             try {
                 const member = await interaction.guild.members.fetch(user.userId).catch(() => null);
                 const username = member ? member.user.username : 'Unknown User';
-                return `${emojis[index]} **${username}** - ${typeEmojis[type]} ${user[type]}`;
+                return `${emojis[index]} **${username}** - ${typeEmojis[type]} ${formatNumber(user[type])}`;
             } catch {
-                return `${emojis[index]} **Unknown User** - ${typeEmojis[type]} ${user[type]}`;
+                return `${emojis[index]} **Unknown User** - ${typeEmojis[type]} ${formatNumber(user[type])}`;
             }
         }));
 

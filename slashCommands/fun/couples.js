@@ -8,18 +8,19 @@ module.exports = {
     
     async execute(interaction) {
         try {
-            const couples = await relationshipManager.getCouples(interaction.guild.id);
+            const couples = relationshipManager.getMarriageLeaderboard(interaction.guild.id, 50);
 
             if (couples.length === 0) {
-                return interaction.reply({ content: '❌ There are no married couples in this server!', ephemeral: true });
+                return interaction.reply({ content: '❌ There are no married couples in this server!' });
             }
 
             let description = '';
             for (let i = 0; i < couples.length; i++) {
                 try {
-                    const user1 = await interaction.client.users.fetch(couples[i].user1);
-                    const user2 = await interaction.client.users.fetch(couples[i].user2);
-                    description += `${i + 1}. ${user1} 💕 ${user2}\n`;
+                    const user1 = await interaction.client.users.fetch(couples[i].partner1);
+                    const user2 = await interaction.client.users.fetch(couples[i].partner2);
+                    const daysMarried = couples[i].daysMarried;
+                    description += `${i + 1}. **${user1.username}** 💕 **${user2.username}** - ${daysMarried} days\n`;
                 } catch (error) {
                     console.error('Error fetching users:', error);
                 }
@@ -36,7 +37,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in couples command:', error);
-            await interaction.reply({ content: '❌ An error occurred while fetching couples!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while fetching couples!' });
         }
     }
 };

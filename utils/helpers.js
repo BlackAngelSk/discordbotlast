@@ -21,7 +21,32 @@ function formatDuration(seconds) {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Helper function to format large numbers (K/M/B/T/Q)
+function formatNumber(num) {
+    if (typeof num !== 'number' || num < 0) return '0';
+    
+    const tiers = [
+        { size: 1e18, suffix: 'Qn' }, // Quintillion
+        { size: 1e15, suffix: 'Q' },  // Quadrillion
+        { size: 1e12, suffix: 'T' },  // Trillion
+        { size: 1e9, suffix: 'B' },   // Billion
+        { size: 1e6, suffix: 'M' },   // Million
+        { size: 1e3, suffix: 'K' }    // Thousand
+    ];
+    
+    for (const tier of tiers) {
+        if (num >= tier.size) {
+            const value = num / tier.size;
+            const decimals = value >= 100 ? 0 : 1;
+            return value.toFixed(decimals).replace(/\.0$/, '') + tier.suffix;
+        }
+    }
+    
+    return num.toString();
+}
+
 module.exports = {
     parseDuration,
-    formatDuration
+    formatDuration,
+    formatNumber
 };
