@@ -173,6 +173,40 @@ class GameStatsManager {
         if (total === 0) return 0;
         return ((gameStats.wins / total) * 100).toFixed(1);
     }
+
+    getUserStats(userId) {
+        const stats = this.getStats(userId);
+        const totals = this.getTotalGames(userId);
+
+        const wins =
+            stats.blackjack.wins +
+            stats.roulette.wins +
+            stats.slots.wins +
+            stats.dice.wins +
+            stats.coinflip.wins +
+            stats.rps.wins +
+            stats.ttt.wins;
+
+        const losses =
+            stats.blackjack.losses +
+            stats.roulette.losses +
+            stats.slots.losses +
+            stats.dice.losses +
+            stats.coinflip.losses +
+            stats.rps.losses +
+            stats.ttt.losses;
+
+        const total =
+            totals.blackjack +
+            totals.roulette +
+            totals.slots +
+            totals.dice +
+            totals.coinflip +
+            totals.rps +
+            totals.ttt;
+
+        return { total, wins, losses };
+    }
 }
 
 const gameStatsManager = new GameStatsManager();
