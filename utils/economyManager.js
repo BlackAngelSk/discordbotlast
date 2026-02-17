@@ -207,28 +207,28 @@ class EconomyManager {
         }
     }
 
-    addBalance(guildId, userId, amount) {
+    async addBalance(guildId, userId, amount) {
         if (!this.data.users[userId]) {
             this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
         }
         this.data.users[userId].balance += amount;
-        this.saveData();
+        await this.save();
     }
 
-    removeBalance(guildId, userId, amount) {
+    async removeBalance(guildId, userId, amount) {
         if (!this.data.users[userId]) {
             this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
         }
         this.data.users[userId].balance = Math.max(0, this.data.users[userId].balance - amount);
-        this.saveData();
+        await this.save();
     }
 
-    setBalance(guildId, userId, amount) {
+    async setBalance(guildId, userId, amount) {
         if (!this.data.users[userId]) {
             this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
         }
         this.data.users[userId].balance = amount;
-        this.saveData();
+        await this.save();
     }
 }
 
