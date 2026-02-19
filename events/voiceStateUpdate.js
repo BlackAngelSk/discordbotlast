@@ -1,5 +1,6 @@
 const { Events } = require('discord.js');
 const voiceRewardsManager = require('../utils/voiceRewardsManager');
+const activityTracker = require('../utils/activityTracker');
 
 module.exports = {
     name: Events.VoiceStateUpdate,
@@ -13,6 +14,7 @@ module.exports = {
                 // Check if user is not deafened or muted (anti-AFK)
                 if (!newState.selfDeaf && !newState.selfMute) {
                     await voiceRewardsManager.joinVoice(guildId, userId, newState.channelId);
+                    await activityTracker.startVoiceSession(guildId, userId, newState.channelId);
                     console.log(`🎤 ${newState.member.user.tag} joined voice channel`);
                 }
             }
@@ -20,6 +22,7 @@ module.exports = {
             // User left a voice channel
             if (oldState.channelId && !newState.channelId) {
                 const session = await voiceRewardsManager.leaveVoice(guildId, userId);
+                const activitySession = await activityTracker.endVoiceSession(userId);
                 if (session) {
                     console.log(`🎤 ${newState.member.user.tag} left voice after ${session.minutes} minutes`);
                 }
@@ -29,6 +32,8 @@ module.exports = {
             if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
                 await voiceRewardsManager.leaveVoice(guildId, userId);
                 await voiceRewardsManager.joinVoice(guildId, userId, newState.channelId);
+                await activityTracker.endVoiceSession(userId);
+                await activityTracker.startVoiceSession(guildId, userId, newState.channelId);
                 console.log(`🎤 ${newState.member.user.tag} switched voice channels`);
             }
 
@@ -40,9 +45,11 @@ module.exports = {
                 if (wasActive && !isActive) {
                     // User went AFK
                     await voiceRewardsManager.leaveVoice(guildId, userId);
+                    await activityTracker.endVoiceSession(userId);
                 } else if (!wasActive && isActive) {
                     // User came back from AFK
                     await voiceRewardsManager.joinVoice(guildId, userId, newState.channelId);
+                    await activityTracker.startVoiceSession(guildId, userId, newState.channelId);
                 }
             }
         } catch (error) {

@@ -2,10 +2,57 @@ const { Events, ActionRowBuilder, ButtonBuilder, ChannelType, EmbedBuilder, Perm
 const queues = require('../utils/queues');
 const ticketManager = require('../utils/ticketManager');
 const settingsManager = require('../utils/settingsManager');
+const customRoleShop = require('../utils/customRoleShop');
+const economyManager = require('../utils/economyManager');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        // Handle select menu interactions
+        if (interaction.isStringSelectMenu()) {
+            if (interaction.customId.startsWith('shop_')) {
+                try {
+                    await interaction.deferReply({ flags: 64 });
+
+                    let itemId = interaction.values[0];
+                    if (itemId.startsWith('buyrole_')) {
+                        itemId = itemId.replace('buyrole_', '');
+                    }
+                    const guildId = interaction.guildId;
+                    const userId = interaction.user.id;
+
+                    console.log(`[Shop] Guild: ${guildId}, User: ${userId}, Item: ${itemId}`);
+
+                    const result = await customRoleShop.buyCustomRole(guildId, userId, itemId, interaction.guild, economyManager);
+
+                    if (result.success) {
+                        const embed = new EmbedBuilder()
+                            .setColor(0x00FF00)
+                            .setTitle('✅ Purchase Successful!')
+                            .setDescription(result.message)
+                            .setThumbnail(interaction.user.displayAvatarURL());
+
+                        return await interaction.editReply({ embeds: [embed] });
+                    } else {
+                        const embed = new EmbedBuilder()
+                            .setColor(0xFF0000)
+                            .setTitle('❌ Purchase Failed')
+                            .setDescription(result.message);
+
+                        return await interaction.editReply({ embeds: [embed] });
+                    }
+                } catch (error) {
+                    console.error('Error handling shop select menu:', error);
+                    if (!interaction.replied && !interaction.deferred) {
+                        await interaction.reply({ content: '❌ An error occurred while processing your purchase.', flags: 64 });
+                    } else if (interaction.deferred) {
+                        await interaction.editReply({ content: '❌ An error occurred while processing your purchase.' });
+                    }
+                }
+            }
+            return;
+        }
+
         if (!interaction.isButton()) return;
 
         // Handle help category buttons
@@ -265,6 +312,42 @@ module.exports = {
             console.error('Error handling music button:', error);
             if (!interaction.replied) {
                 await interaction.reply({ content: '❌ Failed to handle that control.', flags: 64 });
+            }
+        }
+
+        // Handle custom role shop buttons (deprecated - using select menus now)
+        // Keeping for backward compatibility
+        if (interaction.customId.startsWith('buyrole_')) {
+            try {
+                await interaction.deferReply({ flags: 64 });
+
+                const itemId = interaction.customId.replace('buyrole_', '');
+                const guildId = interaction.guildId;
+                const userId = interaction.user.id;
+
+                const result = await customRoleShop.buyCustomRole(guildId, userId, itemId, interaction.guild, economyManager);
+
+                if (result.success) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0x00FF00)
+                        .setTitle('✅ Purchase Successful!')
+                        .setDescription(result.message)
+                        .setThumbnail(interaction.user.displayAvatarURL());
+
+                    return await interaction.editReply({ embeds: [embed] });
+                } else {
+                    const embed = new EmbedBuilder()
+                        .setColor(0xFF0000)
+                        .setTitle('❌ Purchase Failed')
+                        .setDescription(result.message);
+
+                    return await interaction.editReply({ embeds: [embed] });
+                }
+            } catch (error) {
+                console.error('Error handling custom role purchase:', error);
+                if (!interaction.replied) {
+                    await interaction.reply({ content: '❌ An error occurred while processing your purchase.', flags: 64 });
+                }
             }
         }
     }

@@ -25,6 +25,10 @@ const afkManager = require('./utils/afkManager');
 const voiceRewardsManager = require('./utils/voiceRewardsManager');
 const raidProtectionManager = require('./utils/raidProtectionManager');
 const scheduledMessagesManager = require('./utils/scheduledMessagesManager');
+const birthdayManager = require('./utils/birthdayManager');
+const customRoleShop = require('./utils/customRoleShop');
+const activityTracker = require('./utils/activityTracker');
+const serverMilestones = require('./utils/serverMilestones');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -90,6 +94,18 @@ async function loadHandlers() {
         
         await scheduledMessagesManager.init(client);
         console.log('✅ Scheduled messages manager initialized!');
+
+        await birthdayManager.init();
+        console.log('✅ Birthday manager initialized!');
+
+        await customRoleShop.init();
+        console.log('✅ Custom role shop initialized!');
+
+        await activityTracker.init();
+        console.log('✅ Activity tracker initialized!');
+
+        await serverMilestones.init();
+        console.log('✅ Server milestones initialized!');
 
         await reactionRoleManager.init();
         console.log('✅ Reaction role manager initialized!');

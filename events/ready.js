@@ -44,5 +44,16 @@ module.exports = {
         } catch (error) {
             console.error('Error restarting giveaways:', error);
         }
+
+        // Start rainbow role color updates
+        try {
+            const customRoleShop = require('../utils/customRoleShop');
+            setInterval(async () => {
+                await customRoleShop.applyRainbowUpdates(readyClient);
+            }, 3000); // Every 3 seconds
+            console.log('✅ Rainbow role updates started');
+        } catch (error) {
+            console.error('Error starting rainbow updates:', error);
+        }
     }
 };
