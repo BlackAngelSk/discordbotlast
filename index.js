@@ -29,6 +29,7 @@ const birthdayManager = require('./utils/birthdayManager');
 const customRoleShop = require('./utils/customRoleShop');
 const activityTracker = require('./utils/activityTracker');
 const serverMilestones = require('./utils/serverMilestones');
+const seasonManager = require('./utils/seasonManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -106,6 +107,9 @@ async function loadHandlers() {
 
         await serverMilestones.init();
         console.log('✅ Server milestones initialized!');
+
+        await seasonManager.init();
+        console.log('✅ Season manager initialized!');
 
         await reactionRoleManager.init();
         console.log('✅ Reaction role manager initialized!');
