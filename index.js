@@ -30,6 +30,7 @@ const customRoleShop = require('./utils/customRoleShop');
 const activityTracker = require('./utils/activityTracker');
 const serverMilestones = require('./utils/serverMilestones');
 const seasonManager = require('./utils/seasonManager');
+const seasonLeaderboardManager = require('./utils/seasonLeaderboardManager');
 const Dashboard = require('./dashboard/server');
 
 // Create a new Discord client instance
@@ -111,6 +112,9 @@ async function loadHandlers() {
         await seasonManager.init();
         console.log('✅ Season manager initialized!');
 
+        await seasonLeaderboardManager.init();
+        console.log('✅ Season leaderboard manager initialized!');
+
         await reactionRoleManager.init();
         console.log('✅ Reaction role manager initialized!');
 
@@ -164,6 +168,12 @@ loadHandlers().then(() => {
     client.once(Events.ClientReady, async () => {
         console.log(`✅ Bot is ready! Logged in as ${client.user.tag}`);
         
+        // Migrate usernames in existing seasons
+        const migrated = await seasonManager.migrateUsernames(client);
+        if (migrated > 0) {
+            console.log(`✅ Migrated ${migrated} usernames in seasons`);
+        }
+        
         // Register slash commands
         await slashCommandHandler.registerCommands();
         
@@ -171,5 +181,76 @@ loadHandlers().then(() => {
             const dashboard = new Dashboard(client);
             dashboard.start();
         }
+
+        // Start season leaderboard update task (every 15 minutes)
+        setInterval(async () => {
+            await updateSeasonLeaderboards(client);
+        }, 15 * 60 * 1000); // 15 minutes
+
+        // Initial update
+        await updateSeasonLeaderboards(client);
     });
 });
+
+/**
+ * Update season leaderboards in all configured channels
+ * @param {Client} client - Discord client
+ */
+async function updateSeasonLeaderboards(client) {
+    try {
+        const guildConfigs = seasonLeaderboardManager.config;
+
+        for (const guildId in guildConfigs) {
+            const config = guildConfigs[guildId];
+            if (!config.channelId) continue;
+
+            const guild = client.guilds.cache.get(guildId);
+            if (!guild) continue;
+
+            const channel = guild.channels.cache.get(config.channelId);
+            if (!channel || !channel.isTextBased()) continue;
+
+            const seasonName = seasonManager.getCurrentSeason(guildId);
+            if (!seasonName) continue;
+
+            try {
+                const embeds = await seasonLeaderboardManager.generateSeasonEmbeds(guildId, seasonManager, seasonName, client);
+                
+                if (embeds.length === 0) continue;
+
+                // Delete old message if exists
+                if (config.messageId) {
+                    try {
+                        const oldMessage = await channel.messages.fetch(config.messageId);
+                        await oldMessage.delete();
+                    } catch (error) {
+                        // Message already deleted or not found
+                    }
+                }
+
+                // Send new embeds in chunks (Discord has a limit of 10 embeds per message)
+                const embedChunks = [];
+                for (let i = 0; i < embeds.length; i += 10) {
+                    embedChunks.push(embeds.slice(i, i + 10));
+                }
+
+                // Send first chunk and save message ID
+                if (embedChunks.length > 0) {
+                    const firstMessage = await channel.send({ embeds: embedChunks[0] });
+                    await seasonLeaderboardManager.setLeaderboardMessage(guildId, firstMessage.id);
+
+                    // Send remaining chunks
+                    for (let i = 1; i < embedChunks.length; i++) {
+                        await channel.send({ embeds: embedChunks[i] });
+                    }
+                }
+
+                console.log(`✅ Updated leaderboards for guild ${guildId}`);
+            } catch (error) {
+                console.error(`Error updating leaderboards for guild ${guildId}:`, error);
+            }
+        }
+    } catch (error) {
+        console.error('Error in leaderboard update task:', error);
+    }
+}

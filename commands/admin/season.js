@@ -1,10 +1,12 @@
 const { EmbedBuilder } = require('discord.js');
 const seasonManager = require('../../utils/seasonManager');
+const economyManager = require('../../utils/economyManager');
+const gameStatsManager = require('../../utils/gameStatsManager');
 
 module.exports = {
     name: 'season',
     description: 'Manage economy seasons (Admin only)',
-    usage: '!season <create|list|info|end|leaderboard> [args]',
+    usage: '!season <create|list|info|end|leaderboard|enroll> [args]',
     aliases: ['seasons'],
     category: 'admin',
     async execute(message, args) {
@@ -22,7 +24,7 @@ module.exports = {
                     embeds: [new EmbedBuilder()
                         .setColor(0x5865F2)
                         .setTitle('📊 Season Management Commands')
-                        .setDescription('```\n!season create <name>         - Create a new season\n!season list                  - List all seasons\n!season info <season>         - Get season info\n!season leaderboard [season]  - Show season leaderboard\n!season end <season>          - End a season\n```')
+                        .setDescription('```\n!season create <name>         - Create a new season (auto-enrolls all members)\n!season list                  - List all seasons\n!season info <season>         - Get season info\n!season leaderboard [season]  - Show season leaderboard\n!season enroll <season>       - Manually enroll all current members\n!season refresh [season]      - Refresh all player stats from live data\n!season end <season>          - End a season\n```')
                         .setFooter({ text: 'Admin only command' })
                     ]
                 });
@@ -40,6 +42,12 @@ module.exports = {
                     break;
                 case 'leaderboard':
                     await handleLeaderboard(message, args, guildId);
+                    break;
+                case 'enroll':
+                    await handleEnroll(message, args, guildId);
+                    break;
+                case 'refresh':
+                    await handleRefresh(message, args, guildId);
                     break;
                 case 'end':
                     await handleEnd(message, args, guildId);
@@ -73,19 +81,160 @@ async function handleCreate(message, args, guildId) {
         return message.reply(`❌ ${result.error}`);
     }
 
-    const embed = new EmbedBuilder()
-        .setColor(0x57F287)
-        .setTitle('✅ Season Created')
-        .setDescription(`New season **${seasonName}** has been created!`)
-        .addFields(
-            { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
-            { name: '👤 Created By', value: `<@${message.author.id}>`, inline: true },
-            { name: '🕐 Started', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false },
-            { name: '📝 Status', value: '🟢 Active', inline: true }
-        )
-        .setTimestamp();
+    // Auto-enroll all members
+    const statusMsg = await message.reply('⏳ Creating season and enrolling members...');
+    
+    try {
+        const members = await message.guild.members.fetch();
+        const enrollResult = await seasonManager.autoEnrollAllMembers(
+            guildId,
+            seasonName,
+            Array.from(members.values()),
+            (userId) => ({
+                username: Array.from(members.values()).find(m => m.id === userId)?.user.username || 'Unknown User',
+                balance: economyManager.getUserData(guildId, userId).balance,
+                xp: economyManager.getUserData(guildId, userId).xp,
+                level: economyManager.getUserData(guildId, userId).level,
+                seasonalCoins: economyManager.getUserData(guildId, userId).seasonalCoins,
+                gambling: gameStatsManager.getStats(userId)
+            })
+        );
 
-    message.reply({ embeds: [embed] });
+        const embed = new EmbedBuilder()
+            .setColor(0x57F287)
+            .setTitle('✅ Season Created & Members Enrolled')
+            .setDescription(`New season **${seasonName}** has been created!`)
+            .addFields(
+                { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
+                { name: '👤 Created By', value: `<@${message.author.id}>`, inline: true },
+                { name: '👥 Members Enrolled', value: `**${enrollResult.enrolled}** member(s)`, inline: true },
+                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, & All Gambling Stats', inline: true },
+                { name: '🕐 Started', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false },
+                { name: '📝 Status', value: '🟢 Active', inline: true }
+            )
+            .setTimestamp();
+
+        await statusMsg.edit({ content: '', embeds: [embed] });
+    } catch (error) {
+        console.error('Error enrolling members:', error);
+        const embed = new EmbedBuilder()
+            .setColor(0xFF9800)
+            .setTitle('⚠️ Season Created (Enrollment Partial)')
+            .setDescription(`New season **${seasonName}** has been created!\n\n⚠️ However, there was an error auto-enrolling members.`)
+            .addFields(
+                { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
+                { name: '👤 Created By', value: `<@${message.author.id}>`, inline: true },
+                { name: '🕐 Started', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false }
+            )
+            .setFooter({ text: 'Use !season enroll <season> to manually enroll members' })
+            .setTimestamp();
+
+        await statusMsg.edit({ content: '', embeds: [embed] });
+    }
+}
+
+async function handleEnroll(message, args, guildId) {
+    const seasonName = args.slice(1).join('-').toLowerCase();
+
+    if (!seasonName) {
+        return message.reply('❌ Please specify a season name: `!season enroll <season-name>`');
+    }
+
+    const season = seasonManager.getSeason(guildId, seasonName);
+    if (!season) {
+        return message.reply(`❌ Season **${seasonName}** not found!`);
+    }
+
+    const statusMsg = await message.reply('⏳ Enrolling all members in the season...');
+
+    try {
+        const members = await message.guild.members.fetch();
+        const enrollResult = await seasonManager.autoEnrollAllMembers(
+            guildId,
+            seasonName,
+            Array.from(members.values()),
+            (userId) => ({
+                username: Array.from(members.values()).find(m => m.id === userId)?.user.username || 'Unknown User',
+                balance: economyManager.getUserData(guildId, userId).balance,
+                xp: economyManager.getUserData(guildId, userId).xp,
+                level: economyManager.getUserData(guildId, userId).level,
+                seasonalCoins: economyManager.getUserData(guildId, userId).seasonalCoins,
+                gambling: gameStatsManager.getStats(userId)
+            })
+        );
+
+        const embed = new EmbedBuilder()
+            .setColor(0x57F287)
+            .setTitle('✅ Members Enrolled')
+            .setDescription(`All members have been enrolled in season **${seasonName}**!`)
+            .addFields(
+                { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
+                { name: '👥 Members Enrolled', value: `**${enrollResult.enrolled}** member(s)`, inline: true },
+                { name: '👥 Total in Season', value: season.totalPlayers.toString(), inline: true },
+                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, & All Gambling Stats', inline: false }
+            )
+            .setTimestamp();
+
+        await statusMsg.edit({ content: '', embeds: [embed] });
+    } catch (error) {
+        console.error('Error enrolling members:', error);
+        await statusMsg.edit({ 
+            content: '❌ An error occurred while enrolling members. Check console for details.' 
+        });
+    }
+}
+
+async function handleRefresh(message, args, guildId) {
+    const currentSeason = seasonManager.getCurrentSeason(guildId);
+    let seasonName = currentSeason;
+
+    if (args[1]) {
+        seasonName = args.slice(1).join('-').toLowerCase();
+    }
+
+    if (!seasonName) {
+        return message.reply('❌ No active season. Create one with `!season create <name>`');
+    }
+
+    const season = seasonManager.getSeason(guildId, seasonName);
+    if (!season) {
+        return message.reply(`❌ Season **${seasonName}** not found!`);
+    }
+
+    const statusMsg = await message.reply('⏳ Refreshing all player stats...');
+
+    try {
+        const refreshResult = await seasonManager.refreshSeasonStats(
+            guildId,
+            seasonName,
+            (userId) => ({
+                username: message.guild.members.cache.get(userId)?.user.username || 'Unknown User',
+                balance: economyManager.getUserData(guildId, userId).balance,
+                xp: economyManager.getUserData(guildId, userId).xp,
+                level: economyManager.getUserData(guildId, userId).level,
+                seasonalCoins: economyManager.getUserData(guildId, userId).seasonalCoins,
+                gambling: gameStatsManager.getStats(userId)
+            })
+        );
+
+        const embed = new EmbedBuilder()
+            .setColor(0x57F287)
+            .setTitle('✅ Season Stats Refreshed')
+            .setDescription(`All player stats in season **${seasonName}** have been updated!`)
+            .addFields(
+                { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
+                { name: '🔄 Players Updated', value: `**${refreshResult.updated}** player(s)`, inline: true },
+                { name: '👥 Total in Season', value: season.totalPlayers.toString(), inline: true }
+            )
+            .setTimestamp();
+
+        await statusMsg.edit({ content: '', embeds: [embed] });
+    } catch (error) {
+        console.error('Error refreshing season stats:', error);
+        await statusMsg.edit({ 
+            content: '❌ An error occurred while refreshing stats. Check console for details.' 
+        });
+    }
 }
 
 async function handleList(message, guildId) {
@@ -173,7 +322,7 @@ async function handleLeaderboard(message, args, guildId) {
         return message.reply(`❌ Season **${seasonName}** not found!`);
     }
 
-    const leaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'coins', 10);
+    const leaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', 10);
 
     if (leaderboard.length === 0) {
         return message.reply(`ℹ️ No players in season **${seasonName}** yet!`);
@@ -182,7 +331,7 @@ async function handleLeaderboard(message, args, guildId) {
     let description = '';
     leaderboard.forEach((player, index) => {
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
-        description += `${medal} <@${player.userId}> - **${player.coins.toLocaleString()}** coins (Lvl ${player.level})\n`;
+        description += `${medal} <@${player.userId}> - **${player.balance.toLocaleString()}** coins (Lvl ${player.level})\n`;
     });
 
     const embed = new EmbedBuilder()

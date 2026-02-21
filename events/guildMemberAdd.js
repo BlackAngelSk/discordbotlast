@@ -3,6 +3,9 @@ const settingsManager = require('../utils/settingsManager');
 const statsManager = require('../utils/statsManager');
 const inviteManager = require('../utils/inviteManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
+const seasonManager = require('../utils/seasonManager');
+const economyManager = require('../utils/economyManager');
+const gameStatsManager = require('../utils/gameStatsManager');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -201,6 +204,31 @@ module.exports = {
                 }
             } catch (error) {
                 console.error('Error sending welcome card:', error);
+            }
+
+            // Auto-enroll new member in active seasons
+            try {
+                const userData = economyManager.getUserData(member.guild.id, member.id);
+                const gamblingStats = gameStatsManager.getStats(member.id);
+                
+                const enrolledSeasons = await seasonManager.autoEnrollUserInSeasons(
+                    member.guild.id,
+                    member.id,
+                    {
+                        username: member.user.username,
+                        balance: userData.balance || 0,
+                        xp: userData.xp || 0,
+                        level: userData.level || 1,
+                        seasonalCoins: userData.seasonalCoins || 0,
+                        gambling: gamblingStats
+                    }
+                );
+                
+                if (enrolledSeasons.length > 0) {
+                    console.log(`✅ ${member.user.tag} auto-enrolled in ${enrolledSeasons.length} season(s): ${enrolledSeasons.join(', ')}`);
+                }
+            } catch (error) {
+                console.error('Error auto-enrolling user in seasons:', error);
             }
 
         } catch (error) {
