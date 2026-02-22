@@ -204,6 +204,55 @@ class SeasonManager {
     }
 
     /**
+     * Add voice hours to a player's season stats
+     * @param {string} guildId - Discord Guild ID
+     * @param {string} seasonName - Season name
+     * @param {string} userId - Discord User ID
+     * @param {number} minutes - Minutes spent in voice
+     * @param {string} username - Discord username (optional)
+     * @returns {Object} Result with success status
+     */
+    async addVoiceHours(guildId, seasonName, userId, minutes, username = 'Unknown User') {
+        const season = this.getSeason(guildId, seasonName);
+        if (!season) {
+            return { success: false, error: 'Season not found' };
+        }
+
+        const voiceHours = minutes / 60;
+
+        // Initialize player if they don't exist yet
+        if (!season.leaderboard[userId]) {
+            season.leaderboard[userId] = {
+                userId,
+                username,
+                balance: 0,
+                xp: 0,
+                level: 1,
+                coins: 0,
+                voiceHours: 0,
+                gambling: {
+                    blackjack: { wins: 0, losses: 0, ties: 0 },
+                    roulette: { wins: 0, losses: 0 },
+                    slots: { wins: 0, losses: 0 },
+                    dice: { wins: 0, losses: 0 },
+                    coinflip: { wins: 0, losses: 0 },
+                    rps: { wins: 0, losses: 0, ties: 0 },
+                    ttt: { wins: 0, losses: 0, ties: 0 }
+                },
+                lastUpdated: Date.now()
+            };
+            season.totalPlayers = Object.keys(season.leaderboard).length;
+        }
+
+        // Add voice hours
+        season.leaderboard[userId].voiceHours = (season.leaderboard[userId].voiceHours || 0) + voiceHours;
+        season.leaderboard[userId].lastUpdated = Date.now();
+
+        await this.save();
+        return { success: true, voiceHours: season.leaderboard[userId].voiceHours };
+    }
+
+    /**
      * Get season leaderboard
      * @param {string} guildId - Discord Guild ID
      * @param {string} seasonName - Season name
@@ -471,11 +520,15 @@ class SeasonManager {
         for (const userId in season.leaderboard) {
             const stats = getStats(userId);
             if (stats) {
+                // Preserve existing voice hours during refresh
+                const existingVoiceHours = season.leaderboard[userId].voiceHours || 0;
+                
                 season.leaderboard[userId].balance = stats.balance || 0;
                 season.leaderboard[userId].xp = stats.xp || 0;
                 season.leaderboard[userId].level = stats.level || 1;
                 season.leaderboard[userId].coins = stats.seasonalCoins || 0;
                 season.leaderboard[userId].gambling = stats.gambling || season.leaderboard[userId].gambling;
+                season.leaderboard[userId].voiceHours = existingVoiceHours;
                 if (stats.username) {
                     season.leaderboard[userId].username = stats.username;
                 }

@@ -268,10 +268,13 @@ class SeasonLeaderboardManager {
 
         // Voice Channel Hours leaderboard
         const voiceLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'voiceHours', balanceLimit);
-        if (voiceLeaderboard.length > 0) {
+        // Filter to only show players with voice hours > 0
+        const filteredVoiceLeaderboard = voiceLeaderboard.filter(player => (player.voiceHours || 0) > 0);
+        
+        if (filteredVoiceLeaderboard.length > 0) {
             let voiceDesc = '';
-            for (let i = 0; i < voiceLeaderboard.length; i++) {
-                const player = voiceLeaderboard[i];
+            for (let i = 0; i < filteredVoiceLeaderboard.length; i++) {
+                const player = filteredVoiceLeaderboard[i];
                 const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
                 const username = await getUsername(player.userId, player.username);
                 const hours = Math.floor(player.voiceHours || 0);
