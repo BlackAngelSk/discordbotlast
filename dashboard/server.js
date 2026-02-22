@@ -17,6 +17,34 @@ const analyticsManager = require('../utils/analyticsManager');
 const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 
+const withTimeout = (promise, ms) => new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise
+        .then(result => {
+            clearTimeout(timer);
+            resolve(result);
+        })
+        .catch(() => {
+            clearTimeout(timer);
+            resolve(null);
+        });
+});
+
+const resolveGuildUsername = async (guild, userId) => {
+    if (!guild) return `Unknown (${userId})`;
+    const cached = guild.members?.cache?.get(userId);
+    if (cached) return cached.user?.username || `Unknown (${userId})`;
+    const member = await withTimeout(guild.members.fetch(userId).catch(() => null), 3000);
+    return member ? member.user.username : `Unknown (${userId})`;
+};
+
+const resolveGlobalUsername = async (client, userId) => {
+    const cached = client.users?.cache?.get(userId);
+    if (cached) return cached.username || `Unknown (${userId})`;
+    const user = await withTimeout(client.users.fetch(userId).catch(() => null), 3000);
+    return user ? user.username : `Unknown (${userId})`;
+};
+
 class Dashboard {
     constructor(client) {
         this.client = client;
@@ -413,20 +441,10 @@ class Dashboard {
                 let leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
 
                 // Resolve usernames for leaderboard
-                leaderboard = await Promise.all(leaderboard.map(async (user) => {
-                    try {
-                        const member = await guild.members.fetch(user.userId).catch(() => null);
-                        return {
-                            ...user,
-                            username: member ? member.user.username : `Unknown (${user.userId})`
-                        };
-                    } catch {
-                        return {
-                            ...user,
-                            username: `Unknown (${user.userId})`
-                        };
-                    }
-                }));
+                leaderboard = await Promise.all(leaderboard.map(async (user) => ({
+                    ...user,
+                    username: await resolveGuildUsername(guild, user.userId)
+                })));
 
                 res.render('economy', {
                     guildId,
@@ -447,21 +465,10 @@ class Dashboard {
                 let leaderboard = economyManager.getGlobalLeaderboard('balance', 100);
 
                 // Resolve usernames for global leaderboard
-                leaderboard = await Promise.all(leaderboard.map(async (user) => {
-                    try {
-                        // Try to fetch user from Discord
-                        const discordUser = await this.client.users.fetch(user.userId).catch(() => null);
-                        return {
-                            ...user,
-                            username: discordUser ? discordUser.username : `Unknown (${user.userId})`
-                        };
-                    } catch {
-                        return {
-                            ...user,
-                            username: `Unknown (${user.userId})`
-                        };
-                    }
-                }));
+                leaderboard = await Promise.all(leaderboard.map(async (user) => ({
+                    ...user,
+                    username: await resolveGlobalUsername(this.client, user.userId)
+                })));
 
                 res.render('global-leaderboard', {
                     leaderboard,
@@ -495,20 +502,10 @@ class Dashboard {
                 
                 // Resolve usernames for leaderboard
                 if (guild) {
-                    leaderboard = await Promise.all(leaderboard.map(async (user) => {
-                        try {
-                            const member = await guild.members.fetch(user.userId).catch(() => null);
-                            return {
-                                ...user,
-                                username: member ? member.user.username : `Unknown (${user.userId})`
-                            };
-                        } catch {
-                            return {
-                                ...user,
-                                username: `Unknown (${user.userId})`
-                            };
-                        }
-                    }));
+                    leaderboard = await Promise.all(leaderboard.map(async (user) => ({
+                        ...user,
+                        username: await resolveGuildUsername(guild, user.userId)
+                    })));
                 }
                 
                 res.json(leaderboard);

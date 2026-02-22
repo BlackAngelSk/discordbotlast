@@ -1,6 +1,7 @@
 const { Events } = require('discord.js');
 const voiceRewardsManager = require('../utils/voiceRewardsManager');
 const activityTracker = require('../utils/activityTracker');
+const seasonManager = require('../utils/seasonManager');
 
 module.exports = {
     name: Events.VoiceStateUpdate,
@@ -23,7 +24,18 @@ module.exports = {
             if (oldState.channelId && !newState.channelId) {
                 const session = await voiceRewardsManager.leaveVoice(guildId, userId);
                 const activitySession = await activityTracker.endVoiceSession(userId);
+                
+                // Update season manager with voice hours
                 if (session) {
+                    const voiceHours = session.minutes / 60;
+                    const currentSeason = seasonManager.getCurrentSeason(guildId);
+                    if (currentSeason) {
+                        const season = seasonManager.getSeason(guildId, currentSeason);
+                        if (season && season.leaderboard[userId]) {
+                            season.leaderboard[userId].voiceHours = (season.leaderboard[userId].voiceHours || 0) + voiceHours;
+                            await seasonManager.save();
+                        }
+                    }
                     console.log(`🎤 ${newState.member.user.tag} left voice after ${session.minutes} minutes`);
                 }
             }

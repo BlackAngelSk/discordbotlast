@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const settingsManager = require('./settingsManager');
+const commandPermissionsManager = require('./commandPermissionsManager');
 
 class CommandHandler {
     constructor(client) {
@@ -69,6 +70,18 @@ class CommandHandler {
 
         const command = this.commands.get(commandName);
         if (!command) return;
+
+        const baseCommandName = command.name;
+        if (!commandPermissionsManager.isCommandEnabled(message.guild.id, baseCommandName)) {
+            return message.reply('❌ This command is disabled in this server.');
+        }
+
+        const requiredRoleId = commandPermissionsManager.getRequiredRole(message.guild.id, baseCommandName);
+        if (requiredRoleId && !message.member.permissions.has('Administrator')) {
+            if (!message.member.roles.cache.has(requiredRoleId)) {
+                return message.reply('❌ You do not have permission to use this command.');
+            }
+        }
 
         try {
             await command.execute(message, args, this.client);

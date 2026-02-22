@@ -6,6 +6,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const databaseManager = require('./databaseManager');
+const { fetchUserSafe } = require('./discordFetch');
 
 class SeasonManager {
     constructor() {
@@ -53,8 +54,8 @@ class SeasonManager {
                     const player = season.leaderboard[userId];
                     if (!player.username || player.username === 'Unknown User') {
                         try {
-                            const user = await client.users.fetch(userId);
-                            player.username = user.username;
+                            const user = await fetchUserSafe(client, userId);
+                            player.username = user ? user.username : `User${userId.slice(-4)}`;
                             updated++;
                         } catch (error) {
                             player.username = `User${userId.slice(-4)}`;
@@ -115,7 +116,8 @@ class SeasonManager {
             isActive: true,
             leaderboard: {}, // userId -> { balance, xp, level, coins }
             totalPlayers: 0,
-            archived: false
+            archived: false,
+            summaryPosted: false
         };
 
         this.data.seasons[guildId][seasonName] = seasonData;
@@ -167,7 +169,7 @@ class SeasonManager {
      * @param {string} guildId - Discord Guild ID
      * @param {string} seasonName - Season name
      * @param {string} userId - Discord User ID
-     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling}
+     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling, voiceHours}
      */
     async recordPlayerStats(guildId, seasonName, userId, stats) {
         const season = this.getSeason(guildId, seasonName);
@@ -182,6 +184,7 @@ class SeasonManager {
             xp: stats.xp || 0,
             level: stats.level || 1,
             coins: stats.seasonalCoins || 0,
+            voiceHours: stats.voiceHours || 0,
             gambling: stats.gambling || {
                 blackjack: { wins: 0, losses: 0, ties: 0 },
                 roulette: { wins: 0, losses: 0 },
@@ -204,7 +207,7 @@ class SeasonManager {
      * Get season leaderboard
      * @param {string} guildId - Discord Guild ID
      * @param {string} seasonName - Season name
-     * @param {string} sortBy - Sort by: 'balance', 'xp', 'level', 'coins'
+     * @param {string} sortBy - Sort by: 'balance', 'xp', 'level', 'coins', 'voiceHours'
      * @param {number} limit - Limit results
      * @returns {Array} Leaderboard entries
      */
@@ -234,7 +237,18 @@ class SeasonManager {
         season.isActive = false;
         season.endDate = new Date().toISOString();
         season.archived = true;
+        season.summaryPosted = season.summaryPosted || false;
 
+        await this.save();
+        return { success: true };
+    }
+
+    async markSeasonSummaryPosted(guildId, seasonName) {
+        const season = this.getSeason(guildId, seasonName);
+        if (!season) {
+            return { success: false, error: 'Season not found' };
+        }
+        season.summaryPosted = true;
         await this.save();
         return { success: true };
     }
@@ -475,6 +489,35 @@ class SeasonManager {
         }
 
         return { success: true, updated: updatedCount };
+    }
+
+    async pruneInactivePlayers(guildId, seasonName, inactiveDays = 30) {
+        const season = this.getSeason(guildId, seasonName);
+        if (!season) {
+            return { success: false, error: 'Season not found', pruned: 0 };
+        }
+
+        if (inactiveDays <= 0) {
+            return { success: true, pruned: 0 };
+        }
+
+        const cutoff = Date.now() - (inactiveDays * 24 * 60 * 60 * 1000);
+        let pruned = 0;
+
+        for (const userId in season.leaderboard) {
+            const entry = season.leaderboard[userId];
+            if (entry?.lastUpdated && entry.lastUpdated < cutoff) {
+                delete season.leaderboard[userId];
+                pruned++;
+            }
+        }
+
+        if (pruned > 0) {
+            season.totalPlayers = Object.keys(season.leaderboard).length;
+            await this.save();
+        }
+
+        return { success: true, pruned };
     }
 }
 

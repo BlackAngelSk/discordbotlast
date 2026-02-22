@@ -48,8 +48,15 @@ module.exports = {
         // Start rainbow role color updates
         try {
             const customRoleShop = require('../utils/customRoleShop');
+            let rainbowRunning = false;
             setInterval(async () => {
-                await customRoleShop.applyRainbowUpdates(readyClient);
+                if (rainbowRunning) return;
+                rainbowRunning = true;
+                try {
+                    await customRoleShop.applyRainbowUpdates(readyClient);
+                } finally {
+                    rainbowRunning = false;
+                }
             }, 3000); // Every 3 seconds
             console.log('✅ Rainbow role updates started');
         } catch (error) {

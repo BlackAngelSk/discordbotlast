@@ -1,9 +1,11 @@
-const { Events, ActionRowBuilder, ButtonBuilder, ChannelType, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { Events, ActionRowBuilder, ButtonBuilder, ChannelType, EmbedBuilder, PermissionFlagsBits, ButtonStyle, AttachmentBuilder } = require('discord.js');
 const queues = require('../utils/queues');
 const ticketManager = require('../utils/ticketManager');
 const settingsManager = require('../utils/settingsManager');
 const customRoleShop = require('../utils/customRoleShop');
 const economyManager = require('../utils/economyManager');
+const seasonLeaderboardManager = require('../utils/seasonLeaderboardManager');
+const moderationManager = require('../utils/moderationManager');
 
 module.exports = {
     name: Events.InteractionCreate,
@@ -55,6 +57,112 @@ module.exports = {
 
         if (!interaction.isButton()) return;
 
+        if (interaction.customId.startsWith('automod_toggle:')) {
+            try {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                    return interaction.reply({ content: '❌ You need Manage Server permission.', ephemeral: true });
+                }
+
+                const parts = interaction.customId.split(':');
+                const guildId = parts[1];
+                const key = parts[2];
+                if (!guildId || !key || guildId !== interaction.guildId) {
+                    return interaction.reply({ content: '❌ Invalid auto-mod toggle.', ephemeral: true });
+                }
+
+                const settings = moderationManager.getAutomodSettings(guildId);
+                if (typeof settings[key] === 'boolean') {
+                    settings[key] = !settings[key];
+                    await moderationManager.updateAutomodSettings(guildId, settings);
+                }
+
+                const updated = moderationManager.getAutomodSettings(guildId);
+                const embed = new EmbedBuilder()
+                    .setColor('#5865F2')
+                    .setTitle('🛡️ Auto-Mod Dashboard')
+                    .setDescription('Toggle settings using the buttons below.')
+                    .addFields(
+                        { name: 'Status', value: updated.enabled ? '✅ Enabled' : '❌ Disabled', inline: true },
+                        { name: 'Anti-Invite', value: updated.antiInvite ? '✅ On' : '❌ Off', inline: true },
+                        { name: 'Anti-Spam', value: updated.antiSpam ? '✅ On' : '❌ Off', inline: true },
+                        { name: 'Emoji-Only Delete', value: updated.emojiOnly ? '✅ On' : '❌ Off', inline: true }
+                    )
+                    .setTimestamp();
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`automod_toggle:${guildId}:enabled`)
+                        .setLabel(updated.enabled ? 'Disable' : 'Enable')
+                        .setStyle(updated.enabled ? ButtonStyle.Success : ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`automod_toggle:${guildId}:antiInvite`)
+                        .setLabel('Anti-Invite')
+                        .setStyle(updated.antiInvite ? ButtonStyle.Success : ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`automod_toggle:${guildId}:antiSpam`)
+                        .setLabel('Anti-Spam')
+                        .setStyle(updated.antiSpam ? ButtonStyle.Success : ButtonStyle.Secondary),
+                    new ButtonBuilder()
+                        .setCustomId(`automod_toggle:${guildId}:emojiOnly`)
+                        .setLabel('Emoji-Only')
+                        .setStyle(updated.emojiOnly ? ButtonStyle.Success : ButtonStyle.Secondary)
+                );
+
+                await interaction.update({ embeds: [embed], components: [row] });
+                return;
+            } catch (error) {
+                console.error('Error handling automod dashboard:', error);
+                return interaction.reply({ content: '❌ Failed to update auto-mod settings.', ephemeral: true });
+            }
+        }
+
+        if (interaction.customId.startsWith('lb_page:')) {
+            try {
+                const parts = interaction.customId.split(':');
+                const guildId = parts[1];
+                const page = parseInt(parts[2], 10);
+                if (!guildId || Number.isNaN(page)) {
+                    return interaction.reply({ content: '❌ Invalid leaderboard page.', ephemeral: true });
+                }
+
+                const cached = seasonLeaderboardManager.getPageCache(guildId);
+                if (!cached || !cached.embeds || cached.embeds.length === 0) {
+                    return interaction.reply({ content: '⏳ Leaderboard cache expired. Please wait for the next update.', ephemeral: true });
+                }
+
+                if (interaction.channelId !== cached.channelId || interaction.message.id !== cached.messageId) {
+                    return interaction.reply({ content: '❌ This leaderboard is no longer active.', ephemeral: true });
+                }
+
+                const totalPages = cached.embeds.length;
+                const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+
+                const row = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`lb_page:${guildId}:${Math.max(0, safePage - 1)}`)
+                        .setLabel('⬅️ Prev')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(safePage === 0),
+                    new ButtonBuilder()
+                        .setCustomId(`lb_page:${guildId}:${Math.min(totalPages - 1, safePage + 1)}`)
+                        .setLabel('Next ➡️')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(safePage === totalPages - 1),
+                    new ButtonBuilder()
+                        .setCustomId(`lb_page:${guildId}:${safePage}`)
+                        .setLabel(`Page ${safePage + 1}/${totalPages}`)
+                        .setStyle(ButtonStyle.Primary)
+                        .setDisabled(true)
+                );
+
+                await interaction.update({ embeds: [cached.embeds[safePage]], components: [row] });
+                return;
+            } catch (error) {
+                console.error('Error handling leaderboard pagination:', error);
+                return interaction.reply({ content: '❌ Failed to change page.', ephemeral: true });
+            }
+        }
+
         // Handle help category buttons
         if (interaction.customId.startsWith('help_')) {
             try {
@@ -73,7 +181,7 @@ module.exports = {
                             .setDescription('Play music from YouTube, Spotify, and SoundCloud!')
                             .addFields(
                                 { name: '▶️ Playback', value: `\`${p}play <url/query>\` - Play a song\n\`${p}pause\` - Pause playback (DJ)\n\`${p}resume\` - Resume playback (DJ)\n\`${p}skip\` - Skip current song (DJ)\n\`${p}stop\` - Stop and clear queue (DJ)\n\`${p}leave\` - Leave voice channel` },
-                                { name: '📋 Queue', value: `\`${p}queue\` - View song queue\n\`${p}nowplaying\` - Current song info\n\`${p}remove <pos>\` - Remove song (DJ)\n\`${p}move <from> <to>\` - Move song (DJ)\n\`${p}shuffle\` - Shuffle queue (DJ)\n\`${p}clear\` - Clear queue (DJ)` },
+                                { name: '📋 Queue', value: `\`${p}queue\` - View song queue\n\`${p}nowplaying\` - Current song info\n\`${p}remove <pos>\` - Remove song (DJ)\n\`${p}move <from> <to>\` - Move song (DJ)\n\`${p}swap <a> <b>\` - Swap songs (DJ)\n\`${p}shuffle\` - Shuffle queue (DJ)` },
                                 { name: '🔧 Controls', value: `\`${p}volume <0-200>\` - Set volume (DJ)\n\`${p}loop <off/song/queue>\` - Loop mode (DJ)\n\`${p}previous\` - Play previous song (DJ)\n\`${p}jump <pos>\` - Jump to position (DJ)\n\`${p}autoplay\` - Toggle autoplay (DJ)` },
                                 { name: '📝 Info', value: `\`${p}lyrics [song]\` - Get song lyrics` }
                             );
@@ -84,8 +192,8 @@ module.exports = {
                             .setDescription('Earn coins, gamble, and climb the leaderboard!')
                             .addFields(
                                 { name: '💵 Balance', value: `\`/balance [@user]\` - Check balance\n\`/daily\` - Daily coins + streak bonus\n\`/weekly\` - Weekly coins\n\`${p}profile [@user]\` - View full profile with XP` },
-                                { name: '🎰 Gambling', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}coinflip <h/t> <bet>\` - 2.5x multiplier\n\`${p}dice <1-6> <bet>\` - 6x multiplier\n\`${p}roulette <bet>\` - Roulette wheel\n\`${p}blackjack <bet>\` - Card game\n\`${p}rps <bet>\` - Rock paper scissors` },
-                                { name: '🏆 Leaderboards', value: `\`${p}leaderboard balance\` - Richest users\n\`${p}leaderboard xp\` - Top levels\n\`${p}leaderboard seasonal\` - Seasonal coins` },
+                                { name: '🎰 Gambling', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}coinflip <h/t> <bet>\` - 2.5x multiplier\n\`${p}dice <1-6> <bet>\` - 6x multiplier\n\`${p}roulette <bet>\` - Roulette wheel\n\`${p}blackjack <bet>\` - Card game\n\`${p}rps <bet>\` - Rock paper scissors\n\`${p}russianroulette\` - Risky roulette` },
+                                { name: '🏆 Leaderboards', value: `\`${p}leaderboard balance\` - Richest users\n\`${p}leaderboard xp\` - Top levels\n\`${p}leaderboard seasonal\` - Seasonal coins\n\`/leaderboard-update\` - Force update (admin/role)` },
                                 { name: '🛒 Shop', value: `\`/shop\` - View items to buy\n\`${p}transfer @user <amount>\` - Send coins` }
                             );
                         break;
@@ -94,9 +202,9 @@ module.exports = {
                         embed.setTitle('🎮 Game Commands')
                             .setDescription('Play games and track your stats!')
                             .addFields(
-                                { name: '🎲 Mini Games', value: `\`${p}minigame rps\` - Rock paper scissors\n\`${p}minigame guess\` - Guess the number\n\`${p}minigame trivia\` - Trivia questions\n\`${p}ttt [@user]\` - Tic tac toe` },
-                                { name: '🎰 Betting Games', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}blackjack <bet>\` - Card game\n\`${p}roulette <bet>\` - Roulette\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`${p}rps <bet>\` - RPS with betting` },
-                                { name: '📊 Stats', value: `\`${p}gamestats [@user]\` - View game statistics` }
+                                { name: '🎲 Mini Games', value: `\`${p}minigame rps\` - Rock paper scissors\n\`${p}minigame guess\` - Guess the number\n\`${p}minigame trivia\` - Trivia questions\n\`${p}ttt [@user]\` - Tic tac toe\n\`${p}count\` - Counting game` },
+                                { name: '🎰 Betting Games', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}blackjack <bet>\` - Card game\n\`${p}roulette <bet>\` - Roulette\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`${p}rps <bet>\` - RPS with betting\n\`${p}russianroulette\` - Risky roulette\n\`${p}horserace <bet>\` - Horse race` },
+                                { name: '📊 Stats', value: `\`${p}gamestats [@user]\` - View game statistics\n\`${p}horseracehistory [@user]\` - Horse race history` }
                             );
                         break;
 
@@ -104,10 +212,35 @@ module.exports = {
                         embed.setTitle('🛡️ Moderation Commands')
                             .setDescription('Keep your server safe and organized!')
                             .addFields(
-                                { name: '👮 Actions', value: `\`${p}kick @user [reason]\` - Kick member\n\`${p}ban @user [reason]\` - Ban member\n\`${p}unban <userId>\` - Unban user\n\`${p}timeout @user <mins> [reason]\` - Timeout\n\`${p}untimeout @user\` - Remove timeout\n\`${p}warn @user <reason>\` - Warn user` },
-                                { name: '🗑️ Cleanup', value: `\`${p}purge <amount>\` - Delete messages\n\`${p}clear <amount>\` - Clear messages\n\`${p}lock\` - Lock channel\n\`${p}unlock\` - Unlock channel` },
-                                { name: '📋 Warnings', value: `\`/warnings add @user <reason>\`\n\`/warnings list @user\`\n\`/warnings remove @user <id>\`\n\`/warnings clear @user\`\n\`/modlog #channel\` - Set log channel` },
+                                { name: '👮 Actions', value: `\`${p}kick @user [reason]\` - Kick member\n\`${p}ban @user [reason]\` - Ban member\n\`${p}unban <userId>\` - Unban user\n\`${p}timeout @user <mins> [reason]\` - Timeout\n\`${p}untimeout @user\` - Remove timeout\n\`${p}warn @user <reason>\` - Warn user\n\`/softban @user [reason]\` - Soft ban\n\`/mute @user <mins>\` - Mute member` },
+                                { name: '🗑️ Cleanup', value: `\`${p}purge <amount>\` - Delete messages\n\`${p}clear <amount>\` - Clear messages\n\`${p}lock\` - Lock channel\n\`${p}unlock\` - Unlock channel\n\`/slowmode <seconds>\` - Set slowmode` },
+                                { name: '📋 Warnings & Logs', value: `\`/warnings add @user <reason>\`\n\`/warnings list @user\`\n\`/warnings remove @user <id>\`\n\`/warnings clear @user\`\n\`${p}logging\` - Logging settings\n\`/modlog #channel\` - Set mod log` },
                                 { name: '🤖 Auto-Mod', value: `\`/automod enable/disable\`\n\`/automod antiinvite\` - Block invites\n\`/automod antispam\` - Block spam\n\`/automod badwords add/remove\`\n\`/automod settings\` - View settings` }
+                            );
+                        break;
+                    case 'utility':
+                    case 'config':
+                        embed.setTitle('🔧 Utility Commands')
+                            .setDescription('Configuration and server information!')
+                            .addFields(
+                                { name: '⚙️ Configuration', value: `\`${p}config\` - View settings\n\`${p}config prefix <prefix>\` - Set prefix\n\`${p}config djrole <name>\` - Set DJ role\n\`${p}config autorole <name>\` - Set auto role\n\`${p}setup\` - Quick server setup\n\`${p}config reset\` - Reset settings` },
+                                { name: '🏆 Leaderboard Admin', value: `\`/leaderboard-channel #channel\` - Set channel\n\`/leaderboard-config view\` - View config\n\`/leaderboard-config set\` - Update config\n\`/leaderboard-config export\` - Export CSV` },
+                                { name: 'ℹ️ Information', value: `\`${p}server\` - Server info\n\`${p}ping\` - Bot latency\n\`/avatar [@user]\` - User avatar\n\`/userinfo [@user]\` - User details\n\`/roleinfo <@role>\` - Role info\n\`/serverinfo\` - Server details` },
+                                { name: '🧰 Utility Tools', value: `\`/ask <question>\` - Ask AI\n\`/ai\` - AI chat\n\`/announce\` - Announcement\n\`/birthday\` - Birthday settings\n\`/customrole\` - Custom role shop\n\`/milestones\` - Milestones\n\`/giveaway\` - Giveaways\n\`/invites\` - Invite stats\n\`/invitestats\` - Invite leaderboard\n\`/welcome-leave\` - Welcome/leave builder` },
+                                { name: '🌐 Other', value: `\`${p}dashboard\` - Web dashboard\n\`${p}hello\` - Say hello!\n\`${p}help\` - Help menu\n\`${p}prefix\` - Show prefix\n\`${p}leave\` - Bot leaves server` }
+                            );
+                        break;
+
+                    case 'admin':
+                        embed.setTitle('🧰 Admin Commands')
+                            .setDescription('Server and economy administration tools!')
+                            .addFields(
+                                { name: '💰 Economy Admin', value: `\`${p}addcoins @user <amount>\`\n\`${p}removecoins @user <amount>\`\n\`${p}setbalance @user <amount>\`\n\`${p}giveexp @user <amount>\`` },
+                                { name: '🧹 Resets', value: `\`${p}cleareconomy\`\n\`${p}reseteconomy\`\n\`${p}cleargamedata\`\n\`${p}resetwarnings\`` },
+                                { name: '📅 Seasons', value: `\`${p}season create <name>\`\n\`${p}season end <name>\`\n\`${p}season stats [name]\`\n\`${p}season refresh [name]\`` },
+                                { name: '⚙️ Server Admin', value: `\`${p}botprefix <prefix>\`\n\`${p}serverlanguage <code>\`\n\`${p}serverstats\`\n\`${p}announcement <msg>\`\n\`${p}backup\`` },
+                                { name: '🔐 Permissions', value: `\`/command-permissions list\`\n\`/command-permissions disable <command>\`\n\`/command-permissions enable <command>\`\n\`/command-permissions role <command> <role>\`` },
+                                { name: '🧾 Audit Logs', value: `\`/auditlog view\`\n\`/auditlog export\`` }
                             );
                         break;
                 }
@@ -207,6 +340,28 @@ module.exports = {
                 await interaction.deferReply({ ephemeral: true });
 
                 const ticketId = interaction.customId.replace('close_ticket_', '');
+
+                // Build transcript
+                const messages = [];
+                let lastId;
+                while (true) {
+                    const batch = await interaction.channel.messages.fetch({ limit: 100, before: lastId }).catch(() => null);
+                    if (!batch || batch.size === 0) break;
+                    messages.push(...Array.from(batch.values()));
+                    lastId = batch.last().id;
+                }
+
+                const sorted = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+                const transcriptLines = sorted.map(m => {
+                    const time = new Date(m.createdTimestamp).toISOString();
+                    const author = `${m.author?.tag || 'Unknown'}`;
+                    const content = (m.content || '').replace(/\n/g, ' ');
+                    return `[${time}] ${author}: ${content}`;
+                });
+
+                const transcriptContent = transcriptLines.join('\n');
+                const transcriptPath = await ticketManager.saveTranscript(interaction.guildId, ticketId, transcriptContent);
+
                 await ticketManager.closeTicket(interaction.guildId, ticketId);
 
                 const embed = new EmbedBuilder()
@@ -216,6 +371,24 @@ module.exports = {
                     .setTimestamp();
 
                 await interaction.editReply({ embeds: [embed] });
+
+                const settings = ticketManager.getSettings(interaction.guildId);
+                if (settings.logsChannelId && transcriptPath) {
+                    const logsChannel = await interaction.client.channels.fetch(settings.logsChannelId).catch(() => null);
+                    if (logsChannel && logsChannel.isTextBased()) {
+                        const file = new AttachmentBuilder(transcriptPath, { name: `${ticketId}.txt` });
+                        const logEmbed = new EmbedBuilder()
+                            .setColor(0x5865F2)
+                            .setTitle('🧾 Ticket Transcript')
+                            .setDescription(`Ticket **${ticketId}** transcript attached.`)
+                            .addFields(
+                                { name: 'Closed By', value: `${interaction.user}`, inline: true },
+                                { name: 'Channel', value: `${interaction.channel}`, inline: true }
+                            )
+                            .setTimestamp();
+                        await logsChannel.send({ embeds: [logEmbed], files: [file] });
+                    }
+                }
 
                 setTimeout(async () => {
                     try {

@@ -5,12 +5,14 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const { fetchUserSafe, fetchChannelSafe } = require('./discordFetch');
 
 class NotificationManager {
     constructor(client) {
         this.client = client;
         this.dataFile = path.join(__dirname, '..', 'data', 'notifications.json');
         this.schedules = new Map();
+        this.scheduleCheckRunning = false;
     }
 
     async init() {
@@ -28,7 +30,8 @@ class NotificationManager {
 
     async sendDMAlert(userId, alert) {
         try {
-            const user = await this.client.users.fetch(userId);
+            const user = await fetchUserSafe(this.client, userId);
+            if (!user) return false;
             await user.send({
                 embeds: [{
                     color: alert.color || 0x5865F2,
@@ -99,7 +102,8 @@ class NotificationManager {
 
     async sendAnnouncement(announcement) {
         try {
-            const channel = await this.client.channels.fetch(announcement.channelId);
+            const channel = await fetchChannelSafe(this.client, announcement.channelId);
+            if (!channel || !channel.isTextBased()) return false;
             await channel.send(announcement.message);
 
             const data = JSON.parse(await fs.readFile(this.dataFile, 'utf-8'));
@@ -119,7 +123,8 @@ class NotificationManager {
 
     async celebrateMilestone(guildId, userId, milestone, reward) {
         try {
-            const user = await this.client.users.fetch(userId);
+            const user = await fetchUserSafe(this.client, userId);
+            if (!user) return false;
             await user.send({
                 embeds: [{
                     color: 0x57F287,
@@ -151,6 +156,8 @@ class NotificationManager {
 
     startScheduleChecker() {
         setInterval(async () => {
+            if (this.scheduleCheckRunning) return;
+            this.scheduleCheckRunning = true;
             try {
                 const data = JSON.parse(await fs.readFile(this.dataFile, 'utf-8'));
                 for (const guildId in data.announcements) {
@@ -162,6 +169,8 @@ class NotificationManager {
                 }
             } catch (error) {
                 console.error('Schedule checker error:', error);
+            } finally {
+                this.scheduleCheckRunning = false;
             }
         }, 60000); // Check every minute
     }

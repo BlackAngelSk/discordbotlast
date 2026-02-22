@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
+const { fetchChannelSafe } = require('./discordFetch');
 
 class ScheduledMessagesManager {
     constructor() {
@@ -10,6 +11,7 @@ class ScheduledMessagesManager {
         };
         this.client = null;
         this.intervals = new Map();
+        this.inFlight = new Set();
     }
 
     async init(client = null) {
@@ -155,9 +157,11 @@ class ScheduledMessagesManager {
     async sendScheduledMessage(guildId, messageId) {
         const message = this.getMessage(guildId, messageId);
         if (!message || !this.client) return;
+        if (this.inFlight.has(messageId)) return;
+        this.inFlight.add(messageId);
 
         try {
-            const channel = await this.client.channels.fetch(message.channelId);
+            const channel = await fetchChannelSafe(this.client, message.channelId);
             if (!channel || !channel.isTextBased()) return;
 
             // Parse content for embeds
@@ -184,6 +188,8 @@ class ScheduledMessagesManager {
             console.log(`📅 Sent scheduled message ${messageId} in guild ${guildId}`);
         } catch (error) {
             console.error(`Error sending scheduled message ${messageId}:`, error);
+        } finally {
+            this.inFlight.delete(messageId);
         }
     }
 

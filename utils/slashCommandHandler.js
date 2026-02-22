@@ -1,6 +1,7 @@
 const { REST, Routes, Collection, MessageFlags } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
+const commandPermissionsManager = require('./commandPermissionsManager');
 
 class SlashCommandHandler {
     constructor(client) {
@@ -82,6 +83,17 @@ class SlashCommandHandler {
         if (!command) {
             console.error(`No command matching ${interaction.commandName} was found.`);
             return;
+        }
+
+        if (!commandPermissionsManager.isCommandEnabled(interaction.guildId, interaction.commandName)) {
+            return interaction.reply({ content: '❌ This command is disabled in this server.', flags: MessageFlags.Ephemeral });
+        }
+
+        const requiredRoleId = commandPermissionsManager.getRequiredRole(interaction.guildId, interaction.commandName);
+        if (requiredRoleId && !interaction.member.permissions.has('Administrator')) {
+            if (!interaction.member.roles.cache.has(requiredRoleId)) {
+                return interaction.reply({ content: '❌ You do not have permission to use this command.', flags: MessageFlags.Ephemeral });
+            }
         }
 
         try {

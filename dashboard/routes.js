@@ -8,6 +8,27 @@ const moderationManager = require('../utils/moderationManager');
 const analyticsManager = require('../utils/analyticsManager');
 const { formatNumber } = require('../utils/helpers');
 
+const withTimeout = (promise, ms) => new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    promise
+        .then(result => {
+            clearTimeout(timer);
+            resolve(result);
+        })
+        .catch(() => {
+            clearTimeout(timer);
+            resolve(null);
+        });
+});
+
+const resolveGuildUsername = async (guild, userId) => {
+    if (!guild) return `Unknown (${userId})`;
+    const cached = guild.members?.cache?.get(userId);
+    if (cached) return cached.user?.username || `Unknown (${userId})`;
+    const member = await withTimeout(guild.members.fetch(userId).catch(() => null), 3000);
+    return member ? member.user.username : `Unknown (${userId})`;
+};
+
 module.exports = function(app, client, checkAuth, checkGuildAccess) {
 
     // Moderation Panel
@@ -84,20 +105,10 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             let leaderboard = economyManager.getLeaderboard(guildId, 10);
 
             // Resolve usernames for leaderboard
-            leaderboard = await Promise.all(leaderboard.map(async (user) => {
-                try {
-                    const member = await guild.members.fetch(user.userId).catch(() => null);
-                    return {
-                        ...user,
-                        username: member ? member.user.username : `Unknown (${user.userId})`
-                    };
-                } catch {
-                    return {
-                        ...user,
-                        username: `Unknown (${user.userId})`
-                    };
-                }
-            }));
+            leaderboard = await Promise.all(leaderboard.map(async (user) => ({
+                ...user,
+                username: await resolveGuildUsername(guild, user.userId)
+            })));
 
             res.render('shop', {
                 guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
@@ -202,6 +213,27 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             res.json({ success: true });
         } catch (error) {
             res.status(500).json({ error: error.message });
+        }
+    });
+
+    // Delete Shop Item (DELETE route for frontend compatibility)
+    app.delete('/api/:guildId/shop/items/:itemId', checkAuth, checkGuildAccess, async (req, res) => {
+        try {
+            const { guildId, itemId } = req.params;
+            
+            if (!itemId) {
+                return res.status(400).json({ success: false, error: 'Item ID is required' });
+            }
+
+            const removed = economyManager.removeShopItem(guildId, itemId);
+            if (!removed) {
+                return res.status(404).json({ success: false, error: 'Item not found' });
+            }
+
+            res.json({ success: true, message: 'Item deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting shop item:', error);
+            res.status(500).json({ success: false, error: error.message });
         }
     });
 

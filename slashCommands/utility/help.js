@@ -1,4 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const settingsManager = require('../../utils/settingsManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -33,19 +34,59 @@ module.exports = {
             return interaction.reply({ embeds: [embed] });
         }
 
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle('📚 Bot Commands')
-            .setDescription('Here are all available commands. Use `/help <command>` for more details.')
-            .addFields(
-                { name: '🎵 Music', value: '`play` `pause` `resume` `stop` `skip` `queue` `volume` `nowplaying` `loop` `shuffle` `previous`' },
-                { name: '🎮 Fun & Games', value: '`blackjack` `coinflip` `dice` `rps` `slots` `roulette` `ttt` `propose` `accept` `reject` `divorce` `spouse` `couples` `horserace`' },
-                { name: '💰 Economy', value: '`balance` `daily` `weekly` `transfer` `shop` `leaderboard`' },
-                { name: '🛡️ Moderation', value: '`ban` `kick` `timeout` `warn` `clear` `lock` `unlock` `slowmode` `automod` `logging`' },
-                { name: '🔧 Utility', value: '`help` `ping` `stats` `profile` `avatar` `userinfo` `serverinfo` `giveaway` `invites`' }
-            )
-            .setFooter({ text: 'Use /help <command> for detailed information' });
+        const settings = settingsManager.get(interaction.guildId);
+        const p = settings.prefix;
 
-        await interaction.reply({ embeds: [embed] });
+        const embed = new EmbedBuilder()
+            .setColor('#5865F2')
+            .setTitle('🤖 Discord Bot - Command Categories')
+            .setDescription(`**Server Prefix:** \`${p}\`\n**Slash Commands:** Type \`/\` in chat\n\nClick a button below or use \`${p}help <category>\` for detailed commands!`)
+            .addFields(
+                { name: '🎵 Music', value: 'Play songs, control playback, manage queue', inline: true },
+                { name: '💰 Economy', value: 'Balance, daily rewards, gambling, shop', inline: true },
+                { name: '🎮 Games', value: 'Mini games, betting, leaderboards', inline: true },
+                { name: '🛡️ Moderation', value: 'Kick, ban, timeout, warnings, automod', inline: true },
+                { name: '🎫 Server Tools', value: 'Tickets, reaction roles, starboard', inline: true },
+                { name: '📊 Stats', value: 'Server stats, user profiles, activity', inline: true },
+                { name: '📝 Custom', value: 'Custom commands (admin)', inline: true },
+                { name: '🔧 Utility', value: 'Config, info commands, setup', inline: true },
+                { name: '🎭 Fun', value: 'Polls, memes, 8ball', inline: true },
+                { name: '🧰 Admin', value: 'Season tools, economy admin, backups', inline: true }
+            )
+            .setFooter({ text: `Type ${p}help <category> for detailed commands | Example: ${p}help music` })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Music')
+                .setEmoji('🎵')
+                .setCustomId('help_music')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setLabel('Economy')
+                .setEmoji('💰')
+                .setCustomId('help_economy')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setLabel('Games')
+                .setEmoji('🎮')
+                .setCustomId('help_games')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setLabel('Moderation')
+                .setEmoji('🛡️')
+                .setCustomId('help_moderation')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        const adminRow = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Admin')
+                .setEmoji('🧰')
+                .setCustomId('help_admin')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        await interaction.reply({ embeds: [embed], components: [row, adminRow] });
     }
 };

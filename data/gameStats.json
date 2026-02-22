@@ -34,9 +34,9 @@
   },
   "396685113804587009": {
     "blackjack": {
-      "wins": 0,
-      "losses": 0,
-      "ties": 0
+      "wins": 1,
+      "losses": 2,
+      "ties": 1
     },
     "roulette": {
       "wins": 0,
@@ -60,7 +60,2581 @@
       "ties": 0
     },
     "ttt": {
-      "wins": 1,
+      "wins": 2,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "269854360798756864": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "225638691933126657": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "464508178789302273": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "602916178951798808": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1119276903400996966": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "639204942141194242": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "331069140330872832": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "786159684552753195": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "724541487681110047": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "461621228600295426": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "722035390986584134": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "711862424583667733": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "301345060019240960": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "712008097543225435": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "742823072486129725": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "752960748711575552": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "473948254472503297": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "534769701297979392": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "360790644932870144": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "285196278541844480": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "341672750131445762": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "651487779506618379": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "510545249601323011": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "601487785542680639": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "323211958482370571": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "406841667560275988": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "547042320227500035": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1465732108004888668": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "721669183758270474": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "460495715173662722": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "814874910765482025": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "962741807408640020": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "418819536922345482": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "664130274094743572": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1455190625048854611": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "900822440513527818": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "280776802492874765": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "334003778636349442": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "481017558376382464": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "676405031871840287": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "330309766628900866": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "195140009748201472": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1156392147038253057": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "607284845034471445": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "202411181787447306": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "450681872545087501": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "632229220483072020": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "229539260087140353": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "360427589858492417": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "584005943935631360": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1021071579251216496": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "282957332089143297": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "246285714399035393": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "752565394673369221": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "878050921085558794": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "380339213805158401": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "277448148559855618": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "521415948201361419": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "692862875865186344": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "293459633715150849": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "418484187277033473": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "252096628259946507": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "655821913855361025": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "999320722604298281": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "446376069440733184": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "549962044888186883": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "505869331251593217": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "680050711916314642": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "764185629743120404": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "153196871710408704": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "373827871212568576": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "566622880402505728": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "299520760249319424": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "311844360608153600": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "1364265413982031973": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "232077418033053698": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "791754936870240278": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "340562486002712576": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
       "losses": 0,
       "ties": 0
     }

@@ -60,6 +60,10 @@ module.exports = {
                 .setDescription('View current auto-mod settings'))
         .addSubcommand(subcommand =>
             subcommand
+                .setName('dashboard')
+                .setDescription('Open the auto-mod dashboard with buttons'))
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('scan')
                 .setDescription('Scan recent messages and remove violations')
                 .addIntegerOption(option =>
@@ -170,6 +174,54 @@ module.exports = {
                 .setTimestamp();
 
             return interaction.reply({ embeds: [embed] });
+        }
+
+        if (subcommand === 'dashboard') {
+            const settings = moderationManager.getAutomodSettings(interaction.guildId);
+
+            const embed = new EmbedBuilder()
+                .setColor('#5865F2')
+                .setTitle('🛡️ Auto-Mod Dashboard')
+                .setDescription('Toggle settings using the buttons below.')
+                .addFields(
+                    { name: 'Status', value: settings.enabled ? '✅ Enabled' : '❌ Disabled', inline: true },
+                    { name: 'Anti-Invite', value: settings.antiInvite ? '✅ On' : '❌ Off', inline: true },
+                    { name: 'Anti-Spam', value: settings.antiSpam ? '✅ On' : '❌ Off', inline: true },
+                    { name: 'Emoji-Only Delete', value: settings.emojiOnly ? '✅ On' : '❌ Off', inline: true }
+                )
+                .setTimestamp();
+
+            const row = {
+                type: 1,
+                components: [
+                    {
+                        type: 2,
+                        style: settings.enabled ? 3 : 2,
+                        label: settings.enabled ? 'Disable' : 'Enable',
+                        custom_id: `automod_toggle:${interaction.guildId}:enabled`
+                    },
+                    {
+                        type: 2,
+                        style: settings.antiInvite ? 3 : 2,
+                        label: 'Anti-Invite',
+                        custom_id: `automod_toggle:${interaction.guildId}:antiInvite`
+                    },
+                    {
+                        type: 2,
+                        style: settings.antiSpam ? 3 : 2,
+                        label: 'Anti-Spam',
+                        custom_id: `automod_toggle:${interaction.guildId}:antiSpam`
+                    },
+                    {
+                        type: 2,
+                        style: settings.emojiOnly ? 3 : 2,
+                        label: 'Emoji-Only',
+                        custom_id: `automod_toggle:${interaction.guildId}:emojiOnly`
+                    }
+                ]
+            };
+
+            return interaction.reply({ embeds: [embed], components: [row], flags: MessageFlags.Ephemeral });
         }
 
         if (subcommand === 'scan') {

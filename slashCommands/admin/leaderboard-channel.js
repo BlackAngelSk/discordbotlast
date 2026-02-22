@@ -9,7 +9,20 @@ module.exports = {
         .addChannelOption(option =>
             option.setName('channel')
                 .setDescription('Channel to post leaderboards')
-                .setRequired(true)),
+                .setRequired(true))
+        .addIntegerOption(option =>
+            option.setName('interval')
+                .setDescription('Update interval in minutes (min 5)')
+                .setMinValue(5)
+                .setRequired(false))
+        .addBooleanOption(option =>
+            option.setName('compact')
+                .setDescription('Compact mode (Top 3 only)')
+                .setRequired(false))
+        .addRoleOption(option =>
+            option.setName('role')
+                .setDescription('Role allowed to force-update leaderboards')
+                .setRequired(false)),
     
     async execute(interaction) {
         try {
@@ -21,6 +34,9 @@ module.exports = {
             }
 
             const channel = interaction.options.getChannel('channel');
+            const interval = interaction.options.getInteger('interval');
+            const compact = interaction.options.getBoolean('compact');
+            const role = interaction.options.getRole('role');
 
             if (!channel.isTextBased()) {
                 return interaction.reply({
@@ -30,6 +46,14 @@ module.exports = {
             }
 
             await seasonLeaderboardManager.setLeaderboardChannel(interaction.guildId, channel.id);
+            await seasonLeaderboardManager.setLeaderboardOptions(interaction.guildId, {
+                updateIntervalMinutes: interval ?? undefined,
+                compactMode: compact ?? undefined,
+                allowedRoleId: role?.id ?? undefined
+            });
+
+            const balanceTop = compact ? 'Top 3' : 'Top 10';
+            const gamblingTop = compact ? 'Top 3' : 'Top 5';
 
             const embed = new EmbedBuilder()
                 .setColor(0x57F287)
@@ -37,14 +61,16 @@ module.exports = {
                 .setDescription(`Leaderboards will be posted in ${channel}`)
                 .addFields(
                     { name: '📍 Channel', value: channel.toString(), inline: true },
-                    { name: '🔄 Update Interval', value: 'Every 15 minutes', inline: true },
-                    { name: '📊 Economy Leaderboards', value: '💰 Season Balance (Top 10)', inline: false },
-                    { name: '🃏 Blackjack', value: '• Most Wins (Top 5)\n• Best Win Rate (Top 5)\n• Most Games (Top 5)', inline: true },
-                    { name: '🎰 Roulette & Slots', value: '• Most Wins (Top 5)\n• Best Win Rate (Top 5)\n• Most Games (Top 5)', inline: true },
-                    { name: '🎲 Dice', value: '• Most Wins (Top 5)\n• Best Win Rate (Top 5)\n• Most Games (Top 5)', inline: true },
-                    { name: '🪙 Coinflip', value: '• Most Wins (Top 5)\n• Best Win Rate (Top 5)\n• Most Games (Top 5)', inline: true },
-                    { name: '🎮 RPS & TTT', value: '• Most Wins (Top 5)\n• Best Win Rate (Top 5)\n• Most Games (Top 5)', inline: true },
-                    { name: '📈 Total Content', value: '**23 Embeds** (1 Header + 1 Balance + 21 Gambling Stats)', inline: false }
+                    { name: '🔄 Update Interval', value: `Every ${interval || 15} minutes`, inline: true },
+                    { name: '🗜️ Compact Mode', value: compact ? 'Enabled (Top 3)' : 'Disabled (Top 10/5)', inline: true },
+                    { name: '🔐 Force Update Role', value: role ? role.toString() : 'Administrator only', inline: true },
+                    { name: '📊 Economy Leaderboards', value: `💰 Season Balance (${balanceTop})`, inline: false },
+                    { name: '🃏 Blackjack', value: `• Most Wins (${gamblingTop})\n• Best Win Rate (${gamblingTop})\n• Most Games (${gamblingTop})`, inline: true },
+                    { name: '🎰 Roulette & Slots', value: `• Most Wins (${gamblingTop})\n• Best Win Rate (${gamblingTop})\n• Most Games (${gamblingTop})`, inline: true },
+                    { name: '🎲 Dice', value: `• Most Wins (${gamblingTop})\n• Best Win Rate (${gamblingTop})\n• Most Games (${gamblingTop})`, inline: true },
+                    { name: '🪙 Coinflip', value: `• Most Wins (${gamblingTop})\n• Best Win Rate (${gamblingTop})\n• Most Games (${gamblingTop})`, inline: true },
+                    { name: '🎮 RPS & TTT', value: `• Most Wins (${gamblingTop})\n• Best Win Rate (${gamblingTop})\n• Most Games (${gamblingTop})`, inline: true },
+                    { name: '📈 Total Content', value: compact ? '**9 Embeds** (1 Header + 1 Balance + 7 Gambling Stats)' : '**23 Embeds** (1 Header + 1 Balance + 21 Gambling Stats)', inline: false }
                 )
                 .setTimestamp();
 

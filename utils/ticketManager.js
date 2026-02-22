@@ -80,6 +80,23 @@ class TicketManager {
         return false;
     }
 
+    async saveTranscript(guildId, ticketId, content) {
+        if (!this.data.tickets[guildId] || !this.data.tickets[guildId][ticketId]) {
+            return null;
+        }
+
+        const transcriptsDir = path.join(__dirname, '..', 'data', 'transcripts');
+        await fs.mkdir(transcriptsDir, { recursive: true });
+
+        const filename = `${ticketId}.txt`;
+        const filePath = path.join(transcriptsDir, filename);
+        await fs.writeFile(filePath, content, 'utf8');
+
+        this.data.tickets[guildId][ticketId].transcriptFile = filename;
+        await this.save();
+        return filePath;
+    }
+
     getTicket(guildId, ticketId) {
         return this.data.tickets[guildId] ? this.data.tickets[guildId][ticketId] : null;
     }

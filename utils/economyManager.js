@@ -202,33 +202,36 @@ class EconomyManager {
 
     removeShopItem(guildId, itemId) {
         if (this.data.shops[guildId]) {
+            const before = this.data.shops[guildId].length;
             this.data.shops[guildId] = this.data.shops[guildId].filter(item => item.id !== itemId);
-            this.saveData();
+            const after = this.data.shops[guildId].length;
+            if (before > after) {
+                this.saveData();
+                return true;
+            }
         }
+        return false;
     }
 
     async addBalance(guildId, userId, amount) {
-        if (!this.data.users[userId]) {
-            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
-        }
-        this.data.users[userId].balance += amount;
+        const userData = this.getUserData(guildId, userId);
+        userData.balance += amount;
         await this.save();
+        return userData.balance;
     }
 
     async removeBalance(guildId, userId, amount) {
-        if (!this.data.users[userId]) {
-            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
-        }
-        this.data.users[userId].balance = Math.max(0, this.data.users[userId].balance - amount);
+        const userData = this.getUserData(guildId, userId);
+        userData.balance = Math.max(0, userData.balance - amount);
         await this.save();
+        return userData.balance;
     }
 
     async setBalance(guildId, userId, amount) {
-        if (!this.data.users[userId]) {
-            this.data.users[userId] = { balance: 0, xp: 0, level: 1 };
-        }
-        this.data.users[userId].balance = amount;
+        const userData = this.getUserData(guildId, userId);
+        userData.balance = amount;
         await this.save();
+        return userData.balance;
     }
 }
 

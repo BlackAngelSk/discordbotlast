@@ -8,6 +8,9 @@ class SeasonLeaderboardManager {
     constructor() {
         this.config = {};
         this.loaded = false;
+        this.usernameCache = new Map(); // userId -> { username, expiresAt }
+        this.usernameCacheTTL = 6 * 60 * 60 * 1000; // 6 hours
+        this.pageCache = new Map(); // guildId -> { embeds, expiresAt, messageId, channelId }
     }
 
     async init() {
@@ -39,6 +42,25 @@ class SeasonLeaderboardManager {
         }
     }
 
+    getGuildConfig(guildId) {
+        if (!this.config[guildId]) {
+            this.config[guildId] = {};
+        }
+
+        const cfg = this.config[guildId];
+        if (typeof cfg.enabled !== 'boolean') cfg.enabled = true;
+        if (!cfg.updateIntervalMinutes) cfg.updateIntervalMinutes = 15;
+        if (typeof cfg.compactMode !== 'boolean') cfg.compactMode = false;
+        if (!Array.isArray(cfg.messageIds)) cfg.messageIds = [];
+        if (!cfg.allowedRoleId) cfg.allowedRoleId = null;
+        if (!cfg.indexMessageId) cfg.indexMessageId = null;
+        if (!cfg.lastAutoUpdate) cfg.lastAutoUpdate = 0;
+        if (!cfg.pruneDays) cfg.pruneDays = 30;
+        if (!Array.isArray(cfg.payouts)) cfg.payouts = [10000, 5000, 2500];
+        if (!Array.isArray(cfg.rewardRoles)) cfg.rewardRoles = [];
+        return cfg;
+    }
+
     /**
      * Set leaderboard channel for a guild
      * @param {string} guildId - Discord Guild ID
@@ -46,13 +68,39 @@ class SeasonLeaderboardManager {
      * @returns {Object} Result
      */
     async setLeaderboardChannel(guildId, channelId) {
-        if (!this.config[guildId]) {
-            this.config[guildId] = {};
-        }
-        this.config[guildId].channelId = channelId;
-        this.config[guildId].messageId = null; // Reset message ID
+        const cfg = this.getGuildConfig(guildId);
+        cfg.channelId = channelId;
+        cfg.messageId = null; // Backward compatibility
+        cfg.messageIds = []; // Reset message IDs
+        cfg.indexMessageId = null; // Reset index message
         await this.save();
         return { success: true };
+    }
+
+    async setLeaderboardOptions(guildId, options = {}) {
+        const cfg = this.getGuildConfig(guildId);
+        if (typeof options.enabled === 'boolean') {
+            cfg.enabled = options.enabled;
+        }
+        if (typeof options.updateIntervalMinutes === 'number' && options.updateIntervalMinutes >= 5) {
+            cfg.updateIntervalMinutes = Math.floor(options.updateIntervalMinutes);
+        }
+        if (typeof options.compactMode === 'boolean') {
+            cfg.compactMode = options.compactMode;
+        }
+        if (typeof options.pruneDays === 'number' && options.pruneDays >= 0) {
+            cfg.pruneDays = Math.floor(options.pruneDays);
+        }
+        if (Array.isArray(options.payouts) && options.payouts.length > 0) {
+            cfg.payouts = options.payouts.map((p) => Number(p) || 0).slice(0, 3);
+        }
+        if (Array.isArray(options.rewardRoles)) {
+            cfg.rewardRoles = options.rewardRoles.slice(0, 3);
+        }
+        if (options.allowedRoleId !== undefined) {
+            cfg.allowedRoleId = options.allowedRoleId || null;
+        }
+        await this.save();
     }
 
     /**
@@ -70,10 +118,21 @@ class SeasonLeaderboardManager {
      * @param {string} messageId - Discord Message ID
      */
     async setLeaderboardMessage(guildId, messageId) {
-        if (!this.config[guildId]) {
-            this.config[guildId] = {};
-        }
-        this.config[guildId].messageId = messageId;
+        const cfg = this.getGuildConfig(guildId);
+        cfg.messageId = messageId;
+        await this.save();
+    }
+
+    async setLeaderboardMessages(guildId, messageIds = []) {
+        const cfg = this.getGuildConfig(guildId);
+        cfg.messageIds = messageIds;
+        cfg.messageId = messageIds[0] || null; // Backward compatibility
+        await this.save();
+    }
+
+    async setIndexMessage(guildId, messageId) {
+        const cfg = this.getGuildConfig(guildId);
+        cfg.indexMessageId = messageId || null;
         await this.save();
     }
 
@@ -84,6 +143,32 @@ class SeasonLeaderboardManager {
      */
     getLeaderboardMessage(guildId) {
         return this.config[guildId]?.messageId || null;
+    }
+
+    getLeaderboardMessages(guildId) {
+        return this.config[guildId]?.messageIds || [];
+    }
+
+    getIndexMessage(guildId) {
+        return this.config[guildId]?.indexMessageId || null;
+    }
+
+    setPageCache(guildId, data) {
+        if (!data) return;
+        this.pageCache.set(guildId, {
+            ...data,
+            expiresAt: Date.now() + 30 * 60 * 1000 // 30 minutes
+        });
+    }
+
+    getPageCache(guildId) {
+        const cached = this.pageCache.get(guildId);
+        if (!cached) return null;
+        if (cached.expiresAt < Date.now()) {
+            this.pageCache.delete(guildId);
+            return null;
+        }
+        return cached;
     }
 
     /**
@@ -100,37 +185,63 @@ class SeasonLeaderboardManager {
             return [];
         }
 
+        const cfg = this.getGuildConfig(guildId);
+        const updateIntervalMinutes = cfg.updateIntervalMinutes || 15;
+        const compactMode = !!cfg.compactMode;
+        const balanceLimit = compactMode ? 3 : 10;
+        const gamblingLimit = compactMode ? 3 : 5;
+        const nextUpdateAt = Math.floor((Date.now() + (updateIntervalMinutes * 60 * 1000)) / 1000);
+
         // Helper to get username with fallback
         const getUsername = async (userId, storedUsername) => {
             if (storedUsername && storedUsername !== 'Unknown User') {
                 return storedUsername;
             }
+
+            const cached = this.usernameCache.get(userId);
+            if (cached && cached.expiresAt > Date.now()) {
+                return cached.username;
+            }
             
             try {
                 const user = await client.users.fetch(userId);
-                return user.username;
+                const username = user.username;
+                this.usernameCache.set(userId, { username, expiresAt: Date.now() + this.usernameCacheTTL });
+                return username;
             } catch (error) {
-                return `User${userId.slice(-4)}`;
+                const fallback = `User${userId.slice(-4)}`;
+                this.usernameCache.set(userId, { username: fallback, expiresAt: Date.now() + this.usernameCacheTTL });
+                return fallback;
             }
         };
 
         const embeds = [];
+        const combinedFields = [];
+        const combinedTitle = `📊 ${seasonName.toUpperCase()} - Live Leaderboards`;
+        const combinedDescription = `Updated every ${updateIntervalMinutes} minutes • Total Players: ${season.totalPlayers}`;
 
         // Header embed with season info
         const headerEmbed = new EmbedBuilder()
             .setColor(0x5865F2)
             .setTitle(`📊 ${seasonName.toUpperCase()} - Live Leaderboards`)
-            .setDescription(`Updated every 15 minutes • Total Players: ${season.totalPlayers}`)
+            .setDescription(`Updated every ${updateIntervalMinutes} minutes • Total Players: ${season.totalPlayers}`)
             .addFields(
                 { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
-                { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true }
+                { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true },
+                { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:R>`, inline: true }
             )
             .setTimestamp();
 
         embeds.push(headerEmbed);
 
+        combinedFields.push(
+            { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
+            { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true },
+            { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:R>`, inline: true }
+        );
+
         // Balance leaderboard
-        const balanceLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', 10);
+        const balanceLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', balanceLimit);
         if (balanceLeaderboard.length > 0) {
             let balanceDesc = '';
             for (let i = 0; i < balanceLeaderboard.length; i++) {
@@ -144,9 +255,43 @@ class SeasonLeaderboardManager {
                 .setColor(0x57F287)
                 .setTitle('💰 Season Balance Leaderboard')
                 .setDescription(balanceDesc)
-                .setFooter({ text: 'Top 10 Players' });
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
 
             embeds.push(balanceEmbed);
+
+            combinedFields.push({
+                name: '💰 Season Balance Leaderboard',
+                value: balanceDesc,
+                inline: false
+            });
+        }
+
+        // Voice Channel Hours leaderboard
+        const voiceLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'voiceHours', balanceLimit);
+        if (voiceLeaderboard.length > 0) {
+            let voiceDesc = '';
+            for (let i = 0; i < voiceLeaderboard.length; i++) {
+                const player = voiceLeaderboard[i];
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                const username = await getUsername(player.userId, player.username);
+                const hours = Math.floor(player.voiceHours || 0);
+                const minutes = Math.round(((player.voiceHours || 0) - hours) * 60);
+                voiceDesc += `${medal} **${username}** • **${hours}h ${minutes}m**\n`;
+            }
+
+            const voiceEmbed = new EmbedBuilder()
+                .setColor(0x9C27B0)
+                .setTitle('🎙️ Season Voice Channel Hours')
+                .setDescription(voiceDesc)
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
+
+            embeds.push(voiceEmbed);
+
+            combinedFields.push({
+                name: '🎙️ Season Voice Channel Hours',
+                value: voiceDesc,
+                inline: false
+            });
         }
 
         // Gambling leaderboards
@@ -198,10 +343,14 @@ class SeasonLeaderboardManager {
         for (const game of gamblingGames) {
             // Wins leaderboard
             const winsLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'wins', 5);
-            if (winsLeaderboard.length > 0) {
+            const winsLimit = gamblingLimit;
+            const winRateLimit = gamblingLimit;
+            const totalLimit = gamblingLimit;
+            const winsLeaderboardLimited = winsLeaderboard.slice(0, winsLimit);
+            if (winsLeaderboardLimited.length > 0) {
                 let winsDesc = '';
-                for (let i = 0; i < winsLeaderboard.length; i++) {
-                    const player = winsLeaderboard[i];
+                for (let i = 0; i < winsLeaderboardLimited.length; i++) {
+                    const player = winsLeaderboardLimited[i];
                     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
                     const winRate = player.total > 0 ? ((player.wins / player.total) * 100).toFixed(1) : 0;
                     const username = await getUsername(player.userId, player.username);
@@ -212,17 +361,24 @@ class SeasonLeaderboardManager {
                     .setColor(game.color)
                     .setTitle(`${game.name} - Most Wins`)
                     .setDescription(winsDesc)
-                    .setFooter({ text: 'Top 5 Players' });
+                    .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 5 Players' });
 
                 embeds.push(winsEmbed);
+
+                combinedFields.push({
+                    name: `${game.name} - Most Wins`,
+                    value: winsDesc,
+                    inline: false
+                });
             }
 
             // Win Rate leaderboard
             const winRateLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'winRate', 5);
-            if (winRateLeaderboard.length > 0) {
+            const winRateLeaderboardLimited = winRateLeaderboard.slice(0, winRateLimit);
+            if (winRateLeaderboardLimited.length > 0) {
                 let winRateDesc = '';
-                for (let i = 0; i < winRateLeaderboard.length; i++) {
-                    const player = winRateLeaderboard[i];
+                for (let i = 0; i < winRateLeaderboardLimited.length; i++) {
+                    const player = winRateLeaderboardLimited[i];
                     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
                     const username = await getUsername(player.userId, player.username);
                     winRateDesc += `${medal} **${username}** • **${player.winRate}%** win rate (${player.wins}W/${player.losses}L)\n`;
@@ -232,17 +388,24 @@ class SeasonLeaderboardManager {
                     .setColor(game.color)
                     .setTitle(`${game.name} - Best Win Rate`)
                     .setDescription(winRateDesc)
-                    .setFooter({ text: 'Top 5 Players (min 5 games)' });
+                    .setFooter({ text: compactMode ? 'Top 3 Players (min 5 games)' : 'Top 5 Players (min 5 games)' });
 
                 embeds.push(winRateEmbed);
+
+                combinedFields.push({
+                    name: `${game.name} - Best Win Rate`,
+                    value: winRateDesc,
+                    inline: false
+                });
             }
 
             // Total Games leaderboard
             const totalGamesLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'total', 5);
-            if (totalGamesLeaderboard.length > 0) {
+            const totalGamesLeaderboardLimited = totalGamesLeaderboard.slice(0, totalLimit);
+            if (totalGamesLeaderboardLimited.length > 0) {
                 let totalDesc = '';
-                for (let i = 0; i < totalGamesLeaderboard.length; i++) {
-                    const player = totalGamesLeaderboard[i];
+                for (let i = 0; i < totalGamesLeaderboardLimited.length; i++) {
+                    const player = totalGamesLeaderboardLimited[i];
                     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
                     const winRate = player.total > 0 ? ((player.wins / player.total) * 100).toFixed(1) : 0;
                     const username = await getUsername(player.userId, player.username);
@@ -253,13 +416,75 @@ class SeasonLeaderboardManager {
                     .setColor(game.color)
                     .setTitle(`${game.name} - Most Games Played`)
                     .setDescription(totalDesc)
-                    .setFooter({ text: 'Top 5 Players' });
+                    .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 5 Players' });
 
                 embeds.push(totalEmbed);
+
+                combinedFields.push({
+                    name: `${game.name} - Most Games Played`,
+                    value: totalDesc,
+                    inline: false
+                });
             }
         }
 
+        const combinedEmbed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle(combinedTitle)
+            .setDescription(combinedDescription)
+            .setTimestamp();
+
+        const isCombinedWithinLimits = (fields) => {
+            if (fields.length > 25) return false;
+            let total = (combinedTitle?.length || 0) + (combinedDescription?.length || 0);
+            for (const field of fields) {
+                if (!field?.name || !field?.value) return false;
+                if (field.name.length > 256 || field.value.length > 1024) return false;
+                total += field.name.length + field.value.length;
+            }
+            return total <= 6000;
+        };
+
+        if (isCombinedWithinLimits(combinedFields)) {
+            combinedEmbed.addFields(combinedFields);
+            return [combinedEmbed];
+        }
+
         return embeds;
+    }
+
+    async generateSeasonSummaryEmbed(guildId, seasonManager, seasonName) {
+        const season = seasonManager.getSeason(guildId, seasonName);
+        if (!season) return null;
+
+        const cfg = this.getGuildConfig(guildId);
+        const winners = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', 3);
+        let winnersDesc = '';
+        for (let i = 0; i < winners.length; i++) {
+            const player = winners[i];
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
+            const payout = cfg.payouts?.[i] ? ` • Payout: **${cfg.payouts[i].toLocaleString()}** coins` : '';
+            winnersDesc += `${medal} <@${player.userId}> • **${player.balance.toLocaleString()}** coins${payout}\n`;
+        }
+
+        if (!winnersDesc) {
+            winnersDesc = 'No winners available.';
+        }
+
+        const totalPlayers = season.totalPlayers || 0;
+        const summaryEmbed = new EmbedBuilder()
+            .setColor(0xF1C40F)
+            .setTitle(`🏁 ${seasonName.toUpperCase()} - Season End Summary`)
+            .setDescription('The season has ended. Here are the final results!')
+            .addFields(
+                { name: '👥 Total Players', value: `${totalPlayers}`, inline: true },
+                { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
+                { name: '🧾 Ended', value: season.endDate ? new Date(season.endDate).toLocaleDateString() : 'N/A', inline: true },
+                { name: '🏆 Winners (Balance)', value: winnersDesc, inline: false }
+            )
+            .setTimestamp();
+
+        return summaryEmbed;
     }
 
     /**
