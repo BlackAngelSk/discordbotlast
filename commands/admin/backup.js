@@ -1,6 +1,8 @@
 const { EmbedBuilder } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
+const settingsManager = require('../../utils/settingsManager');
+const { hasBotWatcherPermission } = require('../../utils/permissions');
 
 module.exports = {
     name: 'backup',
@@ -11,8 +13,9 @@ module.exports = {
     async execute(message, args) {
         try {
             // Check permissions
-            if (!message.member.permissions.has('Administrator')) {
-                return message.reply('❌ You need "Administrator" permission!');
+            if (!hasBotWatcherPermission(message.member)) {
+                const settings = settingsManager.get(message.guild.id);
+                return message.reply(`❌ You need the ${settings.botWatcherRole} role or Administrator permission to use this command!`);
             }
 
             const dataDir = path.join(__dirname, '../../data');

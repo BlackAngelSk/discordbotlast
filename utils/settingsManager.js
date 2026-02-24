@@ -14,7 +14,8 @@ const DEFAULT_SETTINGS = {
     leaveChannel: null,
     leaveMessage: '👋 {user} has left the server.',
     autoRole: 'Member',
-    djRole: 'DJ'
+    djRole: 'DJ',
+    botWatcherRole: 'Bot Watcher'
 };
 
 class SettingsManager {

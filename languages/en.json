@@ -20,6 +20,7 @@
     "prefix": "🔧 Prefix",
     "djRole": "🎵 DJ Role",
     "autoRole": "👥 Auto Role",
+    "botWatcherRole": "🛡️ Bot Watcher Role",
     "language": "🌍 Language",
     "welcomeMessages": "👋 Welcome Messages",
     "leaveMessages": "👋 Leave Messages",
@@ -48,8 +49,10 @@
     "autoRoleInvalid": "❌ Please provide a role name!\nExample: `{prefix}config autorole Member`",
     "djRoleSet": "✅ DJ role set to: {role}",
     "djRoleInvalid": "❌ Please provide a role name!\nExample: `{prefix}config djrole DJ`",
+    "botWatcherRoleSet": "✅ Bot Watcher role set to: {role}",
+    "botWatcherRoleInvalid": "❌ Please provide a role name!\nExample: `{prefix}config botwatcherrole Bot Watcher`",
     "reset": "✅ All settings reset to default!",
-    "unknownSetting": "❌ Unknown setting! Available settings:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `reset`"
+    "unknownSetting": "❌ Unknown setting! Available settings:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `botwatcherrole`, `reset`"
   },
 
   "help": {

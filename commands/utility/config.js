@@ -44,6 +44,11 @@ module.exports = {
                         inline: true 
                     },
                     { 
+                        name: languageManager.get(guildId, 'config.botWatcherRole'), 
+                        value: settings.botWatcherRole || languageManager.get(guildId, 'common.none'), 
+                        inline: true 
+                    },
+                    { 
                         name: languageManager.get(guildId, 'config.welcomeMessages'), 
                         value: `${languageManager.get(guildId, 'config.status')}: ${settings.welcomeEnabled ? '✅ ' + languageManager.get(guildId, 'common.enabled') : '❌ ' + languageManager.get(guildId, 'common.disabled')}\n` +
                                `${languageManager.get(guildId, 'config.channel')}: ${settings.welcomeChannel ? `<#${settings.welcomeChannel}>` : languageManager.get(guildId, 'common.notSet')}\n` +
@@ -164,6 +169,15 @@ module.exports = {
                 }
                 await settingsManager.set(guildId, 'djRole', value);
                 return message.reply(languageManager.get(guildId, 'config.djRoleSet', { role: value }));
+
+            case 'botwatcherrole':
+            case 'watcherrole':
+            case 'botwatcher':
+                if (!value) {
+                    return message.reply(languageManager.get(guildId, 'config.botWatcherRoleInvalid', { prefix }));
+                }
+                await settingsManager.set(guildId, 'botWatcherRole', value);
+                return message.reply(languageManager.get(guildId, 'config.botWatcherRoleSet', { role: value }));
 
             case 'reset':
                 await settingsManager.reset(guildId);

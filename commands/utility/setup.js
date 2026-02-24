@@ -3,7 +3,7 @@ const settingsManager = require('../../utils/settingsManager');
 
 module.exports = {
     name: 'setup',
-    description: 'Setup DJ role and Member role for the server',
+    description: 'Setup DJ role, Member role, and Bot Watcher role for the server',
     async execute(message, args, client) {
         // Check if user has admin permissions
         if (!message.member.permissions.has(PermissionFlagsBits.Administrator)) {
@@ -37,6 +37,17 @@ module.exports = {
                 });
             }
 
+            // Create Bot Watcher role if it doesn't exist
+            let botWatcherRole = message.guild.roles.cache.find(r => r.name === settings.botWatcherRole);
+            if (!botWatcherRole) {
+                botWatcherRole = await message.guild.roles.create({
+                    name: settings.botWatcherRole,
+                    color: 0x5865F2, // Blurplet color
+                    reason: 'Bot watcher role (monitoring + backups)',
+                    permissions: []
+                });
+            }
+
             const setupEmbed = new EmbedBuilder()
                 .setColor(0x00ff00)
                 .setTitle('✅ Server Setup Complete!')
@@ -50,6 +61,11 @@ module.exports = {
                     { 
                         name: '👥 Member Role', 
                         value: `${memberRole}\nNew members will automatically receive this role`,
+                        inline: false 
+                    },
+                    { 
+                        name: '🛡️ Bot Watcher Role', 
+                        value: `${botWatcherRole}\nUsers with this role can monitor bot status and run backups`,
                         inline: false 
                     }
                 )

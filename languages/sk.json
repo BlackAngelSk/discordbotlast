@@ -20,6 +20,7 @@
     "prefix": "🔧 Prefix",
     "djRole": "🎵 DJ Rola",
     "autoRole": "👥 Automatická Rola",
+    "botWatcherRole": "🛡️ Bot Watcher Rola",
     "language": "🌍 Jazyk",
     "welcomeMessages": "👋 Uvítacie Správy",
     "leaveMessages": "👋 Správy pri Odchode",
@@ -48,8 +49,10 @@
     "autoRoleInvalid": "❌ Prosím zadaj názov roly!\nPríklad: `{prefix}config autorole Člen`",
     "djRoleSet": "✅ DJ rola nastavená na: {role}",
     "djRoleInvalid": "❌ Prosím zadaj názov roly!\nPríklad: `{prefix}config djrole DJ`",
+    "botWatcherRoleSet": "✅ Bot Watcher rola nastavená na: {role}",
+    "botWatcherRoleInvalid": "❌ Prosím zadaj názov roly!\nPríklad: `{prefix}config botwatcherrole Bot Watcher`",
     "reset": "✅ Všetky nastavenia resetované na predvolené!",
-    "unknownSetting": "❌ Neznáme nastavenie! Dostupné nastavenia:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `reset`"
+    "unknownSetting": "❌ Neznáme nastavenie! Dostupné nastavenia:\n`prefix`, `language`, `welcomechannel`, `welcomemessage`, `welcomeenable/disable`\n`leavechannel`, `leavemessage`, `leaveenable/disable`\n`autorole`, `djrole`, `botwatcherrole`, `reset`"
   },
 
   "help": {

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const systemStatsManager = require('../../utils/systemStatsManager');
+const { hasBotWatcherPermission } = require('../../utils/permissions');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,12 +9,14 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            // Check if user is bot owner
+            // Check if user is bot owner or has bot watcher role
             const OWNER_ID = process.env.BOT_OWNER_ID;
-            
-            if (interaction.user.id !== OWNER_ID) {
+            const isOwner = interaction.user.id === OWNER_ID;
+            const canWatch = interaction.member ? hasBotWatcherPermission(interaction.member) : false;
+
+            if (!isOwner && !canWatch) {
                 return interaction.reply({
-                    content: '❌ This command is only available to the bot owner.',
+                    content: '❌ This command is only available to the bot owner or Bot Watcher role.',
                     flags: MessageFlags.Ephemeral
                 });
             }
