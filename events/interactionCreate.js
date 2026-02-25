@@ -390,9 +390,13 @@ module.exports = {
                     }
                 }
 
+                const channelIdToDelete = interaction.channelId;
                 setTimeout(async () => {
                     try {
-                        await interaction.channel.delete();
+                        const channel = await interaction.guild?.channels.fetch(channelIdToDelete).catch(() => null);
+                        if (channel) {
+                            await channel.delete();
+                        }
                     } catch (error) {
                         console.error('Error deleting ticket channel:', error);
                     }

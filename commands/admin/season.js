@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, ChannelType } = require('discord.js');
 const seasonManager = require('../../utils/seasonManager');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
@@ -373,6 +373,33 @@ async function handleEnd(message, args, guildId) {
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
         winners += `${medal} <@${player.userId}> - ${player.coins.toLocaleString()} coins\n`;
     });
+
+    const resultsChannelName = `season-${seasonName}-top3`;
+    let resultsChannel = message.guild.channels.cache.find(
+        (c) => c.type === ChannelType.GuildText && c.name === resultsChannelName
+    );
+
+    if (!resultsChannel) {
+        try {
+            resultsChannel = await message.guild.channels.create({
+                name: resultsChannelName,
+                type: ChannelType.GuildText
+            });
+        } catch (error) {
+            console.error('Failed to create season results channel:', error);
+        }
+    }
+
+    if (resultsChannel) {
+        const top3Embed = new EmbedBuilder()
+            .setColor(0xF1C40F)
+            .setTitle(`🏆 ${seasonName} - Top 3 Winners`)
+            .setDescription(winners || 'No players')
+            .addFields({ name: '👥 Total Players', value: season.totalPlayers.toString(), inline: true })
+            .setTimestamp();
+
+        await resultsChannel.send({ embeds: [top3Embed] });
+    }
 
     const embed = new EmbedBuilder()
         .setColor(0xED4245)
