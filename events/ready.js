@@ -6,6 +6,11 @@ module.exports = {
     async execute(readyClient) {
         console.log(`✅ Logged in as ${readyClient.user.tag}!`);
         console.log(`🤖 Bot is ready and serving ${readyClient.guilds.cache.size} servers`);
+
+        // Unified startup coordinator from index.js (non-blocking)
+        if (typeof readyClient.startReadyTasks === 'function') {
+            readyClient.startReadyTasks();
+        }
         
         // Set bot presence/status
         const activities = [
@@ -33,17 +38,19 @@ module.exports = {
         }, 30000); // 30 seconds
 
         console.log('✅ Bot status set successfully');
-        
-        // Restart active giveaways
-        try {
-            const giveawayCommand = require('../commands/utility/giveaway');
-            if (giveawayCommand.restartGiveaways) {
-                await giveawayCommand.restartGiveaways(readyClient);
-                console.log('✅ Active giveaways restarted');
+
+        // Restart active giveaways in background to keep ready path fast
+        setTimeout(async () => {
+            try {
+                const giveawayCommand = require('../commands/utility/giveaway');
+                if (giveawayCommand.restartGiveaways) {
+                    await giveawayCommand.restartGiveaways(readyClient);
+                    console.log('✅ Active giveaways restarted');
+                }
+            } catch (error) {
+                console.error('Error restarting giveaways:', error);
             }
-        } catch (error) {
-            console.error('Error restarting giveaways:', error);
-        }
+        }, 0);
 
         // Start rainbow role color updates
         try {

@@ -34,9 +34,9 @@
   },
   "396685113804587009": {
     "blackjack": {
-      "wins": 2,
-      "losses": 3,
-      "ties": 1
+      "wins": 3,
+      "losses": 6,
+      "ties": 2
     },
     "roulette": {
       "wins": 0,
@@ -60,9 +60,9 @@
       "ties": 0
     },
     "ttt": {
-      "wins": 3,
+      "wins": 6,
       "losses": 0,
-      "ties": 0
+      "ties": 4
     }
   },
   "269854360798756864": {

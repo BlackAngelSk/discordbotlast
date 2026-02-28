@@ -82,98 +82,60 @@ const slashCommandHandler = new SlashCommandHandler(client);
 // Load all commands and events
 async function loadHandlers() {
     try {
+        console.time('⏱️ Total startup init');
+
+        const runInitStep = async (label, initFn) => {
+            const timerLabel = `⏱️ Init: ${label}`;
+            console.time(timerLabel);
+            await initFn();
+            console.timeEnd(timerLabel);
+            console.log(`✅ ${label} initialized!`);
+        };
+
         // Initialize database first
-        await databaseManager.init();
-        console.log('✅ Database manager initialized!');
+        await runInitStep('Database manager', () => databaseManager.init());
 
-        // Initialize managers first
-        await settingsManager.init();
-        console.log('✅ Settings manager initialized!');
-        
-        await languageManager.init();
-        console.log('✅ Language manager initialized!');
-        
-        await economyManager.init();
-        console.log('✅ Economy manager initialized!');
-        
-        await moderationManager.init();
-        console.log('✅ Moderation manager initialized!');
+        // Core managers (parallel)
+        await Promise.all([
+            runInitStep('Settings manager', () => settingsManager.init()),
+            runInitStep('Language manager', () => languageManager.init()),
+            runInitStep('Economy manager', () => economyManager.init()),
+            runInitStep('Moderation manager', () => moderationManager.init()),
+            runInitStep('Command permissions manager', () => commandPermissionsManager.init()),
+            runInitStep('Game stats manager', () => gameStatsManager.init()),
+            runInitStep('Stats manager', () => statsManager.init()),
+            runInitStep('Level rewards manager', () => levelRewardsManager.init()),
+            runInitStep('Suggestion manager', () => suggestionManager.init()),
+            runInitStep('Shop manager', () => shopManager.init()),
+            runInitStep('AFK manager', () => afkManager.init()),
+            runInitStep('Voice rewards manager', () => voiceRewardsManager.init()),
+            runInitStep('Raid protection manager', () => raidProtectionManager.init()),
+            runInitStep('Birthday manager', () => birthdayManager.init())
+        ]);
 
-        await commandPermissionsManager.init();
-        console.log('✅ Command permissions manager initialized!');
-        
-        await gameStatsManager.init();
-        console.log('✅ Game stats manager initialized!');
+        // Feature managers (parallel)
+        await Promise.all([
+            runInitStep('Scheduled messages manager', () => scheduledMessagesManager.init(client)),
+            runInitStep('Custom role shop', () => customRoleShop.init()),
+            runInitStep('Activity tracker', () => activityTracker.init()),
+            runInitStep('Server milestones', () => serverMilestones.init()),
+            runInitStep('Season manager', () => seasonManager.init()),
+            runInitStep('Season leaderboard manager', () => seasonLeaderboardManager.init()),
+            runInitStep('Reaction role manager', () => reactionRoleManager.init()),
+            runInitStep('Starboard manager', () => starboardManager.init()),
+            runInitStep('Custom command manager', () => customCommandManager.init()),
+            runInitStep('Ticket manager', () => ticketManager.init()),
+            runInitStep('Relationship manager', () => relationshipManager.init()),
+            runInitStep('Analytics manager', () => analyticsManager.init()),
+            runInitStep('Music playlist manager', () => musicPlaylistManager.init()),
+            runInitStep('Enhanced AI manager', () => enhancedAIManager.init())
+        ]);
 
-        await statsManager.init();
-        console.log('✅ Stats manager initialized!');
+        await runInitStep('Command handler', () => commandHandler.loadCommands());
+        await runInitStep('Event handler', () => eventHandler.loadEvents());
+        await runInitStep('Slash command handler', () => slashCommandHandler.loadSlashCommands());
 
-         await levelRewardsManager.init();
-        console.log('✅ Level rewards manager initialized!');
-        
-        await suggestionManager.init();
-        console.log('✅ Suggestion manager initialized!');
-        
-        await shopManager.init();
-        console.log('✅ Shop manager initialized!');
-        
-        await afkManager.init();
-        console.log('✅ AFK manager initialized!');
-        
-        await voiceRewardsManager.init();
-        console.log('✅ Voice rewards manager initialized!');
-        
-        await raidProtectionManager.init();
-        console.log('✅ Raid protection manager initialized!');
-        
-        await scheduledMessagesManager.init(client);
-        console.log('✅ Scheduled messages manager initialized!');
-
-        await birthdayManager.init();
-        console.log('✅ Birthday manager initialized!');
-
-        await customRoleShop.init();
-        console.log('✅ Custom role shop initialized!');
-
-        await activityTracker.init();
-        console.log('✅ Activity tracker initialized!');
-
-        await serverMilestones.init();
-        console.log('✅ Server milestones initialized!');
-
-        await seasonManager.init();
-        console.log('✅ Season manager initialized!');
-
-        await seasonLeaderboardManager.init();
-        console.log('✅ Season leaderboard manager initialized!');
-
-        await reactionRoleManager.init();
-        console.log('✅ Reaction role manager initialized!');
-
-        await starboardManager.init();
-        console.log('✅ Starboard manager initialized!');
-
-        await customCommandManager.init();
-        console.log('✅ Custom command manager initialized!');
-
-        await ticketManager.init();
-        console.log('✅ Ticket manager initialized!');
-
-        await relationshipManager.init();
-        console.log('✅ Relationship manager initialized!');
-
-        await analyticsManager.init();
-        console.log('✅ Analytics manager initialized!');
-
-        await musicPlaylistManager.init();
-        console.log('✅ Music playlist manager initialized!');
-
-        await enhancedAIManager.init();
-        console.log('✅ Enhanced AI manager initialized!');
-        
-        await commandHandler.loadCommands();
-        await eventHandler.loadEvents();
-        await slashCommandHandler.loadSlashCommands();
+        console.timeEnd('⏱️ Total startup init');
         console.log('✅ All handlers loaded successfully!');
     } catch (error) {
         console.error('❌ Error loading handlers:', error);
@@ -196,47 +158,62 @@ loadHandlers().then(() => {
     });
 
     // Login to Discord with your bot token
+    client.startReadyTasks = () => {
+        // Move non-critical ready work off the first ready tick
+        setTimeout(async () => {
+            console.log(`✅ Bot startup coordinator running as ${client.user.tag}`);
+
+            // Migrate usernames in existing seasons
+            try {
+                const migrated = await seasonManager.migrateUsernames(client);
+                if (migrated > 0) {
+                    console.log(`✅ Migrated ${migrated} usernames in seasons`);
+                }
+            } catch (error) {
+                console.error('Error migrating season usernames:', error);
+            }
+
+            // Register slash commands
+            try {
+                await slashCommandHandler.registerCommands();
+                console.log('✅ Slash commands registered');
+            } catch (error) {
+                console.error('Error registering slash commands:', error);
+            }
+
+            if (process.env.DASHBOARD_ENABLED === 'true') {
+                try {
+                    const dashboard = new Dashboard(client);
+                    dashboard.start();
+                } catch (error) {
+                    console.error('Error starting dashboard:', error);
+                }
+            }
+
+            // Start season leaderboard update task (runs every minute, respects per-guild interval)
+            setInterval(async () => {
+                if (seasonLeaderboardTaskRunning) return;
+                seasonLeaderboardTaskRunning = true;
+                try {
+                    await updateSeasonLeaderboards(client);
+                } finally {
+                    seasonLeaderboardTaskRunning = false;
+                }
+            }, 60 * 1000); // 1 minute
+
+            // Initial update
+            if (!seasonLeaderboardTaskRunning) {
+                seasonLeaderboardTaskRunning = true;
+                try {
+                    await updateSeasonLeaderboards(client);
+                } finally {
+                    seasonLeaderboardTaskRunning = false;
+                }
+            }
+        }, 0);
+    };
+
     client.login(process.env.DISCORD_TOKEN);
-
-    // Start dashboard and register slash commands when bot is ready
-    client.once(Events.ClientReady, async () => {
-        console.log(`✅ Bot is ready! Logged in as ${client.user.tag}`);
-        
-        // Migrate usernames in existing seasons
-        const migrated = await seasonManager.migrateUsernames(client);
-        if (migrated > 0) {
-            console.log(`✅ Migrated ${migrated} usernames in seasons`);
-        }
-        
-        // Register slash commands
-        await slashCommandHandler.registerCommands();
-        
-        if (process.env.DASHBOARD_ENABLED === 'true') {
-            const dashboard = new Dashboard(client);
-            dashboard.start();
-        }
-
-        // Start season leaderboard update task (runs every minute, respects per-guild interval)
-        setInterval(async () => {
-            if (seasonLeaderboardTaskRunning) return;
-            seasonLeaderboardTaskRunning = true;
-            try {
-                await updateSeasonLeaderboards(client);
-            } finally {
-                seasonLeaderboardTaskRunning = false;
-            }
-        }, 60 * 1000); // 1 minute
-
-        // Initial update
-        if (!seasonLeaderboardTaskRunning) {
-            seasonLeaderboardTaskRunning = true;
-            try {
-                await updateSeasonLeaderboards(client);
-            } finally {
-                seasonLeaderboardTaskRunning = false;
-            }
-        }
-    });
 });
 
 /**

@@ -5,6 +5,9 @@ class CustomRoleShop {
     constructor() {
         this.dataPath = path.join(__dirname, '..', 'data', 'customRoles.json');
         this.rainbowRoles = new Set(); // Track rainbow roles
+        this.pendingRainbowUpdate = new Map(); // roleId -> { guildId, roleId, color }
+        this.lastAppliedRainbowColor = new Map(); // roleId -> color
+        this.rainbowInterval = null;
         this.data = {
             customRoles: {}, // guildId_userId: { roleId, colorHex, name, boughtAt, itemId, isRainbow }
             roleItems: {} // guildId: { items with prices }
@@ -193,6 +196,8 @@ class CustomRoleShop {
 
     // Rainbow color rotation
     startRainbowRotation() {
+        if (this.rainbowInterval) return;
+
         const colors = [
             0xFF0000, // Red
             0xFF7F00, // Orange
@@ -205,7 +210,7 @@ class CustomRoleShop {
 
         let colorIndex = 0;
 
-        setInterval(async () => {
+        this.rainbowInterval = setInterval(async () => {
             if (this.rainbowRoles.size === 0) return;
 
             const color = colors[colorIndex];
@@ -215,10 +220,13 @@ class CustomRoleShop {
             for (const [key, customRole] of Object.entries(this.data.customRoles)) {
                 if (customRole.isRainbow) {
                     try {
-                        const [guildId, userId] = key.split('_');
-                        // We need to fetch the guild from client, but we'll handle this in the event
-                        this.pendingRainbowUpdate = this.pendingRainbowUpdate || [];
-                        this.pendingRainbowUpdate.push({ roleId: customRole.roleId, color });
+                        const [guildId] = key.split('_');
+                        // Keep only the latest color update per role to avoid startup/backlog spikes
+                        this.pendingRainbowUpdate.set(customRole.roleId, {
+                            guildId,
+                            roleId: customRole.roleId,
+                            color
+                        });
                     } catch (e) {
                         console.error('Error updating rainbow role:', e);
                     }
@@ -229,25 +237,32 @@ class CustomRoleShop {
 
     // Call this from a ready event with the client
     async applyRainbowUpdates(client) {
-        if (!this.pendingRainbowUpdate || this.pendingRainbowUpdate.length === 0) return;
+        if (!this.pendingRainbowUpdate || this.pendingRainbowUpdate.size === 0) return;
 
-        const updates = this.pendingRainbowUpdate;
-        this.pendingRainbowUpdate = [];
+        const MAX_UPDATES_PER_TICK = 8;
+        let processed = 0;
 
-        for (const { roleId, color } of updates) {
+        for (const [pendingRoleId, pending] of this.pendingRainbowUpdate) {
+            if (processed >= MAX_UPDATES_PER_TICK) break;
+
+            this.pendingRainbowUpdate.delete(pendingRoleId);
+
+            const { guildId, roleId, color } = pending;
+
             try {
-                // Find guild with this role
-                for (const guild of client.guilds.cache.values()) {
-                    try {
-                        const role = await guild.roles.fetch(roleId);
-                        if (role) {
-                            await role.edit({ color });
-                            break;
-                        }
-                    } catch (e) {
-                        // Role doesn't exist in this guild, continue
-                    }
+                if (this.lastAppliedRainbowColor.get(roleId) === color) {
+                    continue;
                 }
+
+                const guild = client.guilds.cache.get(guildId);
+                if (!guild) continue;
+
+                const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId).catch(() => null);
+                if (!role) continue;
+
+                await role.edit({ color });
+                this.lastAppliedRainbowColor.set(roleId, color);
+                processed += 1;
             } catch (e) {
                 console.error('Error applying rainbow update:', e);
             }
