@@ -231,6 +231,15 @@ module.exports = {
                 console.error('Error auto-enrolling user in seasons:', error);
             }
 
+            // Send welcome message
+            try {
+                if (client.welcomeMessageManager) {
+                    await client.welcomeMessageManager.sendWelcomeMessage(member);
+                }
+            } catch (error) {
+                console.error('Error sending welcome message:', error);
+            }
+
         } catch (error) {
             console.error('Error in guildMemberAdd event:', error);
         }

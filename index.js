@@ -35,6 +35,20 @@ const commandPermissionsManager = require('./utils/commandPermissionsManager');
 const Dashboard = require('./dashboard/server');
 const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 
+// New system managers
+const ErrorHandler = require('./utils/errorHandler');
+const CooldownManager = require('./utils/cooldownManager');
+const RateLimiter = require('./utils/rateLimiter');
+const ShutdownManager = require('./utils/shutdownManager');
+const InputValidator = require('./utils/inputValidator');
+const Logger = require('./utils/logger');
+const UptimeMonitor = require('./utils/uptimeMonitor');
+const AutoBackup = require('./utils/autoBackup');
+const AuditLog = require('./utils/auditLog');
+const WelcomeMessageManager = require('./utils/welcomeMessageManager');
+const ReminderManager = require('./utils/reminderManager');
+const RoleTemplateManager = require('./utils/roleTemplateManager');
+
 // Create a new Discord client instance
 const client = new Client({
     intents: [
@@ -78,6 +92,31 @@ wrapInteractionMethod('editReply');
 const commandHandler = new CommandHandler(client);
 const eventHandler = new EventHandler(client);
 const slashCommandHandler = new SlashCommandHandler(client);
+
+// Initialize new systems
+const errorHandler = new ErrorHandler(client);
+const cooldownManager = new CooldownManager();
+const rateLimiter = new RateLimiter({ maxRequests: 5, windowMs: 60000 });
+const shutdownManager = new ShutdownManager(client);
+const logger = new Logger(client);
+const uptimeMonitor = new UptimeMonitor(client);
+const autoBackup = new AutoBackup();
+const auditLog = new AuditLog();
+const welcomeMessageManager = new WelcomeMessageManager();
+const reminderManager = new ReminderManager(client);
+const roleTemplateManager = new RoleTemplateManager();
+
+// Attach to client for global access
+client.errorHandler = errorHandler;
+client.cooldownManager = cooldownManager;
+client.rateLimiter = rateLimiter;
+client.logger = logger;
+client.uptimeMonitor = uptimeMonitor;
+client.auditLog = auditLog;
+client.welcomeMessageManager = welcomeMessageManager;
+client.reminderManager = reminderManager;
+client.roleTemplateManager = roleTemplateManager;
+client.InputValidator = InputValidator;
 
 // Load all commands and events
 async function loadHandlers() {
@@ -135,10 +174,16 @@ async function loadHandlers() {
         await runInitStep('Event handler', () => eventHandler.loadEvents());
         await runInitStep('Slash command handler', () => slashCommandHandler.loadSlashCommands());
 
+        // Initialize new systems
+        logger.success('All new system managers initialized');
+        autoBackup.createBackup('startup');
+        logger.info('System startup backup created');
+
         console.timeEnd('⏱️ Total startup init');
         console.log('✅ All handlers loaded successfully!');
     } catch (error) {
         console.error('❌ Error loading handlers:', error);
+        errorHandler.logError('STARTUP_ERROR', error);
         process.exit(1);
     }
 }
@@ -146,8 +191,22 @@ async function loadHandlers() {
 // Load handlers before logging in
 let seasonLeaderboardTaskRunning = false;
 
+// Setup shutdown handlers
+shutdownManager.onShutdown(async () => {
+    logger.info('Running pre-shutdown cleanup tasks');
+    
+    // Create final backup
+    const backup = autoBackup.createBackup('shutdown');
+    if (backup) {
+        logger.info('Final shutdown backup created', { backup: backup.name });
+    }
+});
+
+shutdownManager.setShutdownTimeout(30000); // 30 second timeout
+
 loadHandlers().then(() => {
     // Handle messages for commands
+
     client.on(Events.MessageCreate, async (message) => {
         await commandHandler.handleCommand(message);
     });
