@@ -45,7 +45,7 @@ module.exports = {
                 .setFooter({ text: 'React quickly to respond to this proposal!' })
                 .setTimestamp();
 
-            const sentMessage = await interaction.reply({ embeds: [embed], fetchReply: true });
+            const sentMessage = await interaction.reply({ embeds: [embed], withResponse: true });
             await sentMessage.react('✅');
             await sentMessage.react('❌');
 

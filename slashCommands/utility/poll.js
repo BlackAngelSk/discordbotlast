@@ -118,7 +118,7 @@ module.exports = {
         const message = await interaction.reply({ 
             embeds: [embed], 
             components: [buttons],
-            fetchReply: true
+            withResponse: true
         });
 
         // Store poll data

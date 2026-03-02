@@ -46,7 +46,7 @@ async function playRPSWithBet(interaction, bet) {
         new ButtonBuilder().setCustomId('rps_scissors').setLabel('Scissors').setEmoji('✂️').setStyle(ButtonStyle.Secondary)
     );
 
-    const msg = await interaction.reply({ embeds: [gameEmbed], components: [row], fetchReply: true });
+    const msg = await interaction.reply({ embeds: [gameEmbed], components: [row], withResponse: true });
 
     const collector = msg.createMessageComponentCollector({ componentType: ComponentType.Button, time: 30_000, filter: i => i.user.id === interaction.user.id });
 

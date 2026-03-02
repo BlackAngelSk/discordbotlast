@@ -36,7 +36,7 @@ module.exports = {
             .setFooter({ text: `Poll by ${interaction.user.tag}` })
             .setTimestamp();
 
-        const message = await interaction.reply({ embeds: [embed], fetchReply: true });
+        const message = await interaction.reply({ embeds: [embed], withResponse: true });
 
         for (let i = 0; i < options.length; i++) {
             await message.react(emojis[i]);
