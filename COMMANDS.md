@@ -1,9 +1,11 @@
 # 📖 Complete Command Reference
 
-**Total Commands:** 117+ (All available as both prefix and slash commands)
+> ✅ Synced with latest help definitions in `commands/utility/help.js` and `slashCommands/utility/help.js` (March 8, 2026).
+
+**Total Commands:** 117+ (mixed prefix + slash coverage)
 
 **Quick Links:**
-- [Music](#-music-commands) | [Games](#-games--entertainment) | [Economy](#-economy--leveling) | [Moderation](#-moderation) | [Utility](#-utility) | [Premium](#-premium-features) | [AI](#-ai-features)
+- [Music](#-music-commands) | [Games](#-games--entertainment) | [Economy](#-economy--leveling) | [Moderation](#-moderation) | [Server Tools](#-helpjs-category-map-current-source-of-truth) | [Stats](#-helpjs-category-map-current-source-of-truth) | [Custom](#-helpjs-category-map-current-source-of-truth) | [Utility](#-utility) | [Fun](#-helpjs-category-map-current-source-of-truth) | [Admin](#-helpjs-category-map-current-source-of-truth)
 
 ---
 
@@ -290,32 +292,6 @@
 
 ---
 
-## 💎 Premium Features
-
-### Premium Commands
-
-| Command | Usage | Description |
-|---------|-------|-------------|
-| `/premium info` | `/premium info` | View all tiers |
-| `/premium subscribe` | `/premium subscribe <tier>` | Subscribe to tier |
-| `/premium status` | `/premium status` | Check subscription |
-| `/premium features` | `/premium features` | View your features |
-| `!premium-setup info` | `!premium-setup info` | Admin: View tiers |
-| `!premium-setup check` | `!premium-setup check @user` | Admin: Check user tier |
-
-**Premium Tiers:**
-
-| Feature | Basic ($2.99) | Pro ($5.99) | Elite ($9.99) |
-|---------|--------------|------------|--------------|
-| Custom Commands | 10 | 25 | 100 |
-| Shop Slots | 5 | 15 | 50 |
-| Monthly Bonus | 500 coins | 1,500 coins | 3,000 coins |
-| Exclusive Games | ❌ | 3 games | All games |
-| Priority Support | ❌ | ✅ | ✅ |
-| Custom Bot | ❌ | ❌ | 1 slot |
-
----
-
 ## 📊 Analytics
 
 | Command | Usage | Description |
@@ -437,6 +413,41 @@
 
 ---
 
+## 🧭 help.js Category Map (Current Source of Truth)
+
+The interactive help menu currently exposes these categories:
+- `music`
+- `economy`
+- `games`
+- `moderation`
+- `server`
+- `stats`
+- `custom`
+- `utility`
+- `fun`
+- `admin`
+
+### Canonical category examples from help.js
+
+- **Music:** `!play`, `/play`, `!queue`, `/queue`, `!autoplay`, `/playlist ...`
+- **Economy:** `/balance`, `/daily`, `/weekly`, `!slots`, `!blackjack`, `/leaderboard`
+- **Games:** `!minigame ...`, `!ttt`, `/ttt`, `!horserace`, `/horserace`
+- **Moderation:** `!kick`, `/kick`, `!ban`, `/ban`, `/warnings ...`, `/automod ...`
+- **Server Tools:** `!ticket setup`, `!reactionrole ...`, `!starboard ...`, `!welcomecard ...`
+- **Stats:** `!stats overview/users/channels/activity`, `!profile`, `/stats`, `/analytics`, `/activity`
+- **Custom:** `!customcmd add/remove/list`
+- **Utility:** `!config`, `!setup`, `/leaderboard-config ...`, `!ping`, `/serverinfo`, `/ask`, `/ai`
+- **Fun:** `/poll`, `/8ball`, `/meme`, `!propose`, `/propose`, `!couples`, `/couples`
+- **Admin:** `!addcoins`, `!reseteconomy`, `!season ...`, `/command-permissions ...`, `/auditlog ...`
+
+### `/help` command modes (slash)
+
+- `/help` → category menu
+- `/help command:<name>` → detailed single command help
+- `/help search:<keyword>` → command catalog search
+
+---
+
 ## 📌 Command Tips
 
 ### Quick Reference
@@ -463,9 +474,9 @@
 ---
 
 **Total Commands:** 117+  
-**Categories:** 12  
-**Slash Commands:** All  
-**Prefix Commands:** All  
+**help.js Categories:** 10 (`music`, `economy`, `games`, `moderation`, `server`, `stats`, `custom`, `utility`, `fun`, `admin`)  
+**Slash Commands:** Extensive coverage (see `/help search:<keyword>`)  
+**Prefix Commands:** Extensive coverage (see `!help <category>`)  
 
 For setup instructions, see **SETUP.md**  
 For features and guides, see **GUIDE.md**
