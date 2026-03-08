@@ -3,6 +3,7 @@ const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const statsManager = require('../utils/statsManager');
 const customCommandManager = require('../utils/customCommandManager');
+const settingsManager = require('../utils/settingsManager');
 const afkManager = require('../utils/afkManager');
 const levelRewardsManager = require('../utils/levelRewardsManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
@@ -234,10 +235,13 @@ module.exports = {
             console.error('XP tracking error:', error);
         }
 
-        // Check for custom commands
-        if (message.content.startsWith('!')) {
-            const args = message.content.slice(1).split(/ +/);
-            const commandName = args[0].toLowerCase();
+        // Check for custom commands (uses server prefixes)
+        const prefixes = settingsManager.getPrefixes(message.guildId);
+        const usedPrefix = prefixes.find(prefix => message.content.startsWith(prefix));
+
+        if (usedPrefix) {
+            const args = message.content.slice(usedPrefix.length).trim().split(/ +/);
+            const commandName = (args[0] || '').toLowerCase();
             const customCommand = customCommandManager.getCommand(message.guildId, commandName);
             
             if (customCommand) {

@@ -5,9 +5,9 @@
   },
   "automod": {
     "421968526547353601": {
-      "enabled": true,
-      "antiSpam": true,
-      "antiInvite": true,
+      "enabled": false,
+      "antiSpam": false,
+      "antiInvite": false,
       "badWords": [
         "nigger",
         "NEG3R"
@@ -15,7 +15,7 @@
       "maxMentions": 5,
       "maxEmojis": 10,
       "modLogChannel": "",
-      "emojiOnly": true
+      "emojiOnly": false
     }
   }
 }

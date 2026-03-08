@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 
 module.exports = {
@@ -36,7 +36,7 @@ module.exports = {
             .setFooter({ text: `Type ${p}help <category> for detailed commands | Example: ${p}help music` })
             .setTimestamp();
 
-        const row = new ActionRowBuilder().addComponents(
+        const row1 = new ActionRowBuilder().addComponents(
             new ButtonBuilder()
                 .setLabel('Music')
                 .setEmoji('🎵')
@@ -56,14 +56,69 @@ module.exports = {
                 .setLabel('Moderation')
                 .setEmoji('🛡️')
                 .setCustomId('help_moderation')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setLabel('Server Tools')
+                .setEmoji('🎫')
+                .setCustomId('help_server')
+                .setStyle(ButtonStyle.Primary)
+        );
+
+        const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Stats')
+                .setEmoji('📊')
+                .setCustomId('help_stats')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setLabel('Custom')
+                .setEmoji('📝')
+                .setCustomId('help_custom')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setLabel('Utility')
+                .setEmoji('🔧')
+                .setCustomId('help_utility')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setLabel('Fun')
+                .setEmoji('🎭')
+                .setCustomId('help_fun')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setLabel('Admin')
+                .setEmoji('🧰')
+                .setCustomId('help_admin')
                 .setStyle(ButtonStyle.Danger)
         );
 
-        await message.reply({ embeds: [mainEmbed], components: [row] });
+        const reply = await message.reply({ embeds: [mainEmbed], components: [row1, row2] });
+
+        // Button interaction collector
+        const collector = reply.createMessageComponentCollector({ time: 300000 }); // 5 minutes
+
+        collector.on('collect', async (i) => {
+            if (i.user.id !== message.author.id) {
+                return i.reply({ content: '❌ These buttons are not for you!', flags: MessageFlags.Ephemeral });
+            }
+
+            const category = i.customId.replace('help_', '');
+            await i.deferUpdate();
+            
+            const categoryEmbed = getCategoryEmbed(p, category);
+            await i.editReply({ embeds: [categoryEmbed], components: [row1, row2] });
+        });
+
+        collector.on('end', () => {
+            // Disable buttons after timeout
+            row1.components.forEach(btn => btn.setDisabled(true));
+            row2.components.forEach(btn => btn.setDisabled(true));
+            reply.edit({ components: [row1, row2] }).catch(() => {});
+        });
     }
 };
 
-function sendCategoryHelp(message, p, category) {
+function getCategoryEmbed(p, category) {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
         .setTimestamp();
@@ -73,10 +128,10 @@ function sendCategoryHelp(message, p, category) {
             embed.setTitle('🎵 Music Commands')
                 .setDescription('Play music from YouTube, Spotify, and SoundCloud!')
                 .addFields(
-                    { name: '▶️ Playback', value: `\`${p}play <url/query>\` - Play a song\n\`${p}pause\` - Pause playback (DJ)\n\`${p}resume\` - Resume playback (DJ)\n\`${p}skip\` - Skip current song (DJ)\n\`${p}stop\` - Stop and clear queue (DJ)\n\`${p}leave\` - Leave voice channel` },
-                    { name: '📋 Queue', value: `\`${p}queue\` - View song queue\n\`${p}nowplaying\` - Current song info\n\`${p}remove <pos>\` - Remove song (DJ)\n\`${p}move <from> <to>\` - Move song (DJ)\n\`${p}swap <a> <b>\` - Swap songs (DJ)\n\`${p}shuffle\` - Shuffle queue (DJ)` },
-                    { name: '🔧 Controls', value: `\`${p}volume <0-200>\` - Set volume (DJ)\n\`${p}loop <off/song/queue>\` - Loop mode (DJ)\n\`${p}previous\` - Play previous song (DJ)\n\`${p}jump <pos>\` - Jump to position (DJ)\n\`${p}autoplay\` - Toggle autoplay (DJ)` },
-                    { name: '📝 Info', value: `\`${p}lyrics [song]\` - Get song lyrics` }
+                    { name: '▶️ Playback', value: `\`${p}play <url/query>\` - Play a song\n\`/play <song>\` - Play a song (slash)\n\`${p}pause\` - Pause playback (DJ)\n\`/pause\` - Pause (slash)\n\`${p}resume\` - Resume playback (DJ)\n\`/resume\` - Resume (slash)\n\`${p}skip\` - Skip current song (DJ)\n\`/skip\` - Skip (slash)\n\`${p}stop\` - Stop and clear queue (DJ)\n\`/stop\` - Stop (slash)\n\`${p}leave\` - Leave voice channel` },
+                    { name: '📋 Queue', value: `\`${p}queue\` - View song queue\n\`/queue\` - View queue (slash)\n\`${p}nowplaying\` - Current song info\n\`/nowplaying\` - Current song (slash)\n\`${p}remove <pos>\` - Remove song (DJ)\n\`${p}move <from> <to>\` - Move song (DJ)\n\`${p}swap <a> <b>\` - Swap songs (DJ)\n\`${p}shuffle\` - Shuffle queue (DJ)` },
+                    { name: '🔧 Controls', value: `\`${p}volume <0-200>\` - Set volume (DJ)\n\`/volume <amount>\` - Set volume (slash)\n\`${p}loop <off/song/queue>\` - Loop mode (DJ)\n\`/loop\` - Loop mode (slash)\n\`${p}previous\` - Play previous song (DJ)\n\`/previous\` - Previous song (slash)\n\`${p}jump <pos>\` - Jump to position (DJ)\n\`/jump <position>\` - Jump to position (slash)\n\`${p}autoplay\` - Toggle autoplay (DJ)` },
+                    { name: '📝 Info & Playlists', value: `\`${p}lyrics [song]\` - Get song lyrics\n\`/playlist create/add/remove/list\` - Manage playlists` }
                 );
             break;
 
@@ -86,8 +141,8 @@ function sendCategoryHelp(message, p, category) {
                 .addFields(
                     { name: '💵 Balance', value: `\`/balance [@user]\` - Check balance\n\`/daily\` - Daily coins + streak bonus\n\`/weekly\` - Weekly coins\n\`${p}profile [@user]\` - View full profile with XP` },
                     { name: '🎰 Gambling', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}coinflip <h/t> <bet>\` - 2.5x multiplier\n\`${p}dice <1-6> <bet>\` - 6x multiplier\n\`${p}roulette <bet>\` - Roulette wheel\n\`${p}blackjack <bet>\` - Card game\n\`${p}rps <bet>\` - Rock paper scissors\n\`${p}russianroulette\` - Risky roulette` },
-                    { name: '🏆 Leaderboards', value: `\`${p}leaderboard balance\` - Richest users\n\`${p}leaderboard xp\` - Top levels\n\`${p}leaderboard seasonal\` - Seasonal coins\n\`/leaderboard-update\` - Force update (admin/role)` },
-                    { name: '🛒 Shop', value: `\`/shop\` - View items to buy\n\`${p}transfer @user <amount>\` - Send coins` }
+                    { name: '🏆 Leaderboards', value: `\`${p}leaderboard balance\` - Richest users\n\`${p}leaderboard xp\` - Top levels\n\`${p}leaderboard seasonal\` - Seasonal coins\n\`/leaderboard\` - Slash command leaderboard\n\`/leaderboard-update\` - Force update (admin/role)` },
+                    { name: '🛒 Shop', value: `\`/shop\` - View items to buy\n\`${p}transfer @user <amount>\` - Send coins\n\`/transfer @user <amount>\` - Send coins (slash)` }
                 );
             break;
 
@@ -95,26 +150,24 @@ function sendCategoryHelp(message, p, category) {
             embed.setTitle('🎮 Game Commands')
                 .setDescription('Play games and track your stats!')
                 .addFields(
-                    { name: '🎲 Mini Games', value: `\`${p}minigame rps\` - Rock paper scissors\n\`${p}minigame guess\` - Guess the number\n\`${p}minigame trivia\` - Trivia questions\n\`${p}ttt [@user]\` - Tic tac toe\n\`${p}count\` - Counting game` },
-                    { name: '🎰 Betting Games', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}blackjack <bet>\` - Card game\n\`${p}roulette <bet>\` - Roulette\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`${p}rps <bet>\` - RPS with betting\n\`${p}russianroulette\` - Risky roulette\n\`${p}horserace <bet>\` - Horse race` },
-                    { name: '📊 Stats', value: `\`${p}gamestats [@user]\` - View game statistics\n\`${p}horseracehistory [@user]\` - Horse race history` }
+                    { name: '🎲 Mini Games', value: `\`${p}minigame rps\` - Rock paper scissors\n\`${p}minigame guess\` - Guess the number\n\`${p}minigame trivia\` - Trivia questions\n\`${p}ttt [@user]\` - Tic tac toe\n\`/ttt @user\` - Tic tac toe (slash)\n\`${p}count\` - Counting game\n\`/count\` - Counting game (slash)` },
+                    { name: '🎰 Betting Games', value: `\`${p}slots <bet>\` - Slot machine\n\`${p}blackjack <bet>\` - Card game\n\`/blackjack <bet>\` - Card game (slash)\n\`${p}roulette <bet>\` - Roulette\n\`/roulette <bet>\` - Roulette (slash)\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`/coinflip <choice> <bet>\` - Coin flip (slash)\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`/dice <number> <bet>\` - Dice roll (slash)\n\`${p}rps <bet>\` - RPS with betting\n\`/rps <choice> <bet>\` - RPS (slash)\n\`${p}russianroulette\` - Risky roulette\n\`/russianroulette\` - Risky roulette (slash)\n\`${p}horserace <bet>\` - Horse race\n\`/horserace <bet>\` - Horse race (slash)` },
+                    { name: '📊 Stats', value: `\`${p}gamestats [@user]\` - View game statistics\n\`${p}horseracehistory [@user]\` - Horse race history\n\`/horseracehistory [@user]\` - Horse race history (slash)\n\`/horseracesim <count>\` - Simulate races (admin)` }
                 );
             break;
 
         case 'moderation':
-        case 'mod':
             embed.setTitle('🛡️ Moderation Commands')
                 .setDescription('Keep your server safe and organized!')
                 .addFields(
-                    { name: '👮 Actions', value: `\`${p}kick @user [reason]\` - Kick member\n\`${p}ban @user [reason]\` - Ban member\n\`${p}unban <userId>\` - Unban user\n\`${p}timeout @user <mins> [reason]\` - Timeout\n\`${p}untimeout @user\` - Remove timeout\n\`${p}warn @user <reason>\` - Warn user\n\`/softban @user [reason]\` - Soft ban\n\`/mute @user <mins>\` - Mute member` },
-                    { name: '🗑️ Cleanup', value: `\`${p}purge <amount>\` - Delete messages\n\`${p}clear <amount>\` - Clear messages\n\`${p}lock\` - Lock channel\n\`${p}unlock\` - Unlock channel\n\`/slowmode <seconds>\` - Set slowmode` },
-                    { name: '📋 Warnings & Logs', value: `\`/warnings add @user <reason>\`\n\`/warnings list @user\`\n\`/warnings remove @user <id>\`\n\`/warnings clear @user\`\n\`${p}logging\` - Logging settings\n\`/modlog #channel\` - Set mod log` },
+                    { name: '👮 Actions', value: `\`${p}kick @user [reason]\` - Kick member\n\`/kick @user [reason]\` - Kick (slash)\n\`${p}ban @user [reason]\` - Ban member\n\`/ban @user [reason]\` - Ban (slash)\n\`${p}unban <userId>\` - Unban user\n\`${p}timeout @user <mins> [reason]\` - Timeout\n\`${p}untimeout @user\` - Remove timeout\n\`${p}warn @user <reason>\` - Warn user\n\`/softban @user [reason]\` - Soft ban\n\`/mute @user <mins>\` - Mute member` },
+                    { name: '🗑️ Cleanup', value: `\`${p}purge <amount>\` - Delete messages\n\`${p}clear <amount>\` - Clear messages\n\`/clear <amount>\` - Clear messages (slash)\n\`${p}lock\` - Lock channel\n\`/lock\` - Lock channel (slash)\n\`${p}unlock\` - Unlock channel\n\`/unlock\` - Unlock channel (slash)\n\`/slowmode <seconds>\` - Set slowmode` },
+                    { name: '📋 Warnings & Logs', value: `\`/warnings add @user <reason>\`\n\`/warnings list @user\`\n\`/warnings remove @user <id>\`\n\`/warnings clear @user\`\n\`${p}logging\` - Logging settings\n\`/logging\` - Logging settings (slash)\n\`/modlog #channel\` - Set mod log` },
                     { name: '🤖 Auto-Mod', value: `\`/automod enable/disable\`\n\`/automod antiinvite\` - Block invites\n\`/automod antispam\` - Block spam\n\`/automod badwords add/remove\`\n\`/automod settings\` - View settings` }
                 );
             break;
 
         case 'server':
-        case 'tools':
             embed.setTitle('🎫 Server Tools')
                 .setDescription('Advanced server management features!')
                 .addFields(
@@ -127,7 +180,6 @@ function sendCategoryHelp(message, p, category) {
             break;
 
         case 'stats':
-        case 'analytics':
             embed.setTitle('📊 Statistics & Analytics')
                 .setDescription('Track server and user activity!')
                 .addFields(
@@ -149,15 +201,14 @@ function sendCategoryHelp(message, p, category) {
             break;
 
         case 'utility':
-        case 'config':
             embed.setTitle('🔧 Utility Commands')
                 .setDescription('Configuration and server information!')
                 .addFields(
                     { name: '⚙️ Configuration', value: `\`${p}config\` - View settings\n\`${p}config prefix <prefix>\` - Set prefix\n\`${p}config djrole <name>\` - Set DJ role\n\`${p}config autorole <name>\` - Set auto role\n\`${p}setup\` - Quick server setup\n\`${p}config reset\` - Reset settings` },
                     { name: '🏆 Leaderboard Admin', value: `\`/leaderboard-channel #channel\` - Set channel\n\`/leaderboard-config view\` - View config\n\`/leaderboard-config set\` - Update config\n\`/leaderboard-config export\` - Export CSV` },
-                    { name: 'ℹ️ Information', value: `\`${p}server\` - Server info\n\`${p}ping\` - Bot latency\n\`/avatar [@user]\` - User avatar\n\`/userinfo [@user]\` - User details\n\`/roleinfo <@role>\` - Role info\n\`/serverinfo\` - Server details` },
-                    { name: '🧰 Utility Tools', value: `\`/ask <question>\` - Ask AI\n\`/ai\` - AI chat\n\`/announce\` - Announcement\n\`/birthday\` - Birthday settings\n\`/customrole\` - Custom role shop\n\`/milestones\` - Milestones\n\`/giveaway\` - Giveaways\n\`/invites\` - Invite stats\n\`/invitestats\` - Invite leaderboard\n\`/welcome-leave\` - Welcome/leave builder` },
-                    { name: '🌐 Other', value: `\`${p}dashboard\` - Web dashboard\n\`${p}hello\` - Say hello!\n\`${p}help\` - Help menu\n\`${p}prefix\` - Show prefix\n\`${p}leave\` - Bot leaves server` }
+                    { name: 'ℹ️ Information', value: `\`${p}server\` - Server info\n\`${p}ping\` - Bot latency\n\`/ping\` - Bot latency (slash)\n\`/avatar [@user]\` - User avatar\n\`/userinfo [@user]\` - User details\n\`/roleinfo <@role>\` - Role info\n\`/serverinfo\` - Server details` },
+                    { name: '🧰 Utility Tools', value: `\`/ask <question>\` - Ask AI\n\`/ai\` - AI chat\n\`/announce\` - Announcement\n\`/birthday\` - Birthday settings\n\`/customrole\` - Custom role shop\n\`/milestones\` - Milestones\n\`/giveaway\` - Giveaways\n\`${p}giveaway\` - Giveaways (prefix)\n\`/invites\` - Invite stats\n\`/invitestats\` - Invite leaderboard\n\`${p}invites\` - Invite stats (prefix)\n\`${p}invitestats\` - Invite leaderboard (prefix)\n\`/reminder\` - Set reminders\n\`/activity voice/leaderboard\` - Activity stats` },
+                    { name: '🌐 Other', value: `\`${p}dashboard\` - Web dashboard\n\`${p}hello\` - Say hello!\n\`${p}help\` - Help menu\n\`/help\` - Help menu (slash)\n\`${p}prefix\` - Show prefix\n\`/prefix\` - Show prefix (slash)\n\`${p}leave\` - Bot leaves server\n\`${p}profile [@user]\` - User profile\n\`/profile [@user]\` - User profile (slash)\n\`${p}stats\` - Stats overview\n\`/stats\` - Stats overview (slash)\n\`/analytics\` - Server analytics` }
                 );
             break;
 
@@ -165,7 +216,7 @@ function sendCategoryHelp(message, p, category) {
             embed.setTitle('🎭 Fun Commands')
                 .setDescription('Entertainment and random fun!')
                 .addFields(
-                    { name: 'Commands', value: `\`/poll <question> <options>\` - Create poll\n\`/8ball <question>\` - Magic 8-ball\n\`/meme\` - Random meme\n\`${p}hello\` - Friendly greeting\n\`${p}propose @user\` - Propose\n\`${p}accept\` - Accept proposal\n\`${p}reject\` - Reject proposal\n\`${p}divorce\` - Divorce\n\`${p}spouse [@user]\` - View spouse\n\`${p}couples\` - Top couples` }
+                    { name: 'Commands', value: `\`/poll <question> <options>\` - Create poll\n\`/8ball <question>\` - Magic 8-ball\n\`/meme\` - Random meme\n\`${p}hello\` - Friendly greeting\n\`${p}propose @user\` - Propose\n\`/propose @user\` - Propose (slash)\n\`${p}accept\` - Accept proposal\n\`/accept\` - Accept (slash)\n\`${p}reject\` - Reject proposal\n\`/reject\` - Reject (slash)\n\`${p}divorce\` - Divorce\n\`/divorce\` - Divorce (slash)\n\`${p}spouse [@user]\` - View spouse\n\`/spouse [@user]\` - View spouse (slash)\n\`${p}couples\` - Top couples\n\`/couples\` - Top couples (slash)` }
                 );
             break;
 
@@ -176,9 +227,9 @@ function sendCategoryHelp(message, p, category) {
                     { name: '💰 Economy Admin', value: `\`${p}addcoins @user <amount>\`\n\`${p}removecoins @user <amount>\`\n\`${p}setbalance @user <amount>\`\n\`${p}giveexp @user <amount>\`` },
                     { name: '🧹 Resets', value: `\`${p}cleareconomy\`\n\`${p}reseteconomy\`\n\`${p}cleargamedata\`\n\`${p}resetwarnings\`` },
                     { name: '📅 Seasons', value: `\`${p}season create <name>\`\n\`${p}season end <name>\`\n\`${p}season stats [name]\`\n\`${p}season refresh [name]\`` },
-                    { name: '⚙️ Server Admin', value: `\`${p}botprefix <prefix>\`\n\`${p}serverlanguage <code>\`\n\`${p}serverstats\`\n\`${p}announcement <msg>\`\n\`${p}backup\`` },
+                    { name: '⚙️ Server Admin', value: `\`${p}botprefix <prefix>\`\n\`${p}serverlanguage <code>\`\n\`${p}serverstats\`\n\`${p}announcement <msg>\`\n\`${p}backup\`\n\`/welcomemessage\` - Configure welcome messages\n\`/roletemplate\` - Role templates\n\`/mongodb-space\` - Check MongoDB usage (Owner)\n\`/system-stats\` - System CPU/RAM stats\n\`/botstatus\` - Bot health and status` },
                     { name: '🔐 Permissions', value: `\`/command-permissions list\`\n\`/command-permissions disable <command>\`\n\`/command-permissions enable <command>\`\n\`/command-permissions role <command> <role>\`` },
-                    { name: '🧾 Audit Logs', value: `\`/auditlog view\`\n\`/auditlog export\`` }
+                    { name: '🧾 Audit Logs', value: `\`/auditlog view\`\n\`/auditlog export\`\n\`/auditlogs\` - View logs` }
                 );
             break;
 
@@ -188,6 +239,11 @@ function sendCategoryHelp(message, p, category) {
                 .setColor('#ed4245');
     }
 
-    embed.setFooter({ text: `${p}help - Back to main menu | DJ = Requires DJ role` });
+    embed.setFooter({ text: `Click buttons to navigate | DJ = Requires DJ role` });
+    return embed;
+}
+
+function sendCategoryHelp(message, p, category) {
+    const embed = getCategoryEmbed(p, category);
     message.reply({ embeds: [embed] });
 }
