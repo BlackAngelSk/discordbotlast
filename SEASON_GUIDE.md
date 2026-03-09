@@ -12,7 +12,7 @@ The season management system allows administrators to create distinct seasons fo
 
 ## Commands
 
-All commands are admin-only and use the prefix `!season`
+Season management commands are admin-only and use the prefix `!season`. Leaderboard panel controls are available via slash commands (for example `/leaderboard-channel`, `/leaderboard-config`, `/leaderboard-update`).
 
 ### Create a New Season
 
@@ -83,13 +83,13 @@ Get detailed statistics about a specific season.
 !season leaderboard [season-name]
 ```
 
-View the top 10 players in a season by coins earned.
+View the top 10 players in a season by balance.
 
 If no season is specified, shows the current active season.
 
 **Response:**
 - Top 10 players with medals (🥇🥈🥉)
-- Coins earned and level
+- Balance and level
 - Total player count
 
 **Examples:**
@@ -145,7 +145,7 @@ When you create a season:
 ### Season Data Structure
 
 Each season tracks:
-- **name**: Season identifier (e.g., "season-development")
+- **name**: Season identifier (e.g., "spring-2026", "summer-2026")
 - **isActive**: Whether season is currently active
 - **startDate**: When season was created
 - **endDate**: When season ended (if archived)
@@ -159,33 +159,52 @@ Each season tracks:
 
 ### Naming Convention
 
-Season names should follow this format:
+**Automatic Quarterly Seasons:**
+The bot automatically creates and manages quarterly seasons. Seasons are named in this format:
+- `spring-{year}` (March-May)
+- `summer-{year}` (June-August)
+- `fall-{year}` (September-November)
+- `winter-{year}` (December-February)
+
+Example: `spring-2026`, `summer-2026`, `fall-2026`, `winter-2026`
+
+**Custom Named Seasons:**
+For manually created seasons, names should follow this format:
 - Lowercase letters only
 - Numbers allowed
 - Hyphens for word separation
-- Example: `season-development`, `spring-2024`, `competitive-s1`
+- Example: `season-development`, `competitive-s1`
+
+### Automatic Quarterly Season Management
+
+The bot automatically:
+1. **Detects quarter changes** - Checks every 6 hours if the quarter has changed
+2. **Creates new seasons** - When a new quarter arrives (Jan 1, Apr 1, Jul 1, Oct 1)
+3. **Archives previous seasons** - Automatically ends the old season
+4. **Auto-enrolls members** - New members are automatically added to the current quarterly season
+5. **Distributes rewards** - Season winners receive payouts and reward roles (if configured)
+
+No admin action needed for seasonal rollover—it happens automatically!
 
 ---
 
 ## Usage Examples
 
-### Scenario 1: Start a New Competition Season
+### Scenario 1: Automatic Seasonal Rollover
 
 ```
-!season create season-march-2024
-📊 Season Management Commands: 
-✅ Season Created
-Season Name: `season-march-2024`
-Started: March 15, 2024
-Status: 🟢 Active
+📅 March 21, 2026 - New Season Detected
+✅ Auto-archived season "winter-2026"
+✅ Created quarterly season "spring-2026"
+📝 All members automatically enrolled in spring-2026
 ```
 
-### Scenario 2: Check Leaderboard Progress
+### Scenario 2: Check Current Season Progress
 
 ```
-!season leaderboard season-march-2024
+!season leaderboard
 
-🏆 Season Leaderboard: season-march-2024
+🏆 Season Leaderboard: spring-2026
 🥇 @Player1 - 50,000 coins (Lvl 25)
 🥈 @Player2 - 45,000 coins (Lvl 24)
 🥉 @Player3 - 40,000 coins (Lvl 23)
@@ -193,12 +212,12 @@ Status: 🟢 Active
 ...
 ```
 
-### Scenario 3: End Season and Award Winners
+### Scenario 3: End Season Early (Manual)
 
 ```
-!season end season-march-2024
+!season end spring-2026
 
-🏁 Season Ended: season-march-2024
+🏁 Season Ended: spring-2026
 This season has been archived.
 
 🏆 Top Winners
@@ -208,6 +227,46 @@ This season has been archived.
 
 Total Players: 150
 ```
+
+---
+
+## Automatic Quarterly Scheduling
+
+### How It Works
+
+The bot includes a built-in quarterly season scheduler:
+
+- **Check Frequency**: Every 6 hours (after bot startup)
+- **Action Frequency**: Once per 24-hour period
+- **Quarters**: Spring, Summer, Fall, Winter (based on calendar months)
+- **Zero Configuration**: Automatically handles all guild servers
+
+### Quarterly Dates
+
+| Quarter | Months | Start Date | Season Name |
+|---------|--------|-----------|------------|
+| Spring | Mar-May | March 1 | spring-{year} |
+| Summer | Jun-Aug | June 1 | summer-{year} |
+| Fall | Sep-Nov | September 1 | fall-{year} |
+| Winter | Dec-Feb | December 1 | winter-{year} |
+
+### What Happens Automatically
+
+When a new quarter begins:
+
+1. ✅ Old season is **automatically ended and archived**
+2. ✅ New quarterly season is **created** (e.g., "spring-2026")
+3. ✅ All guild members are **auto-enrolled** with current stats
+4. ✅ Payouts and reward roles are **distributed to winners** from the previous season
+5. ✅ Fresh leaderboard tracking **starts** for the new quarter
+
+### Disabling Auto-Scheduling (Optional)
+
+To use only manual season creation, you would need to:
+1. Remove/disable the quarterly scheduler from bot startup
+2. Manually create seasons with `!season create <name>`
+
+Contact your server admin if you need custom season timing.
 
 ---
 

@@ -572,6 +572,89 @@ class SeasonManager {
 
         return { success: true, pruned };
     }
+
+    /**
+     * Get the current quarter name (spring, summer, fall, winter)
+     * @returns {string} Quarter name (spring|summer|fall|winter)
+     */
+    getCurrentQuarter() {
+        const month = new Date().getMonth(); // 0-11
+        if (month >= 2 && month <= 4) return 'spring';
+        if (month >= 5 && month <= 7) return 'summer';
+        if (month >= 8 && month <= 10) return 'fall';
+        return 'winter';
+    }
+
+    /**
+     * Get seasonal name (e.g., "spring-2026")
+     * @returns {string} Season name in format "{quarter}-{year}"
+     */
+    getQuarterlySeasonName() {
+        const now = new Date();
+        const quarter = this.getCurrentQuarter();
+        const year = now.getFullYear();
+        return `${quarter}-${year}`;
+    }
+
+    /**
+     * Auto-create quarterly seasons for guilds
+     * Called once per day to check if a new quarter has started
+     * @param {Object} client - Discord client for fetching guild members
+     * @param {string} botUserId - Bot user ID (for creator)
+     * @returns {Object} Result with created seasons count
+     */
+    async autoCreateQuarterlySeasons(client, botUserId) {
+        try {
+            const currentSeasonName = this.getQuarterlySeasonName();
+            let createdCount = 0;
+
+            // Get all guilds from the seasons data
+            for (const guildId in this.data.seasons) {
+                try {
+                    const guild = client.guilds.cache.get(guildId);
+                    if (!guild) continue;
+
+                    const currentSeason = this.getCurrentSeason(guildId);
+
+                    // If current season doesn't match expected quarterly season, create new one
+                    if (currentSeason !== currentSeasonName) {
+                        // Archive old season if it exists
+                        if (currentSeason) {
+                            const oldSeason = this.getSeason(guildId, currentSeason);
+                            if (oldSeason && oldSeason.isActive) {
+                                await this.endSeason(guildId, currentSeason);
+                                console.log(`🏁 Auto-archived season "${currentSeason}" for guild ${guildId}`);
+                            }
+                        }
+
+                        // Create new quarterly season
+                        const result = await this.createSeason(guildId, currentSeasonName, botUserId);
+                        if (result.success) {
+                            // Auto-enroll all members
+                            const members = await guild.members.fetch().catch(() => []);
+                            if (members.length > 0) {
+                                await this.autoEnrollAllMembers(
+                                    guildId,
+                                    currentSeasonName,
+                                    Array.from(members.values()),
+                                    () => ({})
+                                );
+                            }
+                            createdCount++;
+                            console.log(`✅ Auto-created quarterly season "${currentSeasonName}" for guild ${guildId}`);
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Error processing guild ${guildId} for auto-seasonal creation:`, error);
+                }
+            }
+
+            return { success: true, created: createdCount };
+        } catch (error) {
+            console.error('Error in autoCreateQuarterlySeasons:', error);
+            return { success: false, created: 0 };
+        }
+    }
 }
 
 module.exports = new SeasonManager();

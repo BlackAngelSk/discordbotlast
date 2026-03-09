@@ -366,12 +366,12 @@ async function handleEnd(message, args, guildId) {
         return message.reply(`❌ ${result.error}`);
     }
 
-    const leaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'coins', 3);
+    const leaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', 3);
     let winners = '';
 
     leaderboard.forEach((player, index) => {
         const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉';
-        winners += `${medal} <@${player.userId}> - ${player.coins.toLocaleString()} coins\n`;
+        winners += `${medal} <@${player.userId}> - ${player.balance.toLocaleString()} coins\n`;
     });
 
     const resultsChannelName = `season-${seasonName}-top3`;

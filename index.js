@@ -190,6 +190,8 @@ async function loadHandlers() {
 
 // Load handlers before logging in
 let seasonLeaderboardTaskRunning = false;
+let quarterlySeasonCheckRunning = false;
+let lastQuarterlySeasonCheck = 0;
 
 // Setup shutdown handlers
 shutdownManager.onShutdown(async () => {
@@ -259,6 +261,24 @@ loadHandlers().then(() => {
                     seasonLeaderboardTaskRunning = false;
                 }
             }, 60 * 1000); // 1 minute
+
+            // Start quarterly season auto-creation task (runs every 6 hours, checks once per day)
+            setInterval(async () => {
+                if (quarterlySeasonCheckRunning) return;
+                const now = Date.now();
+                // Only check once per day (86400000 ms = 24 hours)
+                if (now - lastQuarterlySeasonCheck < 24 * 60 * 60 * 1000) return;
+                
+                quarterlySeasonCheckRunning = true;
+                try {
+                    await seasonManager.autoCreateQuarterlySeasons(client, client.user.id);
+                    lastQuarterlySeasonCheck = now;
+                } catch (error) {
+                    console.error('Error in quarterly season check:', error);
+                } finally {
+                    quarterlySeasonCheckRunning = false;
+                }
+            }, 6 * 60 * 60 * 1000); // 6 hours
 
             // Initial update
             if (!seasonLeaderboardTaskRunning) {
