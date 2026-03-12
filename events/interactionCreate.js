@@ -60,14 +60,14 @@ module.exports = {
         if (interaction.customId.startsWith('automod_toggle:')) {
             try {
                 if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-                    return interaction.reply({ content: '❌ You need Manage Server permission.', ephemeral: true });
+                    return interaction.reply({ content: '❌ You need Manage Server permission.', flags: 64 });
                 }
 
                 const parts = interaction.customId.split(':');
                 const guildId = parts[1];
                 const key = parts[2];
                 if (!guildId || !key || guildId !== interaction.guildId) {
-                    return interaction.reply({ content: '❌ Invalid auto-mod toggle.', ephemeral: true });
+                    return interaction.reply({ content: '❌ Invalid auto-mod toggle.', flags: 64 });
                 }
 
                 const settings = moderationManager.getAutomodSettings(guildId);
@@ -112,7 +112,7 @@ module.exports = {
                 return;
             } catch (error) {
                 console.error('Error handling automod dashboard:', error);
-                return interaction.reply({ content: '❌ Failed to update auto-mod settings.', ephemeral: true });
+                return interaction.reply({ content: '❌ Failed to update auto-mod settings.', flags: 64 });
             }
         }
 
@@ -122,16 +122,16 @@ module.exports = {
                 const guildId = parts[1];
                 const page = parseInt(parts[2], 10);
                 if (!guildId || Number.isNaN(page)) {
-                    return interaction.reply({ content: '❌ Invalid leaderboard page.', ephemeral: true });
+                    return interaction.reply({ content: '❌ Invalid leaderboard page.', flags: 64 });
                 }
 
                 const cached = seasonLeaderboardManager.getPageCache(guildId);
                 if (!cached || !cached.embeds || cached.embeds.length === 0) {
-                    return interaction.reply({ content: '⏳ Leaderboard cache expired. Please wait for the next update.', ephemeral: true });
+                    return interaction.reply({ content: '⏳ Leaderboard cache expired. Please wait for the next update.', flags: 64 });
                 }
 
                 if (interaction.channelId !== cached.channelId || interaction.message.id !== cached.messageId) {
-                    return interaction.reply({ content: '❌ This leaderboard is no longer active.', ephemeral: true });
+                    return interaction.reply({ content: '❌ This leaderboard is no longer active.', flags: 64 });
                 }
 
                 const totalPages = cached.embeds.length;
@@ -159,7 +159,7 @@ module.exports = {
                 return;
             } catch (error) {
                 console.error('Error handling leaderboard pagination:', error);
-                return interaction.reply({ content: '❌ Failed to change page.', ephemeral: true });
+                return interaction.reply({ content: '❌ Failed to change page.', flags: 64 });
             }
         }
 
@@ -168,7 +168,7 @@ module.exports = {
         // Handle ticket system
         if (interaction.customId === 'create_ticket') {
             try {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: 64 });
                 
                 const settings = ticketManager.getSettings(interaction.guildId);
                 if (!settings.categoryId) {
@@ -248,7 +248,7 @@ module.exports = {
         // Handle close ticket
         if (interaction.customId.startsWith('close_ticket_')) {
             try {
-                await interaction.deferReply({ ephemeral: true });
+                await interaction.deferReply({ flags: 64 });
 
                 const ticketId = interaction.customId.replace('close_ticket_', '');
 

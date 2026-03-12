@@ -10,15 +10,15 @@
       "losses": 0
     },
     "slots": {
-      "wins": 0,
-      "losses": 0
+      "wins": 21,
+      "losses": 21
     },
     "dice": {
       "wins": 0,
       "losses": 0
     },
     "coinflip": {
-      "wins": 0,
+      "wins": 1,
       "losses": 0
     },
     "rps": {
@@ -2607,6 +2607,39 @@
     }
   },
   "340562486002712576": {
+    "blackjack": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "373924787975618571": {
     "blackjack": {
       "wins": 0,
       "losses": 0,
