@@ -10,8 +10,8 @@
       "losses": 0
     },
     "slots": {
-      "wins": 21,
-      "losses": 21
+      "wins": 25,
+      "losses": 31
     },
     "dice": {
       "wins": 0,
@@ -43,8 +43,8 @@
       "losses": 4
     },
     "slots": {
-      "wins": 10,
-      "losses": 21
+      "wins": 11,
+      "losses": 23
     },
     "dice": {
       "wins": 0,

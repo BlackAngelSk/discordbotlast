@@ -1,4 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const fs = require('fs').promises;
+const path = require('path');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -6,23 +8,29 @@ const MIN_BET = 10;
 const MAX_BET = 1_000_000;
 const COOLDOWN_MS = 3000;
 const slotCooldowns = new Map();
+const activeSlotSessions = new Set();
+let lastCooldownCleanupAt = 0;
 const GRID_SIZE = 5;
 const FREE_SPIN_SYMBOL = '🌀';
 const FREE_SPIN_TRIGGER_COUNT = 3;
 const BASE_FREE_SPINS = 3;
-const MAX_TOTAL_SPINS = 500;
+const MAX_TOTAL_SPINS = 25;
 const ANIMATION_STEPS = 3;
 const ANIMATION_DELAY_MS = 450;
 const SPIN_REVEAL_DELAY_MS = 500;
 const SKIP_BUTTON_TIMEOUT_MS = 60_000;
 const SKIP_BUTTON_ID = 'slots_skip';
 const EMBED_FIELD_VALUE_LIMIT = 1024;
+const EMBED_DESCRIPTION_LIMIT = 4096;
+const EMBED_FOOTER_LIMIT = 2048;
+const COOLDOWN_CLEANUP_INTERVAL_MS = 60_000;
 const TARGET_RTP = 0.92;
+const ANALYTICS_FILE = path.join(__dirname, '..', '..', 'data', 'analytics.json');
 const PAYOUT_MULTIPLIERS = {
-    default: { 3: 0.8, 4: 1.6, 5: 3.2 },
-    '🔔': { 3: 1.2, 4: 2.8, 5: 5.5 },
-    '⭐': { 3: 2.5, 4: 6.5, 5: 14 },
-    '💎': { 3: 5, 4: 12, 5: 30 }
+    default: { 3: 1.08, 4: 2.16, 5: 4.32 },
+    '🔔': { 3: 1.62, 4: 3.78, 5: 7.4 },
+    '⭐': { 3: 3.38, 4: 8.78, 5: 18.9 },
+    '💎': { 3: 6.75, 4: 16.2, 5: 40.5 }
 };
 
 const SLOT_SYMBOLS = [
@@ -34,7 +42,7 @@ const SLOT_SYMBOLS = [
     { icon: '🔔', weight: 6 },
     { icon: '⭐', weight: 1.7 },
     { icon: '💎', weight: 0.9 },
-    { icon: FREE_SPIN_SYMBOL, weight: 0.8 }
+    { icon: FREE_SPIN_SYMBOL, weight: 2.4 }
 ];
 
 const TOTAL_WEIGHT = SLOT_SYMBOLS.reduce((acc, symbol) => acc + symbol.weight, 0);
@@ -67,6 +75,96 @@ function parseBetArg(rawArg, balance) {
     return Number.isInteger(bet) ? bet : null;
 }
 
+function getSessionKey(guildId, userId) {
+    return `${guildId}_${userId}`;
+}
+
+function pruneSlotCooldowns(now = Date.now()) {
+    if ((now - lastCooldownCleanupAt) < COOLDOWN_CLEANUP_INTERVAL_MS) {
+        return;
+    }
+
+    lastCooldownCleanupAt = now;
+    for (const [userId, expiresAt] of slotCooldowns.entries()) {
+        if (expiresAt <= now) {
+            slotCooldowns.delete(userId);
+        }
+    }
+}
+
+async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPlayed, freeSpinsAwarded, totalWinningLines, sessionRTP, skippedReveal }) {
+    try {
+        let analytics = {
+            servers: {},
+            commands: {},
+            users: {},
+            events: []
+        };
+
+        try {
+            const raw = await fs.readFile(ANALYTICS_FILE, 'utf8');
+            analytics = JSON.parse(raw);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('Error reading analytics file for slots telemetry:', error);
+            }
+        }
+
+        analytics.slots = analytics.slots || {
+            sessions: 0,
+            totalBet: 0,
+            totalPayout: 0,
+            totalFreeSpins: 0,
+            totalSpins: 0,
+            totalWinningPaylines: 0,
+            skippedReveals: 0,
+            avgRTP: 0,
+            lastSessionAt: null
+        };
+
+        analytics.slots.sessions += 1;
+        analytics.slots.totalBet += bet;
+        analytics.slots.totalPayout += totalPayout;
+        analytics.slots.totalFreeSpins += freeSpinsAwarded;
+        analytics.slots.totalSpins += spinsPlayed;
+        analytics.slots.totalWinningPaylines += totalWinningLines;
+        analytics.slots.skippedReveals += skippedReveal ? 1 : 0;
+        analytics.slots.avgRTP = analytics.slots.totalBet > 0
+            ? analytics.slots.totalPayout / analytics.slots.totalBet
+            : 0;
+        analytics.slots.lastSessionAt = new Date().toISOString();
+
+        analytics.slots.perGuild = analytics.slots.perGuild || {};
+        analytics.slots.perUser = analytics.slots.perUser || {};
+
+        analytics.slots.perGuild[guildId] = (analytics.slots.perGuild[guildId] || 0) + 1;
+        analytics.slots.perUser[userId] = (analytics.slots.perUser[userId] || 0) + 1;
+
+        analytics.events = analytics.events || [];
+        analytics.events.push({
+            type: 'slots_session',
+            guildId,
+            userId,
+            bet,
+            totalPayout,
+            spinsPlayed,
+            freeSpinsAwarded,
+            totalWinningLines,
+            rtp: Number(sessionRTP.toFixed(4)),
+            skippedReveal,
+            at: Date.now()
+        });
+
+        if (analytics.events.length > 5000) {
+            analytics.events = analytics.events.slice(-5000);
+        }
+
+        await fs.writeFile(ANALYTICS_FILE, JSON.stringify(analytics, null, 2));
+    } catch (error) {
+        console.error('Error recording slots telemetry:', error);
+    }
+}
+
 module.exports = {
     name: 'slots',
     description: 'Play 5x5 slots with paylines, patterns, and free spins!',
@@ -74,10 +172,20 @@ module.exports = {
     aliases: ['slot', 'slotmachine'],
     category: 'fun',
     async execute(message, args) {
+        const userId = message.author.id;
+        const guildId = message.guild.id;
+        const sessionKey = getSessionKey(guildId, userId);
+        let bet = 0;
+        let betRemoved = false;
+
         try {
-            const userId = message.author.id;
-            const guildId = message.guild.id;
             const now = Date.now();
+            pruneSlotCooldowns(now);
+
+            if (activeSlotSessions.has(sessionKey)) {
+                return message.reply('⏳ You already have a slots session running. Please finish it first.');
+            }
+
             const nextAvailableAt = slotCooldowns.get(userId) || 0;
 
             if (now < nextAvailableAt) {
@@ -85,8 +193,10 @@ module.exports = {
                 return message.reply(`⏳ Please wait ${secondsLeft}s before using slots again.`);
             }
 
+            activeSlotSessions.add(sessionKey);
+
             const userData = economyManager.getUserData(guildId, userId);
-            const bet = parseBetArg(args[0], userData.balance);
+            bet = parseBetArg(args[0], userData.balance);
 
             if (!Number.isInteger(bet)) {
                 return message.reply('❌ Please provide a valid bet amount (`number`, `max`, or `all`).\nUsage: `!slots <bet|max|all>`');
@@ -108,13 +218,39 @@ module.exports = {
             if (!removed) {
                 return message.reply('❌ Could not place your bet. Please try again.');
             }
+            betRemoved = true;
 
             slotCooldowns.set(userId, now + COOLDOWN_MS);
-            await playSlotsWithBet(message, bet);
+            const result = await playSlotsWithBet(message, bet);
+
+            if (result.totalPayout > 0) {
+                await economyManager.addMoney(guildId, userId, result.totalPayout);
+            }
+
+            await gameStatsManager.recordSlots(userId, result.won);
+
+            await recordSlotsTelemetry({
+                guildId,
+                userId,
+                bet,
+                totalPayout: result.totalPayout,
+                spinsPlayed: result.spinsPlayed,
+                freeSpinsAwarded: result.freeSpinsAwarded,
+                totalWinningLines: result.totalWinningLines,
+                sessionRTP: result.sessionRTP,
+                skippedReveal: result.skipRequested
+            });
 
         } catch (error) {
             console.error('Error in slots command:', error);
+            if (betRemoved && bet > 0) {
+                await economyManager.addMoney(guildId, userId, bet);
+                return message.reply('❌ An error occurred while playing slots. Your bet was refunded.');
+            }
+
             message.reply('❌ An error occurred while playing slots!');
+        } finally {
+            activeSlotSessions.delete(sessionKey);
         }
     }
 };
@@ -154,13 +290,20 @@ async function playSlotsWithBet(message, bet) {
         return `${safe.slice(0, EMBED_FIELD_VALUE_LIMIT - 3)}...`;
     };
 
+    const clampText = (value, limit, fallback = '—') => {
+        const normalized = typeof value === 'string' ? value : String(value ?? '');
+        const safe = normalized.trim().length > 0 ? normalized : fallback;
+        if (safe.length <= limit) return safe;
+        return `${safe.slice(0, limit - 3)}...`;
+    };
+
     const buildSessionSummary = (lines) => {
         if (!lines.length) return 'No wins this session.';
 
         let output = '';
         for (let i = 0; i < lines.length; i++) {
             const candidate = output ? `${output}\n${lines[i]}` : lines[i];
-            if (candidate.length > 1024) {
+            if (candidate.length > EMBED_FIELD_VALUE_LIMIT) {
                 const remaining = lines.length - i;
                 return `${output}\n...and ${remaining} more spin${remaining > 1 ? 's' : ''}.`;
             }
@@ -356,13 +499,13 @@ async function playSlotsWithBet(message, bet) {
             const progressEmbed = new EmbedBuilder()
                 .setColor(0x5865f2)
                 .setTitle('🎰 5x5 Slots - Free Spins Rolling')
-                .setDescription(`${formatGrid(grid)}\n\n${detail}`)
+                .setDescription(clampText(`${formatGrid(grid)}\n\n${detail}`, EMBED_DESCRIPTION_LIMIT, '🎰 Rolling...'))
                 .addFields(
                     { name: 'Total Payout So Far', value: `${totalPayout.toLocaleString()} coins`, inline: true },
                     { name: 'Spins Played', value: `${spinsPlayed}/${MAX_TOTAL_SPINS}`, inline: true },
                     { name: 'Spins Remaining', value: `${spinsRemaining}`, inline: true }
                 )
-                .setFooter({ text: 'Press ⏩ to skip reveal and instantly finish all remaining spins.' });
+                .setFooter({ text: clampText('Press ⏩ to skip reveal and instantly finish all remaining spins.', EMBED_FOOTER_LIMIT, 'Slots') });
 
             await msg.edit({ embeds: [progressEmbed], components: [createSkipRow(false)] });
             await new Promise(resolve => setTimeout(resolve, SPIN_REVEAL_DELAY_MS));
@@ -373,12 +516,8 @@ async function playSlotsWithBet(message, bet) {
 
     const won = totalPayout > 0;
     const net = totalPayout - bet;
-
-    if (won) {
-        await economyManager.addMoney(message.guild.id, message.author.id, totalPayout);
-    }
-
-    await gameStatsManager.recordSlots(message.author.id, won);
+    const currentBalance = economyManager.getUserData(message.guild.id, message.author.id).balance;
+    const projectedBalance = currentBalance + totalPayout;
 
     let resultDescription = `${formatGrid(lastGrid)}\n\n`;
     if (won) {
@@ -398,24 +537,41 @@ async function playSlotsWithBet(message, bet) {
     const sessionRTP = totalPayout / bet;
     const safeTopWinningLines = clampFieldValue(topWinningLines);
     const safeSessionSummary = clampFieldValue(sessionSummary);
+    const safeDescription = clampText(resultDescription, EMBED_DESCRIPTION_LIMIT, 'No result details available.');
+    const safeFooter = clampText(
+        `${PAYLINES.length} patterns active • ${FREE_SPIN_SYMBOL} x${FREE_SPIN_TRIGGER_COUNT}+ grants free spins • Target RTP ${(TARGET_RTP * 100).toFixed(0)}%`,
+        EMBED_FOOTER_LIMIT,
+        'Slots'
+    );
 
     const resultEmbed = new EmbedBuilder()
         .setColor(won ? 0x57f287 : 0xed4245)
         .setTitle('🎰 5x5 Slots - Result')
-        .setDescription(resultDescription)
+        .setDescription(safeDescription)
         .addFields(
             { name: 'Bet', value: `${bet.toLocaleString()} coins`, inline: true },
             { name: 'Total Payout', value: won ? `✅ ${totalPayout.toLocaleString()} coins` : '❌ 0 coins', inline: true },
             { name: 'Net', value: net >= 0 ? `+${net.toLocaleString()} coins` : `${net.toLocaleString()} coins`, inline: true },
             { name: 'Spins', value: `${spinsPlayed} total (${freeSpinsAwarded} free)`, inline: true },
             { name: 'Winning Paylines', value: `${totalWinningLines}/${PAYLINES.length}`, inline: true },
-            { name: 'Balance', value: `${economyManager.getUserData(message.guild.id, message.author.id).balance.toLocaleString()} coins`, inline: true },
+            { name: 'Balance', value: `${projectedBalance.toLocaleString()} coins`, inline: true },
             { name: 'Free Spin Symbols', value: `${FREE_SPIN_SYMBOL} x${lastSpecialCount} on last spin • +${lastAwardedSpins} free spins`, inline: false },
             { name: 'Session RTP', value: `${(sessionRTP * 100).toFixed(1)}%`, inline: true },
             { name: 'Top Wins', value: safeTopWinningLines },
             { name: 'Session Summary', value: safeSessionSummary }
         )
-        .setFooter({ text: `${PAYLINES.length} patterns active • ${FREE_SPIN_SYMBOL} x${FREE_SPIN_TRIGGER_COUNT}+ grants free spins • Target RTP ${(TARGET_RTP * 100).toFixed(0)}%` });
+        .setFooter({ text: safeFooter });
 
     await msg.edit({ embeds: [resultEmbed], components: [] });
+
+    return {
+        won,
+        totalPayout,
+        net,
+        spinsPlayed,
+        freeSpinsAwarded,
+        totalWinningLines,
+        sessionRTP,
+        skipRequested
+    };
 }
