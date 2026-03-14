@@ -6,6 +6,8 @@ const gameStatsManager = require('../../utils/gameStatsManager');
 
 const MIN_BET = 10;
 const MAX_BET = 1_000_000;
+const BONUS_BUY_COST_MULTIPLIER = 15;
+const BONUS_BUY_FREE_SPINS = 8;
 const COOLDOWN_MS = 3000;
 const slotCooldowns = new Map();
 const activeSlotSessions = new Set();
@@ -75,6 +77,13 @@ function parseBetArg(rawArg, balance) {
     return Number.isInteger(bet) ? bet : null;
 }
 
+function shouldBuyBonus(args) {
+    if (!Array.isArray(args) || args.length < 2) return false;
+
+    const bonusKeywords = new Set(['bonus', 'buy', 'buybonus', 'freespin', 'freespins']);
+    return args.slice(1).some(arg => bonusKeywords.has(String(arg).toLowerCase()));
+}
+
 function getSessionKey(guildId, userId) {
     return `${guildId}_${userId}`;
 }
@@ -92,7 +101,7 @@ function pruneSlotCooldowns(now = Date.now()) {
     }
 }
 
-async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPlayed, freeSpinsAwarded, totalWinningLines, sessionRTP, skippedReveal }) {
+async function recordSlotsTelemetry({ guildId, userId, bet, totalWager, bonusCost, boughtBonus, totalPayout, spinsPlayed, freeSpinsAwarded, totalWinningLines, sessionRTP, skippedReveal }) {
     try {
         let analytics = {
             servers: {},
@@ -117,6 +126,8 @@ async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPl
             totalFreeSpins: 0,
             totalSpins: 0,
             totalWinningPaylines: 0,
+            bonusBuys: 0,
+            totalBonusCost: 0,
             skippedReveals: 0,
             avgRTP: 0,
             lastSessionAt: null
@@ -124,13 +135,16 @@ async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPl
 
         analytics.slots.sessions += 1;
         analytics.slots.totalBet += bet;
+        analytics.slots.totalWager = (analytics.slots.totalWager || 0) + (totalWager || bet);
         analytics.slots.totalPayout += totalPayout;
         analytics.slots.totalFreeSpins += freeSpinsAwarded;
         analytics.slots.totalSpins += spinsPlayed;
         analytics.slots.totalWinningPaylines += totalWinningLines;
+        analytics.slots.bonusBuys += boughtBonus ? 1 : 0;
+        analytics.slots.totalBonusCost += bonusCost || 0;
         analytics.slots.skippedReveals += skippedReveal ? 1 : 0;
-        analytics.slots.avgRTP = analytics.slots.totalBet > 0
-            ? analytics.slots.totalPayout / analytics.slots.totalBet
+        analytics.slots.avgRTP = analytics.slots.totalWager > 0
+            ? analytics.slots.totalPayout / analytics.slots.totalWager
             : 0;
         analytics.slots.lastSessionAt = new Date().toISOString();
 
@@ -146,6 +160,9 @@ async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPl
             guildId,
             userId,
             bet,
+            totalWager: totalWager || bet,
+            boughtBonus: Boolean(boughtBonus),
+            bonusCost: bonusCost || 0,
             totalPayout,
             spinsPlayed,
             freeSpinsAwarded,
@@ -168,7 +185,7 @@ async function recordSlotsTelemetry({ guildId, userId, bet, totalPayout, spinsPl
 module.exports = {
     name: 'slots',
     description: 'Play 5x5 slots with paylines, patterns, and free spins!',
-    usage: '!slots <bet|max|all>',
+    usage: '!slots <bet|max|all> [bonus]',
     aliases: ['slot', 'slotmachine'],
     category: 'fun',
     async execute(message, args) {
@@ -176,6 +193,7 @@ module.exports = {
         const guildId = message.guild.id;
         const sessionKey = getSessionKey(guildId, userId);
         let bet = 0;
+        let totalWager = 0;
         let betRemoved = false;
 
         try {
@@ -197,31 +215,42 @@ module.exports = {
 
             const userData = economyManager.getUserData(guildId, userId);
             bet = parseBetArg(args[0], userData.balance);
+            const boughtBonus = shouldBuyBonus(args);
+            const bonusCost = boughtBonus ? Math.floor(bet * BONUS_BUY_COST_MULTIPLIER) : 0;
+            totalWager = bet + bonusCost;
 
             if (!Number.isInteger(bet)) {
-                return message.reply('❌ Please provide a valid bet amount (`number`, `max`, or `all`).\nUsage: `!slots <bet|max|all>`');
+                return message.reply('❌ Please provide a valid bet amount (`number`, `max`, or `all`).\nUsage: `!slots <bet|max|all> [bonus]`');
             }
 
             if (bet < MIN_BET) {
-                return message.reply(`❌ Minimum bet is ${MIN_BET} coins.\nUsage: \`!slots <bet|max|all>\``);
+                return message.reply(`❌ Minimum bet is ${MIN_BET} coins.\nUsage: \`!slots <bet|max|all> [bonus]\``);
             }
 
             if (bet > MAX_BET) {
                 return message.reply(`❌ Maximum bet is ${MAX_BET.toLocaleString()} coins.`);
             }
 
-            if (userData.balance < bet) {
+            if (userData.balance < totalWager) {
+                if (boughtBonus) {
+                    return message.reply(`❌ You don't have enough coins!\nBase bet: ${bet.toLocaleString()}\nBonus buy: ${bonusCost.toLocaleString()}\nTotal required: ${totalWager.toLocaleString()}\nYour balance: ${userData.balance.toLocaleString()} coins`);
+                }
+
                 return message.reply(`❌ You don't have enough coins! Your balance: ${userData.balance.toLocaleString()} coins`);
             }
 
-            const removed = await economyManager.removeMoney(guildId, userId, bet);
+            const removed = await economyManager.removeMoney(guildId, userId, totalWager);
             if (!removed) {
                 return message.reply('❌ Could not place your bet. Please try again.');
             }
             betRemoved = true;
 
             slotCooldowns.set(userId, now + COOLDOWN_MS);
-            const result = await playSlotsWithBet(message, bet);
+            const result = await playSlotsWithBet(message, bet, {
+                boughtBonus,
+                bonusCost,
+                totalWager
+            });
 
             if (result.totalPayout > 0) {
                 await economyManager.addMoney(guildId, userId, result.totalPayout);
@@ -233,6 +262,9 @@ module.exports = {
                 guildId,
                 userId,
                 bet,
+                totalWager,
+                bonusCost,
+                boughtBonus,
                 totalPayout: result.totalPayout,
                 spinsPlayed: result.spinsPlayed,
                 freeSpinsAwarded: result.freeSpinsAwarded,
@@ -243,9 +275,9 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in slots command:', error);
-            if (betRemoved && bet > 0) {
-                await economyManager.addMoney(guildId, userId, bet);
-                return message.reply('❌ An error occurred while playing slots. Your bet was refunded.');
+            if (betRemoved && totalWager > 0) {
+                await economyManager.addMoney(guildId, userId, totalWager);
+                return message.reply('❌ An error occurred while playing slots. Your total wager was refunded.');
             }
 
             message.reply('❌ An error occurred while playing slots!');
@@ -255,7 +287,11 @@ module.exports = {
     }
 };
 
-async function playSlotsWithBet(message, bet) {
+async function playSlotsWithBet(message, bet, options = {}) {
+    const boughtBonus = Boolean(options.boughtBonus);
+    const bonusCost = Number.isFinite(options.bonusCost) ? options.bonusCost : 0;
+    const totalWager = Number.isFinite(options.totalWager) ? options.totalWager : (bet + bonusCost);
+
     const pickWeightedSymbol = () => {
         let roll = Math.random() * TOTAL_WEIGHT;
 
@@ -409,7 +445,7 @@ async function playSlotsWithBet(message, bet) {
     const spinEmbed = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('🎰 5x5 Slots Machine')
-        .setDescription(`Spinning 5x5 reels... (Bet: ${bet.toLocaleString()} coins)\n\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰`);
+        .setDescription(`Spinning 5x5 reels... (Bet: ${bet.toLocaleString()} coins${boughtBonus ? ` • Bonus Buy: ${bonusCost.toLocaleString()} coins` : ''})\n\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰\n🎰 🎰 🎰 🎰 🎰`);
 
     const msg = await message.reply({ embeds: [spinEmbed] });
 
@@ -427,14 +463,14 @@ async function playSlotsWithBet(message, bet) {
         const animationEmbed = new EmbedBuilder()
             .setColor(0x5865f2)
             .setTitle(`🎰 5x5 Slots Machine • Spinning ${step}/${ANIMATION_STEPS}`)
-            .setDescription(`Bet: ${bet.toLocaleString()} coins\n\n${formatGrid(animationGrid)}`);
+            .setDescription(`Bet: ${bet.toLocaleString()} coins${boughtBonus ? ` • Bonus Buy: ${bonusCost.toLocaleString()} coins` : ''}\n\n${formatGrid(animationGrid)}`);
 
         await msg.edit({ embeds: [animationEmbed] });
         await new Promise(resolve => setTimeout(resolve, ANIMATION_DELAY_MS));
     }
 
     let totalPayout = 0;
-    let spinsRemaining = 1;
+    let spinsRemaining = boughtBonus ? BONUS_BUY_FREE_SPINS : 1;
     let spinsPlayed = 0;
     let freeSpinsAwarded = 0;
     let totalWinningLines = 0;
@@ -483,7 +519,9 @@ async function playSlotsWithBet(message, bet) {
             freeSpinsAwarded += actualAwardedSpins;
         }
 
-        const spinLabel = wasFreeSpin ? `Free Spin ${spinsPlayed - 1}` : 'Base Spin';
+        const spinLabel = boughtBonus
+            ? `Bonus Spin ${spinsPlayed}`
+            : (wasFreeSpin ? `Free Spin ${spinsPlayed - 1}` : 'Base Spin');
         const lineText = wins.length > 0
             ? `+${spinPayout.toLocaleString()} coins (${wins.length} line${wins.length > 1 ? 's' : ''})`
             : 'No line wins';
@@ -515,7 +553,7 @@ async function playSlotsWithBet(message, bet) {
     skipCollector.stop('finished');
 
     const won = totalPayout > 0;
-    const net = totalPayout - bet;
+    const net = totalPayout - totalWager;
     const currentBalance = economyManager.getUserData(message.guild.id, message.author.id).balance;
     const projectedBalance = currentBalance + totalPayout;
 
@@ -532,9 +570,13 @@ async function playSlotsWithBet(message, bet) {
         resultDescription += `\n\n${FREE_SPIN_SYMBOL} You unlocked **${freeSpinsAwarded}** free spins!`;
     }
 
+    if (boughtBonus) {
+        resultDescription += `\n\n🛒 Bonus Buy used: **${BONUS_BUY_FREE_SPINS}** starting bonus spins for **${bonusCost.toLocaleString()}** coins.`;
+    }
+
     const sessionSummary = buildSessionSummary(summaryLines);
     const topWinningLines = formatWinningLines(allWins);
-    const sessionRTP = totalPayout / bet;
+    const sessionRTP = totalWager > 0 ? (totalPayout / totalWager) : 0;
     const safeTopWinningLines = clampFieldValue(topWinningLines);
     const safeSessionSummary = clampFieldValue(sessionSummary);
     const safeDescription = clampText(resultDescription, EMBED_DESCRIPTION_LIMIT, 'No result details available.');
@@ -550,11 +592,13 @@ async function playSlotsWithBet(message, bet) {
         .setDescription(safeDescription)
         .addFields(
             { name: 'Bet', value: `${bet.toLocaleString()} coins`, inline: true },
+            { name: 'Total Cost', value: `${totalWager.toLocaleString()} coins`, inline: true },
             { name: 'Total Payout', value: won ? `✅ ${totalPayout.toLocaleString()} coins` : '❌ 0 coins', inline: true },
             { name: 'Net', value: net >= 0 ? `+${net.toLocaleString()} coins` : `${net.toLocaleString()} coins`, inline: true },
-            { name: 'Spins', value: `${spinsPlayed} total (${freeSpinsAwarded} free)`, inline: true },
+            { name: 'Spins', value: `${spinsPlayed} total (${freeSpinsAwarded} won${boughtBonus ? ` + ${BONUS_BUY_FREE_SPINS} bought` : ''})`, inline: true },
             { name: 'Winning Paylines', value: `${totalWinningLines}/${PAYLINES.length}`, inline: true },
             { name: 'Balance', value: `${projectedBalance.toLocaleString()} coins`, inline: true },
+            { name: 'Bonus Buy', value: boughtBonus ? `🛒 Yes (${bonusCost.toLocaleString()} coins)` : 'No', inline: true },
             { name: 'Free Spin Symbols', value: `${FREE_SPIN_SYMBOL} x${lastSpecialCount} on last spin • +${lastAwardedSpins} free spins`, inline: false },
             { name: 'Session RTP', value: `${(sessionRTP * 100).toFixed(1)}%`, inline: true },
             { name: 'Top Wins', value: safeTopWinningLines },
@@ -566,6 +610,9 @@ async function playSlotsWithBet(message, bet) {
 
     return {
         won,
+        boughtBonus,
+        bonusCost,
+        totalWager,
         totalPayout,
         net,
         spinsPlayed,
