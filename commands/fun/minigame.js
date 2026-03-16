@@ -959,13 +959,13 @@ async function playSlots(message) {
 module.exports = {
   name: 'minigames',
   aliases: ['minigame', 'game', 'games'],
-  description: 'Play minigames (RPS, guess, trivia, tictactoe, blackjack, roulette)',
+  description: 'Play minigames (RPS, guess, trivia, tictactoe, blackjack, roulette, slots, mines)',
   async execute(message, args) {
     const settings = settingsManager.get(message.guild.id);
     const prefix = settings.prefix;
     const sub = (args[0] || '').toLowerCase();
 
-    if (!sub || !['rps', 'guess', 'trivia', 'tictactoe', 'ttt', 'blackjack', 'bj', 'roulette', 'roul', 'slots', 'slot'].includes(sub)) {
+    if (!sub || !['rps', 'guess', 'trivia', 'tictactoe', 'ttt', 'blackjack', 'bj', 'roulette', 'roul', 'slots', 'slot', 'mines', 'mine'].includes(sub)) {
       const usage = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('Mini Games')
@@ -977,7 +977,8 @@ module.exports = {
           { name: '⭕ Tic-Tac-Toe', value: `${prefix}minigame tictactoe (or ttt)` },
           { name: '🃏 Blackjack', value: `${prefix}minigame blackjack (or bj)` },
           { name: '🎰 Roulette', value: `${prefix}minigame roulette (or roul)` },
-          { name: '🎰 Slots', value: `${prefix}minigame slots (or slot)` }
+          { name: '🎰 Slots', value: `${prefix}minigame slots (or slot)` },
+          { name: '💣 Mines', value: `${prefix}mines <bet|max|all> [mines 1-6]` }
         );
 
       await message.reply({ embeds: [usage] });
@@ -998,6 +999,8 @@ module.exports = {
       await playRoulette(message);
     } else if (sub === 'slots' || sub === 'slot') {
       await playSlots(message);
+    } else if (sub === 'mines' || sub === 'mine') {
+      await message.reply(`💣 Mines uses the dedicated command: \`${prefix}mines <bet|max|all> [mines 1-6]\``);
     }
   }
 };

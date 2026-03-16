@@ -55,6 +55,7 @@ class GameStatsManager {
                 slots: { wins: 0, losses: 0 },
                 dice: { wins: 0, losses: 0 },
                 coinflip: { wins: 0, losses: 0 },
+                mines: { wins: 0, losses: 0 },
                 rps: { wins: 0, losses: 0, ties: 0 },
                 ttt: { wins: 0, losses: 0, ties: 0 }
             });
@@ -67,6 +68,7 @@ class GameStatsManager {
         if (!stats.slots) stats.slots = { wins: 0, losses: 0 };
         if (!stats.dice) stats.dice = { wins: 0, losses: 0 };
         if (!stats.coinflip) stats.coinflip = { wins: 0, losses: 0 };
+        if (!stats.mines) stats.mines = { wins: 0, losses: 0 };
         if (!stats.rps) stats.rps = { wins: 0, losses: 0, ties: 0 };
         if (!stats.ttt) stats.ttt = { wins: 0, losses: 0, ties: 0 };
         
@@ -125,6 +127,16 @@ class GameStatsManager {
         await this.save();
     }
 
+    async recordMines(userId, won) {
+        const stats = this.getStats(userId);
+        if (won) {
+            stats.mines.wins++;
+        } else {
+            stats.mines.losses++;
+        }
+        await this.save();
+    }
+
     async recordRPS(userId, result) {
         const stats = this.getStats(userId);
         if (result === 'win') {
@@ -157,6 +169,7 @@ class GameStatsManager {
             slots: stats.slots.wins + stats.slots.losses,
             dice: stats.dice.wins + stats.dice.losses,
             coinflip: stats.coinflip.wins + stats.coinflip.losses,
+            mines: stats.mines.wins + stats.mines.losses,
             rps: stats.rps.wins + stats.rps.losses + stats.rps.ties,
             ttt: stats.ttt.wins + stats.ttt.losses + stats.ttt.ties
         };
@@ -184,6 +197,7 @@ class GameStatsManager {
             stats.slots.wins +
             stats.dice.wins +
             stats.coinflip.wins +
+            stats.mines.wins +
             stats.rps.wins +
             stats.ttt.wins;
 
@@ -193,6 +207,7 @@ class GameStatsManager {
             stats.slots.losses +
             stats.dice.losses +
             stats.coinflip.losses +
+            stats.mines.losses +
             stats.rps.losses +
             stats.ttt.losses;
 
@@ -202,6 +217,7 @@ class GameStatsManager {
             totals.slots +
             totals.dice +
             totals.coinflip +
+            totals.mines +
             totals.rps +
             totals.ttt;
 

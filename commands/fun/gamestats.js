@@ -45,6 +45,13 @@ module.exports = {
                     inline: true
                 },
                 {
+                    name: '💣 Mines',
+                    value: totals.mines > 0
+                        ? `**Wins:** ${stats.mines.wins}\n**Losses:** ${stats.mines.losses}\n**Total:** ${totals.mines}\n**Win Rate:** ${gameStatsManager.getWinRate(targetUser.id, 'mines')}%`
+                        : 'No games played yet',
+                    inline: true
+                },
+                {
                     name: '✋ Rock Paper Scissors',
                     value: totals.rps > 0
                         ? `**Wins:** ${stats.rps.wins}\n**Losses:** ${stats.rps.losses}\n**Ties:** ${stats.rps.ties}\n**Total:** ${totals.rps}\n**Win Rate:** ${gameStatsManager.getWinRate(targetUser.id, 'rps')}%`

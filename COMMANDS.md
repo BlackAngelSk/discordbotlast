@@ -75,7 +75,7 @@
 |---------|-------|-------------|
 | `/minigames` `!minigames` | `/minigames` | Open interactive game menu |
 
-**Available Games:** Rock Paper Scissors, Number Guessing, Trivia, Tic-Tac-Toe, Blackjack, Roulette, Slots
+**Available Games:** Rock Paper Scissors, Number Guessing, Trivia, Tic-Tac-Toe, Blackjack, Roulette, Slots, Mines
 
 ### Betting Games (Win Coins!)
 
@@ -84,6 +84,7 @@
 | `/blackjack` `!blackjack` | `/blackjack <bet>` | 10 coins | Play 21 against dealer |
 | `/roulette` `!roulette` | `/roulette <bet> <red\|black\|green\|number>` | 10 coins | Spin the wheel |
 | `/slots` `!slots` | `/slots <bet>` | 10 coins | Slot machine |
+| `/mines` `!mines` | `/mines <bet> [mines]` | 10 coins | Reveal safe tiles and cash out |
 | `/coinflip` `!coinflip` | `/coinflip <bet> <heads\|tails>` | 10 coins | Flip a coin |
 
 ### Other Fun Commands
