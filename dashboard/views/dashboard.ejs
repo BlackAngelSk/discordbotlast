@@ -1,11 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Select Server</title>
-    <link rel="stylesheet" href="/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select Server — Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
+<body>
+<div class="server-picker">
+
+  <!-- Navbar -->
+  <nav class="landing-nav">
+    <div class="container">
+      <a href="/" class="landing-nav-brand">
+        <div class="landing-nav-brand-icon"><i class="fas fa-robot" style="color:white;font-size:16px"></i></div>
+        Discord Bot
+      </a>
+      <div class="landing-nav-links">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+        <a href="/logout" class="btn btn-secondary btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <div class="server-picker-content">
+    <div class="server-picker-header">
+      <h1><i class="fas fa-th-large" style="color:var(--brand);margin-right:10px"></i>Your Servers</h1>
+      <p>Choose a server to manage its settings and configuration</p>
+    </div>
+
+    <!-- Search -->
+    <div style="margin-bottom:22px">
+      <div class="search-input" style="max-width:340px">
+        <i class="fas fa-search"></i>
+        <input type="text" id="serverSearch" placeholder="Search servers...">
+      </div>
+    </div>
+
+    <!-- Grid -->
+    <div class="server-grid" id="serverGrid">
+      <% if (guilds.length === 0) { %>
+        <div class="no-servers-msg">
+          <i class="fas fa-robot"></i>
+          <h2>No servers found</h2>
+          <p>Invite the bot to your server to manage it here.</p>
+          <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.CLIENT_ID %>&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Invite Bot
+          </a>
+        </div>
+      <% } else { %>
+        <% guilds.forEach(guild => { %>
+          <a href="/dashboard/<%= guild.id %>" class="server-card" data-name="<%= guild.name.toLowerCase() %>">
+            <% if (guild.icon) { %>
+              <img class="server-card-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="server-card-icon-default" style="display:none"><%= guild.name.charAt(0).toUpperCase() %></div>
+            <% } else { %>
+              <div class="server-card-icon-default"><%= guild.name.charAt(0).toUpperCase() %></div>
+            <% } %>
+            <div class="server-card-name"><%= guild.name %></div>
+            <div class="server-card-meta"><i class="fas fa-arrow-right"></i> Manage server</div>
+          </a>
+        <% }); %>
+      <% } %>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const saved = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggle');
+  btn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    btn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+  });
+
+  document.getElementById('serverSearch').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.server-card').forEach(c => {
+      c.style.display = (c.dataset.name || '').includes(q) ? '' : 'none';
+    });
+  });
+</script>
+</body>
+</html>
+
 <body>
     <nav class="navbar">
         <div class="container">

@@ -4,7 +4,7 @@
  */
 
 require('dotenv').config();
-const seasonManager = require('./utils/seasonManager');
+const seasonManager = require('../../utils/seasonManager');
 
 async function testVoiceHoursPreservation() {
     try {

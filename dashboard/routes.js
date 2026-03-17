@@ -55,7 +55,7 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             }
 
             res.render('moderation', {
-                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
                 warnings,
                 bans: [],
                 kicks: [],
@@ -81,7 +81,7 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             const modSettings = moderationManager.getAutomodSettings(guildId);
 
             res.render('automod', {
-                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
                 settings: modSettings,
                 user: req.user
             });
@@ -111,7 +111,7 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
             })));
 
             res.render('shop', {
-                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount },
+                guild: { id: guild.id, name: guild.name, memberCount: guild.memberCount, icon: guild.icon },
                 shopItems: shopItems || [],
                 leaderboard: leaderboard || [],
                 formatNumber,

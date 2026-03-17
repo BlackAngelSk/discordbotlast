@@ -1,219 +1,175 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto-Mod Settings - <%= guild.name %></title>
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        .automod-container { max-width: 900px; margin: 40px auto; padding: 20px; }
-        .settings-card { background: var(--card-bg); padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border-color); margin-bottom: 20px; }
-        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--border-color); }
-        .setting-row:last-child { border-bottom: none; }
-        .setting-info h3 { margin: 0 0 5px 0; color: var(--text-color); }
-        .setting-info p { margin: 0; color: var(--text-light); font-size: 14px; }
-        .toggle-switch { position: relative; width: 60px; height: 30px; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #71717a; transition: .4s; border-radius: 30px; }
-        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #57F287; }
-        input:checked + .slider:before { transform: translateX(30px); }
-        .badwords-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-        .badword-tag { background: #ED4245; color: white; padding: 8px 12px; border-radius: 20px; display: flex; align-items: center; gap: 8px; }
-        .badword-tag button { background: none; border: none; color: white; cursor: pointer; font-size: 18px; padding: 0; }
-        .add-word-form { display: flex; gap: 10px; margin-top: 15px; }
-        .add-word-form input { flex: 1; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color); }
-        .btn-add { background: #5865F2; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-        .btn-add:hover { background: #4752c4; }
-        .limit-input { width: 100px; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; margin-left: 10px; background: var(--input-bg); color: var(--text-color); }
-        .save-btn { background: #57F287; color: white; padding: 12px 30px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 20px; }
-        .save-btn:hover { background: #45c06d; }
-        .status-badge { padding: 6px 12px; border-radius: 4px; font-weight: bold; font-size: 14px; }
-        .status-on { background: #57F287; color: white; }
-        .status-off { background: #ED4245; color: white; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Auto-Mod</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <h1>🤖 <%= guild.name %> - Auto-Moderation</h1>
-            </div>
-            <div class="nav-links">
-                <a href="/dashboard/<%= guild.id %>" class="btn-back">← Back to Dashboard</a>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container main-content">
-        <!-- Quick Navigation -->
-        <div class="quick-nav">
-            <a href="/dashboard/<%= guild.id %>" class="nav-btn">⚙️ Settings</a>
-            <a href="/dashboard/<%= guild.id %>/economy" class="nav-btn">💰 Economy</a>
-            <a href="/dashboard/<%= guild.id %>/moderation" class="nav-btn">🛡️ Moderation</a>
-            <a href="/dashboard/<%= guild.id %>/automod" class="nav-btn active">🤖 Auto-Mod</a>
-            <a href="/dashboard/<%= guild.id %>/shop" class="nav-btn">🛒 Shop</a>
-            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
-        </div>
-
-    <div class="automod-container">
-        <div class="settings-card">
-            <h2>Auto-Moderation Settings</h2>
-            <p style="color: #666; margin-bottom: 30px;">Configure automatic moderation rules for your server</p>
-
-            <form id="automodForm">
-                <!-- Master Toggle -->
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h3>Enable Auto-Moderation</h3>
-                        <p>Master switch for all auto-moderation features</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="enabled" <%= settings.enabled ? 'checked' : '' %>>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <!-- Anti-Invite -->
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h3>Anti-Invite Links</h3>
-                        <p>Block Discord invite links (discord.gg/...)</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="antiInvite" <%= settings.antiInvite ? 'checked' : '' %>>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <!-- Anti-Spam -->
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h3>Anti-Spam</h3>
-                        <p>Detect spam (5+ messages in 5 seconds = timeout)</p>
-                    </div>
-                    <label class="toggle-switch">
-                        <input type="checkbox" name="antiSpam" <%= settings.antiSpam ? 'checked' : '' %>>
-                        <span class="slider"></span>
-                    </label>
-                </div>
-
-                <!-- Max Mentions -->
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h3>Max Mentions Limit</h3>
-                        <p>Maximum user mentions allowed per message</p>
-                    </div>
-                    <input type="number" name="maxMentions" class="limit-input" value="<%= settings.maxMentions || 5 %>" min="1" max="50">
-                </div>
-
-                <!-- Max Emojis -->
-                <div class="setting-row">
-                    <div class="setting-info">
-                        <h3>Max Emojis Limit</h3>
-                        <p>Maximum emojis allowed per message</p>
-                    </div>
-                    <input type="number" name="maxEmojis" class="limit-input" value="<%= settings.maxEmojis || 10 %>" min="1" max="100">
-                </div>
-
-                <button type="submit" class="save-btn">💾 Save Settings</button>
-            </form>
-        </div>
-
-        <!-- Bad Words Section -->
-        <div class="settings-card">
-            <h2>Bad Words Filter</h2>
-            <p style="color: #666; margin-bottom: 20px;">Manage your custom word blacklist</p>
-
-            <div class="add-word-form">
-                <input type="text" id="newBadWord" placeholder="Enter word to blacklist...">
-                <button class="btn-add" onclick="addBadWord()">➕ Add Word</button>
-            </div>
-
-            <div class="badwords-list" id="badwordsList">
-                <% if (settings.badWords && settings.badWords.length > 0) { %>
-                    <% settings.badWords.forEach(word => { %>
-                        <div class="badword-tag">
-                            <%= word %>
-                            <button onclick="removeBadWord('<%= word %>')">×</button>
-                        </div>
-                    <% }) %>
-                <% } else { %>
-                    <p style="color: #999;">No bad words added yet</p>
-                <% } %>
-            </div>
-        </div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+      <div class="sidebar-guild">
+        <% if (guild.icon) { %>
+          <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+        <% } else { %>
+          <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+        <% } %>
+        <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
+      </div>
     </div>
-
-    <script>
-        document.getElementById('automodForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = {
-                enabled: formData.get('enabled') === 'on',
-                antiInvite: formData.get('antiInvite') === 'on',
-                antiSpam: formData.get('antiSpam') === 'on',
-                maxMentions: parseInt(formData.get('maxMentions')),
-                maxEmojis: parseInt(formData.get('maxEmojis'))
-            };
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/automod/settings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert('✅ Settings saved successfully!');
-                } else {
-                    alert('❌ Failed to save settings');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        });
-
-        async function addBadWord() {
-            const word = document.getElementById('newBadWord').value.trim();
-            if (!word) return alert('Please enter a word');
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/automod/badwords', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ word })
-                });
-                
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    alert('Failed to add word');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-
-        async function removeBadWord(word) {
-            if (!confirm(`Remove "${word}" from blacklist?`)) return;
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/automod/badwords', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ word })
-                });
-                
-                if (response.ok) {
-                    location.reload();
-                } else {
-                    alert('Failed to remove word');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-    </script>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Server</div>
+      <a href="/dashboard/<%= guild.id %>" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+      <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link"><i class="fas fa-coins"></i> Economy</a>
+      <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
+      <div class="sidebar-section-label">Moderation</div>
+      <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link"><i class="fas fa-shield-halved"></i> Moderation</a>
+      <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link active"><i class="fas fa-robot"></i> Auto-Mod</a>
+      <div class="sidebar-section-label">Stats</div>
+      <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
+      <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
+    </nav>
+    <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+        <div><div class="topbar-title">Auto-Moderation</div><div class="topbar-subtitle"><%= guild.name %></div></div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+      </div>
+    </header>
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-robot" style="color:var(--brand);margin-right:8px"></i>Auto-Moderation</h1>
+        <p>Configure automatic enforcement rules for <strong><%= guild.name %></strong></p>
+      </div>
+      <form id="automodForm">
+        <div class="card">
+          <div class="card-header"><div><div class="card-title"><i class="fas fa-sliders"></i> Moderation Rules</div><div class="card-subtitle">Automatically enforce server rules</div></div></div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Enable Auto-Moderation</h4><p>Master switch — turns all auto-mod features on/off</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="enabled" <%= settings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Anti-Invite Links</h4><p>Delete messages containing Discord invite links (discord.gg/...)</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="antiInvite" <%= settings.antiInvite ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Anti-Spam</h4><p>Timeout users who send 5+ messages within 5 seconds</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="antiSpam" <%= settings.antiSpam ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row" style="margin-top:20px">
+            <div class="form-group">
+              <label class="form-label">Max Mentions per Message</label>
+              <input type="number" class="form-control" name="maxMentions" value="<%= settings.maxMentions || 5 %>" min="1" max="50">
+              <div class="form-hint">Messages exceeding this will be deleted</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Emojis per Message</label>
+              <input type="number" class="form-control" name="maxEmojis" value="<%= settings.maxEmojis || 10 %>" min="1" max="100">
+              <div class="form-hint">Messages exceeding this will be deleted</div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Settings</button>
+          </div>
+        </div>
+      </form>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-filter"></i> Bad Words Filter</div><div class="card-subtitle">Automatically delete messages containing these words</div></div></div>
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <input type="text" class="form-control" id="newBadWord" placeholder="Enter word to blacklist..." style="max-width:320px">
+          <button class="btn btn-primary" onclick="addBadWord()"><i class="fas fa-plus"></i> Add Word</button>
+        </div>
+        <div class="badword-list" id="badwordsList">
+          <% if (settings.badWords && settings.badWords.length > 0) { %>
+            <% settings.badWords.forEach(word => { %>
+              <span class="badword-tag"><%= word %><button onclick="removeBadWord('<%= word %>')"><i class="fas fa-xmark"></i></button></span>
+            <% }); %>
+          <% } else { %>
+            <p style="color:var(--text-2);font-size:14px"><i class="fas fa-filter"></i> No blacklisted words yet</p>
+          <% } %>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast-container" id="toasts"></div>
+<script>
+const guildId = '<%= guild.id %>';
+const saved = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', saved);
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+themeBtn.addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+});
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+document.getElementById('mobileMenuBtn').addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+document.getElementById('automodForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+  btn.disabled = true;
+  const fd = new FormData(e.target);
+  const data = {
+    enabled: fd.get('enabled') === 'on',
+    antiInvite: fd.get('antiInvite') === 'on',
+    antiSpam: fd.get('antiSpam') === 'on',
+    maxMentions: parseInt(fd.get('maxMentions')),
+    maxEmojis: parseInt(fd.get('maxEmojis'))
+  };
+  try {
+    const r = await fetch(`/api/${guildId}/automod/settings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (r.ok) toast('Settings saved!', 'success');
+    else toast('Failed to save', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+  finally { btn.innerHTML = orig; btn.disabled = false; }
+});
+async function addBadWord() {
+  const word = document.getElementById('newBadWord').value.trim();
+  if (!word) { toast('Enter a word first', 'error'); return; }
+  try {
+    const r = await fetch(`/api/${guildId}/automod/badwords`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word }) });
+    if (r.ok) { toast(`"${word}" added to blacklist`, 'success'); setTimeout(() => location.reload(), 900); }
+    else toast('Failed to add word', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+async function removeBadWord(word) {
+  try {
+    const r = await fetch(`/api/${guildId}/automod/badwords/remove`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ word }) });
+    if (r.ok) { toast(`"${word}" removed`, 'success'); setTimeout(() => location.reload(), 900); }
+    else toast('Failed to remove', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+</script>
 </body>
 </html>

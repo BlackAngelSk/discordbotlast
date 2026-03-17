@@ -1,86 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Bot Dashboard</title>
-    <link rel="stylesheet" href="/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Bot — Dashboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <h1>🎵 Music Bot</h1>
-            </div>
-            <div class="nav-links">
-                <% if (user) { %>
-                    <a href="/dashboard">Dashboard</a>
-                    <span class="user-info">
-                        <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
-                        <%= user.username %>
-                    </span>
-                    <a href="/logout" class="btn-logout">Logout</a>
-                <% } else { %>
-                    <a href="/login" class="btn-login">Login with Discord</a>
-                <% } %>
-            </div>
-        </div>
-    </nav>
+<div class="landing">
 
-    <div class="hero">
-        <div class="container">
-            <h1>Welcome to Music Bot Dashboard</h1>
-            <p>Manage your Discord music bot settings from a beautiful web interface</p>
-            
-            <div class="stats">
-                <div class="stat-card">
-                    <h3><%= client.guilds.cache.size %></h3>
-                    <p>Servers</p>
-                </div>
-                <div class="stat-card">
-                    <h3><%= client.users.cache.size %></h3>
-                    <p>Users</p>
-                </div>
-                <div class="stat-card">
-                    <h3><%= client.channels.cache.size %></h3>
-                    <p>Channels</p>
-                </div>
-            </div>
+  <!-- Navbar -->
+  <nav class="landing-nav">
+    <div class="container">
+      <a href="/" class="landing-nav-brand">
+        <div class="landing-nav-brand-icon"><i class="fas fa-robot" style="color:white;font-size:16px"></i></div>
+        Discord Bot
+      </a>
+      <div class="landing-nav-links">
+        <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+        <% if (user) { %>
+          <div class="topbar-user">
+            <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+            <span class="topbar-user-name"><%= user.username %></span>
+          </div>
+          <a href="/dashboard" class="btn btn-primary btn-sm"><i class="fas fa-th-large"></i> Dashboard</a>
+          <a href="/logout" class="btn btn-secondary btn-sm">Logout</a>
+        <% } else { %>
+          <a href="/login" class="btn btn-primary"><i class="fab fa-discord"></i> Login with Discord</a>
+        <% } %>
+      </div>
+    </div>
+  </nav>
 
-            <% if (!user) { %>
-                <a href="/login" class="btn-primary">Get Started</a>
-            <% } else { %>
-                <a href="/dashboard" class="btn-primary">Go to Dashboard</a>
-            <% } %>
-        </div>
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge"><i class="fas fa-bolt"></i> Fully-featured Discord Bot</div>
+    <h1>The <span>Ultimate</span> Discord<br>Bot Dashboard</h1>
+    <p>Manage your server with confidence — music, economy, moderation, analytics and much more from one beautiful interface.</p>
+
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-value" data-count="<%= client.guilds.cache.size %>">0</div>
+        <div class="hero-stat-label">Servers</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value" data-count="<%= client.users.cache.size %>">0</div>
+        <div class="hero-stat-label">Users</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-value" data-count="<%= client.channels.cache.size %>">0</div>
+        <div class="hero-stat-label">Channels</div>
+      </div>
     </div>
 
-    <div class="features">
-        <div class="container">
-            <h2>Features</h2>
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <span class="icon">🎵</span>
-                    <h3>Music Control</h3>
-                    <p>Play, pause, skip, and manage your music queue</p>
-                </div>
-                <div class="feature-card">
-                    <span class="icon">⚙️</span>
-                    <h3>Easy Configuration</h3>
-                    <p>Configure bot settings with a simple web interface</p>
-                </div>
-                <div class="feature-card">
-                    <span class="icon">🔐</span>
-                    <h3>Secure Access</h3>
-                    <p>Discord OAuth2 authentication for safe access</p>
-                </div>
-                <div class="feature-card">
-                    <span class="icon">📊</span>
-                    <h3>Server Management</h3>
-                    <p>Manage multiple servers from one place</p>
-                </div>
-            </div>
-        </div>
+    <div class="hero-actions">
+      <% if (!user) { %>
+        <a href="/login" class="btn btn-primary btn-lg"><i class="fab fa-discord"></i> Get Started Free</a>
+      <% } else { %>
+        <a href="/dashboard" class="btn btn-primary btn-lg"><i class="fas fa-th-large"></i> Open Dashboard</a>
+      <% } %>
+      <a href="https://discord.com/api/oauth2/authorize?client_id=<%= process.env.CLIENT_ID %>&permissions=8&scope=bot%20applications.commands" target="_blank" class="btn btn-secondary btn-lg">
+        <i class="fas fa-robot"></i> Invite Bot
+      </a>
     </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features-section">
+    <h2 class="features-title">Everything you need</h2>
+    <p class="features-subtitle">One bot, unlimited possibilities — zero hassle setup</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--brand-glow);color:var(--brand)"><i class="fas fa-music"></i></div>
+        <h3>Music System</h3>
+        <p>High-quality playback, queue management, playlists, DJ roles and YouTube/Spotify support.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--green-bg);color:var(--green)"><i class="fas fa-coins"></i></div>
+        <h3>Economy & Levels</h3>
+        <p>Full economy with shop, daily rewards, XP levelling, leaderboards and role rewards.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--red-bg);color:var(--red)"><i class="fas fa-shield-halved"></i></div>
+        <h3>Auto Moderation</h3>
+        <p>Spam protection, bad word filter, anti-raid, invite blocking and mention limits.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--blue-bg);color:var(--blue)"><i class="fas fa-chart-line"></i></div>
+        <h3>Analytics</h3>
+        <p>Detailed stats — message activity, top commands, engagement scores and daily trends.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--yellow-bg);color:#b8a400"><i class="fas fa-ticket"></i></div>
+        <h3>Ticket System</h3>
+        <p>Professional support tickets with channel management, transcripts and roles.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:var(--purple-bg);color:var(--purple)"><i class="fas fa-cogs"></i></div>
+        <h3>Full Configuration</h3>
+        <p>Configure every bot feature through this web dashboard — no commands required.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+  // Apply saved theme
+  const saved = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  const btn = document.getElementById('themeToggle');
+  btn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+  btn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    btn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+  });
+
+  // Animated counters
+  document.querySelectorAll('[data-count]').forEach(el => {
+    const target = parseInt(el.dataset.count) || 0;
+    let n = 0;
+    const step = Math.max(1, Math.ceil(target / 50));
+    const t = setInterval(() => {
+      n = Math.min(n + step, target);
+      el.textContent = n.toLocaleString();
+      if (n >= target) clearInterval(t);
+    }, 25);
+  });
+</script>
 </body>
 </html>

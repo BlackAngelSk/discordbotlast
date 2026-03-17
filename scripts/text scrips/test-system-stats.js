@@ -3,7 +3,7 @@
  * Displays CPU and RAM usage information
  */
 
-const systemStatsManager = require('./utils/systemStatsManager');
+const systemStatsManager = require('../../utils/systemStatsManager');
 
 console.log('📊 System Stats Test\n');
 console.log('═'.repeat(60));

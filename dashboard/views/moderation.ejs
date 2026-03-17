@@ -1,312 +1,270 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Moderation Panel - <%= guild.name %></title>
-    <link rel="stylesheet" href="/style.css">
-    <style>
-        .mod-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
-        .mod-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-        .mod-tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid var(--border-color); }
-        .mod-tab { padding: 12px 24px; cursor: pointer; border: none; background: none; color: var(--text-color); font-size: 16px; transition: all 0.3s; }
-        .mod-tab.active { border-bottom: 3px solid #5865F2; color: #5865F2; font-weight: bold; }
-        .mod-tab:hover { background: var(--card-secondary); }
-        .mod-panel { display: none; }
-        .mod-panel.active { display: block; }
-        .mod-table { width: 100%; border-collapse: collapse; background: var(--card-bg); box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border-color); }
-        .mod-table th, .mod-table td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        .mod-table th { background: #5865F2; color: white; font-weight: bold; }
-        .mod-table tr:hover { background: var(--card-secondary); }
-        .action-btn { padding: 6px 12px; margin: 0 4px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.3s; }
-        .btn-remove { background: #ED4245; color: white; }
-        .btn-remove:hover { background: #c13639; }
-        .btn-unban { background: #57F287; color: white; }
-        .btn-unban:hover { background: #45c06d; }
-        .filter-bar { display: flex; gap: 10px; margin-bottom: 20px; align-items: center; }
-        .filter-bar input, .filter-bar select { padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; background: var(--input-bg); color: var(--text-color); }
-        .filter-bar input { flex: 1; }
-        .add-warning-form { background: var(--card-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border-color); margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: var(--text-color); }
-        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 14px; background: var(--input-bg); color: var(--text-color); }
-        .form-group textarea { resize: vertical; min-height: 80px; }
-        .btn-primary { background: #5865F2; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        .btn-primary:hover { background: #4752c4; }
-        .no-data { text-align: center; padding: 40px; color: var(--text-light); font-size: 18px; }
-        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
-        .badge-warn { background: #FEE75C; color: #000; }
-        .badge-ban { background: #ED4245; color: white; }
-        .badge-kick { background: #F26522; color: white; }
-        .badge-timeout { background: #EB459E; color: white; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Moderation</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <h1>🛡️ <%= guild.name %> - Moderation Panel</h1>
-            </div>
-            <div class="nav-links">
-                <a href="/dashboard/<%= guild.id %>" class="btn-back">← Back to Dashboard</a>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container main-content">
-        <!-- Quick Navigation -->
-        <div class="quick-nav">
-            <a href="/dashboard/<%= guild.id %>" class="nav-btn">⚙️ Settings</a>
-            <a href="/dashboard/<%= guild.id %>/economy" class="nav-btn">💰 Economy</a>
-            <a href="/dashboard/<%= guild.id %>/moderation" class="nav-btn active">🛡️ Moderation</a>
-            <a href="/dashboard/<%= guild.id %>/automod" class="nav-btn">🤖 Auto-Mod</a>
-            <a href="/dashboard/<%= guild.id %>/shop" class="nav-btn">🛒 Shop</a>
-            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
-        </div>
-
-    <div class="mod-container">
-        <div class="mod-header">
-            <h2>Moderation Management</h2>
-        </div>
-
-        <div class="mod-tabs">
-            <button class="mod-tab active" onclick="switchTab('warnings')">Warnings</button>
-            <button class="mod-tab" onclick="switchTab('bans')">Bans</button>
-            <button class="mod-tab" onclick="switchTab('kicks')">Kicks</button>
-            <button class="mod-tab" onclick="switchTab('timeouts')">Timeouts</button>
-        </div>
-
-        <!-- Warnings Panel -->
-        <div id="warnings" class="mod-panel active">
-            <div class="add-warning-form">
-                <h3>Add Warning</h3>
-                <form id="addWarningForm">
-                    <div class="form-group">
-                        <label>User ID</label>
-                        <input type="text" name="userId" placeholder="Enter user ID" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Reason</label>
-                        <textarea name="reason" placeholder="Enter warning reason" required></textarea>
-                    </div>
-                    <button type="submit" class="btn-primary">Add Warning</button>
-                </form>
-            </div>
-
-            <div class="filter-bar">
-                <input type="text" id="warningsSearch" placeholder="Search by user or reason..." onkeyup="filterTable('warningsTable', this.value)">
-            </div>
-
-            <table class="mod-table" id="warningsTable">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>User ID</th>
-                        <th>Reason</th>
-                        <th>Moderator</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (warnings && warnings.length > 0) { %>
-                        <% warnings.forEach(warning => { %>
-                            <tr>
-                                <td><span class="badge badge-warn">⚠️</span> <%= warning.username || 'Unknown' %></td>
-                                <td><code><%= warning.userId %></code></td>
-                                <td><%= warning.reason %></td>
-                                <td><%= warning.moderator || 'System' %></td>
-                                <td><%= new Date(warning.timestamp).toLocaleDateString() %></td>
-                                <td>
-                                    <button class="action-btn btn-remove" onclick="removeWarning('<%= warning.userId %>', '<%= warning.id %>')">Remove</button>
-                                </td>
-                            </tr>
-                        <% }) %>
-                    <% } else { %>
-                        <tr><td colspan="6" class="no-data">No warnings found</td></tr>
-                    <% } %>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Bans Panel -->
-        <div id="bans" class="mod-panel">
-            <div class="filter-bar">
-                <input type="text" id="bansSearch" placeholder="Search banned users..." onkeyup="filterTable('bansTable', this.value)">
-            </div>
-
-            <table class="mod-table" id="bansTable">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>User ID</th>
-                        <th>Reason</th>
-                        <th>Moderator</th>
-                        <th>Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (bans && bans.length > 0) { %>
-                        <% bans.forEach(ban => { %>
-                            <tr>
-                                <td><span class="badge badge-ban">🚫</span> <%= ban.user.username %>#<%= ban.user.discriminator %></td>
-                                <td><code><%= ban.user.id %></code></td>
-                                <td><%= ban.reason || 'No reason provided' %></td>
-                                <td><%= ban.moderator || 'Unknown' %></td>
-                                <td><%= new Date(ban.timestamp || Date.now()).toLocaleDateString() %></td>
-                                <td>
-                                    <button class="action-btn btn-unban" onclick="unbanUser('<%= ban.user.id %>')">Unban</button>
-                                </td>
-                            </tr>
-                        <% }) %>
-                    <% } else { %>
-                        <tr><td colspan="6" class="no-data">No bans found</td></tr>
-                    <% } %>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Kicks Panel -->
-        <div id="kicks" class="mod-panel">
-            <table class="mod-table">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Reason</th>
-                        <th>Moderator</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (kicks && kicks.length > 0) { %>
-                        <% kicks.forEach(kick => { %>
-                            <tr>
-                                <td><span class="badge badge-kick">👢</span> <%= kick.username %></td>
-                                <td><%= kick.reason %></td>
-                                <td><%= kick.moderator %></td>
-                                <td><%= new Date(kick.timestamp).toLocaleDateString() %></td>
-                            </tr>
-                        <% }) %>
-                    <% } else { %>
-                        <tr><td colspan="4" class="no-data">No kicks recorded</td></tr>
-                    <% } %>
-                </tbody>
-            </table>
-        </div>
-
-        <!-- Timeouts Panel -->
-        <div id="timeouts" class="mod-panel">
-            <table class="mod-table">
-                <thead>
-                    <tr>
-                        <th>User</th>
-                        <th>Duration</th>
-                        <th>Reason</th>
-                        <th>Moderator</th>
-                        <th>Date</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% if (timeouts && timeouts.length > 0) { %>
-                        <% timeouts.forEach(timeout => { %>
-                            <tr>
-                                <td><span class="badge badge-timeout">⏱️</span> <%= timeout.username %></td>
-                                <td><%= timeout.duration %> min</td>
-                                <td><%= timeout.reason %></td>
-                                <td><%= timeout.moderator %></td>
-                                <td><%= new Date(timeout.timestamp).toLocaleDateString() %></td>
-                            </tr>
-                        <% }) %>
-                    <% } else { %>
-                        <tr><td colspan="5" class="no-data">No timeouts recorded</td></tr>
-                    <% } %>
-                </tbody>
-            </table>
-        </div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+      <div class="sidebar-guild">
+        <% if (guild.icon) { %>
+          <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+        <% } else { %>
+          <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+        <% } %>
+        <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
+      </div>
     </div>
-
-    <script>
-        function switchTab(tabName) {
-            document.querySelectorAll('.mod-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelectorAll('.mod-panel').forEach(panel => panel.classList.remove('active'));
-            event.target.classList.add('active');
-            document.getElementById(tabName).classList.add('active');
-        }
-
-        function filterTable(tableId, searchValue) {
-            const table = document.getElementById(tableId);
-            const rows = table.getElementsByTagName('tr');
-            
-            for (let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchValue.toLowerCase()) ? '' : 'none';
-            }
-        }
-
-        document.getElementById('addWarningForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData);
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/moderation/warnings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert('Warning added successfully!');
-                    location.reload();
-                } else {
-                    alert('Failed to add warning');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        });
-
-        async function removeWarning(userId, warningId) {
-            if (!confirm('Are you sure you want to remove this warning?')) return;
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/moderation/warnings/' + userId + '/' + warningId, {
-                    method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                    alert('Warning removed!');
-                    location.reload();
-                } else {
-                    alert('Failed to remove warning');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-
-        async function unbanUser(userId) {
-            if (!confirm('Are you sure you want to unban this user?')) return;
-            
-            try {
-                const response = await fetch('/api/<%= guild.id %>/moderation/unban', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId })
-                });
-                
-                if (response.ok) {
-                    alert('User unbanned!');
-                    location.reload();
-                } else {
-                    alert('Failed to unban user');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-    </script>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Server</div>
+      <a href="/dashboard/<%= guild.id %>" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+      <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link"><i class="fas fa-coins"></i> Economy</a>
+      <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
+      <div class="sidebar-section-label">Moderation</div>
+      <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link active"><i class="fas fa-shield-halved"></i> Moderation</a>
+      <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link"><i class="fas fa-robot"></i> Auto-Mod</a>
+      <div class="sidebar-section-label">Stats</div>
+      <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
+      <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
+    </nav>
+    <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+        <div><div class="topbar-title">Moderation</div><div class="topbar-subtitle"><%= guild.name %></div></div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+      </div>
+    </header>
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-shield-halved" style="color:var(--brand);margin-right:8px"></i>Moderation Panel</h1>
+        <p>Manage warnings, bans and enforcement for <strong><%= guild.name %></strong></p>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Warnings</span><div class="stat-card-icon yellow"><i class="fas fa-triangle-exclamation"></i></div></div>
+          <div class="stat-card-value"><%= warnings ? warnings.length : 0 %></div>
+          <div class="stat-card-change"><i class="fas fa-scroll"></i> Active warnings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Bans</span><div class="stat-card-icon red"><i class="fas fa-ban"></i></div></div>
+          <div class="stat-card-value"><%= bans ? bans.length : 0 %></div>
+          <div class="stat-card-change"><i class="fas fa-gavel"></i> Banned users</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Kicks</span><div class="stat-card-icon orange"><i class="fas fa-person-walking-arrow-right"></i></div></div>
+          <div class="stat-card-value"><%= kicks ? kicks.length : 0 %></div>
+          <div class="stat-card-change"><i class="fas fa-door-open"></i> Kick records</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Timeouts</span><div class="stat-card-icon purple"><i class="fas fa-clock"></i></div></div>
+          <div class="stat-card-value"><%= timeouts ? timeouts.length : 0 %></div>
+          <div class="stat-card-change"><i class="fas fa-hourglass"></i> Timeout records</div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div><div class="card-title"><i class="fas fa-plus"></i> Add Warning</div><div class="card-subtitle">Manually warn a user</div></div>
+        </div>
+        <form id="addWarningForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">User ID</label>
+              <input type="text" class="form-control" name="userId" placeholder="123456789012345678" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Reason</label>
+              <input type="text" class="form-control" name="reason" placeholder="Enter warning reason" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-triangle-exclamation"></i> Add Warning</button>
+        </form>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title"><i class="fas fa-gavel"></i> Moderation Records</div></div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="warnings"><i class="fas fa-triangle-exclamation"></i> Warnings</button>
+          <button class="tab-btn" data-tab="bans"><i class="fas fa-ban"></i> Bans</button>
+          <button class="tab-btn" data-tab="kicks"><i class="fas fa-person-walking-arrow-right"></i> Kicks</button>
+          <button class="tab-btn" data-tab="timeouts"><i class="fas fa-clock"></i> Timeouts</button>
+        </div>
+        <div class="tab-panel active" id="tab-warnings">
+          <div style="margin-bottom:12px"><input type="text" class="form-control" placeholder="Search warnings..." oninput="filterTable('warningsTbl', this.value)" style="max-width:360px"></div>
+          <div class="table-wrapper">
+            <table id="warningsTbl">
+              <thead><tr><th>User</th><th>User ID</th><th>Reason</th><th>Moderator</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody>
+                <% if (warnings && warnings.length > 0) { %>
+                  <% warnings.forEach(w => { %>
+                    <tr>
+                      <td><span class="badge badge-warning"><i class="fas fa-triangle-exclamation"></i></span> <%= w.username || 'Unknown' %></td>
+                      <td><code><%= w.userId %></code></td>
+                      <td><%= w.reason %></td>
+                      <td><%= w.moderator || 'System' %></td>
+                      <td><%= new Date(w.timestamp).toLocaleDateString() %></td>
+                      <td><button class="btn btn-danger btn-sm" onclick="removeWarning('<%= w.userId %>', '<%= w.id %>')"><i class="fas fa-trash"></i></button></td>
+                    </tr>
+                  <% }); %>
+                <% } else { %>
+                  <tr><td colspan="6" class="table-empty"><i class="fas fa-triangle-exclamation"></i> No warnings found</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-bans">
+          <div style="margin-bottom:12px"><input type="text" class="form-control" placeholder="Search bans..." oninput="filterTable('bansTbl', this.value)" style="max-width:360px"></div>
+          <div class="table-wrapper">
+            <table id="bansTbl">
+              <thead><tr><th>User</th><th>User ID</th><th>Reason</th><th>Moderator</th><th>Date</th><th>Actions</th></tr></thead>
+              <tbody>
+                <% if (bans && bans.length > 0) { %>
+                  <% bans.forEach(b => { %>
+                    <tr>
+                      <td><span class="badge badge-danger"><i class="fas fa-ban"></i></span> <%= b.user.username %>#<%= b.user.discriminator %></td>
+                      <td><code><%= b.user.id %></code></td>
+                      <td><%= b.reason || 'No reason' %></td>
+                      <td><%= b.moderator || 'Unknown' %></td>
+                      <td><%= new Date(b.timestamp || Date.now()).toLocaleDateString() %></td>
+                      <td><button class="btn btn-success btn-sm" onclick="unbanUser('<%= b.user.id %>')"><i class="fas fa-rotate-left"></i> Unban</button></td>
+                    </tr>
+                  <% }); %>
+                <% } else { %>
+                  <tr><td colspan="6" class="table-empty"><i class="fas fa-ban"></i> No bans found</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-kicks">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>User</th><th>Reason</th><th>Moderator</th><th>Date</th></tr></thead>
+              <tbody>
+                <% if (kicks && kicks.length > 0) { %>
+                  <% kicks.forEach(k => { %>
+                    <tr>
+                      <td><span class="badge badge-warning"><i class="fas fa-person-walking-arrow-right"></i></span> <%= k.username %></td>
+                      <td><%= k.reason %></td>
+                      <td><%= k.moderator %></td>
+                      <td><%= new Date(k.timestamp).toLocaleDateString() %></td>
+                    </tr>
+                  <% }); %>
+                <% } else { %>
+                  <tr><td colspan="4" class="table-empty"><i class="fas fa-person-walking-arrow-right"></i> No kicks recorded</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-panel" id="tab-timeouts">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr><th>User</th><th>Duration</th><th>Reason</th><th>Moderator</th><th>Date</th></tr></thead>
+              <tbody>
+                <% if (timeouts && timeouts.length > 0) { %>
+                  <% timeouts.forEach(t => { %>
+                    <tr>
+                      <td><span class="badge badge-info"><i class="fas fa-clock"></i></span> <%= t.username %></td>
+                      <td><%= t.duration %> min</td>
+                      <td><%= t.reason %></td>
+                      <td><%= t.moderator %></td>
+                      <td><%= new Date(t.timestamp).toLocaleDateString() %></td>
+                    </tr>
+                  <% }); %>
+                <% } else { %>
+                  <tr><td colspan="5" class="table-empty"><i class="fas fa-clock"></i> No timeouts recorded</td></tr>
+                <% } %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast-container" id="toasts"></div>
+<script>
+const guildId = '<%= guild.id %>';
+const saved = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', saved);
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+themeBtn.addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+});
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+document.getElementById('mobileMenuBtn').addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle', info: 'fa-circle-info', warning: 'fa-triangle-exclamation' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+function filterTable(tableId, q) {
+  const tbl = document.getElementById(tableId);
+  if (!tbl) return;
+  Array.from(tbl.querySelectorAll('tbody tr')).forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+document.getElementById('addWarningForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  try {
+    const r = await fetch(`/api/${guildId}/moderation/warnings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    if (r.ok) { toast('Warning added!', 'success'); setTimeout(() => location.reload(), 1200); }
+    else toast('Failed to add warning', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+});
+async function removeWarning(userId, warningId) {
+  if (!confirm('Remove this warning?')) return;
+  try {
+    const r = await fetch(`/api/${guildId}/moderation/warnings/${userId}/${warningId}`, { method: 'DELETE' });
+    if (r.ok) { toast('Warning removed!', 'success'); setTimeout(() => location.reload(), 1200); }
+    else toast('Failed to remove', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+async function unbanUser(userId) {
+  if (!confirm('Unban this user?')) return;
+  try {
+    const r = await fetch(`/api/${guildId}/moderation/unban`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) });
+    if (r.ok) { toast('User unbanned!', 'success'); setTimeout(() => location.reload(), 1200); }
+    else toast('Failed to unban', 'error');
+  } catch(err) { toast('Error: ' + err.message, 'error'); }
+}
+</script>
 </body>
 </html>

@@ -29,8 +29,34 @@ module.exports = {
                 .replace(/official|video|audio|lyrics|hd|4k/gi, '')
                 .trim();
 
+            const normalize = (text) =>
+                String(text || '')
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s]/gi, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+            const scoreMatch = (query, candidate) => {
+                const q = normalize(query);
+                const c = normalize(candidate);
+                if (!q || !c) return 0;
+                if (c === q) return 100;
+                if (c.includes(q)) return 90;
+
+                const qWords = q.split(' ').filter(Boolean);
+                const cWords = new Set(c.split(' ').filter(Boolean));
+                if (qWords.length === 0) return 0;
+
+                let hits = 0;
+                for (const word of qWords) {
+                    if (cWords.has(word)) hits++;
+                }
+                return Math.round((hits / qWords.length) * 80);
+            };
+
             let lyrics;
             let foundLyrics = false;
+            let displayTitle = cleanQuery;
 
             // Try multiple API approaches
             async function tryLyricsOVH(artist, song) {
@@ -48,13 +74,55 @@ module.exports = {
                 }
             }
 
+            async function tryLyricsSuggest(query) {
+                try {
+                    const response = await fetch(
+                        `https://api.lyrics.ovh/suggest/${encodeURIComponent(query.trim())}`
+                    );
+
+                    if (!response.ok) return null;
+
+                    const data = await response.json();
+                    const candidates = Array.isArray(data.data) ? data.data.slice(0, 8) : [];
+                    if (candidates.length === 0) return null;
+
+                    const ranked = candidates
+                        .map((item) => {
+                            const artist = item?.artist?.name || '';
+                            const title = item?.title || '';
+                            return {
+                                artist,
+                                title,
+                                label: `${artist} - ${title}`,
+                                score: scoreMatch(query, `${artist} ${title}`)
+                            };
+                        })
+                        .sort((a, b) => b.score - a.score);
+
+                    for (const candidate of ranked) {
+                        if (!candidate.artist || !candidate.title) continue;
+                        const result = await tryLyricsOVH(candidate.artist, candidate.title);
+                        if (result) {
+                            return { lyrics: result, label: candidate.label };
+                        }
+                    }
+
+                    return null;
+                } catch (_) {
+                    return null;
+                }
+            }
+
             // First, try direct artist - song format
             if (cleanQuery.includes(' - ')) {
                 const [artist, ...songParts] = cleanQuery.split(' - ');
                 const song = songParts.join(' - ').trim();
                 if (artist.trim()) {
                     lyrics = await tryLyricsOVH(artist, song);
-                    if (lyrics) foundLyrics = true;
+                    if (lyrics) {
+                        foundLyrics = true;
+                        displayTitle = `${artist.trim()} - ${song}`;
+                    }
                 }
             }
 
@@ -63,21 +131,33 @@ module.exports = {
                 const parts = cleanQuery.split(/\s+by\s+|\s+feat\s+/i);
                 if (parts.length >= 2) {
                     lyrics = await tryLyricsOVH(parts[1], parts[0]);
-                    if (lyrics) foundLyrics = true;
+                    if (lyrics) {
+                        foundLyrics = true;
+                        displayTitle = `${parts[1].trim()} - ${parts[0].trim()}`;
+                    }
                 }
             }
 
-            // Try as-is (lyrics.ovh will attempt to parse it)
+            // Try with suggestion endpoint for better artist/title matching
             if (!foundLyrics) {
-                lyrics = await tryLyricsOVH(cleanQuery, cleanQuery);
-                if (lyrics) foundLyrics = true;
+                const suggested = await tryLyricsSuggest(cleanQuery);
+                if (suggested?.lyrics) {
+                    lyrics = suggested.lyrics;
+                    foundLyrics = true;
+                    displayTitle = suggested.label;
+                }
             }
 
             // Last resort: try swapping common separators
             if (!foundLyrics && cleanQuery.includes('/')) {
                 const parts = cleanQuery.split('/');
-                lyrics = await tryLyricsOVH(parts[0], parts[1]);
-                if (lyrics) foundLyrics = true;
+                if (parts.length >= 2) {
+                    lyrics = await tryLyricsOVH(parts[0], parts[1]);
+                    if (lyrics) {
+                        foundLyrics = true;
+                        displayTitle = `${parts[0].trim()} - ${parts[1].trim()}`;
+                    }
+                }
             }
 
             if (!foundLyrics || !lyrics) {
@@ -105,7 +185,7 @@ module.exports = {
             // Send first chunk
             const embed = new EmbedBuilder()
                 .setColor(0x0099ff)
-                .setTitle(`🎤 Lyrics: ${cleanQuery}`)
+                .setTitle(`🎤 Lyrics: ${displayTitle}`)
                 .setDescription(chunks[0]);
             
             if (chunks.length > 1) {

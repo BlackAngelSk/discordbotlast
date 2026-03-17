@@ -1,78 +1,156 @@
 <!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economy - <%= guildId %></title>
+    <title><%= guild.name %> — Economy</title>
     <link rel="stylesheet" href="/style.css">
-    <style>
-        .economy-container { max-width: 1200px; margin: 40px auto; padding: 20px; }
-        .section { background: var(--card-bg); padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px var(--shadow); border: 1px solid var(--border-color); margin-bottom: 30px; }
-        .section h2 { color: var(--primary-color); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
-        table th { background: var(--card-secondary); padding: 12px; text-align: left; color: var(--text-color); font-weight: 600; border-bottom: 2px solid var(--border-color); }
-        table td { padding: 12px; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
-        table tr:hover { background: var(--card-secondary); }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <h1>💰 Economy Dashboard</h1>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+            <div class="sidebar-guild">
+                <% if (guild.icon) { %>
+                    <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+                <% } else { %>
+                    <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+                <% } %>
+                <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
             </div>
-            <div class="nav-links">
-                <a href="/dashboard">Dashboard</a>
-                <a href="/logout" class="btn-logout">Logout</a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Server</div>
+            <a href="/dashboard/<%= guild.id %>" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+            <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link active"><i class="fas fa-coins"></i> Economy</a>
+            <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
+            <div class="sidebar-section-label">Moderation</div>
+            <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link"><i class="fas fa-shield-halved"></i> Moderation</a>
+            <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link"><i class="fas fa-robot"></i> Auto-Mod</a>
+            <div class="sidebar-section-label">Stats</div>
+            <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
+            <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
+        </nav>
+        <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+                <div><div class="topbar-title">Economy</div><div class="topbar-subtitle"><%= guild.name %></div></div>
             </div>
-        </div>
-    </nav>
+            <div class="topbar-right">
+                <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+                <div class="topbar-user">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                    <span class="topbar-user-name"><%= user.username %></span>
+                </div>
+            </div>
+        </header>
 
-    <div class="container main-content">
-        <!-- Quick Navigation -->
-        <div class="quick-nav">
-            <a href="/dashboard/<%= guildId %>" class="nav-btn">⚙️ Settings</a>
-            <a href="/dashboard/<%= guildId %>/economy" class="nav-btn active">💰 Economy</a>
-            <a href="/dashboard/<%= guildId %>/moderation" class="nav-btn">🛡️ Moderation</a>
-            <a href="/dashboard/<%= guildId %>/automod" class="nav-btn">🤖 Auto-Mod</a>
-            <a href="/dashboard/<%= guildId %>/shop" class="nav-btn">🛒 Shop</a>
-            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
-        </div>
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fas fa-coins" style="color:var(--brand);margin-right:8px"></i>Economy Leaderboard</h1>
+                <p>Top earners in <strong><%= guild.name %></strong></p>
+            </div>
 
-    <div class="economy-container">
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Total Users</span><div class="stat-card-icon blue"><i class="fas fa-users"></i></div></div>
+                    <div class="stat-card-value"><%= leaderboard.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-database"></i> Economy profiles</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Top Balance</span><div class="stat-card-icon yellow"><i class="fas fa-crown"></i></div></div>
+                    <div class="stat-card-value"><%= formatNumber(leaderboard[0]?.balance || 0) %></div>
+                    <div class="stat-card-change"><i class="fas fa-coins"></i> <% if(leaderboard[0]) { %><%= leaderboard[0].username %><% } else { %>Nobody yet<% } %></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Avg Balance</span><div class="stat-card-icon purple"><i class="fas fa-chart-simple"></i></div></div>
+                    <div class="stat-card-value"><%= leaderboard.length > 0 ? formatNumber(Math.round(leaderboard.reduce((a,b) => a+(b.balance||0),0)/leaderboard.length)) : 0 %></div>
+                    <div class="stat-card-change"><i class="fas fa-coins"></i> Per user</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Top Level</span><div class="stat-card-icon orange"><i class="fas fa-star"></i></div></div>
+                    <div class="stat-card-value">Lv <%= leaderboard.length > 0 ? Math.max(...leaderboard.map(u=>u.level||0)) : 0 %></div>
+                    <div class="stat-card-change"><i class="fas fa-star"></i> Highest rank</div>
+                </div>
+            </div>
 
-        <div class="section">
-            <h2>💰 Economy Leaderboard</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>User</th>
-                        <th>Balance</th>
-                        <th>Level</th>
-                        <th>Total XP</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% leaderboard.forEach((user, index) => { %>
-                    <tr>
-                        <td><strong>#<%= index + 1 %></strong></td>
-                        <td><%= user.username %></td>
-                        <td>💵 <%= formatNumber(user.balance || 0) %></td>
-                        <td>Level <%= user.level || 0 %></td>
-                        <td><%= formatNumber(user.xp || 0) %> XP</td>
-                    </tr>
-                    <% }); %>
-                </tbody>
-            </table>
-        </div>
+            <% if (leaderboard.length >= 3) { %>
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header"><div class="card-title"><i class="fas fa-trophy"></i> Top 3 Podium</div></div>
+                <div class="leaderboard-podium">
+                    <div class="podium-item silver">
+                        <div class="podium-avatar">2</div>
+                        <div class="podium-name"><%= leaderboard[1].username %></div>
+                        <div class="podium-value"><i class="fas fa-coins"></i> <%= formatNumber(leaderboard[1].balance || 0) %></div>
+                        <div class="podium-bar" style="height:80px;background:var(--silver-gradient,#C0C0C0)"></div>
+                    </div>
+                    <div class="podium-item gold">
+                        <div class="podium-crown"><i class="fas fa-crown" style="color:#FFD700"></i></div>
+                        <div class="podium-avatar">1</div>
+                        <div class="podium-name"><%= leaderboard[0].username %></div>
+                        <div class="podium-value"><i class="fas fa-coins"></i> <%= formatNumber(leaderboard[0].balance || 0) %></div>
+                        <div class="podium-bar" style="height:110px;background:var(--gold-gradient,#FFD700)"></div>
+                    </div>
+                    <div class="podium-item bronze">
+                        <div class="podium-avatar">3</div>
+                        <div class="podium-name"><%= leaderboard[2].username %></div>
+                        <div class="podium-value"><i class="fas fa-coins"></i> <%= formatNumber(leaderboard[2].balance || 0) %></div>
+                        <div class="podium-bar" style="height:60px;background:var(--bronze-gradient,#CD7F32)"></div>
+                    </div>
+                </div>
+            </div>
+            <% } %>
 
-        <div class="section">
-            <h2>📊 Economy Statistics</h2>
-            <p>Total users with economy profile: <strong><%= leaderboard.length %></strong></p>
-            <p>Highest balance: <strong>💵 <%= formatNumber(leaderboard[0]?.balance || 0) %></strong></p>
-            <p>Average balance: <strong>💵 <%= formatNumber(Math.round(leaderboard.reduce((a, b) => a + (b.balance || 0), 0) / leaderboard.length)) %></strong></p>
-        </div>
+            <div class="card">
+                <div class="card-header"><div class="card-title"><i class="fas fa-list-ol"></i> Full Leaderboard</div></div>
+                <div class="table-wrapper">
+                    <table>
+                        <thead><tr><th>Rank</th><th>User</th><th>Balance</th><th>Level</th><th>XP</th></tr></thead>
+                        <tbody>
+                            <% if (leaderboard.length > 0) { %>
+                                <% leaderboard.forEach((u, i) => { %>
+                                    <tr>
+                                        <td><span class="rank-badge <%= i===0?'gold':i===1?'silver':i===2?'bronze':'normal' %>"><%= i+1 %></span></td>
+                                        <td><strong><%= u.username %></strong></td>
+                                        <td><span style="color:var(--green);font-weight:600"><i class="fas fa-coins" style="font-size:11px;margin-right:4px"></i><%= formatNumber(u.balance || 0) %></span></td>
+                                        <td><span class="badge badge-info">Lv <%= u.level || 0 %></span></td>
+                                        <td><%= formatNumber(u.xp || 0) %> XP</td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr><td colspan="5" class="table-empty"><i class="fas fa-coins"></i> No economy data yet</td></tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
     </div>
+</div>
+<script>
+const saved = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', saved);
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+themeBtn.addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+});
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+document.getElementById('mobileMenuBtn').addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+</script>
 </body>
 </html>

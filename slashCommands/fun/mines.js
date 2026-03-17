@@ -194,7 +194,8 @@ async function playMinesWithBet(interaction, bet, mineCount) {
         'Pick a tile to start. Every safe tile increases your multiplier. Hit **Cash Out** anytime.'
     );
 
-    const msg = await interaction.reply({ embeds: [introEmbed], components: createRows(game), withResponse: true });
+    await interaction.reply({ embeds: [introEmbed], components: createRows(game) });
+    const msg = await interaction.fetchReply();
 
     const collector = msg.createMessageComponentCollector({
         componentType: ComponentType.Button,

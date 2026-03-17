@@ -4,8 +4,8 @@
  */
 
 require('dotenv').config();
-const seasonManager = require('./utils/seasonManager');
-const seasonLeaderboardManager = require('./utils/seasonLeaderboardManager');
+const seasonManager = require('../../utils/seasonManager');
+const seasonLeaderboardManager = require('../../utils/seasonLeaderboardManager');
 
 async function comprehensiveTest() {
     try {

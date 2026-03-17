@@ -1,353 +1,358 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= guild.name %> - Settings</title>
-    <link rel="stylesheet" href="/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Settings</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <div class="nav-brand">
-                <h1>🎵 Music Bot</h1>
-            </div>
-            <div class="nav-links">
-                <a href="/dashboard">Dashboard</a>
-                <span class="user-info">
-                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar">
-                    <%= user.username %>
-                </span>
-                <a href="/logout" class="btn-logout">Logout</a>
-            </div>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+      <div class="sidebar-guild">
+        <% if (guild.icon) { %>
+          <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+        <% } else { %>
+          <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+        <% } %>
+        <div class="sidebar-guild-info">
+          <h3><%= guild.name %></h3>
+          <span><%= guild.memberCount %> members</span>
         </div>
-    </nav>
-
-    <div class="container main-content">
-        <div class="server-header">
-            <% if (guild.icon) { %>
-                <img src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
-            <% } else { %>
-                <div class="server-icon-default large"><%= guild.name.charAt(0) %></div>
-            <% } %>
-            <div>
-                <h1><%= guild.name %></h1>
-                <p><%= guild.memberCount %> members</p>
-            </div>
-        </div>
-
-        <!-- Quick Navigation -->
-        <div class="quick-nav">
-            <a href="/dashboard/<%= guild.id %>" class="nav-btn active">⚙️ Settings</a>
-            <a href="/dashboard/<%= guild.id %>/economy" class="nav-btn">💰 Economy</a>
-            <a href="/dashboard/<%= guild.id %>/moderation" class="nav-btn">🛡️ Moderation</a>
-            <a href="/dashboard/<%= guild.id %>/automod" class="nav-btn">🤖 Auto-Mod</a>
-            <a href="/dashboard/<%= guild.id %>/shop" class="nav-btn">🛒 Shop</a>
-            <a href="/global-leaderboard" class="nav-btn">🌍 Global Leaderboard</a>
-        </div>
-
-        <div id="message" class="message hidden"></div>
-
-        <form id="settingsForm" class="settings-form">
-            <!-- Basic Settings -->
-            <div class="settings-section">
-                <h2>⚙️ Basic Settings</h2>
-                
-                <div class="form-group">
-                    <label>Command Prefixes</label>
-                    <div id="prefixContainer" class="prefix-list">
-                        <% settings.prefixes.forEach((prefix, index) => { %>
-                            <div class="prefix-item">
-                                <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" data-index="<%= index %>">
-                                <button type="button" class="btn-small btn-danger" onclick="removePrefix(<%= index %>)">Remove</button>
-                            </div>
-                        <% }); %>
-                    </div>
-                    <button type="button" class="btn-small btn-secondary" onclick="addPrefix()">+ Add Prefix</button>
-                    <small>You can have multiple prefixes (up to 5). All prefixes will trigger bot commands.</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="djRole">DJ Role</label>
-                    <select id="djRole" name="djRole">
-                        <% roles.forEach(role => { %>
-                            <option value="<%= role.name %>" <%= settings.djRole === role.name ? 'selected' : '' %>>
-                                <%= role.name %>
-                            </option>
-                        <% }); %>
-                    </select>
-                    <small>Role required for DJ commands (skip, pause, etc.)</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="autoRole">Auto Role</label>
-                    <select id="autoRole" name="autoRole">
-                        <option value="">None</option>
-                        <% roles.forEach(role => { %>
-                            <option value="<%= role.name %>" <%= settings.autoRole === role.name ? 'selected' : '' %>>
-                                <%= role.name %>
-                            </option>
-                        <% }); %>
-                    </select>
-                    <small>Role automatically assigned to new members</small>
-                </div>
-            </div>
-
-            <!-- Welcome Messages -->
-            <div class="settings-section">
-                <h2>👋 Welcome Messages</h2>
-                
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="welcomeEnabled" name="welcomeEnabled" <%= settings.welcomeEnabled ? 'checked' : '' %>>
-                        Enable Welcome Messages
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label for="welcomeChannel">Welcome Channel</label>
-                    <select id="welcomeChannel" name="welcomeChannel">
-                        <option value="">Select Channel</option>
-                        <% channels.forEach(channel => { %>
-                            <option value="<%= channel.name %>" <%= settings.welcomeChannel === channel.name ? 'selected' : '' %>>
-                                #<%= channel.name %>
-                            </option>
-                        <% }); %>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="welcomeMessage">Welcome Message</label>
-                    <textarea id="welcomeMessage" name="welcomeMessage" rows="3"><%= settings.welcomeMessage %></textarea>
-                    <small>Use {user} for username, {server} for server name</small>
-                </div>
-            </div>
-
-            <!-- Leave Messages -->
-            <div class="settings-section">
-                <h2>👋 Leave Messages</h2>
-                
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="leaveEnabled" name="leaveEnabled" <%= settings.leaveEnabled ? 'checked' : '' %>>
-                        Enable Leave Messages
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label for="leaveChannel">Leave Channel</label>
-                    <select id="leaveChannel" name="leaveChannel">
-                        <option value="">Select Channel</option>
-                        <% channels.forEach(channel => { %>
-                            <option value="<%= channel.name %>" <%= settings.leaveChannel === channel.name ? 'selected' : '' %>>
-                                #<%= channel.name %>
-                            </option>
-                        <% }); %>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="leaveMessage">Leave Message</label>
-                    <textarea id="leaveMessage" name="leaveMessage" rows="3"><%= settings.leaveMessage %></textarea>
-                    <small>Use {user} for username, {server} for server name</small>
-                </div>
-            </div>
-
-            <!-- Logging System -->
-            <div class="settings-section">
-                <h2>📋 Server Logging</h2>
-                
-                <div class="form-group">
-                    <label for="loggingChannel">Logging Channel</label>
-                    <select id="loggingChannel" name="loggingChannel">
-                        <option value="">Disable Logging</option>
-                        <% channels.forEach(channel => { %>
-                            <option value="<%= channel.id %>" <%= loggingChannel === channel.id ? 'selected' : '' %>>
-                                #<%= channel.name %>
-                            </option>
-                        <% }); %>
-                    </select>
-                    <small>All server events will be logged here (messages, members, roles, channels)</small>
-                </div>
-
-                <div class="logging-info">
-                    <h4>📊 What Gets Logged:</h4>
-                    <ul>
-                        <li>✏️ Message edits and deletions</li>
-                        <li>👤 Member joins and leaves</li>
-                        <li>⭐ Role changes</li>
-                        <li>📂 Channel creation and deletion</li>
-                    </ul>
-                </div>
-            </div>
-
-            <!-- Invite Tracking -->
-            <div class="settings-section">
-                <h2>📊 Invite Analytics</h2>
-                
-                <div class="invite-info">
-                    <p>Track who invites new members to grow your server organically.</p>
-                    <h4>💡 Commands:</h4>
-                    <ul>
-                        <li><code>!invites [@user]</code> - View invite count for a user</li>
-                        <li><code>!invitestats</code> - See top inviters leaderboard</li>
-                        <li><code>/invites</code> - Slash command version</li>
-                        <li><code>/invitestats</code> - Slash command leaderboard</li>
-                    </ul>
-                </div>
-
-                <% if (topInviters && topInviters.length > 0) { %>
-                    <div class="leaderboard">
-                        <h4>🏆 Top 5 Inviters</h4>
-                        <table class="invite-table">
-                            <tr>
-                                <th>#</th>
-                                <th>User</th>
-                                <th>Invites</th>
-                            </tr>
-                            <% topInviters.forEach((inviter, index) => { %>
-                                <tr>
-                                    <td><%= index + 1 %></td>
-                                    <td><div class="user-tag"><%= inviter.userId %></div></td>
-                                    <td><strong><%= inviter.count %></strong></td>
-                                </tr>
-                            <% }); %>
-                        </table>
-                    </div>
-                <% } else { %>
-                    <div class="no-data">
-                        <p>No invite data yet. Start inviting members to see stats here!</p>
-                    </div>
-                <% } %>
-            </div>
-
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save Changes</button>
-                <button type="button" class="btn-danger" onclick="resetSettings()">Reset to Defaults</button>
-            </div>
-        </form>
+      </div>
     </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Server</div>
+      <a href="/dashboard/<%= guild.id %>" class="sidebar-link active"><i class="fas fa-cog"></i> Settings</a>
+      <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link"><i class="fas fa-coins"></i> Economy</a>
+      <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
+      <div class="sidebar-section-label">Moderation</div>
+      <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link"><i class="fas fa-shield-halved"></i> Moderation</a>
+      <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link"><i class="fas fa-robot"></i> Auto-Mod</a>
+      <div class="sidebar-section-label">Stats</div>
+      <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
+      <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-    <script>
-        const guildId = '<%= guild.id %>';
-        const form = document.getElementById('settingsForm');
-        const messageDiv = document.getElementById('message');
+  <div class="main-wrapper">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+        <div>
+          <div class="topbar-title">Server Settings</div>
+          <div class="topbar-subtitle"><%= guild.name %></div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+      </div>
+    </header>
 
-        function showMessage(text, type = 'success') {
-            messageDiv.textContent = text;
-            messageDiv.className = `message ${type}`;
-            setTimeout(() => {
-                messageDiv.className = 'message hidden';
-            }, 5000);
-        }
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-cog" style="color:var(--brand);margin-right:8px"></i>Server Settings</h1>
+        <p>Configure the bot for <strong><%= guild.name %></strong></p>
+      </div>
 
-        function addPrefix() {
-            const container = document.getElementById('prefixContainer');
-            const count = container.children.length;
-            
-            if (count >= 5) {
-                showMessage('Maximum 5 prefixes allowed', 'error');
-                return;
-            }
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Members</span><div class="stat-card-icon blue"><i class="fas fa-users"></i></div></div>
+          <div class="stat-card-value"><%= guild.memberCount %></div>
+          <div class="stat-card-change"><i class="fas fa-server"></i> Active server</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Text Channels</span><div class="stat-card-icon purple"><i class="fas fa-hashtag"></i></div></div>
+          <div class="stat-card-value"><%= channels.length %></div>
+          <div class="stat-card-change"><i class="fas fa-hashtag"></i> Available</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Roles</span><div class="stat-card-icon orange"><i class="fas fa-tag"></i></div></div>
+          <div class="stat-card-value"><%= roles.length %></div>
+          <div class="stat-card-change"><i class="fas fa-tag"></i> Configured</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Open Tickets</span><div class="stat-card-icon yellow"><i class="fas fa-ticket"></i></div></div>
+          <div class="stat-card-value"><%= activeTickets %></div>
+          <div class="stat-card-change"><i class="fas fa-ticket"></i> Support tickets</div>
+        </div>
+      </div>
 
-            const item = document.createElement('div');
-            item.className = 'prefix-item';
-            item.innerHTML = `
-                <input type="text" class="prefix-input" maxlength="5" data-index="${count}">
-                <button type="button" class="btn-small btn-danger" onclick="removePrefix(${count})">Remove</button>
-            `;
-            container.appendChild(item);
-        }
+      <form id="settingsForm">
 
-        function removePrefix(index) {
-            const container = document.getElementById('prefixContainer');
-            const items = container.querySelectorAll('.prefix-item');
-            
-            if (items.length <= 1) {
-                showMessage('You must have at least one prefix', 'error');
-                return;
-            }
+        <!-- Basic Settings -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-sliders"></i> Basic Settings</div><div class="card-subtitle">Core bot configuration</div></div>
+          </div>
+          <div class="form-section">
+            <div class="form-section-title"><i class="fas fa-terminal"></i> Command Prefixes</div>
+            <div id="prefixContainer" class="prefix-list">
+              <% settings.prefixes.forEach((prefix, index) => { %>
+                <div class="prefix-item">
+                  <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" placeholder="!">
+                  <button type="button" class="btn btn-danger btn-sm" onclick="removePrefix(this)"><i class="fas fa-trash"></i></button>
+                </div>
+              <% }); %>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addPrefix()" style="margin-top:6px"><i class="fas fa-plus"></i> Add Prefix</button>
+            <div class="form-hint">Up to 5 prefixes. All will trigger bot commands.</div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">DJ Role</label>
+              <select class="form-control" name="djRole">
+                <% roles.forEach(role => { %>
+                  <option value="<%= role.name %>" <%= settings.djRole === role.name ? 'selected' : '' %>><%= role.name %></option>
+                <% }); %>
+              </select>
+              <div class="form-hint">Required for DJ commands (skip, pause, stop)</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Auto Role</label>
+              <select class="form-control" name="autoRole">
+                <option value="">None</option>
+                <% roles.forEach(role => { %>
+                  <option value="<%= role.name %>" <%= settings.autoRole === role.name ? 'selected' : '' %>><%= role.name %></option>
+                <% }); %>
+              </select>
+              <div class="form-hint">Automatically assigned to new members</div>
+            </div>
+          </div>
+        </div>
 
-            container.children[index].remove();
-        }
+        <!-- Welcome Messages -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-hand-wave"></i> Welcome Messages</div><div class="card-subtitle">Greet new members when they join</div></div>
+            <label class="toggle-switch"><input type="checkbox" name="welcomeEnabled" <%= settings.welcomeEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Welcome Channel</label>
+              <select class="form-control" name="welcomeChannel">
+                <option value="">Select Channel</option>
+                <% channels.forEach(c => { %>
+                  <option value="<%= c.name %>" <%= settings.welcomeChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Welcome Message</label>
+              <textarea class="form-control" name="welcomeMessage" rows="3"><%= settings.welcomeMessage %></textarea>
+              <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
+            </div>
+          </div>
+        </div>
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        <!-- Leave Messages -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-door-open"></i> Leave Messages</div><div class="card-subtitle">Notify when members leave</div></div>
+            <label class="toggle-switch"><input type="checkbox" name="leaveEnabled" <%= settings.leaveEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Leave Channel</label>
+              <select class="form-control" name="leaveChannel">
+                <option value="">Select Channel</option>
+                <% channels.forEach(c => { %>
+                  <option value="<%= c.name %>" <%= settings.leaveChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Leave Message</label>
+              <textarea class="form-control" name="leaveMessage" rows="3"><%= settings.leaveMessage %></textarea>
+              <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
+            </div>
+          </div>
+        </div>
 
-            const formData = new FormData(form);
-            const data = {};
-            
-            // Collect prefixes from input fields
-            const prefixInputs = document.querySelectorAll('.prefix-input');
-            const prefixes = [];
-            prefixInputs.forEach(input => {
-                const value = input.value.trim();
-                if (value) {
-                    prefixes.push(value);
-                }
-            });
+        <!-- Logging -->
+        <div class="card">
+          <div class="card-header"><div><div class="card-title"><i class="fas fa-scroll"></i> Server Logging</div><div class="card-subtitle">Audit log for server events</div></div></div>
+          <div class="form-group">
+            <label class="form-label">Logging Channel</label>
+            <select class="form-control" name="loggingChannel" style="max-width:380px">
+              <option value="">Disable Logging</option>
+              <% channels.forEach(c => { %>
+                <option value="<%= c.id %>" <%= loggingChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
+              <% }); %>
+            </select>
+            <div class="form-hint">Logs message edits/deletes, member joins/leaves, role changes, channel events</div>
+          </div>
+        </div>
 
-            if (prefixes.length === 0) {
-                showMessage('You must have at least one prefix', 'error');
-                return;
-            }
+        <!-- Invite Analytics -->
+        <div class="card">
+          <div class="card-header"><div><div class="card-title"><i class="fas fa-user-plus"></i> Invite Analytics</div><div class="card-subtitle">Track who invites new members</div></div></div>
+          <div style="margin-bottom:14px;padding:12px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
+            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Available commands:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px"><code>!invites</code><code>!invitestats</code><code>/invites</code><code>/invitestats</code></div>
+          </div>
+          <% if (topInviters && topInviters.length > 0) { %>
+            <div class="table-wrapper"><table>
+              <thead><tr><th>#</th><th>User</th><th>Invites</th></tr></thead>
+              <tbody>
+                <% topInviters.forEach((inv, i) => { %>
+                  <tr>
+                    <td><span class="rank-badge <%= i===0?'gold':i===1?'silver':i===2?'bronze':'normal' %>"><%= i+1 %></span></td>
+                    <td><code><%= inv.userId %></code></td>
+                    <td><strong style="color:var(--green)"><%= inv.count %></strong></td>
+                  </tr>
+                <% }); %>
+              </tbody>
+            </table></div>
+          <% } else { %>
+            <div class="table-empty"><i class="fas fa-link-slash"></i>No invite data yet</div>
+          <% } %>
+        </div>
 
-            data.prefixes = prefixes;
+        <!-- Auto-Mod Quick Settings -->
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-robot"></i> Auto-Moderation</div><div class="card-subtitle">Quick toggles — <a href="/dashboard/<%= guild.id %>/automod">Full configuration</a></div></div>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Enable Auto-Moderation</h4><p>Master switch for all auto-mod rules</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="autoModEnabled" <%= modSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Anti-Spam</h4><p>Timeout users sending 5+ messages in 5 seconds</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="antiSpam" <%= modSettings.antiSpam ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Anti-Invite Links</h4><p>Block Discord invite links (discord.gg/...)</p></div>
+            <label class="toggle-switch"><input type="checkbox" name="antiInvite" <%= modSettings.antiInvite ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="form-row" style="margin-top:14px">
+            <div class="form-group">
+              <label class="form-label">Mod Log Channel</label>
+              <select class="form-control" name="modLogChannel">
+                <option value="">None</option>
+                <% channels.forEach(c => { %>
+                  <option value="<%= c.id %>" <%= modLogChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Max Mentions per Message</label>
+              <input type="number" class="form-control" name="maxMentions" value="<%= modSettings.maxMentions || 5 %>" min="1" max="50">
+            </div>
+          </div>
+        </div>
 
-            // Convert form data to object
-            for (let [key, value] of formData.entries()) {
-                if (key === 'welcomeEnabled' || key === 'leaveEnabled') {
-                    data[key] = true;
-                } else if (key !== 'prefix') {  // Skip old prefix field
-                    data[key] = value;
-                }
-            }
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Changes</button>
+          <button type="button" class="btn btn-danger" id="resetBtn"><i class="fas fa-rotate-left"></i> Reset Defaults</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</div>
 
-            // Handle unchecked checkboxes
-            if (!formData.has('welcomeEnabled')) data.welcomeEnabled = false;
-            if (!formData.has('leaveEnabled')) data.leaveEnabled = false;
+<div class="toast-container" id="toasts"></div>
 
-            try {
-                const response = await fetch(`/api/settings/${guildId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-triangle-exclamation" style="color:var(--red)"></i> Reset Settings</div>
+      <button class="modal-close" onclick="closeModal()"><i class="fas fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">Are you sure you want to reset all settings to defaults? This cannot be undone.</div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="confirmReset"><i class="fas fa-rotate-left"></i> Reset</button>
+    </div>
+  </div>
+</div>
 
-                const result = await response.json();
-                
-                if (result.success) {
-                    showMessage('Settings saved successfully!', 'success');
-                } else {
-                    showMessage('Error: ' + result.error, 'error');
-                }
-            } catch (error) {
-                showMessage('Failed to save settings: ' + error.message, 'error');
-            }
-        });
-
-        async function resetSettings() {
-            if (!confirm('Are you sure you want to reset all settings to default? This cannot be undone.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`/api/settings/${guildId}/reset`, {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-                
-                if (result.success) {
-                    showMessage('Settings reset successfully! Reloading...', 'success');
-                    setTimeout(() => location.reload(), 1500);
-                } else {
-                    showMessage('Error: ' + result.error, 'error');
-                }
-            } catch (error) {
-                showMessage('Failed to reset settings: ' + error.message, 'error');
-            }
-        }
-    </script>
+<script>
+const guildId = '<%= guild.id %>';
+const saved = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', saved);
+const themeBtn = document.getElementById('themeToggle');
+themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+themeBtn.addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+});
+const sidebar = document.getElementById('sidebar');
+const overlay = document.getElementById('sidebarOverlay');
+document.getElementById('mobileMenuBtn').addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
+overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle', info: 'fa-circle-info', warning: 'fa-triangle-exclamation' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+function addPrefix() {
+  const c = document.getElementById('prefixContainer');
+  if (c.children.length >= 5) { toast('Maximum 5 prefixes', 'error'); return; }
+  const d = document.createElement('div');
+  d.className = 'prefix-item';
+  d.innerHTML = '<input type="text" class="prefix-input" maxlength="5" placeholder="!"><button type="button" class="btn btn-danger btn-sm" onclick="removePrefix(this)"><i class="fas fa-trash"></i></button>';
+  c.appendChild(d);
+}
+function removePrefix(btn) {
+  const c = document.getElementById('prefixContainer');
+  if (c.children.length <= 1) { toast('Need at least one prefix', 'error'); return; }
+  btn.closest('.prefix-item').remove();
+}
+function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
+document.getElementById('resetBtn').addEventListener('click', () => document.getElementById('resetModal').classList.add('active'));
+document.getElementById('confirmReset').addEventListener('click', async () => {
+  closeModal();
+  try {
+    const r = await fetch(`/api/settings/${guildId}/reset`, { method: 'POST' });
+    const j = await r.json();
+    if (j.success) { toast('Settings reset! Reloading...', 'success'); setTimeout(() => location.reload(), 1600); }
+    else toast('Error: ' + j.error, 'error');
+  } catch (e) { toast('Failed: ' + e.message, 'error'); }
+});
+document.getElementById('settingsForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = e.submitter;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Saving...';
+  btn.disabled = true;
+  const data = {};
+  const fd = new FormData(e.target);
+  const prefixes = [...document.querySelectorAll('.prefix-input')].map(i => i.value.trim()).filter(Boolean);
+  if (!prefixes.length) { toast('Need at least one prefix', 'error'); btn.innerHTML = orig; btn.disabled = false; return; }
+  data.prefixes = prefixes;
+  for (const [k, v] of fd.entries()) {
+    if (['welcomeEnabled', 'leaveEnabled', 'autoModEnabled', 'antiSpam', 'antiInvite', 'emojiOnly'].includes(k)) data[k] = true;
+    else data[k] = v;
+  }
+  ['welcomeEnabled', 'leaveEnabled', 'autoModEnabled', 'antiSpam', 'antiInvite'].forEach(k => { if (!fd.has(k)) data[k] = false; });
+  try {
+    const r = await fetch(`/api/settings/${guildId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    const j = await r.json();
+    if (j.success) toast('Settings saved successfully!', 'success');
+    else toast('Error: ' + j.error, 'error');
+  } catch (err) { toast('Failed to save: ' + err.message, 'error'); }
+  finally { btn.innerHTML = orig; btn.disabled = false; }
+});
+</script>
 </body>
 </html>
