@@ -1,19 +1,19 @@
 {
   "users": {
     "421968526547353601_396685113804587009": {
-      "balance": 2055,
-      "xp": 11735,
-      "level": 11,
-      "lastDaily": 1773679433200,
+      "balance": 798,
+      "xp": 13145,
+      "level": 12,
+      "lastDaily": 1773775228477,
       "lastWeekly": 1773345236650,
       "inventory": [],
-      "dailyStreak": 3,
-      "streakBonusMultiplier": 1.6,
-      "seasonalCoins": 9200
+      "dailyStreak": 4,
+      "streakBonusMultiplier": 1.8,
+      "seasonalCoins": 11000
     },
     "421968526547353601_280776802492874765": {
-      "balance": 4029,
-      "xp": 20145,
+      "balance": 4238,
+      "xp": 21190,
       "level": 15,
       "lastDaily": null,
       "lastWeekly": null,
@@ -23,9 +23,9 @@
       "seasonalCoins": 0
     },
     "421968526547353601_195140009748201472": {
-      "balance": 3878,
-      "xp": 19413,
-      "level": 14,
+      "balance": 4085,
+      "xp": 20448,
+      "level": 15,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -34,8 +34,8 @@
       "seasonalCoins": 0
     },
     "421968526547353601_534769701297979392": {
-      "balance": 4661,
-      "xp": 23317,
+      "balance": 4868,
+      "xp": 24352,
       "level": 16,
       "lastDaily": null,
       "lastWeekly": null,
@@ -45,8 +45,8 @@
       "seasonalCoins": 0
     },
     "421968526547353601_349649557896036354": {
-      "balance": 845754,
-      "xp": 12608,
+      "balance": 854504,
+      "xp": 13471,
       "level": 12,
       "lastDaily": 1772370263903,
       "lastWeekly": 1772370268655,
@@ -56,8 +56,8 @@
       "seasonalCoins": 2400
     },
     "421968526547353601_373827871212568576": {
-      "balance": 2335,
-      "xp": 12959,
+      "balance": 2452,
+      "xp": 13544,
       "level": 12,
       "lastDaily": null,
       "lastWeekly": null,
@@ -353,9 +353,9 @@
       "seasonalCoins": 0
     },
     "421968526547353601_1465732108004888668": {
-      "balance": 1971,
-      "xp": 9886,
-      "level": 10,
+      "balance": 2343,
+      "xp": 11746,
+      "level": 11,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -364,9 +364,9 @@
       "seasonalCoins": 0
     },
     "421968526547353601_721669183758270474": {
-      "balance": 1384,
-      "xp": 6920,
-      "level": 9,
+      "balance": 1756,
+      "xp": 8780,
+      "level": 10,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -463,8 +463,8 @@
       "seasonalCoins": 0
     },
     "421968526547353601_481017558376382464": {
-      "balance": 2149,
-      "xp": 10745,
+      "balance": 2251,
+      "xp": 11255,
       "level": 11,
       "lastDaily": null,
       "lastWeekly": null,
@@ -672,9 +672,9 @@
       "seasonalCoins": 0
     },
     "421968526547353601_692862875865186344": {
-      "balance": 840,
-      "xp": 4232,
-      "level": 7,
+      "balance": 983,
+      "xp": 4947,
+      "level": 8,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -892,8 +892,8 @@
       "seasonalCoins": 0
     },
     "421968526547353601_373924787975618571": {
-      "balance": 2734,
-      "xp": 13670,
+      "balance": 2789,
+      "xp": 13945,
       "level": 12,
       "lastDaily": null,
       "lastWeekly": null,
