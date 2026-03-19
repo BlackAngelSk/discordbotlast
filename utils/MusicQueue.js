@@ -1,11 +1,15 @@
-const { createAudioPlayer, AudioPlayerStatus, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
+const { createAudioPlayer, AudioPlayerStatus, entersState, VoiceConnectionStatus, NoSubscriberBehavior } = require('@discordjs/voice');
 
 class MusicQueue {
     constructor(guildId) {
         this.guildId = guildId;
         this.songs = [];
         this.connection = null;
-        this.player = createAudioPlayer();
+        this.player = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Pause
+            }
+        });
         this.isPlaying = false;
         this.currentSong = null;
         this.disconnectTimer = null;
@@ -18,6 +22,7 @@ class MusicQueue {
         this.previousSongs = []; // Track song history
         this.filters = {}; // Audio filters
         this.ffmpegProcess = null;
+        this.ffmpegPath = null;
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔄 Player entered Idle state');
@@ -172,19 +177,16 @@ class MusicQueue {
 
             const { createAudioResource, StreamType } = require('@discordjs/voice');
             const { spawn } = require('child_process');
-            const { execSync } = require('child_process');
             const path = require('path');
-            
-            // Try to use system ffmpeg first, fallback to ffmpeg-static
-            let ffmpegPath;
-            try {
-                ffmpegPath = execSync('which ffmpeg', { encoding: 'utf8' }).trim();
-                if (!ffmpegPath) throw new Error('ffmpeg not found');
-            } catch {
-                // Fallback to ffmpeg-static
-                ffmpegPath = require('ffmpeg-static');
+            const fs = require('fs');
+
+            // Resolve FFmpeg path once to avoid blocking event loop each song
+            if (!this.ffmpegPath) {
+                const staticPath = require('ffmpeg-static');
+                this.ffmpegPath = staticPath || 'ffmpeg';
             }
-            
+            const ffmpegPath = this.ffmpegPath;
+
             console.log(`🎬 Using FFmpeg from: ${ffmpegPath}`);
 
             // Make sure connection is ready before playing
@@ -212,7 +214,6 @@ class MusicQueue {
             
             // Try to use system yt-dlp first (Linux), fallback to bundled .exe (Windows)
             let ytdlpPath = path.join(homeDir, '.local', 'bin', 'yt-dlp');
-            const fs = require('fs');
             
             if (!fs.existsSync(ytdlpPath)) {
                 // Fallback to bundled version

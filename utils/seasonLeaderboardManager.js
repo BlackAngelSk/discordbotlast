@@ -20,7 +20,11 @@ class SeasonLeaderboardManager {
 
             try {
                 const data = await fs.readFile(CONFIG_FILE, 'utf8');
-                this.config = JSON.parse(data);
+                const sanitized = data.replace(/^\uFEFF/, '').trim();
+                const parsed = JSON.parse(sanitized || '{}');
+                if (parsed && typeof parsed === 'object') {
+                    this.config = parsed;
+                }
             } catch (error) {
                 if (error.code !== 'ENOENT') {
                     console.error('Error loading leaderboard config:', error);
@@ -499,6 +503,10 @@ class SeasonLeaderboardManager {
      * @returns {Array} Leaderboard entries
      */
     getGamblingLeaderboardByType(leaderboard, gameKey, sortBy = 'wins', limit = 5) {
+        if (!leaderboard || typeof leaderboard !== 'object') {
+            return [];
+        }
+
         const players = [];
 
         for (const userId in leaderboard) {
@@ -506,17 +514,20 @@ class SeasonLeaderboardManager {
             if (player.gambling && player.gambling[gameKey]) {
                 const stats = player.gambling[gameKey];
                 const hasTies = ['blackjack', 'rps', 'ttt'].includes(gameKey);
+                const wins = Number(stats.wins) || 0;
+                const losses = Number(stats.losses) || 0;
+                const ties = Number(stats.ties) || 0;
                 const total = hasTies 
-                    ? stats.wins + stats.losses + (stats.ties || 0)
-                    : stats.wins + stats.losses;
+                    ? wins + losses + ties
+                    : wins + losses;
 
                 if (total > 0) {
-                    const winRate = ((stats.wins / total) * 100).toFixed(1);
+                    const winRate = ((wins / total) * 100).toFixed(1);
                     players.push({
                         userId,
-                        wins: stats.wins,
-                        losses: stats.losses,
-                        ties: stats.ties || 0,
+                        wins,
+                        losses,
+                        ties,
                         total: total,
                         winRate: parseFloat(winRate)
                     });

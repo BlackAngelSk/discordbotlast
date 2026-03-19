@@ -25,7 +25,11 @@ class SeasonManager {
 
             try {
                 const fileData = await fs.readFile(this.dataPath, 'utf8');
-                this.data = JSON.parse(fileData);
+                const sanitized = fileData.replace(/^\uFEFF/, '').trim();
+                const parsed = JSON.parse(sanitized || '{}');
+                if (parsed && typeof parsed === 'object') {
+                    this.data = parsed;
+                }
             } catch (error) {
                 if (error.code !== 'ENOENT') {
                     console.error('Error loading seasons:', error);
@@ -262,12 +266,12 @@ class SeasonManager {
      */
     getSeasonLeaderboard(guildId, seasonName, sortBy = 'coins', limit = 10) {
         const season = this.getSeason(guildId, seasonName);
-        if (!season) {
+        if (!season || !season.leaderboard || typeof season.leaderboard !== 'object') {
             return [];
         }
 
         return Object.values(season.leaderboard)
-            .sort((a, b) => b[sortBy] - a[sortBy])
+            .sort((a, b) => (Number(b?.[sortBy]) || 0) - (Number(a?.[sortBy]) || 0))
             .slice(0, limit);
     }
 
