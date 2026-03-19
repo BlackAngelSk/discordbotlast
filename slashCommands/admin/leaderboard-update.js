@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const seasonManager = require('../../utils/seasonManager');
 const seasonLeaderboardManager = require('../../utils/seasonLeaderboardManager');
 const economyManager = require('../../utils/economyManager');
@@ -19,7 +19,7 @@ module.exports = {
             if (!hasAdmin && !hasAllowedRole) {
                 return interaction.reply({
                     content: '❌ You do not have permission to update leaderboards!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -28,11 +28,11 @@ module.exports = {
                 const wait = Math.ceil((60 * 1000 - (now - cfg.lastManualUpdate)) / 1000);
                 return interaction.reply({
                     content: `⏳ Please wait ${wait}s before running this again.`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             cfg.lastManualUpdate = now;
             await seasonLeaderboardManager.save();
@@ -180,7 +180,7 @@ module.exports = {
             } else {
                 interaction.reply({
                     content: '❌ An error occurred while updating leaderboards!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 }).catch(() => null);
             }
         }
