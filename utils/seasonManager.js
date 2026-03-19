@@ -23,12 +23,35 @@ class SeasonManager {
             const dataDir = path.dirname(this.dataPath);
             await fs.mkdir(dataDir, { recursive: true });
 
+            if (databaseManager.useDB === 'mongodb' && databaseManager.db) {
+                try {
+                    const seasonsCollection = databaseManager.db.collection('seasons');
+                    const mongoData = await seasonsCollection.findOne({ _id: 'config' });
+
+                    if (mongoData && typeof mongoData === 'object') {
+                        const { _id, ...rest } = mongoData;
+                        this.data = {
+                            seasons: rest.seasons || {},
+                            currentSeason: rest.currentSeason || {}
+                        };
+                        this.loaded = true;
+                        console.log('✅ Season manager initialized from MongoDB');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error loading seasons from MongoDB, falling back to JSON:', error);
+                }
+            }
+
             try {
                 const fileData = await fs.readFile(this.dataPath, 'utf8');
                 const sanitized = fileData.replace(/^\uFEFF/, '').trim();
                 const parsed = JSON.parse(sanitized || '{}');
                 if (parsed && typeof parsed === 'object') {
-                    this.data = parsed;
+                    this.data = {
+                        seasons: parsed.seasons || {},
+                        currentSeason: parsed.currentSeason || {}
+                    };
                 }
             } catch (error) {
                 if (error.code !== 'ENOENT') {

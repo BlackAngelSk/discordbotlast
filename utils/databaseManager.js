@@ -64,7 +64,12 @@ class DatabaseManager {
             }));
     }
 
-    normalizeDocumentsFromJson(jsonData) {
+    normalizeDocumentsFromJson(collection, jsonData) {
+        // Keep seasons collection compatible with SeasonManager Mongo schema
+        if (collection === 'seasons' && jsonData && typeof jsonData === 'object' && !Array.isArray(jsonData)) {
+            return [{ _id: 'config', ...jsonData }];
+        }
+
         if (Array.isArray(jsonData)) {
             return jsonData.map((doc, index) => {
                 if (doc && typeof doc === 'object') {
@@ -99,7 +104,7 @@ class DatabaseManager {
         const raw = await fs.readFile(filePath, 'utf8');
         const sanitized = raw.replace(/^\uFEFF/, '').trim();
         const jsonData = sanitized ? JSON.parse(sanitized) : {};
-        const docs = this.normalizeDocumentsFromJson(jsonData);
+        const docs = this.normalizeDocumentsFromJson(collection, jsonData);
 
         const mongoCollection = this.db.collection(collection);
         await mongoCollection.deleteMany({});

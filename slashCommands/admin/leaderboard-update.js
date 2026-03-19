@@ -52,7 +52,7 @@ module.exports = {
             }
 
             const guild = interaction.guild;
-            const channel = guild.channels.cache.get(channelId);
+            const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
             
             if (!channel || !channel.isTextBased()) {
                 return interaction.editReply({
@@ -150,6 +150,8 @@ module.exports = {
             await seasonLeaderboardManager.setLeaderboardMessage(interaction.guildId, leaderboardMessage.id);
             await seasonLeaderboardManager.setLeaderboardMessages(interaction.guildId, []);
             await seasonLeaderboardManager.setIndexMessage(interaction.guildId, null);
+            cfg.lastAutoUpdate = Date.now();
+            await seasonLeaderboardManager.save();
             seasonLeaderboardManager.setPageCache(interaction.guildId, {
                 embeds,
                 messageId: leaderboardMessage.id,

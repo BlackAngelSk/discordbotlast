@@ -307,10 +307,10 @@ async function updateSeasonLeaderboards(client) {
             const config = guildConfigs[guildId];
             if (!config.channelId) continue;
 
-            const guild = client.guilds.cache.get(guildId);
+            const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
             if (!guild) continue;
 
-            const channel = guild.channels.cache.get(config.channelId);
+            const channel = guild.channels.cache.get(config.channelId) || await guild.channels.fetch(config.channelId).catch(() => null);
             if (!channel || !channel.isTextBased()) continue;
 
             const seasonName = seasonManager.getCurrentSeason(guildId);
@@ -320,6 +320,12 @@ async function updateSeasonLeaderboards(client) {
             if (!cfg.enabled) continue;
             const now = Date.now();
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
+
+            // Handle bad host clock / future timestamps so updates don't get stuck forever
+            if ((cfg.lastAutoUpdate || 0) > now + (5 * 60 * 1000)) {
+                cfg.lastAutoUpdate = 0;
+            }
+
             if (now - (cfg.lastAutoUpdate || 0) < intervalMs) {
                 continue;
             }
