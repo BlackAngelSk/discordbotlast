@@ -31,26 +31,25 @@ module.exports = {
                     ephemeral: true
                 });
             }
+
+            await interaction.deferReply({ ephemeral: true });
+
             cfg.lastManualUpdate = now;
             await seasonLeaderboardManager.save();
 
             const channelId = seasonLeaderboardManager.getLeaderboardChannel(interaction.guildId);
             if (!channelId) {
-                return interaction.reply({
-                    content: '❌ No leaderboard channel configured! Use `/leaderboard-channel` first.',
-                    ephemeral: true
+                return interaction.editReply({
+                    content: '❌ No leaderboard channel configured! Use `/leaderboard-channel` first.'
                 });
             }
 
             const seasonName = seasonManager.getCurrentSeason(interaction.guildId);
             if (!seasonName) {
-                return interaction.reply({
-                    content: '❌ No active season found!',
-                    ephemeral: true
+                return interaction.editReply({
+                    content: '❌ No active season found!'
                 });
             }
-
-            await interaction.deferReply();
 
             const guild = interaction.guild;
             const channel = guild.channels.cache.get(channelId);
@@ -174,9 +173,16 @@ module.exports = {
             await interaction.editReply({ embeds: [successEmbed] });
         } catch (error) {
             console.error('Error in leaderboard-update command:', error);
-            interaction.editReply({
-                content: '❌ An error occurred while updating leaderboards!'
-            });
+            if (interaction.deferred || interaction.replied) {
+                interaction.editReply({
+                    content: '❌ An error occurred while updating leaderboards!'
+                }).catch(() => null);
+            } else {
+                interaction.reply({
+                    content: '❌ An error occurred while updating leaderboards!',
+                    ephemeral: true
+                }).catch(() => null);
+            }
         }
     }
 };
