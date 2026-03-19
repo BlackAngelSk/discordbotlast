@@ -112,26 +112,53 @@ class DatabaseManager {
     }
 
     async syncAllJsonToMongo({ force = false } = {}) {
-        if (this.useDB !== 'mongodb' || !this.db) return;
+        if (this.useDB !== 'mongodb' || !this.db) {
+            return {
+                totalFiles: 0,
+                syncedCount: 0,
+                skippedCount: 0,
+                failedCount: 0,
+                failures: []
+            };
+        }
 
         try {
             const files = await this.getTopLevelJsonFiles();
             let syncedCount = 0;
+            let skippedCount = 0;
+            const failures = [];
 
             for (const file of files) {
                 try {
                     const result = await this.syncJsonFileToMongo(file.fileName, file.filePath, { force });
                     if (result.synced) syncedCount++;
+                    if (result.skipped) skippedCount++;
                 } catch (error) {
                     console.warn(`⚠️ Auto-sync skipped ${file.fileName}: ${error.message}`);
+                    failures.push({ file: file.fileName, reason: error.message });
                 }
             }
 
             if (syncedCount > 0) {
                 console.log(`🔄 Mongo auto-sync updated ${syncedCount} collection(s)`);
             }
+
+            return {
+                totalFiles: files.length,
+                syncedCount,
+                skippedCount,
+                failedCount: failures.length,
+                failures
+            };
         } catch (error) {
             console.warn('⚠️ Mongo auto-sync failed:', error.message);
+            return {
+                totalFiles: 0,
+                syncedCount: 0,
+                skippedCount: 0,
+                failedCount: 1,
+                failures: [{ file: 'global', reason: error.message }]
+            };
         }
     }
 
