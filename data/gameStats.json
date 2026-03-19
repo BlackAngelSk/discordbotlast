@@ -44,7 +44,7 @@
     },
     "roulette": {
       "wins": 0,
-      "losses": 5
+      "losses": 6
     },
     "slots": {
       "wins": 35,
@@ -1300,6 +1300,10 @@
       "wins": 0,
       "losses": 0,
       "ties": 0
+    },
+    "mines": {
+      "wins": 0,
+      "losses": 0
     }
   },
   "334003778636349442": {
@@ -2706,6 +2710,10 @@
       "wins": 0,
       "losses": 0,
       "ties": 0
+    },
+    "mines": {
+      "wins": 0,
+      "losses": 0
     }
   }
 }

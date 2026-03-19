@@ -37,6 +37,7 @@ const BOARD_TEMPLATE = [
 
 const BOARD_WIDTH = Math.max(...BOARD_TEMPLATE.map(row => row.length));
 const MAX_GHOSTS = 4;
+const POWER_ORB_TURNS = 13;
 
 const DIRECTIONS = {
     up: { x: 0, y: -1 },
@@ -129,12 +130,13 @@ function countPellets(board) {
     return pellets;
 }
 
-function renderBoard(board, player, ghosts) {
+function renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining) {
     let output = '';
     const symbols = {
         crash: 'X',
         player: 'P',
         ghost: 'G',
+        frightenedGhost: 'F',
         wall: '▓',
         pellet: '•',
         power: 'O',
@@ -156,7 +158,14 @@ function renderBoard(board, player, ghosts) {
             } else if (playerHere) {
                 symbol = symbols.player;
             } else if (ghostHere) {
-                symbol = ghostCountHere > 1 ? 'W' : symbols.ghost;
+                const frightenedHere = ghosts.some((ghost, index) => (
+                    ghost.x === x && ghost.y === y && ghostStates[index]?.frightened
+                ));
+                if (frightenedHere && powerTurnsRemaining > 0) {
+                    symbol = ghostCountHere > 1 ? 'f' : symbols.frightenedGhost;
+                } else {
+                    symbol = ghostCountHere > 1 ? 'W' : symbols.ghost;
+                }
             } else if (board[y][x] === '#') {
                 symbol = symbols.wall;
             } else if (board[y][x] === '.') {
@@ -175,6 +184,34 @@ function renderBoard(board, player, ghosts) {
 
 function isPlayerCaught(player, ghosts) {
     return ghosts.some(ghost => ghost.x === player.x && ghost.y === player.y);
+}
+
+function respawnGhost(ghost, ghostState) {
+    ghost.x = ghostState.spawn.x;
+    ghost.y = ghostState.spawn.y;
+    ghostState.released = false;
+    ghostState.frightened = false;
+}
+
+function resolvePlayerGhostCollision(player, ghosts, ghostStates, powerTurnsRemaining) {
+    const collidedIndexes = ghosts
+        .map((ghost, index) => (ghost.x === player.x && ghost.y === player.y ? index : -1))
+        .filter(index => index !== -1);
+
+    if (!collidedIndexes.length) {
+        return { playerCaught: false, ghostsEaten: 0 };
+    }
+
+    if (powerTurnsRemaining > 0) {
+        let ghostsEaten = 0;
+        for (const index of collidedIndexes) {
+            respawnGhost(ghosts[index], ghostStates[index]);
+            ghostsEaten += 1;
+        }
+        return { playerCaught: false, ghostsEaten };
+    }
+
+    return { playerCaught: true, ghostsEaten: 0 };
 }
 
 function getNextPosition(board, x, y, direction) {
@@ -226,7 +263,7 @@ function tryMoveGhost(entity, board, direction, ghostState) {
     }
 }
 
-function getGhostMove(board, ghost, player, ghostState) {
+function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining) {
     const options = Object.keys(DIRECTIONS).filter((key) => {
         const next = getNextPosition(board, ghost.x, ghost.y, key);
         return !isGhostBlocked(board, next.x, next.y, ghostState.released);
@@ -267,6 +304,27 @@ function getGhostMove(board, ghost, player, ghostState) {
             return bestOption;
         }
     }
+
+    if (powerTurnsRemaining > 0 && ghostState.released) {
+        ghostState.frightened = true;
+
+        let safest = options[0];
+        let safestDistance = -1;
+
+        for (const option of options) {
+            const next = getNextPosition(board, ghost.x, ghost.y, option);
+            const distance = Math.abs(player.x - next.x) + Math.abs(player.y - next.y);
+
+            if (distance > safestDistance) {
+                safestDistance = distance;
+                safest = option;
+            }
+        }
+
+        return safest;
+    }
+
+    ghostState.frightened = false;
 
     const chasePlayer = Math.random() < 0.65;
     if (!chasePlayer) {
@@ -320,9 +378,12 @@ async function playPacmanGame(message) {
     let result = 'playing';
     const ghostStates = ghosts.map((_, index) => ({
         released: false,
-        releaseDelayTurns: index * 2
+        releaseDelayTurns: index * 2,
+        frightened: false,
+        spawn: { x: ghosts[index].x, y: ghosts[index].y }
     }));
     let turnCount = 0;
+    let powerTurnsRemaining = 0;
     const inactivityMs = 15_000;
     let inactivityTimer = null;
 
@@ -332,15 +393,16 @@ async function playPacmanGame(message) {
 
     const createEmbed = (stateText = 'Use the buttons to move!') => {
         const pelletsLeft = countPellets(board);
+        const powerText = powerTurnsRemaining > 0 ? ` | **Power:** ${powerTurnsRemaining}` : '';
         return new EmbedBuilder()
             .setColor(result === 'win' ? 0x57f287 : result === 'lose' ? 0xed4245 : 0x5865f2)
             .setTitle('🕹️ Pacman-Style Arcade')
             .setDescription(
-                `${renderBoard(board, player, ghosts)}\n` +
-                `**Score:** ${score} | **Pellets Left:** ${pelletsLeft}\n` +
+                `${renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining)}\n` +
+                `**Score:** ${score} | **Pellets Left:** ${pelletsLeft}${powerText}\n` +
                 `${stateText}`
             )
-                .setFooter({ text: 'P=you, G/W=ghost(s), ▓=wall, •=pellet, O=power orb' });
+            .setFooter({ text: 'P=you, G/W=ghost(s), F=fear ghost, ▓=wall, •=pellet, O=power orb' });
     };
 
     const gameMessage = await message.reply({
@@ -405,7 +467,12 @@ async function playPacmanGame(message) {
 
             tryMove(player, board, move);
 
-            if (isPlayerCaught(player, ghosts)) {
+            const playerCollision = resolvePlayerGhostCollision(player, ghosts, ghostStates, powerTurnsRemaining);
+            if (playerCollision.ghostsEaten > 0) {
+                score += playerCollision.ghostsEaten * 200;
+            }
+
+            if (playerCollision.playerCaught) {
                 result = 'lose';
                 await interaction.deferUpdate().catch(() => {});
                 await finishGame('💀 The ghost caught you!');
@@ -419,6 +486,10 @@ async function playPacmanGame(message) {
             } else if (board[player.y][player.x] === 'o') {
                 board[player.y][player.x] = ' ';
                 score += 50;
+                powerTurnsRemaining = POWER_ORB_TURNS;
+                for (const ghostState of ghostStates) {
+                    ghostState.frightened = ghostState.released;
+                }
             }
 
             if (countPellets(board) === 0) {
@@ -438,17 +509,31 @@ async function playPacmanGame(message) {
                     continue;
                 }
 
-                const ghostMove = getGhostMove(board, ghost, player, ghostState);
+                const ghostMove = getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining);
                 if (ghostMove) {
                     tryMoveGhost(ghost, board, ghostMove, ghostState);
                 }
 
-                if (isPlayerCaught(player, ghosts)) {
+                const ghostCollision = resolvePlayerGhostCollision(player, ghosts, ghostStates, powerTurnsRemaining);
+                if (ghostCollision.ghostsEaten > 0) {
+                    score += ghostCollision.ghostsEaten * 200;
+                }
+
+                if (ghostCollision.playerCaught) {
                     result = 'lose';
                     await interaction.deferUpdate().catch(() => {});
                     await finishGame('💀 A ghost caught you!');
                     collector.stop('caught');
                     return;
+                }
+            }
+
+            if (powerTurnsRemaining > 0) {
+                powerTurnsRemaining -= 1;
+                if (powerTurnsRemaining === 0) {
+                    for (const ghostState of ghostStates) {
+                        ghostState.frightened = false;
+                    }
                 }
             }
 
