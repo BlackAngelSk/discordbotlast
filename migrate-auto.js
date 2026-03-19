@@ -10,6 +10,17 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs').promises;
 const path = require('path');
 
+function validateMongoUri(uri) {
+    if (!uri || typeof uri !== 'string') return 'MONGODB_URI not found in .env file';
+    const trimmed = uri.trim();
+    if (!trimmed) return 'MONGODB_URI is empty in .env file';
+    if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) return 'MONGODB_URI must start with mongodb:// or mongodb+srv://';
+    if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) {
+        return 'MONGODB_URI still contains placeholders like <db_password>';
+    }
+    return null;
+}
+
 class AutoMigration {
     constructor() {
         this.mongoClient = null;
@@ -30,8 +41,9 @@ class AutoMigration {
         const mongoUri = process.env.MONGODB_URI;
         const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
 
-        if (!mongoUri) {
-            throw new Error('MONGODB_URI not found in .env file');
+        const uriError = validateMongoUri(mongoUri);
+        if (uriError) {
+            throw new Error(uriError);
         }
 
         console.log('📡 Connecting to MongoDB...');
@@ -125,6 +137,9 @@ async function main() {
         console.error('  1. MONGODB_URI is correct in .env file');
         console.error('  2. IP address is whitelisted in MongoDB Atlas');
         console.error('  3. Database credentials are correct\n');
+        if (error?.code === 8000 || /bad auth/i.test(error?.message || '')) {
+            console.error('Auth help: encode password special chars (@, :, /, ?, #, %) and verify Atlas DB user permissions.\n');
+        }
         process.exit(1);
     } finally {
         await migration.close();

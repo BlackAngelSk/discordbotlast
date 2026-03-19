@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, AttachmentBuilder, MessageFlags } = require('discord.js');
 const seasonLeaderboardManager = require('../../utils/seasonLeaderboardManager');
 const seasonManager = require('../../utils/seasonManager');
 
@@ -56,9 +56,11 @@ module.exports = {
             if (!interaction.member.permissions.has('Administrator')) {
                 return interaction.reply({
                     content: '❌ You need "Administrator" permission!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
+
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const subcommand = interaction.options.getSubcommand();
             const guildId = interaction.guildId;
@@ -79,7 +81,7 @@ module.exports = {
                     )
                     .setTimestamp();
 
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.editReply({ embeds: [embed] });
             }
 
             if (subcommand === 'set') {
@@ -124,18 +126,18 @@ module.exports = {
                     )
                     .setTimestamp();
 
-                return interaction.reply({ embeds: [embed], ephemeral: true });
+                return interaction.editReply({ embeds: [embed] });
             }
 
             if (subcommand === 'export') {
                 const seasonName = seasonManager.getCurrentSeason(guildId);
                 if (!seasonName) {
-                    return interaction.reply({ content: '❌ No active season found!', ephemeral: true });
+                    return interaction.editReply({ content: '❌ No active season found!' });
                 }
 
                 const season = seasonManager.getSeason(guildId, seasonName);
                 if (!season) {
-                    return interaction.reply({ content: '❌ Season not found!', ephemeral: true });
+                    return interaction.editReply({ content: '❌ Season not found!' });
                 }
 
                 const rows = Object.values(season.leaderboard || {});
@@ -158,15 +160,17 @@ module.exports = {
                 const csv = lines.join('\n');
                 const file = new AttachmentBuilder(Buffer.from(csv, 'utf8'), { name: `${seasonName}-leaderboard.csv` });
 
-                return interaction.reply({
+                return interaction.editReply({
                     content: `📤 Exported ${rows.length} players from **${seasonName}**.`,
-                    files: [file],
-                    ephemeral: true
+                    files: [file]
                 });
             }
         } catch (error) {
             console.error('Error in leaderboard-config command:', error);
-            return interaction.reply({ content: '❌ An error occurred!', ephemeral: true });
+            if (interaction.deferred || interaction.replied) {
+                return interaction.editReply({ content: '❌ An error occurred!' }).catch(() => null);
+            }
+            return interaction.reply({ content: '❌ An error occurred!', flags: MessageFlags.Ephemeral }).catch(() => null);
         }
     }
 };

@@ -21,6 +21,17 @@ const rl = readline.createInterface({
 
 const question = (query) => new Promise((resolve) => rl.question(query, resolve));
 
+function validateMongoUri(uri) {
+    if (!uri || typeof uri !== 'string') return 'MONGODB_URI not found in .env file';
+    const trimmed = uri.trim();
+    if (!trimmed) return 'MONGODB_URI is empty in .env file';
+    if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) return 'MONGODB_URI must start with mongodb:// or mongodb+srv://';
+    if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) {
+        return 'MONGODB_URI still contains placeholders like <db_password>';
+    }
+    return null;
+}
+
 class MongoDBMigration {
     constructor() {
         this.mongoClient = null;
@@ -66,8 +77,9 @@ class MongoDBMigration {
         const mongoUri = process.env.MONGODB_URI;
         const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
 
-        if (!mongoUri) {
-            throw new Error('❌ MONGODB_URI not found in .env file. Please add your MongoDB connection string.');
+        const uriError = validateMongoUri(mongoUri);
+        if (uriError) {
+            throw new Error(`❌ ${uriError}. Please update your .env connection string.`);
         }
 
         console.log('📡 Connecting to MongoDB...');
@@ -254,6 +266,12 @@ class MongoDBMigration {
             }
         } catch (error) {
             console.error('\n❌ Connection failed:', error.message, '\n');
+            if (error?.code === 8000 || /bad auth/i.test(error?.message || '')) {
+                console.error('💡 MongoDB auth tips:');
+                console.error('   - Use real credentials (no placeholders).');
+                console.error('   - URL-encode password special chars (@, :, /, ?, #, %).');
+                console.error('   - Ensure Atlas DB user has permissions.\n');
+            }
         }
     }
 }

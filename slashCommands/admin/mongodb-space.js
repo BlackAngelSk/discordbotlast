@@ -1,6 +1,19 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { checkMongoDBSpace, MONGODB_STORAGE_LIMIT } = require('../../check-mongodb-space');
+const { MONGODB_STORAGE_LIMIT } = require('../../check-mongodb-space');
 const { MongoClient } = require('mongodb');
+
+function validateMongoUri(uri) {
+    if (!uri || typeof uri !== 'string') return 'MONGODB_URI not found.';
+    const trimmed = uri.trim();
+    if (!trimmed) return 'MONGODB_URI is empty.';
+    if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) {
+        return 'MONGODB_URI must start with mongodb:// or mongodb+srv://';
+    }
+    if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) {
+        return 'MONGODB_URI still contains placeholders (e.g. <db_password>).';
+    }
+    return null;
+}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -28,17 +41,19 @@ module.exports = {
         // Defer reply since this might take a moment
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+        let mongoClient = null;
         try {
             const mongoUri = process.env.MONGODB_URI;
             const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
 
-            if (!mongoUri) {
+            const uriError = validateMongoUri(mongoUri);
+            if (uriError) {
                 return interaction.editReply({
-                    content: '❌ MongoDB not configured (MONGODB_URI not found).'
+                    content: `❌ ${uriError}`
                 });
             }
 
-            const mongoClient = new MongoClient(mongoUri);
+            mongoClient = new MongoClient(mongoUri);
             await mongoClient.connect();
             const db = mongoClient.db(dbName);
 
@@ -145,15 +160,24 @@ module.exports = {
             }
 
             embed.setTimestamp();
-
-            await mongoClient.close();
             return interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
+            const isBadAuth = error?.code === 8000 || /bad auth|authentication failed/i.test(error?.message || '');
+            if (isBadAuth) {
+                return interaction.editReply({
+                    content: '❌ MongoDB authentication failed (bad auth). Check username/password in MONGODB_URI, URL-encode special password characters, and verify Atlas DB user permissions.'
+                });
+            }
+
             console.error('Error checking MongoDB space:', error);
             return interaction.editReply({
                 content: `❌ Error checking MongoDB: ${error.message}`
             });
+        } finally {
+            if (mongoClient) {
+                await mongoClient.close().catch(() => null);
+            }
         }
     }
 };

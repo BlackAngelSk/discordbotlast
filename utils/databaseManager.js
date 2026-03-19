@@ -12,21 +12,137 @@ class DatabaseManager {
         this.dbPath = path.join(__dirname, '..', 'data');
         this.mongoClient = null;
         this.db = null;
+        this.autoSyncEnabled = (process.env.MONGODB_AUTOSYNC || 'true').toLowerCase() !== 'false';
+        this.autoSyncIntervalMs = Math.max(30_000, Number(process.env.MONGODB_AUTOSYNC_INTERVAL_MS) || 60_000);
+        this.autoSyncTimer = null;
+        this.lastSyncedMtime = new Map();
+    }
+
+    isValidMongoUri(uri) {
+        if (!uri || typeof uri !== 'string') return false;
+        const trimmed = uri.trim();
+        if (!trimmed) return false;
+        if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) return false;
+        if (trimmed.includes('YOUR_') || trimmed.includes('your_')) return false;
+        return /^mongodb(\+srv)?:\/\//.test(trimmed);
     }
 
     async init() {
         if (this.useDB === 'mongodb') {
             try {
+                const uri = process.env.MONGODB_URI;
+                if (!this.isValidMongoUri(uri)) {
+                    console.warn('⚠️ MongoDB URI is missing or still contains placeholders. Falling back to JSON storage.');
+                    this.useDB = 'json';
+                    return;
+                }
+
                 const { MongoClient } = require('mongodb');
-                this.mongoClient = new MongoClient(process.env.MONGODB_URI);
+                this.mongoClient = new MongoClient(uri);
                 await this.mongoClient.connect();
                 this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
                 console.log('✅ MongoDB connected successfully!');
+
+                if (this.autoSyncEnabled) {
+                    await this.syncAllJsonToMongo({ force: true });
+                    this.startAutoSync();
+                }
             } catch (error) {
                 console.warn('⚠️ MongoDB connection failed, falling back to JSON:', error.message);
                 this.useDB = 'json';
             }
         }
+    }
+
+    async getTopLevelJsonFiles() {
+        const entries = await fs.readdir(this.dbPath, { withFileTypes: true });
+        return entries
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+            .map((entry) => ({
+                fileName: entry.name,
+                filePath: path.join(this.dbPath, entry.name)
+            }));
+    }
+
+    normalizeDocumentsFromJson(jsonData) {
+        if (Array.isArray(jsonData)) {
+            return jsonData.map((doc, index) => {
+                if (doc && typeof doc === 'object') {
+                    return doc._id ? doc : { _id: `row_${index + 1}`, ...doc };
+                }
+                return { _id: `row_${index + 1}`, value: doc };
+            });
+        }
+
+        if (jsonData && typeof jsonData === 'object') {
+            return Object.entries(jsonData).map(([key, value]) => {
+                if (value && typeof value === 'object' && !Array.isArray(value)) {
+                    return { _id: key, ...value };
+                }
+                return { _id: key, value };
+            });
+        }
+
+        return [];
+    }
+
+    async syncJsonFileToMongo(fileName, filePath, { force = false } = {}) {
+        const stats = await fs.stat(filePath);
+        const mtimeMs = stats.mtimeMs;
+        const collection = fileName.replace(/\.json$/i, '');
+        const last = this.lastSyncedMtime.get(collection) || 0;
+
+        if (!force && mtimeMs <= last) {
+            return { collection, skipped: true, synced: false };
+        }
+
+        const raw = await fs.readFile(filePath, 'utf8');
+        const sanitized = raw.replace(/^\uFEFF/, '').trim();
+        const jsonData = sanitized ? JSON.parse(sanitized) : {};
+        const docs = this.normalizeDocumentsFromJson(jsonData);
+
+        const mongoCollection = this.db.collection(collection);
+        await mongoCollection.deleteMany({});
+        if (docs.length > 0) {
+            await mongoCollection.insertMany(docs);
+        }
+
+        this.lastSyncedMtime.set(collection, mtimeMs);
+        return { collection, skipped: false, synced: true, count: docs.length };
+    }
+
+    async syncAllJsonToMongo({ force = false } = {}) {
+        if (this.useDB !== 'mongodb' || !this.db) return;
+
+        try {
+            const files = await this.getTopLevelJsonFiles();
+            let syncedCount = 0;
+
+            for (const file of files) {
+                try {
+                    const result = await this.syncJsonFileToMongo(file.fileName, file.filePath, { force });
+                    if (result.synced) syncedCount++;
+                } catch (error) {
+                    console.warn(`⚠️ Auto-sync skipped ${file.fileName}: ${error.message}`);
+                }
+            }
+
+            if (syncedCount > 0) {
+                console.log(`🔄 Mongo auto-sync updated ${syncedCount} collection(s)`);
+            }
+        } catch (error) {
+            console.warn('⚠️ Mongo auto-sync failed:', error.message);
+        }
+    }
+
+    startAutoSync() {
+        if (this.autoSyncTimer || !this.autoSyncEnabled || this.useDB !== 'mongodb') return;
+        this.autoSyncTimer = setInterval(() => {
+            this.syncAllJsonToMongo().catch((error) => {
+                console.warn('⚠️ Mongo auto-sync interval error:', error.message);
+            });
+        }, this.autoSyncIntervalMs);
+        console.log(`✅ Mongo auto-sync enabled (every ${Math.floor(this.autoSyncIntervalMs / 1000)}s)`);
     }
 
     async getCollection(collection) {
@@ -112,6 +228,10 @@ class DatabaseManager {
     }
 
     async close() {
+        if (this.autoSyncTimer) {
+            clearInterval(this.autoSyncTimer);
+            this.autoSyncTimer = null;
+        }
         if (this.mongoClient) {
             await this.mongoClient.close();
         }

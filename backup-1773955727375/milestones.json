@@ -1,0 +1,64 @@
+{
+  "milestones": {
+    "421968526547353601": {
+      "achieved": [
+        10,
+        25,
+        50
+      ],
+      "lastMemberCount": 86
+    }
+  },
+  "milestoneDefinitions": {
+    "10": {
+      "name": "10 Members",
+      "reward": 1000,
+      "emoji": "🎉"
+    },
+    "25": {
+      "name": "25 Members",
+      "reward": 2500,
+      "emoji": "🎊"
+    },
+    "50": {
+      "name": "50 Members",
+      "reward": 5000,
+      "emoji": "👑"
+    },
+    "100": {
+      "name": "100 Members",
+      "reward": 10000,
+      "emoji": "🏆"
+    },
+    "250": {
+      "name": "250 Members",
+      "reward": 25000,
+      "emoji": "🔱"
+    },
+    "500": {
+      "name": "500 Members",
+      "reward": 50000,
+      "emoji": "⚡"
+    },
+    "1000": {
+      "name": "1,000 Members",
+      "reward": 100000,
+      "emoji": "💎"
+    },
+    "2500": {
+      "name": "2,500 Members",
+      "reward": 250000,
+      "emoji": "👸"
+    },
+    "5000": {
+      "name": "5,000 Members",
+      "reward": 500000,
+      "emoji": "🌟"
+    },
+    "10000": {
+      "name": "10,000 Members",
+      "reward": 1000000,
+      "emoji": "✨"
+    }
+  }
+}

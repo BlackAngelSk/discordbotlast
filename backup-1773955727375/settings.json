@@ -1,0 +1,48 @@
+{
+  "1183343645454245898": {
+    "prefixes": [
+      "!",
+      "."
+    ],
+    "welcomeEnabled": false,
+    "welcomeChannel": null,
+    "welcomeMessage": "🎉 Welcome to the server, {user}! Enjoy your stay!",
+    "leaveEnabled": false,
+    "leaveChannel": null,
+    "leaveMessage": "👋 {user} has left the server.",
+    "autoRole": "Member",
+    "djRole": "DJ",
+    "prefix": "/"
+  },
+  "421968526547353601": {
+    "prefixes": [
+      "!",
+      "."
+    ],
+    "welcomeEnabled": true,
+    "welcomeChannel": "welcome",
+    "welcomeMessage": "🎉 Welcome to the server, {user}! Enjoy your stay!",
+    "leaveEnabled": true,
+    "leaveChannel": "welcome",
+    "leaveMessage": "👋 {user} has left the server.",
+    "autoRole": "Komunisti",
+    "djRole": "DJ",
+    "prefix": "/",
+    "welcomeCardChannel": "606144954728841240"
+  },
+  "865544990625497088": {
+    "prefixes": [
+      "!",
+      "."
+    ],
+    "welcomeEnabled": false,
+    "welcomeChannel": null,
+    "welcomeMessage": "🎉 Welcome to the server, {user}! Enjoy your stay!",
+    "leaveEnabled": false,
+    "leaveChannel": null,
+    "leaveMessage": "👋 {user} has left the server.",
+    "autoRole": "Member",
+    "djRole": "DJ",
+    "prefix": "/"
+  }
+}

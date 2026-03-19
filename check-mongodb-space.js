@@ -10,12 +10,34 @@ const { MongoClient } = require('mongodb');
 // Common limits: 512 MB (free), 2.5 GB, 10 GB, etc.
 const MONGODB_STORAGE_LIMIT = process.env.MONGODB_STORAGE_LIMIT_MB || 512;
 
+function validateMongoUri(uri) {
+    if (!uri || typeof uri !== 'string') {
+        return 'MONGODB_URI not found in .env file';
+    }
+
+    const trimmed = uri.trim();
+    if (!trimmed) {
+        return 'MONGODB_URI is empty in .env file';
+    }
+
+    if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) {
+        return 'MONGODB_URI must start with mongodb:// or mongodb+srv://';
+    }
+
+    if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) {
+        return 'MONGODB_URI still contains placeholders like <db_password>'; 
+    }
+
+    return null;
+}
+
 async function checkMongoDBSpace() {
     const mongoUri = process.env.MONGODB_URI;
     const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
 
-    if (!mongoUri) {
-        console.error('❌ MONGODB_URI not found in .env file');
+    const uriError = validateMongoUri(mongoUri);
+    if (uriError) {
+        console.error(`❌ ${uriError}`);
         process.exit(1);
     }
 
@@ -109,7 +131,15 @@ async function checkMongoDBSpace() {
         console.log('\n✅ MongoDB space check complete!');
 
     } catch (error) {
-        console.error('❌ Error checking MongoDB:', error.message);
+        if (error?.code === 8000 || /bad auth/i.test(error?.message || '')) {
+            console.error('❌ MongoDB authentication failed (bad auth).');
+            console.error('💡 Fixes:');
+            console.error('   1) Set real username/password in MONGODB_URI (no placeholders).');
+            console.error('   2) URL-encode special password chars (@, :, /, ?, #, %).');
+            console.error('   3) Verify DB user has access to this cluster/database.');
+        } else {
+            console.error('❌ Error checking MongoDB:', error.message);
+        }
         process.exit(1);
     } finally {
         await mongoClient.close();
