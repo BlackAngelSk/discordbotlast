@@ -173,7 +173,7 @@ async function playBlackjackWithBet(interaction, bet) {
         .setDescription('Hit or Stand?')
         .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
     
-    const msg = await interaction.reply({ embeds: [prompt], components: [createButtons()], withResponse: true });
+    const msg = await interaction.reply({ embeds: [prompt], components: [createButtons()], fetchReply: true });
     
     const collector = msg.createMessageComponentCollector({
         componentType: ComponentType.Button,
