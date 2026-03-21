@@ -30,8 +30,24 @@ class ErrorHandler {
 
         // Warning events
         process.on('warning', (warning) => {
+            if (this.shouldIgnoreWarning(warning)) {
+                return;
+            }
             this.logError('PROCESS_WARNING', warning);
         });
+    }
+
+    shouldIgnoreWarning(warning) {
+        if (!warning) return false;
+
+        const isTimeoutNegative = warning.name === 'TimeoutNegativeWarning';
+        if (!isTimeoutNegative) return false;
+
+        const stack = typeof warning.stack === 'string' ? warning.stack : '';
+        const isFromDiscordVoice = stack.includes('@discordjs/voice');
+
+        // Known benign timing jitter warning from @discordjs/voice under load.
+        return isFromDiscordVoice;
     }
 
     logError(type, error, context = {}) {
