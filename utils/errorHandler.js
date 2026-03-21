@@ -40,11 +40,17 @@ class ErrorHandler {
     shouldIgnoreWarning(warning) {
         if (!warning) return false;
 
-        const isTimeoutNegative = warning.name === 'TimeoutNegativeWarning';
+        const warningName = typeof warning.name === 'string' ? warning.name : '';
+        const warningMessage = typeof warning.message === 'string' ? warning.message : String(warning);
+        const isTimeoutNegative = warningName === 'TimeoutNegativeWarning' || warningMessage.includes('TimeoutNegativeWarning');
         if (!isTimeoutNegative) return false;
 
         const stack = typeof warning.stack === 'string' ? warning.stack : '';
-        const isFromDiscordVoice = stack.includes('@discordjs/voice');
+        const isFromDiscordVoice =
+            stack.includes('@discordjs/voice') ||
+            stack.includes('@discordjs\\voice') ||
+            warningMessage.includes('@discordjs/voice') ||
+            warningMessage.includes('@discordjs\\voice');
 
         // Known benign timing jitter warning from @discordjs/voice under load.
         return isFromDiscordVoice;
