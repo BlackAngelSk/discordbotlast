@@ -1,4 +1,30 @@
 require('dotenv').config();
+
+// ── Timestamp console override ────────────────────────────────────────────────
+(function patchConsole() {
+    const getTimestamp = () => {
+        const now = new Date();
+        const dd   = String(now.getDate()).padStart(2, '0');
+        const mm   = String(now.getMonth() + 1).padStart(2, '0');
+        const yyyy = now.getFullYear();
+        const hh   = String(now.getHours()).padStart(2, '0');
+        const min  = String(now.getMinutes()).padStart(2, '0');
+        const ss   = String(now.getSeconds()).padStart(2, '0');
+        return `[${dd}.${mm}.${yyyy} ${hh}:${min}:${ss}]`;
+    };
+
+    const PREFIX = '\x1b[90m'; // dark-grey
+    const RESET  = '\x1b[0m';
+
+    ['log', 'info', 'warn', 'error', 'debug'].forEach(method => {
+        const original = console[method].bind(console);
+        console[method] = (...args) => {
+            original(`${PREFIX}${getTimestamp()}${RESET}`, ...args);
+        };
+    });
+})();
+// ─────────────────────────────────────────────────────────────────────────────
+
 const { Client, GatewayIntentBits, Events, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, BaseInteraction, MessageFlags } = require('discord.js');
 const CommandHandler = require('./utils/commandHandler');
 const EventHandler = require('./utils/eventHandler');
