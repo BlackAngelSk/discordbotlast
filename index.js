@@ -143,6 +143,7 @@ client.welcomeMessageManager = welcomeMessageManager;
 client.reminderManager = reminderManager;
 client.roleTemplateManager = roleTemplateManager;
 client.InputValidator = InputValidator;
+client.queues = require('./utils/queues'); // shared music queue Map used by all music commands
 
 // Load all commands and events
 async function loadHandlers() {

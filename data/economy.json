@@ -881,15 +881,15 @@
       "seasonalCoins": 0
     },
     "865544990625497088_349649557896036354": {
-      "balance": 4990,
+      "balance": 6184,
       "xp": 79,
       "level": 1,
-      "lastDaily": null,
+      "lastDaily": 1774212717908,
       "lastWeekly": 1773691498991,
       "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "dailyStreak": 1,
+      "streakBonusMultiplier": 1.2,
+      "seasonalCoins": 1200
     },
     "421968526547353601_373924787975618571": {
       "balance": 2907,
@@ -905,6 +905,29 @@
   },
   "shops": {
     "421968526547353601": [
+      {
+        "id": "vip",
+        "name": "VIP Role",
+        "price": 10000,
+        "type": "role",
+        "description": "Get VIP status in the server"
+      },
+      {
+        "id": "custom_role",
+        "name": "Custom Role Color",
+        "price": 5000,
+        "type": "role",
+        "description": "Choose your own role color"
+      },
+      {
+        "id": "premium",
+        "name": "Premium Badge",
+        "price": 15000,
+        "type": "badge",
+        "description": "Premium member badge"
+      }
+    ],
+    "865544990625497088": [
       {
         "id": "vip",
         "name": "VIP Role",

@@ -14,11 +14,11 @@
       "losses": 33
     },
     "dice": {
-      "wins": 0,
+      "wins": 1,
       "losses": 0
     },
     "coinflip": {
-      "wins": 1,
+      "wins": 2,
       "losses": 0
     },
     "rps": {
@@ -1510,6 +1510,10 @@
       "wins": 0,
       "losses": 0,
       "ties": 0
+    },
+    "mines": {
+      "wins": 0,
+      "losses": 0
     }
   },
   "607284845034471445": {

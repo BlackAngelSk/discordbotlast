@@ -117,6 +117,24 @@ class StatsManager {
 
         return trend;
     }
+
+    /**
+     * Get aggregate bot-wide statistics.
+     * @returns {{ commandsUsed: number, songsPlayed: number, totalMessages: number }}
+     */
+    async getStats() {
+        let totalMessages = 0;
+        let commandsUsed = 0;
+        let songsPlayed = 0;
+
+        for (const serverData of Object.values(this.data.servers || {})) {
+            totalMessages += serverData.totalMessages || 0;
+            commandsUsed  += serverData.commandsUsed  || 0;
+            songsPlayed   += serverData.songsPlayed   || 0;
+        }
+
+        return { commandsUsed, songsPlayed, totalMessages };
+    }
 }
 
 module.exports = new StatsManager();

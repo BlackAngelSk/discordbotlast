@@ -120,7 +120,11 @@ module.exports = {
                 .setFooter({ text: `Asked by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
                 .setTimestamp();
 
-            const chunks = splitForDiscord(response, 1900);
+            const chunks = splitForDiscord(response, 1900).filter(c => c.trim().length > 0);
+
+            if (chunks.length === 0) {
+                return interaction.editReply({ content: '⚠️ The AI returned an empty response. Please try again.' });
+            }
 
             // For short responses, send in embed with metadata
             if (chunks.length === 1 && chunks[0].length <= 2000) {

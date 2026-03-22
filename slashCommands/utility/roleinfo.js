@@ -12,6 +12,10 @@ module.exports = {
     async execute(interaction) {
         const role = interaction.options.getRole('role');
 
+        if (!role) {
+            return interaction.reply({ content: '❌ Could not find that role.', ephemeral: true });
+        }
+
         const permissions = role.permissions.toArray().map(perm => {
             return perm.split(/(?=[A-Z])/).join(' ');
         }).slice(0, 10);
