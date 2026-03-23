@@ -35,11 +35,12 @@ module.exports = {
             ];
 
             // Send initial message
-            const message = await interaction.reply({
+            await interaction.reply({
                 embeds: [embed],
-                components: components,
-                fetchReply: true
+                components: components
             });
+
+            const message = await interaction.fetchReply();
 
             // Set up auto-update every 30 seconds
             const updateInterval = setInterval(async () => {

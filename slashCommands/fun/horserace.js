@@ -125,7 +125,9 @@ module.exports = {
                 )
             );
 
-            const gameMessage = await interaction.reply({ embeds: [embed], components: [row], withResponse: true });
+            await interaction.reply({ embeds: [embed], components: [row] });
+
+            const gameMessage = await interaction.fetchReply();
 
             const collector = gameMessage.createMessageComponentCollector({
                 componentType: ComponentType.Button,

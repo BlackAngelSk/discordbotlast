@@ -36,8 +36,9 @@ module.exports = {
 
         const row = new ActionRowBuilder().addComponents(selectMenu);
 
-        const response = await interaction.reply({ embeds: [embed], components: [row] });
+        await interaction.reply({ embeds: [embed], components: [row] });
 
+        const response = await interaction.fetchReply();
         const collector = response.createMessageComponentCollector({ time: 60000 });
 
         collector.on('collect', async i => {

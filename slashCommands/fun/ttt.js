@@ -228,7 +228,9 @@ async function playTicTacToeWithBet(interaction, bet) {
             `\nYour turn!`
         );
 
-    const msg = await interaction.reply({ embeds: [prompt], components: createButtons() });
+    await interaction.reply({ embeds: [prompt], components: createButtons() });
+
+    const msg = await interaction.fetchReply();
 
     // Bot goes first based on difficulty (easier = less likely to go first)
     const firstMoveChance = totalGames < 3 ? 0.3 : totalGames < 10 ? 0.4 : 0.5;
