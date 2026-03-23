@@ -6,10 +6,19 @@ const customRoleShop = require('../utils/customRoleShop');
 const economyManager = require('../utils/economyManager');
 const seasonLeaderboardManager = require('../utils/seasonLeaderboardManager');
 const moderationManager = require('../utils/moderationManager');
+const activityTracker = require('../utils/activityTracker');
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
+        if (!interaction.isChatInputCommand() && interaction.guildId && interaction.user?.id) {
+            try {
+                await activityTracker.recordActivity(interaction.guildId, interaction.user.id, 'interaction');
+            } catch (error) {
+                console.error('Interaction activity tracking error:', error);
+            }
+        }
+
         // Handle select menu interactions
         if (interaction.isStringSelectMenu()) {
             if (interaction.customId.startsWith('shop_')) {

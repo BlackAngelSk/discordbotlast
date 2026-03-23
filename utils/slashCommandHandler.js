@@ -2,6 +2,7 @@ const { REST, Routes, Collection, MessageFlags } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
 const commandPermissionsManager = require('./commandPermissionsManager');
+const activityTracker = require('./activityTracker');
 
 class SlashCommandHandler {
     constructor(client) {
@@ -97,6 +98,7 @@ class SlashCommandHandler {
         }
 
         try {
+            await activityTracker.recordActivity(interaction.guildId, interaction.user.id, 'slash_command');
             await command.execute(interaction);
         } catch (error) {
             console.error(`Error executing ${interaction.commandName}:`, error);

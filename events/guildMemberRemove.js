@@ -1,10 +1,17 @@
 const { Events } = require('discord.js');
 const settingsManager = require('../utils/settingsManager');
+const activityTracker = require('../utils/activityTracker');
 
 module.exports = {
     name: Events.GuildMemberRemove,
     async execute(member, client) {
         try {
+            try {
+                await activityTracker.removeUser(member.guild.id, member.id);
+            } catch (error) {
+                console.error('Error removing member activity:', error);
+            }
+
             const settings = settingsManager.get(member.guild.id);
 
             // Check if leave messages are enabled

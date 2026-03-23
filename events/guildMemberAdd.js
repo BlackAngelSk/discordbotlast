@@ -6,6 +6,7 @@ const raidProtectionManager = require('../utils/raidProtectionManager');
 const seasonManager = require('../utils/seasonManager');
 const economyManager = require('../utils/economyManager');
 const gameStatsManager = require('../utils/gameStatsManager');
+const activityTracker = require('../utils/activityTracker');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -14,6 +15,12 @@ module.exports = {
     async execute(member, client) {
         try {
             console.log(`👋 New member joined: ${member.user.tag}`);
+
+            try {
+                await activityTracker.registerMember(member.guild.id, member.id, member.joinedTimestamp || Date.now());
+            } catch (error) {
+                console.error('Error registering member activity:', error);
+            }
 
             // Raid protection checks
             const raidSettings = raidProtectionManager.getSettings(member.guild.id);

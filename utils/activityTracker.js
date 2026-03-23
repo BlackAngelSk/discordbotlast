@@ -15,6 +15,27 @@ class ActivityTracker {
         };
     }
 
+    ensurePresenceUser(guildId, userId, joinedAt = null) {
+        const key = `${guildId}_${userId}`;
+
+        if (!this.presenceData.users[key]) {
+            this.presenceData.users[key] = {
+                lastSeen: null,
+                lastActivityType: null,
+                lastMessageAt: null,
+                lastVoiceAt: null,
+                lastCommandAt: null,
+                joinedAt: joinedAt || Date.now(),
+                afkSince: null,
+                isAFK: false
+            };
+        } else if (joinedAt && !this.presenceData.users[key].joinedAt) {
+            this.presenceData.users[key].joinedAt = joinedAt;
+        }
+
+        return this.presenceData.users[key];
+    }
+
     async init() {
         try {
             const voiceDir = path.dirname(this.voiceDataPath);
@@ -53,13 +74,12 @@ class ActivityTracker {
 
     // ===== VOICE TRACKING =====
     startVoiceSession(guildId, userId, voiceChannelId) {
-        const key = `${guildId}_${userId}`;
         this.voiceData.activeUsers[userId] = {
             startTime: Date.now(),
             guildId,
             voiceChannelId
         };
-        return this.save();
+        return this.recordActivity(guildId, userId, 'voice');
     }
 
     async endVoiceSession(userId, economyManager) {
@@ -82,6 +102,8 @@ class ActivityTracker {
         // Update voice stats
         this.voiceData.sessions[key].totalMinutes += durationMinutes;
         this.voiceData.sessions[key].lastSession = new Date().toISOString();
+
+        await this.recordActivity(guildId, userId, 'voice');
 
         // Award coins (1 coin per 5 minutes, minimum 1 coin)
         const coinsEarned = Math.max(1, Math.floor(durationMinutes / 5));
@@ -122,39 +144,97 @@ class ActivityTracker {
 
     // ===== PRESENCE TRACKING =====
     updatePresence(guildId, userId) {
-        const key = `${guildId}_${userId}`;
-        if (!this.presenceData.users[key]) {
-            this.presenceData.users[key] = {
-                lastSeen: Date.now(),
-                afkSince: null,
-                isAFK: false
-            };
-        } else {
-            this.presenceData.users[key].lastSeen = Date.now();
-            this.presenceData.users[key].isAFK = false;
-            this.presenceData.users[key].afkSince = null;
+        return this.recordActivity(guildId, userId, 'presence');
+    }
+
+    recordActivity(guildId, userId, type = 'general', timestamp = Date.now()) {
+        const userData = this.ensurePresenceUser(guildId, userId);
+
+        userData.lastSeen = timestamp;
+        userData.lastActivityType = type;
+        userData.isAFK = false;
+        userData.afkSince = null;
+
+        if (type === 'message') {
+            userData.lastMessageAt = timestamp;
         }
+
+        if (type === 'voice') {
+            userData.lastVoiceAt = timestamp;
+        }
+
+        if (type === 'slash_command' || type === 'interaction') {
+            userData.lastCommandAt = timestamp;
+        }
+
+        return this.save();
+    }
+
+    registerMember(guildId, userId, joinedAt = Date.now()) {
+        this.ensurePresenceUser(guildId, userId, joinedAt);
+        return this.save();
+    }
+
+    removeUser(guildId, userId) {
+        const key = `${guildId}_${userId}`;
+        delete this.presenceData.users[key];
+        delete this.presenceData.dailyRewards[key];
+
+        const activeSession = this.voiceData.activeUsers[userId];
+        if (activeSession && activeSession.guildId === guildId) {
+            delete this.voiceData.activeUsers[userId];
+        }
+
         return this.save();
     }
 
     markAFK(guildId, userId) {
-        const key = `${guildId}_${userId}`;
-        if (!this.presenceData.users[key]) {
-            this.presenceData.users[key] = {
-                lastSeen: Date.now(),
-                afkSince: Date.now(),
-                isAFK: true
-            };
-        } else {
-            this.presenceData.users[key].isAFK = true;
-            this.presenceData.users[key].afkSince = Date.now();
-        }
+        const userData = this.ensurePresenceUser(guildId, userId);
+        userData.isAFK = true;
+        userData.afkSince = Date.now();
         return this.save();
     }
 
     getPresenceStatus(guildId, userId) {
         const key = `${guildId}_${userId}`;
         return this.presenceData.users[key] || null;
+    }
+
+    getLastActivity(guildId, userId, fallbackTimestamp = null) {
+        const userData = this.getPresenceStatus(guildId, userId);
+        const lastSeen = userData?.lastSeen || userData?.joinedAt || fallbackTimestamp || null;
+
+        return {
+            lastSeen,
+            lastActivityType: userData?.lastActivityType || (lastSeen ? 'unknown' : null),
+            joinedAt: userData?.joinedAt || fallbackTimestamp || null,
+            isTracked: Boolean(userData)
+        };
+    }
+
+    getInactiveUsers(guildId, members = [], daysThreshold = 7, limit = 10) {
+        const threshold = Date.now() - (daysThreshold * 24 * 60 * 60 * 1000);
+        const inactiveUsers = [];
+
+        for (const member of members) {
+            if (!member || member.isBot) continue;
+
+            const activity = this.getLastActivity(guildId, member.userId, member.joinedTimestamp || null);
+            if (!activity.lastSeen || activity.lastSeen > threshold) continue;
+
+            inactiveUsers.push({
+                userId: member.userId,
+                lastSeen: activity.lastSeen,
+                lastActivityType: activity.lastActivityType,
+                joinedAt: activity.joinedAt,
+                daysInactive: Math.floor((Date.now() - activity.lastSeen) / (24 * 60 * 60 * 1000)),
+                isTracked: activity.isTracked
+            });
+        }
+
+        return inactiveUsers
+            .sort((a, b) => a.lastSeen - b.lastSeen)
+            .slice(0, limit);
     }
 
     getAFKUsers(guildId, minutesThreshold = 30) {

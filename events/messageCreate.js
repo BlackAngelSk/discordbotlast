@@ -5,6 +5,7 @@ const statsManager = require('../utils/statsManager');
 const customCommandManager = require('../utils/customCommandManager');
 const settingsManager = require('../utils/settingsManager');
 const afkManager = require('../utils/afkManager');
+const activityTracker = require('../utils/activityTracker');
 const levelRewardsManager = require('../utils/levelRewardsManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
 
@@ -164,6 +165,7 @@ module.exports = {
 
         // Track message statistics
         try {
+            await activityTracker.recordActivity(message.guildId, message.author.id, 'message');
             await statsManager.recordMessage(message.guildId, message.author.id, message.channelId);
         } catch (error) {
             console.error('Stats tracking error:', error);

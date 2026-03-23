@@ -238,6 +238,35 @@ class DatabaseManager {
         return { modifiedCount: 0 };
     }
 
+    async upsertOne(collection, query, update) {
+        if (this.useDB === 'mongodb') {
+            return await this.db.collection(collection).updateOne(query, { $set: update }, { upsert: true });
+        }
+
+        const data = await this.getCollection(collection);
+        const key = Object.keys(query)[0];
+        const value = query[key];
+        const existingEntry = Object.entries(data).find(([, item]) => item && item[key] === value);
+        const documentId = existingEntry?.[0] || update._id || value || Date.now().toString();
+        const previous = existingEntry?.[1] || data[documentId] || {};
+
+        data[documentId] = {
+            ...previous,
+            ...update,
+            [key]: value,
+            _id: documentId
+        };
+
+        await this.saveCollection(collection, data);
+
+        return {
+            matchedCount: existingEntry ? 1 : 0,
+            modifiedCount: 1,
+            upsertedCount: existingEntry ? 0 : 1,
+            upsertedId: existingEntry ? null : documentId
+        };
+    }
+
     async deleteOne(collection, query) {
         if (this.useDB === 'mongodb') {
             return await this.db.collection(collection).deleteOne(query);

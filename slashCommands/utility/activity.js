@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const activityTracker = require('../../utils/activityTracker');
 
 module.exports = {
@@ -32,6 +32,24 @@ module.exports = {
                     opt.setName('minutes')
                         .setDescription('AFK threshold in minutes (default: 30)')
                         .setRequired(false)
+                )
+        )
+        .addSubcommand(sub =>
+            sub.setName('inactive')
+                .setDescription('View members inactive for a number of days')
+                .addIntegerOption(opt =>
+                    opt.setName('days')
+                        .setDescription('Inactive threshold in days (default: 7)')
+                        .setRequired(false)
+                        .setMinValue(1)
+                        .setMaxValue(365)
+                )
+                .addIntegerOption(opt =>
+                    opt.setName('limit')
+                        .setDescription('Number of members to show (1-25, default: 10)')
+                        .setRequired(false)
+                        .setMinValue(1)
+                        .setMaxValue(25)
                 )
         ),
 
@@ -120,6 +138,67 @@ module.exports = {
                 .setDescription(description);
 
             return interaction.reply({ embeds: [embed] });
+        }
+
+        if (subcommand === 'inactive') {
+            if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
+                return interaction.reply({
+                    content: '❌ You need the Manage Server permission to view inactive members.',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
+
+            const days = interaction.options.getInteger('days') || 7;
+            const limit = interaction.options.getInteger('limit') || 10;
+
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            const members = await interaction.guild.members.fetch();
+            const inactiveUsers = activityTracker.getInactiveUsers(
+                guildId,
+                members.map(member => ({
+                    userId: member.id,
+                    joinedTimestamp: member.joinedTimestamp,
+                    isBot: member.user.bot
+                })),
+                days,
+                limit
+            );
+
+            if (inactiveUsers.length === 0) {
+                return interaction.editReply({
+                    content: `✅ No members have been inactive for ${days}+ days.`
+                });
+            }
+
+            const descriptionParts = [];
+            for (let i = 0; i < inactiveUsers.length; i++) {
+                const inactiveUser = inactiveUsers[i];
+                const member = members.get(inactiveUser.userId);
+                const displayName = member?.displayName || member?.user?.username || `User ${inactiveUser.userId}`;
+                const timestamp = Math.floor(inactiveUser.lastSeen / 1000);
+                const source = inactiveUser.lastActivityType
+                    ? inactiveUser.lastActivityType.replace(/_/g, ' ')
+                    : 'unknown activity';
+
+                descriptionParts.push(
+                    `${i + 1}. **${displayName}** — inactive for **${inactiveUser.daysInactive} days**\n` +
+                    `Last active: <t:${timestamp}:F> (<t:${timestamp}:R>) via ${source}`
+                );
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor(0xFEE75C)
+                .setTitle(`😴 Inactive Members (${days}+ days)`)
+                .setDescription(descriptionParts.join('\n\n'))
+                .addFields(
+                    { name: 'Threshold', value: `${days} days`, inline: true },
+                    { name: 'Shown', value: `${inactiveUsers.length}`, inline: true },
+                    { name: 'Scope', value: 'Non-bot members only', inline: true }
+                )
+                .setTimestamp();
+
+            return interaction.editReply({ embeds: [embed] });
         }
     }
 };

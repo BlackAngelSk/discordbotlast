@@ -178,9 +178,14 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const updates = req.body;
+                const parseOptionalNumber = (value) => {
+                    if (value === undefined || value === null || value === '') {
+                        return undefined;
+                    }
 
-                // Get current settings
-                const settings = settingsManager.get(guildId);
+                    const parsed = Number(value);
+                    return Number.isFinite(parsed) ? parsed : undefined;
+                };
 
                 // Update allowed fields
                 const allowedFields = [
@@ -189,18 +194,24 @@ class Dashboard {
                     'leaveChannel', 'leaveMessage', 'leaveEnabled'
                 ];
 
+                const settingsUpdates = {};
+
                 allowedFields.forEach(field => {
                     if (updates[field] !== undefined) {
-                        settings[field] = updates[field];
+                        settingsUpdates[field] = updates[field];
                     }
                 });
 
                 // Handle prefixes (array)
                 if (updates.prefixes !== undefined && Array.isArray(updates.prefixes)) {
-                    await settingsManager.setPrefixes(guildId, updates.prefixes);
+                    settingsUpdates.prefixes = updates.prefixes;
                 }
 
-                await settingsManager.save();
+                if (Object.keys(settingsUpdates).length > 0) {
+                    await settingsManager.setMultiple(guildId, settingsUpdates);
+                }
+
+                const settings = settingsManager.get(guildId);
 
                 // Handle logging channel (allow clearing)
                 if (updates.loggingChannel !== undefined) {
@@ -213,8 +224,10 @@ class Dashboard {
                 if (updates.antiSpam !== undefined) autoModUpdates.antiSpam = updates.antiSpam;
                 if (updates.antiInvite !== undefined) autoModUpdates.antiInvite = updates.antiInvite;
                 if (updates.emojiOnly !== undefined) autoModUpdates.emojiOnly = updates.emojiOnly;
-                if (updates.maxMentions !== undefined && Number.isFinite(updates.maxMentions)) autoModUpdates.maxMentions = updates.maxMentions;
-                if (updates.maxEmojis !== undefined && Number.isFinite(updates.maxEmojis)) autoModUpdates.maxEmojis = updates.maxEmojis;
+                const maxMentions = parseOptionalNumber(updates.maxMentions);
+                const maxEmojis = parseOptionalNumber(updates.maxEmojis);
+                if (maxMentions !== undefined) autoModUpdates.maxMentions = maxMentions;
+                if (maxEmojis !== undefined) autoModUpdates.maxEmojis = maxEmojis;
                 if (updates.badWords !== undefined) autoModUpdates.badWords = updates.badWords;
 
                 if (Object.keys(autoModUpdates).length > 0) {
@@ -235,9 +248,9 @@ class Dashboard {
         });
 
         // API: Reset settings
-        this.app.post('/api/settings/:guildId/reset', this.checkAuth, this.checkGuildAccess, (req, res) => {
+        this.app.post('/api/settings/:guildId/reset', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
-                settingsManager.reset(req.params.guildId);
+                await settingsManager.reset(req.params.guildId);
                 const settings = settingsManager.get(req.params.guildId);
                 res.json({ success: true, settings });
             } catch (error) {

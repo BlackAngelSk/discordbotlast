@@ -1,5 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
+const databaseManager = require('./databaseManager');
 
 const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
 
@@ -24,28 +25,96 @@ class SettingsManager {
         this.loaded = false;
     }
 
+    normalizeGuildSettings(settings = {}) {
+        const normalized = { ...DEFAULT_SETTINGS, ...settings };
+
+        if (!Array.isArray(normalized.prefixes) || normalized.prefixes.length === 0) {
+            normalized.prefixes = [normalized.prefix || DEFAULT_SETTINGS.prefixes[0]];
+        }
+
+        normalized.prefix = normalized.prefixes[0] || DEFAULT_SETTINGS.prefixes[0];
+        return normalized;
+    }
+
+    async loadFromFile() {
+        try {
+            const data = await fs.readFile(SETTINGS_FILE, 'utf8');
+            const parsed = JSON.parse(data);
+
+            for (const [guildId, settings] of Object.entries(parsed)) {
+                this.settings.set(guildId, this.normalizeGuildSettings(settings));
+            }
+
+            console.log(`✅ Loaded settings for ${this.settings.size} server(s) from JSON`);
+            return this.settings.size;
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.error('Error loading settings from file:', error);
+            }
+            return 0;
+        }
+    }
+
+    async loadFromDatabase() {
+        if (databaseManager.useDB !== 'mongodb' || !databaseManager.db) {
+            return 0;
+        }
+
+        try {
+            const documents = await databaseManager.find('settings');
+            let loadedCount = 0;
+
+            for (const document of documents) {
+                if (!document?._id) continue;
+
+                const { _id, ...settings } = document;
+                this.settings.set(_id, this.normalizeGuildSettings(settings));
+                loadedCount++;
+            }
+
+            if (loadedCount > 0) {
+                console.log(`✅ Loaded settings for ${loadedCount} server(s) from MongoDB`);
+            }
+
+            return loadedCount;
+        } catch (error) {
+            console.error('Error loading settings from MongoDB:', error);
+            return 0;
+        }
+    }
+
+    async persistGuildToDatabase(guildId) {
+        if (databaseManager.useDB !== 'mongodb' || !databaseManager.db) {
+            return;
+        }
+
+        const settings = this.settings.get(guildId);
+        if (!settings) {
+            return;
+        }
+
+        await databaseManager.upsertOne('settings', { _id: guildId }, { ...settings });
+    }
+
+    async persistAllToDatabase() {
+        if (databaseManager.useDB !== 'mongodb' || !databaseManager.db) {
+            return;
+        }
+
+        await Promise.all(
+            Array.from(this.settings.keys()).map((guildId) => this.persistGuildToDatabase(guildId))
+        );
+    }
+
     async init() {
         try {
             // Ensure data directory exists
             const dataDir = path.dirname(SETTINGS_FILE);
             await fs.mkdir(dataDir, { recursive: true });
 
-            // Load settings from file
-            try {
-                const data = await fs.readFile(SETTINGS_FILE, 'utf8');
-                const parsed = JSON.parse(data);
-                
-                // Convert object to Map
-                for (const [guildId, settings] of Object.entries(parsed)) {
-                    this.settings.set(guildId, { ...DEFAULT_SETTINGS, ...settings });
-                }
-                
-                console.log(`✅ Loaded settings for ${this.settings.size} server(s)`);
-            } catch (error) {
-                if (error.code !== 'ENOENT') {
-                    console.error('Error loading settings:', error);
-                }
-                // File doesn't exist yet, that's okay
+            const mongoLoaded = await this.loadFromDatabase();
+            if (mongoLoaded === 0) {
+                await this.loadFromFile();
             }
 
             this.loaded = true;
@@ -63,6 +132,7 @@ class SettingsManager {
             }
 
             await fs.writeFile(SETTINGS_FILE, JSON.stringify(obj, null, 2));
+            await this.persistAllToDatabase();
         } catch (error) {
             console.error('Error saving settings:', error);
         }
@@ -70,7 +140,7 @@ class SettingsManager {
 
     get(guildId) {
         if (!this.settings.has(guildId)) {
-            this.settings.set(guildId, { ...DEFAULT_SETTINGS });
+            this.settings.set(guildId, this.normalizeGuildSettings());
         }
         return this.settings.get(guildId);
     }
@@ -78,14 +148,14 @@ class SettingsManager {
     async set(guildId, key, value) {
         const settings = this.get(guildId);
         settings[key] = value;
-        this.settings.set(guildId, settings);
+        this.settings.set(guildId, this.normalizeGuildSettings(settings));
         await this.save();
     }
 
     async setMultiple(guildId, updates) {
         const settings = this.get(guildId);
         Object.assign(settings, updates);
-        this.settings.set(guildId, settings);
+        this.settings.set(guildId, this.normalizeGuildSettings(settings));
         await this.save();
     }
 
@@ -142,7 +212,7 @@ class SettingsManager {
     }
 
     async reset(guildId) {
-        this.settings.set(guildId, { ...DEFAULT_SETTINGS });
+        this.settings.set(guildId, this.normalizeGuildSettings());
         await this.save();
     }
 }
