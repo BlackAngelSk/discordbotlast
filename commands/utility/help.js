@@ -31,7 +31,8 @@ module.exports = {
                 { name: '📝 Custom', value: 'Custom commands (admin)', inline: true },
                 { name: '🔧 Utility', value: 'Config, info commands, setup', inline: true },
                 { name: '🎭 Fun', value: 'Polls, memes, 8ball', inline: true },
-                { name: '🧰 Admin', value: 'Season tools, economy admin, backups', inline: true }
+                { name: '🧰 Admin', value: 'Season tools, economy admin, backups', inline: true },
+                { name: '👑 Owner', value: 'Bot owner-only system commands', inline: true }
             )
             .setFooter({ text: `Type ${p}help <category> for detailed commands | Example: ${p}help music` })
             .setTimestamp();
@@ -92,7 +93,15 @@ module.exports = {
                 .setStyle(ButtonStyle.Danger)
         );
 
-        const reply = await message.reply({ embeds: [mainEmbed], components: [row1, row2] });
+        const row3 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('Owner')
+                .setEmoji('👑')
+                .setCustomId('help_owner')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const reply = await message.reply({ embeds: [mainEmbed], components: [row1, row2, row3] });
 
         // Button interaction collector
         const collector = reply.createMessageComponentCollector({ time: 300000 }); // 5 minutes
@@ -106,14 +115,15 @@ module.exports = {
             await i.deferUpdate();
             
             const categoryEmbed = getCategoryEmbed(p, category);
-            await i.editReply({ embeds: [categoryEmbed], components: [row1, row2] });
+            await i.editReply({ embeds: [categoryEmbed], components: [row1, row2, row3] });
         });
 
         collector.on('end', () => {
             // Disable buttons after timeout
             row1.components.forEach(btn => btn.setDisabled(true));
             row2.components.forEach(btn => btn.setDisabled(true));
-            reply.edit({ components: [row1, row2] }).catch(() => {});
+            row3.components.forEach(btn => btn.setDisabled(true));
+            reply.edit({ components: [row1, row2, row3] }).catch(() => {});
         });
     }
 };
@@ -233,9 +243,24 @@ function getCategoryEmbed(p, category) {
                 );
             break;
 
+        case 'owner':
+            embed.setTitle('👑 Owner Commands')
+                .setDescription('Restricted to the bot owner only.')
+                .addFields(
+                    {
+                        name: '🔒 Owner-only Slash Commands',
+                        value: `\`/testcommands\` - Simulate all slash commands and report failures\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync\` - Force sync JSON data to MongoDB`
+                    },
+                    {
+                        name: 'ℹ️ Notes',
+                        value: `Requires \`BOT_OWNER_ID\` in environment variables.\nSome admin commands can also be used by delegated roles, but the commands above are owner-gated.`
+                    }
+                );
+            break;
+
         default:
             embed.setTitle('❌ Unknown Category')
-                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n\`music\`, \`economy\`, \`games\`, \`moderation\`, \`server\`, \`stats\`, \`custom\`, \`utility\`, \`fun\`, \`admin\``)
+                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n\`music\`, \`economy\`, \`games\`, \`moderation\`, \`server\`, \`stats\`, \`custom\`, \`utility\`, \`fun\`, \`admin\`, \`owner\``)
                 .setColor('#ed4245');
     }
 
