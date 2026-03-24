@@ -57,7 +57,8 @@ class GameStatsManager {
                 coinflip: { wins: 0, losses: 0 },
                 mines: { wins: 0, losses: 0 },
                 rps: { wins: 0, losses: 0, ties: 0 },
-                ttt: { wins: 0, losses: 0, ties: 0 }
+                ttt: { wins: 0, losses: 0, ties: 0 },
+                poker: { wins: 0, losses: 0, ties: 0 }
             });
         }
         
@@ -71,6 +72,7 @@ class GameStatsManager {
         if (!stats.mines) stats.mines = { wins: 0, losses: 0 };
         if (!stats.rps) stats.rps = { wins: 0, losses: 0, ties: 0 };
         if (!stats.ttt) stats.ttt = { wins: 0, losses: 0, ties: 0 };
+        if (!stats.poker) stats.poker = { wins: 0, losses: 0, ties: 0 };
         
         return stats;
     }
@@ -161,6 +163,18 @@ class GameStatsManager {
         await this.save();
     }
 
+    async recordPoker(userId, result) {
+        const stats = this.getStats(userId);
+        if (result === 'win') {
+            stats.poker.wins++;
+        } else if (result === 'loss') {
+            stats.poker.losses++;
+        } else if (result === 'tie') {
+            stats.poker.ties++;
+        }
+        await this.save();
+    }
+
     getTotalGames(userId) {
         const stats = this.getStats(userId);
         return {
@@ -171,14 +185,15 @@ class GameStatsManager {
             coinflip: stats.coinflip.wins + stats.coinflip.losses,
             mines: stats.mines.wins + stats.mines.losses,
             rps: stats.rps.wins + stats.rps.losses + stats.rps.ties,
-            ttt: stats.ttt.wins + stats.ttt.losses + stats.ttt.ties
+            ttt: stats.ttt.wins + stats.ttt.losses + stats.ttt.ties,
+            poker: stats.poker.wins + stats.poker.losses + stats.poker.ties
         };
     }
 
     getWinRate(userId, game) {
         const stats = this.getStats(userId);
         const gameStats = stats[game];
-        const hasTies = game === 'blackjack' || game === 'rps' || game === 'ttt';
+        const hasTies = game === 'blackjack' || game === 'rps' || game === 'ttt' || game === 'poker';
         const total = hasTies
             ? gameStats.wins + gameStats.losses + gameStats.ties
             : gameStats.wins + gameStats.losses;
@@ -199,7 +214,8 @@ class GameStatsManager {
             stats.coinflip.wins +
             stats.mines.wins +
             stats.rps.wins +
-            stats.ttt.wins;
+            stats.ttt.wins +
+            stats.poker.wins;
 
         const losses =
             stats.blackjack.losses +
@@ -209,7 +225,8 @@ class GameStatsManager {
             stats.coinflip.losses +
             stats.mines.losses +
             stats.rps.losses +
-            stats.ttt.losses;
+            stats.ttt.losses +
+            stats.poker.losses;
 
         const total =
             totals.blackjack +
@@ -219,7 +236,8 @@ class GameStatsManager {
             totals.coinflip +
             totals.mines +
             totals.rps +
-            totals.ttt;
+            totals.ttt +
+            totals.poker;
 
         return { total, wins, losses };
     }

@@ -34,6 +34,11 @@
     "mines": {
       "wins": 1,
       "losses": 7
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 2,
+      "ties": 0
     }
   },
   "396685113804587009": {
@@ -71,6 +76,11 @@
     "mines": {
       "wins": 1,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "269854360798756864": {
@@ -669,6 +679,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "360790644932870144": {
@@ -999,6 +1014,15 @@
       "wins": 0,
       "losses": 0,
       "ties": 0
+    },
+    "mines": {
+      "wins": 0,
+      "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "721669183758270474": {
@@ -1201,6 +1225,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "1455190625048854611": {
@@ -1304,6 +1333,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "334003778636349442": {
@@ -1374,6 +1408,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "676405031871840287": {
@@ -1477,6 +1516,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "1156392147038253057": {
@@ -1514,6 +1558,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "607284845034471445": {
@@ -1815,6 +1864,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "246285714399035393": {
@@ -2050,6 +2104,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   },
   "293459633715150849": {
@@ -2450,6 +2509,11 @@
     "mines": {
       "wins": 0,
       "losses": 1
+    },
+    "poker": {
+      "wins": 1,
+      "losses": 0,
+      "ties": 0
     }
   },
   "566622880402505728": {
@@ -2718,6 +2782,11 @@
     "mines": {
       "wins": 0,
       "losses": 0
+    },
+    "poker": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
     }
   }
 }
