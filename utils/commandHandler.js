@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const settingsManager = require('./settingsManager');
 const commandPermissionsManager = require('./commandPermissionsManager');
+const { memberHasBetaAccess, getBetaRoleName } = require('./betaAccess');
 
 class CommandHandler {
     constructor(client) {
@@ -83,11 +84,23 @@ class CommandHandler {
             }
         }
 
+        const isBetaCommand = !!command.beta;
+        if (isBetaCommand && !memberHasBetaAccess(message.member)) {
+            return message.reply(`❌ This is a beta command. You need the \`${getBetaRoleName()}\` role.`);
+        }
+
         try {
+            if (isBetaCommand) {
+                message.betaInfiniteBalance = true;
+            }
             await command.execute(message, args, this.client);
         } catch (error) {
             console.error(`Error executing command ${commandName}:`, error);
             await message.reply('❌ There was an error executing that command!');
+        } finally {
+            if (isBetaCommand) {
+                delete message.betaInfiniteBalance;
+            }
         }
     }
 }

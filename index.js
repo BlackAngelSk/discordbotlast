@@ -60,6 +60,7 @@ const seasonLeaderboardManager = require('./utils/seasonLeaderboardManager');
 const commandPermissionsManager = require('./utils/commandPermissionsManager');
 const Dashboard = require('./dashboard/server');
 const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
+const { isDevModeEnabled } = require('./utils/devMode');
 
 // New system managers
 const ErrorHandler = require('./utils/errorHandler');
@@ -131,6 +132,7 @@ const auditLog = new AuditLog();
 const welcomeMessageManager = new WelcomeMessageManager();
 const reminderManager = new ReminderManager(client);
 const roleTemplateManager = new RoleTemplateManager();
+const devModeEnabled = isDevModeEnabled();
 
 // Attach to client for global access
 client.errorHandler = errorHandler;
@@ -234,6 +236,12 @@ shutdownManager.onShutdown(async () => {
 shutdownManager.setShutdownTimeout(30000); // 30 second timeout
 
 loadHandlers().then(() => {
+    if (devModeEnabled) {
+        console.log('🧪 DEV_MODE: ON (MongoDB sync + seasonal leaderboard auto-updates are disabled)');
+    } else {
+        console.log('✅ DEV_MODE: OFF');
+    }
+
     // Handle messages for commands
 
     client.on(Events.MessageCreate, async (message) => {
@@ -279,15 +287,19 @@ loadHandlers().then(() => {
             }
 
             // Start season leaderboard update task (runs every minute, respects per-guild interval)
-            setInterval(async () => {
-                if (seasonLeaderboardTaskRunning) return;
-                seasonLeaderboardTaskRunning = true;
-                try {
-                    await updateSeasonLeaderboards(client);
-                } finally {
-                    seasonLeaderboardTaskRunning = false;
-                }
-            }, 60 * 1000); // 1 minute
+            if (!devModeEnabled) {
+                setInterval(async () => {
+                    if (seasonLeaderboardTaskRunning) return;
+                    seasonLeaderboardTaskRunning = true;
+                    try {
+                        await updateSeasonLeaderboards(client);
+                    } finally {
+                        seasonLeaderboardTaskRunning = false;
+                    }
+                }, 60 * 1000); // 1 minute
+            } else {
+                console.log('🧪 DEV_MODE: Skipping scheduled season leaderboard updates.');
+            }
 
             // Start quarterly season auto-creation task (runs every 6 hours, checks once per day)
             setInterval(async () => {
@@ -308,7 +320,7 @@ loadHandlers().then(() => {
             }, 6 * 60 * 60 * 1000); // 6 hours
 
             // Initial update
-            if (!seasonLeaderboardTaskRunning) {
+            if (!devModeEnabled && !seasonLeaderboardTaskRunning) {
                 seasonLeaderboardTaskRunning = true;
                 try {
                     await updateSeasonLeaderboards(client);
@@ -327,6 +339,10 @@ loadHandlers().then(() => {
  * @param {Client} client - Discord client
  */
 async function updateSeasonLeaderboards(client) {
+    if (devModeEnabled) {
+        return;
+    }
+
     try {
         const guildConfigs = seasonLeaderboardManager.config;
 

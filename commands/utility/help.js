@@ -150,7 +150,7 @@ function getCategoryEmbed(p, category) {
                 .setDescription('Earn coins, gamble, and climb the leaderboard!')
                 .addFields(
                     { name: '💵 Balance', value: `\`/balance [@user]\` - Check balance\n\`/daily\` - Daily coins + streak bonus\n\`/weekly\` - Weekly coins\n\`${p}profile [@user]\` - View full profile with XP` },
-                    { name: '🎰 Gambling', value: `\`${p}slots <bet|max|all> [bonus]\` - Slot machine (optional bonus buy)\n\`${p}mines <bet|max|all> [mines]\` - Reveal & cashout game\n\`${p}coinflip <h/t> <bet>\` - 2.5x multiplier\n\`${p}dice <1-6> <bet>\` - 6x multiplier\n\`${p}roulette <bet>\` - Roulette wheel\n\`${p}blackjack <bet>\` - Card game\n\`${p}rps <bet>\` - Rock paper scissors\n\`${p}russianroulette\` - Risky roulette` },
+                    { name: '🎰 Gambling', value: `\`${p}slots <bet|max|all> [bonus]\` - Slot machine (optional bonus buy)\n\`${p}mines <bet|max|all> [mines]\` - Reveal & cashout game\n\`${p}coinflip <h/t> <bet>\` - 2.5x multiplier\n\`${p}dice <1-6> <bet>\` - 6x multiplier\n\`${p}roulette <bet>\` - Roulette wheel\n\`${p}blackjack <bet>\` - Card game\n\`${p}rps <bet>\` - Rock paper scissors` },
                     { name: '🏆 Leaderboards', value: `\`${p}leaderboard balance\` - Richest users\n\`${p}leaderboard xp\` - Top levels\n\`${p}leaderboard seasonal\` - Seasonal coins\n\`/leaderboard\` - Slash command leaderboard\n\`/leaderboard-update\` - Force update (admin/role)` },
                     { name: '🛒 Shop', value: `\`/shop\` - View items to buy\n\`${p}transfer @user <amount>\` - Send coins\n\`/transfer @user <amount>\` - Send coins (slash)` }
                 );
@@ -161,7 +161,7 @@ function getCategoryEmbed(p, category) {
                 .setDescription('Play games and track your stats!')
                 .addFields(
                     { name: '🎲 Mini Games', value: `\`${p}minigame rps\` - Rock paper scissors\n\`${p}minigame guess\` - Guess the number\n\`${p}minigame trivia\` - Trivia questions\n\`${p}pacman\` - Pacman-style arcade game\n\`${p}ttt [@user]\` - Tic tac toe\n\`/ttt @user\` - Tic tac toe (slash)\n\`${p}count\` - Counting game\n\`/count\` - Counting game (slash)` },
-                    { name: '🎰 Betting Games', value: `\`${p}slots <bet|max|all> [bonus]\` - Slot machine (optional bonus buy)\n\`${p}mines <bet|max|all> [mines]\` - Reveal & cashout game\n\`${p}blackjack <bet>\` - Card game\n\`/blackjack <bet>\` - Card game (slash)\n\`${p}roulette <bet>\` - Roulette\n\`/roulette <bet>\` - Roulette (slash)\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`/coinflip <choice> <bet>\` - Coin flip (slash)\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`/dice <number> <bet>\` - Dice roll (slash)\n\`${p}rps <bet>\` - RPS with betting\n\`/rps <choice> <bet>\` - RPS (slash)\n\`${p}russianroulette\` - Risky roulette\n\`/russianroulette\` - Risky roulette (slash)\n\`${p}horserace <bet>\` - Horse race\n\`/horserace <bet>\` - Horse race (slash)` },
+                    { name: '🎰 Betting Games', value: `\`${p}slots <bet|max|all> [bonus]\` - Slot machine (optional bonus buy)\n\`${p}mines <bet|max|all> [mines]\` - Reveal & cashout game\n\`${p}blackjack <bet>\` - Card game\n\`/blackjack <bet>\` - Card game (slash)\n\`${p}roulette <bet>\` - Roulette\n\`/roulette <bet>\` - Roulette (slash)\n\`${p}coinflip <h/t> <bet>\` - Coin flip\n\`/coinflip <choice> <bet>\` - Coin flip (slash)\n\`${p}dice <1-6> <bet>\` - Dice roll\n\`/dice <number> <bet>\` - Dice roll (slash)\n\`${p}rps <bet>\` - RPS with betting\n\`/rps <choice> <bet>\` - RPS (slash)\n\`${p}horserace <bet>\` - Horse race\n\`/horserace <bet>\` - Horse race (slash)` },
                     { name: '📊 Stats', value: `\`${p}gamestats [@user]\` - View game statistics\n\`${p}horseracehistory [@user]\` - Horse race history\n\`/horseracehistory [@user]\` - Horse race history (slash)\n\`/horseracesim <count>\` - Simulate races (admin)` }
                 );
             break;
@@ -226,7 +226,8 @@ function getCategoryEmbed(p, category) {
             embed.setTitle('🎭 Fun Commands')
                 .setDescription('Entertainment and random fun!')
                 .addFields(
-                    { name: 'Commands', value: `\`/poll <question> <options>\` - Create poll\n\`/8ball <question>\` - Magic 8-ball\n\`/meme\` - Random meme\n\`/flappybird\` - Play Flappy Bird\n\`${p}hello\` - Friendly greeting\n\`${p}propose @user\` - Propose\n\`/propose @user\` - Propose (slash)\n\`${p}accept\` - Accept proposal\n\`/accept\` - Accept (slash)\n\`${p}reject\` - Reject proposal\n\`/reject\` - Reject (slash)\n\`${p}divorce\` - Divorce\n\`/divorce\` - Divorce (slash)\n\`${p}spouse [@user]\` - View spouse\n\`/spouse [@user]\` - View spouse (slash)\n\`${p}couples\` - Top couples\n\`/couples\` - Top couples (slash)` }
+                    { name: 'Commands', value: `\`/poll <question> <options>\` - Create poll\n\`/8ball <question>\` - Magic 8-ball\n\`/meme\` - Random meme\n\`/flappybird\` - Play Flappy Bird\n\`${p}hello\` - Friendly greeting\n\`${p}propose @user\` - Propose\n\`/propose @user\` - Propose (slash)\n\`${p}accept\` - Accept proposal\n\`/accept\` - Accept (slash)\n\`${p}reject\` - Reject proposal\n\`/reject\` - Reject (slash)\n\`${p}divorce\` - Divorce\n\`/divorce\` - Divorce (slash)\n\`${p}spouse [@user]\` - View spouse\n\`/spouse [@user]\` - View spouse (slash)\n\`${p}couples\` - Top couples\n\`/couples\` - Top couples (slash)` },
+                    { name: '🧪 Beta Commands', value: `\`${p}poker host <blind> [buyin]\`, \`${p}poker join <blind>\`, \`${p}poker start\`, \`${p}poker status\`, \`${p}poker leave\`\nUses button controls during turns and sends hole cards by DM.\nRequires **bot beta access** role.\nIn beta poker, balance is test-only (infinite) and does not update real economy. \n\` for now ` }
                 );
             break;
 
@@ -237,7 +238,7 @@ function getCategoryEmbed(p, category) {
                     { name: '💰 Economy Admin', value: `\`${p}addcoins @user <amount>\`\n\`${p}removecoins @user <amount>\`\n\`${p}setbalance @user <amount>\`\n\`${p}giveexp @user <amount>\`` },
                     { name: '🧹 Resets', value: `\`${p}cleareconomy\`\n\`${p}reseteconomy\`\n\`${p}cleargamedata\`\n\`${p}resetwarnings\`` },
                     { name: '📅 Seasons', value: `\`${p}season create <name>\` - Create custom season\n\`${p}season list\` - View all seasons\n\`${p}season info <name>\` - Season details\n\`${p}season leaderboard [name]\` - Top players this season\n\`${p}season end <name>\` - End season & award winners\n\`${p}season enroll <name>\` - Enroll members\n\`${p}season refresh [name]\` - Refresh stats\n\n**Automatic Quarterly Seasons:**\nSeasons auto-create every quarter (Spring/Summer/Fall/Winter)\nExample: \`spring-2026\`, \`summer-2026\`\nOld season auto-archives, new members auto-enrolled` },
-                    { name: '⚙️ Server Admin', value: `\`${p}botprefix <prefix>\`\n\`${p}serverlanguage <code>\`\n\`${p}serverstats\`\n\`${p}announcement <msg>\`\n\`${p}backup\`\n\`/welcomemessage\` - Configure welcome messages\n\`/roletemplate\` - Role templates\n\`/mongodb-space\` - Check MongoDB usage (Owner)\n\`/system-stats\` - System CPU/RAM stats\n\`/botstatus\` - Bot health and status` },
+                    { name: '⚙️ Server Admin', value: `\`${p}botprefix <prefix>\`\n\`${p}serverlanguage <code>\`\n\`${p}serverstats\`\n\`${p}announcement <msg>\`\n\`${p}backup\`\n\`${p}betaaccess @user\` - Grant **bot beta access** role\n\`/welcomemessage\` - Configure welcome messages\n\`/roletemplate\` - Role templates\n\`/mongodb-space\` - Check MongoDB usage (Owner)\n\`/system-stats\` - System CPU/RAM stats\n\`/botstatus\` - Bot health and status` },
                     { name: '🔐 Permissions', value: `\`/command-permissions list\`\n\`/command-permissions disable <command>\`\n\`/command-permissions enable <command>\`\n\`/command-permissions role <command> <role>\`` },
                     { name: '🧾 Audit Logs', value: `\`/auditlog view\`\n\`/auditlog export\`\n\`/auditlogs\` - View logs` }
                 );
@@ -253,7 +254,7 @@ function getCategoryEmbed(p, category) {
                     },
                     {
                         name: 'ℹ️ Notes',
-                        value: `Requires \`BOT_OWNER_ID\` in environment variables.\nSome admin commands can also be used by delegated roles, but the commands above are owner-gated.`
+                        value: `Requires \`BOT_OWNER_ID\` in environment variables.\nSome admin commands can also be used by delegated roles, but the commands above are owner-gated.\n\nDEV mode: set \`DEV_MODE=true\` to disable MongoDB sync and automatic season leaderboard updates.`
                     }
                 );
             break;

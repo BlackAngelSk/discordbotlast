@@ -5,14 +5,16 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const { isDevModeEnabled } = require('./devMode');
 
 class DatabaseManager {
     constructor() {
-        this.useDB = process.env.MONGODB_URI ? 'mongodb' : 'json';
+        this.devMode = isDevModeEnabled();
+        this.useDB = this.devMode ? 'json' : (process.env.MONGODB_URI ? 'mongodb' : 'json');
         this.dbPath = path.join(__dirname, '..', 'data');
         this.mongoClient = null;
         this.db = null;
-        this.autoSyncEnabled = (process.env.MONGODB_AUTOSYNC || 'true').toLowerCase() !== 'false';
+        this.autoSyncEnabled = !this.devMode && (process.env.MONGODB_AUTOSYNC || 'true').toLowerCase() !== 'false';
         this.autoSyncIntervalMs = Math.max(30_000, Number(process.env.MONGODB_AUTOSYNC_INTERVAL_MS) || 60_000);
         this.autoSyncTimer = null;
         this.lastSyncedMtime = new Map();
@@ -28,6 +30,12 @@ class DatabaseManager {
     }
 
     async init() {
+        if (this.devMode) {
+            console.log('🧪 DEV_MODE is enabled: MongoDB sync is disabled, using JSON storage only.');
+            this.useDB = 'json';
+            return;
+        }
+
         if (this.useDB === 'mongodb') {
             try {
                 const uri = process.env.MONGODB_URI;
