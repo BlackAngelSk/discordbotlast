@@ -3,7 +3,13 @@ const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { PokerTableManager } = require('../../utils/pokerTableManager');
 const { memberHasBetaAccess, getBetaRoleName } = require('../../utils/betaAccess');
-const { pokerCommunityAttachment, pokerHandAttachment } = require('../../utils/cardBoardRenderer');
+const {
+    pokerCommunityAttachment,
+    pokerCommunityCardAttachments,
+    pokerHandAttachment,
+    pokerHandCardAttachments,
+    supportsBoardImageRendering
+} = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     name: 'poker',
@@ -171,9 +177,29 @@ async function pokerStatus(message) {
 
     const turnAvatarUrl = await getTurnAvatarUrl(message.guild, table);
     const embed = buildStateEmbed(table, `Current turn: **${table.getCurrentPlayer()?.username || 'None'}**`, turnAvatarUrl);
+    return message.reply(withCommunityBoard(embed, table));
+}
+
+function withCommunityBoard(embed, table) {
+    if (!supportsBoardImageRendering()) {
+        const files = pokerCommunityCardAttachments(table.community);
+        return { embeds: [embed], files };
+    }
+
     const board = pokerCommunityAttachment(table.community, 'poker-board.png');
     embed.setImage('attachment://poker-board.png');
-    return message.reply({ embeds: [embed], files: [board] });
+    return { embeds: [embed], files: [board] };
+}
+
+function withPrivateHand(embed, cards, playerName) {
+    if (!supportsBoardImageRendering()) {
+        const files = pokerHandCardAttachments(cards);
+        return { embeds: [embed], files };
+    }
+
+    const handFile = pokerHandAttachment(cards, playerName, 'poker-hand.png');
+    embed.setImage('attachment://poker-hand.png');
+    return { embeds: [embed], files: [handFile] };
 }
 
 function setupTableLobby(message, table, tableMsg) {
@@ -267,14 +293,12 @@ async function runGameLoop(channel, table, tableMsg = null) {
         const member = await channel.guild.members.fetch(p.userId).catch(() => null);
         if (!member) continue;
         const hand = p.hole.map(c => `${c.rank}${c.suit}`).join(' ');
-        const handFile = pokerHandAttachment(p.hole, p.username, 'poker-hand.png');
         const dmEmbed = new EmbedBuilder()
             .setColor(0x5865f2)
             .setTitle('🃏 Your Poker Hand')
             .setDescription(`Your cards: **${hand}**\nStack: **${p.chips}**`)
-            .setImage('attachment://poker-hand.png')
             .setFooter({ text: 'Keep this private.' });
-        member.send({ embeds: [dmEmbed], files: [handFile] }).catch(() => {});
+        member.send(withPrivateHand(dmEmbed, p.hole, p.username)).catch(() => {});
     }
 
     const gameMessage = tableMsg || await channel.send('🎴 Poker game started!');
@@ -315,9 +339,8 @@ async function conductBettingRound(channel, table, gameMessage, phase) {
 
         const turnAvatarUrl = await getTurnAvatarUrl(channel.guild, table);
         const actionEmbed = buildStateEmbed(table, `**${current.username}** to act (${phase})`, turnAvatarUrl);
-        const actionBoard = pokerCommunityAttachment(table.community, 'poker-board.png');
-        actionEmbed.setImage('attachment://poker-board.png');
-        await gameMessage.edit({ embeds: [actionEmbed], files: [actionBoard], components: [buildActionRow(table, current)] }).catch(() => {});
+        const actionPayload = withCommunityBoard(actionEmbed, table);
+        await gameMessage.edit({ ...actionPayload, components: [buildActionRow(table, current)] }).catch(() => {});
 
         const result = await waitForTurnAction(gameMessage, table, current, 30000);
         if (!result.acted) {
@@ -497,9 +520,8 @@ async function finishAndCleanup(table, gameMessage, showdown = false) {
 
     if (winnerHand) embed.addFields({ name: 'Winning Hand', value: `${winnerHand.rank} (${formatCards(winnerHand.cards)})`, inline: false });
 
-    const board = pokerCommunityAttachment(table.community, 'poker-board.png');
-    embed.setImage('attachment://poker-board.png');
-    await gameMessage.edit({ embeds: [embed], files: [board], components: [] }).catch(() => {});
+    const payload = withCommunityBoard(embed, table);
+    await gameMessage.edit({ ...payload, components: [] }).catch(() => {});
     PokerTableManager.closeTable(table.tableId);
 }
 
@@ -510,9 +532,8 @@ function isBetaInfinite(message) {
 async function updateGameDisplay(gameMessage, table, phase) {
     const turnAvatarUrl = await getTurnAvatarUrl(gameMessage.guild, table);
     const embed = buildStateEmbed(table, `Phase: **${phase}**`, turnAvatarUrl);
-    const board = pokerCommunityAttachment(table.community, 'poker-board.png');
-    embed.setImage('attachment://poker-board.png');
-    await gameMessage.edit({ embeds: [embed], files: [board], components: [] }).catch(() => {});
+    const payload = withCommunityBoard(embed, table);
+    await gameMessage.edit({ ...payload, components: [] }).catch(() => {});
 }
 
 function buildStateEmbed(table, subtitle, turnAvatarUrl = null) {

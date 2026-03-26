@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { createShuffledDeck } = require('../../utils/playingCards');
-const { blackjackBoardAttachment } = require('../../utils/cardBoardRenderer');
+const { blackjackBoardAttachment, blackjackCardAttachments, supportsBoardImageRendering } = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -66,6 +66,11 @@ async function playBlackjackWithBet(interaction, bet) {
     };
 
     const withBoardImage = (embed, hideDealerHole = false) => {
+        if (!supportsBoardImageRendering()) {
+            const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
+            return { embeds: [embed], files };
+        }
+
         const file = blackjackBoardAttachment(playerHand, dealerHand, {
             hideDealerHole,
             playerName: interaction.user.username
