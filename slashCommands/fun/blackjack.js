@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
+const { createShuffledDeck } = require('../../utils/playingCards');
+const { blackjackBoardAttachment } = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -38,24 +40,7 @@ module.exports = {
 };
 
 async function playBlackjackWithBet(interaction, bet) {
-    const deck = [];
-    const suits = ['♠', '♥', '♦', '♣'];
-    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    
-    for (const suit of suits) {
-        for (const rank of ranks) {
-            deck.push({ rank, suit });
-        }
-    }
-    
-    const shuffle = (arr) => {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-    };
-    
-    shuffle(deck);
+    const deck = createShuffledDeck();
     
     const cardValue = (card) => {
         if (card.rank === 'A') return 11;
@@ -78,6 +63,15 @@ async function playBlackjackWithBet(interaction, bet) {
             return `${hand[0].rank}${hand[0].suit} 🂠`;
         }
         return hand.map(c => `${c.rank}${c.suit}`).join(' ');
+    };
+
+    const withBoardImage = (embed, hideDealerHole = false) => {
+        const file = blackjackBoardAttachment(playerHand, dealerHand, {
+            hideDealerHole,
+            playerName: interaction.user.username
+        }, 'blackjack-board.png');
+        embed.setImage('attachment://blackjack-board.png');
+        return { embeds: [embed], files: [file] };
     };
     
     let playerHand = [deck.pop(), deck.pop()];
@@ -119,7 +113,7 @@ async function playBlackjackWithBet(interaction, bet) {
             .setDescription(outcome)
             .setFooter({ text: `Bet: ${bet} coins` });
         
-        await interaction.reply({ embeds: [instantResult] });
+        await interaction.reply(withBoardImage(instantResult, false));
         return;
     }
     
@@ -140,7 +134,7 @@ async function playBlackjackWithBet(interaction, bet) {
             .setDescription('🎉 Blackjack! You win!')
             .setFooter({ text: `Bet: ${bet} coins` });
         
-        await interaction.reply({ embeds: [instantWin] });
+        await interaction.reply(withBoardImage(instantWin, false));
         return;
     }
     
@@ -173,7 +167,7 @@ async function playBlackjackWithBet(interaction, bet) {
         .setDescription('Hit or Stand?')
         .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
     
-    await interaction.reply({ embeds: [prompt], components: [createButtons()], withResponse: true });
+    await interaction.reply({ ...withBoardImage(prompt, true), components: [createButtons()], withResponse: true });
     const msg = await interaction.fetchReply();
     
     const collector = msg.createMessageComponentCollector({
@@ -202,7 +196,7 @@ async function playBlackjackWithBet(interaction, bet) {
                     .setDescription('💥 You busted! Dealer wins.')
                     .setFooter({ text: `Bet: ${bet} coins` });
                 
-                await i.update({ embeds: [bust], components: [createButtons(true)] });
+                await i.update({ ...withBoardImage(bust, false), components: [createButtons(true)] });
                 collector.stop('bust');
                 return;
             }
@@ -219,7 +213,7 @@ async function playBlackjackWithBet(interaction, bet) {
                 .setDescription('Hit or Stand?')
                 .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
             
-            await i.update({ embeds: [updated], components: [createButtons()] });
+            await i.update({ ...withBoardImage(updated, true), components: [createButtons()] });
             
         } else if (i.customId === 'bj_stand') {
             while (handValue(dealerHand) <= 16) {
@@ -270,7 +264,7 @@ async function playBlackjackWithBet(interaction, bet) {
                 .setDescription(outcome)
                 .setFooter({ text: `Bet: ${bet} coins` });
             
-            await i.update({ embeds: [final], components: [createButtons(true)] });
+            await i.update({ ...withBoardImage(final, false), components: [createButtons(true)] });
             collector.stop('finished');
         }
     });

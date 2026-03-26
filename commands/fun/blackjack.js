@@ -1,6 +1,8 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
+const { createShuffledDeck } = require('../../utils/playingCards');
+const { blackjackBoardAttachment } = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     name: 'blackjack',
@@ -36,24 +38,7 @@ module.exports = {
 };
 
 async function playBlackjackWithBet(message, bet) {
-    const deck = [];
-    const suits = ['♠', '♥', '♦', '♣'];
-    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    
-    for (const suit of suits) {
-        for (const rank of ranks) {
-            deck.push({ rank, suit });
-        }
-    }
-    
-    const shuffle = (arr) => {
-        for (let i = arr.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [arr[i], arr[j]] = [arr[j], arr[i]];
-        }
-    };
-    
-    shuffle(deck);
+    const deck = createShuffledDeck();
     
     const cardValue = (card) => {
         if (card.rank === 'A') return 11;
@@ -76,6 +61,15 @@ async function playBlackjackWithBet(message, bet) {
             return `${hand[0].rank}${hand[0].suit} 🂠`;
         }
         return hand.map(c => `${c.rank}${c.suit}`).join(' ');
+    };
+
+    const withBoardImage = (embed, hideDealerHole = false) => {
+        const file = blackjackBoardAttachment(playerHand, dealerHand, {
+            hideDealerHole,
+            playerName: message.author.username
+        }, 'blackjack-board.png');
+        embed.setImage('attachment://blackjack-board.png');
+        return { embeds: [embed], files: [file] };
     };
     
     let playerHand = [deck.pop(), deck.pop()];
@@ -122,7 +116,7 @@ async function playBlackjackWithBet(message, bet) {
             .setDescription(outcome)
             .setFooter({ text: `Bet: ${bet} coins` });
         
-        await message.reply({ embeds: [instantResult] });
+        await message.reply(withBoardImage(instantResult, false));
         return;
     }
     
@@ -144,7 +138,7 @@ async function playBlackjackWithBet(message, bet) {
             .setDescription('🎉 Blackjack! You win!')
             .setFooter({ text: `Bet: ${bet} coins` });
         
-        await message.reply({ embeds: [instantWin] });
+        await message.reply(withBoardImage(instantWin, false));
         return;
     }
     
@@ -177,7 +171,7 @@ async function playBlackjackWithBet(message, bet) {
         .setDescription('Hit or Stand?')
         .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
     
-    const msg = await message.reply({ embeds: [prompt], components: [createButtons()] });
+    const msg = await message.reply({ ...withBoardImage(prompt, true), components: [createButtons()] });
     
     const collector = msg.createMessageComponentCollector({
         componentType: ComponentType.Button,
@@ -205,7 +199,7 @@ async function playBlackjackWithBet(message, bet) {
                     .setDescription('💥 You busted! Dealer wins.')
                     .setFooter({ text: `Bet: ${bet} coins` });
                 
-                await interaction.update({ embeds: [bust], components: [createButtons(true)] });
+                await interaction.update({ ...withBoardImage(bust, false), components: [createButtons(true)] });
                 collector.stop('bust');
                 return;
             }
@@ -222,7 +216,7 @@ async function playBlackjackWithBet(message, bet) {
                 .setDescription('Hit or Stand?')
                 .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
             
-            await interaction.update({ embeds: [updated], components: [createButtons()] });
+            await interaction.update({ ...withBoardImage(updated, true), components: [createButtons()] });
             
         } else if (interaction.customId === 'bj_stand') {
             // Dealer reveals hole card and plays according to rules
@@ -277,7 +271,7 @@ async function playBlackjackWithBet(message, bet) {
                 .setDescription(outcome)
                 .setFooter({ text: `Bet: ${bet} coins` });
             
-            await interaction.update({ embeds: [final], components: [createButtons(true)] });
+            await interaction.update({ ...withBoardImage(final, false), components: [createButtons(true)] });
             collector.stop('finished');
         }
     });

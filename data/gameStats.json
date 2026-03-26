@@ -1,8 +1,8 @@
 {
   "349649557896036354": {
     "blackjack": {
-      "wins": 2,
-      "losses": 2,
+      "wins": 7,
+      "losses": 5,
       "ties": 1
     },
     "roulette": {
@@ -37,7 +37,7 @@
     },
     "poker": {
       "wins": 7,
-      "losses": 4,
+      "losses": 5,
       "ties": 0
     }
   },
@@ -2511,7 +2511,7 @@
       "losses": 1
     },
     "poker": {
-      "wins": 3,
+      "wins": 4,
       "losses": 7,
       "ties": 0
     }
