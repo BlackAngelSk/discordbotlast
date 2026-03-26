@@ -77,25 +77,6 @@ async function playBlackjackWithBet(interaction, bet) {
             return { embeds: [embed], files: [file] };
         }
 
-        const assetBoard = blackjackBoardAttachment(playerHand, dealerHand, {
-            hideDealerHole,
-            playerName: interaction.user.username,
-            useAssetImages: true
-        }, 'blackjack-board.png');
-
-        if (assetBoard) {
-            embed.setImage('attachment://blackjack-board.png');
-            return { embeds: [embed], files: [assetBoard] };
-        }
-        
-        // Fallback: attach individual cards from assets
-        const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
-        if (files.length > 0) {
-            // Use first card as embed image if available
-            const first = files[0];
-            embed.setImage(`attachment://${first.name}`);
-            return { embeds: [embed], files: [first] };
-        }
         return { embeds: [embed] };
     };
     
