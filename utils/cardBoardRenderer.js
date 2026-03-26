@@ -176,7 +176,9 @@ function renderVectorCard(card, x, y, w, h) {
 	</g>`;
 }
 
-function renderCard(card, x, y, w, h, hidden = false) {
+function renderCard(card, x, y, w, h, hidden = false, options = {}) {
+	const useAssetImages = options.useAssetImages !== false;
+
 	if (hidden) {
 		return `
 	<g>
@@ -186,7 +188,7 @@ function renderCard(card, x, y, w, h, hidden = false) {
 	</g>`;
 	}
 
-	const dataUri = getCardImageDataUri(card);
+	const dataUri = useAssetImages ? getCardImageDataUri(card) : null;
 	if (dataUri) {
 		const clipId = `clip_${x}_${y}_${w}_${h}`;
 		return `
@@ -207,6 +209,7 @@ function renderCard(card, x, y, w, h, hidden = false) {
 function buildBlackjackBoardSvg(playerCards, dealerCards, options = {}) {
 	const hideDealerHole = !!options.hideDealerHole;
 	const playerName = options.playerName || 'Player';
+	const useAssetImages = options.useAssetImages !== false;
 	const cardW = 88;
 	const cardH = 124;
 	const gap = 10;
@@ -225,12 +228,12 @@ function buildBlackjackBoardSvg(playerCards, dealerCards, options = {}) {
 
 	let dealerMarkup = '';
 	dealerCards.forEach((c, i) => {
-		dealerMarkup += renderCard(c, 20 + i * (cardW + gap), dealerCardsY, cardW, cardH, hideDealerHole && i === 1);
+		dealerMarkup += renderCard(c, 20 + i * (cardW + gap), dealerCardsY, cardW, cardH, hideDealerHole && i === 1, { useAssetImages });
 	});
 
 	let playerMarkup = '';
 	playerCards.forEach((c, i) => {
-		playerMarkup += renderCard(c, 20 + i * (cardW + gap), playerCardsY, cardW, cardH, false);
+		playerMarkup += renderCard(c, 20 + i * (cardW + gap), playerCardsY, cardW, cardH, false, { useAssetImages });
 	});
 
 	return `<?xml version="1.0" encoding="UTF-8"?>
@@ -244,7 +247,8 @@ function buildBlackjackBoardSvg(playerCards, dealerCards, options = {}) {
 </svg>`;
 }
 
-function buildPokerCommunitySvg(communityCards) {
+function buildPokerCommunitySvg(communityCards, options = {}) {
+	const useAssetImages = options.useAssetImages !== false;
 	const cardW = 100;
 	const cardH = 140;
 	const gap = 12;
@@ -256,9 +260,9 @@ function buildPokerCommunitySvg(communityCards) {
 	for (let i = 0; i < slots; i++) {
 		const card = communityCards[i];
 		if (card) {
-			cardsMarkup += renderCard(card, 18 + i * (cardW + gap), 44, cardW, cardH, false);
+			cardsMarkup += renderCard(card, 18 + i * (cardW + gap), 44, cardW, cardH, false, { useAssetImages });
 		} else {
-			cardsMarkup += renderCard(null, 18 + i * (cardW + gap), 44, cardW, cardH, true);
+			cardsMarkup += renderCard(null, 18 + i * (cardW + gap), 44, cardW, cardH, true, { useAssetImages });
 		}
 	}
 
@@ -270,7 +274,8 @@ function buildPokerCommunitySvg(communityCards) {
 </svg>`;
 }
 
-function buildPokerHandSvg(cards, playerName = 'Player') {
+function buildPokerHandSvg(cards, playerName = 'Player', options = {}) {
+	const useAssetImages = options.useAssetImages !== false;
 	const cardW = 100;
 	const cardH = 140;
 	const gap = 12;
@@ -279,7 +284,7 @@ function buildPokerHandSvg(cards, playerName = 'Player') {
 
 	let cardsMarkup = '';
 	cards.forEach((card, i) => {
-		cardsMarkup += renderCard(card, 18 + i * (cardW + gap), 44, cardW, cardH, false);
+		cardsMarkup += renderCard(card, 18 + i * (cardW + gap), 44, cardW, cardH, false, { useAssetImages });
 	});
 
 	return `<?xml version="1.0" encoding="UTF-8"?>
@@ -295,13 +300,13 @@ function blackjackBoardAttachment(playerCards, dealerCards, options = {}, filena
 	return svgAsBestAttachment(svg, filename);
 }
 
-function pokerCommunityAttachment(communityCards, filename = 'poker-board.svg') {
-	const svg = buildPokerCommunitySvg(communityCards);
+function pokerCommunityAttachment(communityCards, filename = 'poker-board.svg', options = {}) {
+	const svg = buildPokerCommunitySvg(communityCards, options);
 	return svgAsBestAttachment(svg, filename);
 }
 
-function pokerHandAttachment(cards, playerName = 'Player', filename = 'poker-hand.svg') {
-	const svg = buildPokerHandSvg(cards, playerName);
+function pokerHandAttachment(cards, playerName = 'Player', filename = 'poker-hand.svg', options = {}) {
+	const svg = buildPokerHandSvg(cards, playerName, options);
 	return svgAsBestAttachment(svg, filename);
 }
 

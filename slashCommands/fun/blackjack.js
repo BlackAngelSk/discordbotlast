@@ -75,14 +75,27 @@ async function playBlackjackWithBet(interaction, bet) {
             embed.setImage('attachment://blackjack-board.png');
             return { embeds: [embed], files: [file] };
         }
+
+        const vectorFile = blackjackBoardAttachment(playerHand, dealerHand, {
+            hideDealerHole,
+            playerName: interaction.user.username,
+            useAssetImages: false
+        }, 'blackjack-board.png');
+
+        if (vectorFile) {
+            embed.setImage('attachment://blackjack-board.png');
+            return { embeds: [embed], files: [vectorFile] };
+        }
         
         // Fallback: attach individual cards from assets
         const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
         if (files.length > 0) {
             // Use first card as embed image if available
-            embed.setImage(`attachment://${files[0].name}`);
+            const first = files[0];
+            embed.setImage(`attachment://${first.name}`);
+            return { embeds: [embed], files: [first] };
         }
-        return { embeds: [embed], files };
+        return { embeds: [embed] };
     };
     
     let playerHand = [deck.pop(), deck.pop()];

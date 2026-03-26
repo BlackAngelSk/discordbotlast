@@ -187,14 +187,22 @@ function withCommunityBoard(embed, table) {
         embed.setImage('attachment://poker-board.png');
         return { embeds: [embed], files: [board] };
     }
+
+    const vectorBoard = pokerCommunityAttachment(table.community, 'poker-board.png', { useAssetImages: false });
+    if (vectorBoard) {
+        embed.setImage('attachment://poker-board.png');
+        return { embeds: [embed], files: [vectorBoard] };
+    }
     
     // Fallback: attach individual cards from assets
     const files = pokerCommunityCardAttachments(table.community);
     if (files.length > 0) {
         // Use first card as embed image
-        embed.setImage(`attachment://${files[0].name}`);
+        const first = files[0];
+        embed.setImage(`attachment://${first.name}`);
+        return { embeds: [embed], files: [first] };
     }
-    return { embeds: [embed], files };
+    return { embeds: [embed] };
 }
 
 function withPrivateHand(embed, cards, playerName) {
@@ -204,14 +212,22 @@ function withPrivateHand(embed, cards, playerName) {
         embed.setImage('attachment://poker-hand.png');
         return { embeds: [embed], files: [handFile] };
     }
+
+    const vectorHand = pokerHandAttachment(cards, playerName, 'poker-hand.png', { useAssetImages: false });
+    if (vectorHand) {
+        embed.setImage('attachment://poker-hand.png');
+        return { embeds: [embed], files: [vectorHand] };
+    }
     
     // Fallback: attach individual cards from assets
     const files = pokerHandCardAttachments(cards);
     if (files.length > 0) {
         // Use first card as embed image
-        embed.setImage(`attachment://${files[0].name}`);
+        const first = files[0];
+        embed.setImage(`attachment://${first.name}`);
+        return { embeds: [embed], files: [first] };
     }
-    return { embeds: [embed], files };
+    return { embeds: [embed] };
 }
 
 function setupTableLobby(message, table, tableMsg) {
