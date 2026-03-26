@@ -3,6 +3,13 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+let Resvg;
+try {
+	({ Resvg } = require('@resvg/resvg-js'));
+} catch {
+	Resvg = null;
+}
+
 const SUIT_COLOR = {
 	'♠': '#111827',
 	'♣': '#111827',
@@ -90,6 +97,11 @@ function getCardAssetPath(card) {
 
 function supportsBoardImageRendering() {
 	if (typeof converterSupportCache === 'boolean') return converterSupportCache;
+
+	if (Resvg) {
+		converterSupportCache = true;
+		return true;
+	}
 
 	const rsvg = spawnSync('rsvg-convert', ['--version'], { stdio: 'ignore' });
 	if (rsvg.status === 0) {
@@ -306,6 +318,16 @@ function svgAsBestAttachment(svg, filename) {
 }
 
 function svgToPngBuffer(svg) {
+	if (Resvg) {
+		try {
+			const renderer = new Resvg(svg);
+			const pngData = renderer.render().asPng();
+			return Buffer.isBuffer(pngData) ? pngData : Buffer.from(pngData);
+		} catch {
+			// fall through to external converter checks
+		}
+	}
+
 	const rsvg = spawnSync('rsvg-convert', ['-f', 'png'], {
 		input: Buffer.from(svg, 'utf8'),
 		maxBuffer: 10 * 1024 * 1024
