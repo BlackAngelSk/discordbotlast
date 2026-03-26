@@ -187,6 +187,12 @@ function withCommunityBoard(embed, table) {
         embed.setImage('attachment://poker-board.png');
         return { embeds: [embed], files: [board] };
     }
+
+    const assetBoard = pokerCommunityAttachment(table.community, 'poker-board.png', { useAssetImages: true });
+    if (assetBoard) {
+        embed.setImage('attachment://poker-board.png');
+        return { embeds: [embed], files: [assetBoard] };
+    }
     
     // Fallback: attach individual cards from assets
     const files = pokerCommunityCardAttachments(table.community);
@@ -205,6 +211,12 @@ function withPrivateHand(embed, cards, playerName) {
     if (handFile) {
         embed.setImage('attachment://poker-hand.png');
         return { embeds: [embed], files: [handFile] };
+    }
+
+    const assetHand = pokerHandAttachment(cards, playerName, 'poker-hand.png', { useAssetImages: true });
+    if (assetHand) {
+        embed.setImage('attachment://poker-hand.png');
+        return { embeds: [embed], files: [assetHand] };
     }
     
     // Fallback: attach individual cards from assets

@@ -193,12 +193,13 @@ function renderCard(card, x, y, w, h, hidden = false, options = {}) {
 		const clipId = `clip_${x}_${y}_${w}_${h}`;
 		return `
 	<g>
+	  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="#ffffff"/>
 	  <defs>
 		<clipPath id="${clipId}">
 		  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12"/>
 		</clipPath>
 	  </defs>
-	  <image x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" href="${dataUri}" clip-path="url(#${clipId})"/>
+	  <image x="${x}" y="${y}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" href="${dataUri}" clip-path="url(#${clipId})"/>
 	  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="12" fill="none" stroke="#d1d5db" stroke-width="1.5"/>
 	</g>`;
 	}
@@ -210,21 +211,21 @@ function buildBlackjackBoardSvg(playerCards, dealerCards, options = {}) {
 	const hideDealerHole = !!options.hideDealerHole;
 	const playerName = options.playerName || 'Player';
 	const useAssetImages = options.useAssetImages !== false;
-	const cardW = 88;
-	const cardH = 124;
-	const gap = 10;
+	const cardW = 80;
+	const cardH = 112;
+	const gap = 12;
 
 	const topCount = Math.max(2, dealerCards.length);
 	const bottomCount = Math.max(2, playerCards.length);
 	const cols = Math.max(topCount, bottomCount);
 	const width = 40 + cols * cardW + (cols - 1) * gap;
-	const height = 368;
+	const height = 344;
 
 	const dealerLabelY = 30;
-	const dealerCardsY = 52;
-	const dividerY = 186;
-	const playerLabelY = 212;
-	const playerCardsY = 228;
+	const dealerCardsY = 48;
+	const dividerY = 172;
+	const playerLabelY = 198;
+	const playerCardsY = 214;
 
 	let dealerMarkup = '';
 	dealerCards.forEach((c, i) => {
