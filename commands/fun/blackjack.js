@@ -74,8 +74,12 @@ async function playBlackjackWithBet(message, bet) {
             return { embeds: [embed], files: [file] };
         }
         
-        // Fallback: attach individual cards if board rendering failed
+        // Fallback: attach individual cards from assets
         const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
+        if (files.length > 0) {
+            // Use first card as embed image if available
+            embed.setImage(`attachment://${files[0].name}`);
+        }
         return { embeds: [embed], files };
     };
     

@@ -301,7 +301,8 @@ function svgAsBestAttachment(svg, filename) {
 		return new AttachmentBuilder(asPng, { name: pngName });
 	}
 
-	return new AttachmentBuilder(Buffer.from(svg, 'utf8'), { name: filename });
+	// Return null if conversion fails - will trigger fallback to individual card assets
+	return null;
 }
 
 function svgToPngBuffer(svg) {
