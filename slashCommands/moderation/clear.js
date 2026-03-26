@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -16,7 +16,7 @@ module.exports = {
         const amount = interaction.options.getInteger('amount');
 
         if (!interaction.channel.permissionsFor(interaction.guild.members.me).has(PermissionFlagsBits.ManageMessages)) {
-            return interaction.reply({ content: '❌ I don\'t have permission to manage messages!', ephemeral: true });
+            return interaction.reply({ content: '❌ I don\'t have permission to manage messages!', flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -29,11 +29,11 @@ module.exports = {
                 .setFooter({ text: `Cleared by ${interaction.user.username}` })
                 .setTimestamp();
 
-            await interaction.reply({ embeds: [embed], ephemeral: true });
+            await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error('Error clearing messages:', error);
-            await interaction.reply({ content: '❌ Failed to clear messages! Messages older than 14 days cannot be deleted.', ephemeral: true });
+            await interaction.reply({ content: '❌ Failed to clear messages! Messages older than 14 days cannot be deleted.', flags: MessageFlags.Ephemeral });
         }
     }
 };

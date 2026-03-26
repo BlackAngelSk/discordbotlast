@@ -20,7 +20,7 @@ module.exports = {
             if (!djRole) {
                 djRole = await message.guild.roles.create({
                     name: settings.djRole,
-                    color: 0xFF0080, // Pink color
+                    colors: { primaryColor: 0xFF0080 }, // Pink color
                     reason: 'Music bot DJ role',
                     permissions: []
                 });
@@ -31,7 +31,7 @@ module.exports = {
             if (!memberRole) {
                 memberRole = await message.guild.roles.create({
                     name: settings.autoRole,
-                    color: 0x99AAB5, // Grey color
+                    colors: { primaryColor: 0x99AAB5 }, // Grey color
                     reason: 'Default member role',
                     permissions: []
                 });
@@ -42,7 +42,7 @@ module.exports = {
             if (!botWatcherRole) {
                 botWatcherRole = await message.guild.roles.create({
                     name: settings.botWatcherRole,
-                    color: 0x5865F2, // Blurplet color
+                    colors: { primaryColor: 0x5865F2 }, // Blurplet color
                     reason: 'Bot watcher role (monitoring + backups)',
                     permissions: []
                 });

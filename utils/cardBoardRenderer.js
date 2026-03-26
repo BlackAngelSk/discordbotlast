@@ -27,6 +27,7 @@ const SUIT_FILE = {
 const CARD_ASSET_DIR = path.join(__dirname, '..', 'assets', 'cards');
 const cardImageDataCache = new Map();
 let converterSupportCache;
+let rendererWarningShown = false;
 
 function isFaceRank(rank) {
 	return rank === 'J' || rank === 'Q' || rank === 'K';
@@ -111,6 +112,12 @@ function supportsBoardImageRendering() {
 
 	const magick = spawnSync('magick', ['-version'], { stdio: 'ignore' });
 	converterSupportCache = magick.status === 0;
+
+	if (!converterSupportCache && !rendererWarningShown) {
+		rendererWarningShown = true;
+		console.warn('[cardBoardRenderer] No PNG renderer detected (resvg/rsvg-convert/magick). Card table embeds may not render. Run npm install on this machine to install platform binaries.');
+	}
+
 	return converterSupportCache;
 }
 
