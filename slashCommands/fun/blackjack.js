@@ -66,11 +66,6 @@ async function playBlackjackWithBet(interaction, bet) {
     };
 
     const withBoardImage = (embed, hideDealerHole = false) => {
-        if (!supportsBoardImageRendering()) {
-            const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
-            return { embeds: [embed], files };
-        }
-
         const file = blackjackBoardAttachment(playerHand, dealerHand, {
             hideDealerHole,
             playerName: interaction.user.username

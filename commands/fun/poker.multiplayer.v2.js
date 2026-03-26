@@ -181,22 +181,12 @@ async function pokerStatus(message) {
 }
 
 function withCommunityBoard(embed, table) {
-    if (!supportsBoardImageRendering()) {
-        const files = pokerCommunityCardAttachments(table.community);
-        return { embeds: [embed], files };
-    }
-
     const board = pokerCommunityAttachment(table.community, 'poker-board.png');
     embed.setImage('attachment://poker-board.png');
     return { embeds: [embed], files: [board] };
 }
 
 function withPrivateHand(embed, cards, playerName) {
-    if (!supportsBoardImageRendering()) {
-        const files = pokerHandCardAttachments(cards);
-        return { embeds: [embed], files };
-    }
-
     const handFile = pokerHandAttachment(cards, playerName, 'poker-hand.png');
     embed.setImage('attachment://poker-hand.png');
     return { embeds: [embed], files: [handFile] };
