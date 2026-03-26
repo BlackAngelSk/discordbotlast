@@ -70,8 +70,15 @@ async function playBlackjackWithBet(interaction, bet) {
             hideDealerHole,
             playerName: interaction.user.username
         }, 'blackjack-board.png');
-        embed.setImage('attachment://blackjack-board.png');
-        return { embeds: [embed], files: [file] };
+        
+        if (file) {
+            embed.setImage('attachment://blackjack-board.png');
+            return { embeds: [embed], files: [file] };
+        }
+        
+        // Fallback: attach individual cards if board rendering failed
+        const files = blackjackCardAttachments(playerHand, dealerHand, { hideDealerHole });
+        return { embeds: [embed], files };
     };
     
     let playerHand = [deck.pop(), deck.pop()];

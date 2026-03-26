@@ -182,14 +182,28 @@ async function pokerStatus(message) {
 
 function withCommunityBoard(embed, table) {
     const board = pokerCommunityAttachment(table.community, 'poker-board.png');
-    embed.setImage('attachment://poker-board.png');
-    return { embeds: [embed], files: [board] };
+    
+    if (board) {
+        embed.setImage('attachment://poker-board.png');
+        return { embeds: [embed], files: [board] };
+    }
+    
+    // Fallback: attach individual cards if board rendering failed
+    const files = pokerCommunityCardAttachments(table.community);
+    return { embeds: [embed], files };
 }
 
 function withPrivateHand(embed, cards, playerName) {
     const handFile = pokerHandAttachment(cards, playerName, 'poker-hand.png');
-    embed.setImage('attachment://poker-hand.png');
-    return { embeds: [embed], files: [handFile] };
+    
+    if (handFile) {
+        embed.setImage('attachment://poker-hand.png');
+        return { embeds: [embed], files: [handFile] };
+    }
+    
+    // Fallback: attach individual cards if board rendering failed
+    const files = pokerHandCardAttachments(cards);
+    return { embeds: [embed], files };
 }
 
 function setupTableLobby(message, table, tableMsg) {
