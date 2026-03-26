@@ -181,22 +181,34 @@ async function pokerStatus(message) {
 }
 
 function withCommunityBoard(embed, table) {
-    const board = pokerCommunityAttachment(table.community, 'poker-board.png', { useAssetImages: false });
+    const board = pokerCommunityAttachment(table.community, 'poker-board.png', { useAssetImages: true });
     
     if (board) {
         embed.setImage('attachment://poker-board.png');
         return { embeds: [embed], files: [board] };
     }
 
+    const vectorBoard = pokerCommunityAttachment(table.community, 'poker-board.png', { useAssetImages: false });
+    if (vectorBoard) {
+        embed.setImage('attachment://poker-board.png');
+        return { embeds: [embed], files: [vectorBoard] };
+    }
+
     return { embeds: [embed] };
 }
 
 function withPrivateHand(embed, cards, playerName) {
-    const handFile = pokerHandAttachment(cards, playerName, 'poker-hand.png', { useAssetImages: false });
+    const handFile = pokerHandAttachment(cards, playerName, 'poker-hand.png', { useAssetImages: true });
     
     if (handFile) {
         embed.setImage('attachment://poker-hand.png');
         return { embeds: [embed], files: [handFile] };
+    }
+
+    const vectorHand = pokerHandAttachment(cards, playerName, 'poker-hand.png', { useAssetImages: false });
+    if (vectorHand) {
+        embed.setImage('attachment://poker-hand.png');
+        return { embeds: [embed], files: [vectorHand] };
     }
 
     return { embeds: [embed] };

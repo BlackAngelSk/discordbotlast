@@ -67,12 +67,23 @@ async function playBlackjackWithBet(message, bet) {
         const file = blackjackBoardAttachment(playerHand, dealerHand, {
             hideDealerHole,
             playerName: message.author.username,
-            useAssetImages: false
+            useAssetImages: true
         }, 'blackjack-board.png');
         
         if (file) {
             embed.setImage('attachment://blackjack-board.png');
             return { embeds: [embed], files: [file] };
+        }
+
+        const vectorBoard = blackjackBoardAttachment(playerHand, dealerHand, {
+            hideDealerHole,
+            playerName: message.author.username,
+            useAssetImages: false
+        }, 'blackjack-board.png');
+
+        if (vectorBoard) {
+            embed.setImage('attachment://blackjack-board.png');
+            return { embeds: [embed], files: [vectorBoard] };
         }
 
         return { embeds: [embed] };
