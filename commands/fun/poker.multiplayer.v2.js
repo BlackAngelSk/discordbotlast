@@ -5,10 +5,7 @@ const { PokerTableManager } = require('../../utils/pokerTableManager');
 const { memberHasBetaAccess, getBetaRoleName } = require('../../utils/betaAccess');
 const {
     pokerCommunityAttachment,
-    pokerCommunityCardAttachments,
-    pokerHandAttachment,
-    pokerHandCardAttachments,
-    supportsBoardImageRendering
+    pokerHandAttachment
 } = require('../../utils/cardBoardRenderer');
 
 module.exports = {

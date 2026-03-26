@@ -2,7 +2,7 @@ const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, Butt
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { createShuffledDeck } = require('../../utils/playingCards');
-const { blackjackBoardAttachment, blackjackCardAttachments, supportsBoardImageRendering } = require('../../utils/cardBoardRenderer');
+const { blackjackBoardAttachment } = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     data: new SlashCommandBuilder()

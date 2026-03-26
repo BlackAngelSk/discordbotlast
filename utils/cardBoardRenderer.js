@@ -26,8 +26,6 @@ const SUIT_FILE = {
 
 const CARD_ASSET_DIR = path.join(__dirname, '..', 'assets', 'cards');
 const cardImageDataCache = new Map();
-let converterSupportCache;
-let rendererWarningShown = false;
 
 function isFaceRank(rank) {
 	return rank === 'J' || rank === 'Q' || rank === 'K';
@@ -88,81 +86,6 @@ function getCardImageDataUri(card) {
 	}
 }
 
-function getCardAssetPath(card) {
-	if (!card?.rank || !card?.suit) return null;
-	const suitCode = SUIT_FILE[card.suit];
-	if (!suitCode) return null;
-	const p = path.join(CARD_ASSET_DIR, `${suitCode}${card.rank}.png`);
-	return fs.existsSync(p) ? p : null;
-}
-
-function supportsBoardImageRendering() {
-	if (typeof converterSupportCache === 'boolean') return converterSupportCache;
-
-	if (Resvg) {
-		converterSupportCache = true;
-		return true;
-	}
-
-	const rsvg = spawnSync('rsvg-convert', ['--version'], { stdio: 'ignore' });
-	if (rsvg.status === 0) {
-		converterSupportCache = true;
-		return true;
-	}
-
-	const magick = spawnSync('magick', ['-version'], { stdio: 'ignore' });
-	converterSupportCache = magick.status === 0;
-
-	if (!converterSupportCache && !rendererWarningShown) {
-		rendererWarningShown = true;
-		console.warn('[cardBoardRenderer] No PNG renderer detected (resvg/rsvg-convert/magick). Card table embeds may not render. Run npm install on this machine to install platform binaries.');
-	}
-
-	return converterSupportCache;
-}
-
-function blackjackCardAttachments(playerCards, dealerCards, options = {}) {
-	const hideDealerHole = !!options.hideDealerHole;
-	const files = [];
-	let idx = 0;
-
-	dealerCards.forEach((card, i) => {
-		if (hideDealerHole && i === 1) return;
-		const assetPath = getCardAssetPath(card);
-		if (!assetPath) return;
-		files.push(new AttachmentBuilder(assetPath, { name: `dealer-${idx++}.png` }));
-	});
-
-	playerCards.forEach((card) => {
-		const assetPath = getCardAssetPath(card);
-		if (!assetPath) return;
-		files.push(new AttachmentBuilder(assetPath, { name: `player-${idx++}.png` }));
-	});
-
-	return files;
-}
-
-function pokerCommunityCardAttachments(communityCards) {
-	const files = [];
-	let idx = 0;
-	for (const card of communityCards || []) {
-		const assetPath = getCardAssetPath(card);
-		if (!assetPath) continue;
-		files.push(new AttachmentBuilder(assetPath, { name: `board-${idx++}.png` }));
-	}
-	return files;
-}
-
-function pokerHandCardAttachments(cards) {
-	const files = [];
-	let idx = 0;
-	for (const card of cards || []) {
-		const assetPath = getCardAssetPath(card);
-		if (!assetPath) continue;
-		files.push(new AttachmentBuilder(assetPath, { name: `hand-${idx++}.png` }));
-	}
-	return files;
-}
 
 function renderVectorCard(card, x, y, w, h) {
 	const rank = card?.rank ?? '?';
@@ -326,7 +249,7 @@ function svgAsBestAttachment(svg, filename) {
 		return new AttachmentBuilder(asPng, { name: pngName });
 	}
 
-	// Return null if conversion fails - will trigger fallback to individual card assets
+	// Return null if conversion fails
 	return null;
 }
 
@@ -373,10 +296,6 @@ function escapeXml(text) {
 
 module.exports = {
 	blackjackBoardAttachment,
-	blackjackCardAttachments,
 	pokerCommunityAttachment,
-	pokerCommunityCardAttachments,
-	pokerHandAttachment,
-	pokerHandCardAttachments,
-	supportsBoardImageRendering
+	pokerHandAttachment
 };
