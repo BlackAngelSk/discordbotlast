@@ -26,7 +26,7 @@ module.exports = {
                 }
 
                 // Store starboard channel in settings
-                const settingsPath = require('path').join(__dirname, '..', 'data', 'settings.json');
+                const settingsPath = require('path').join(__dirname, '..', '..', 'data', 'settings.json');
                 const fs = require('fs').promises;
                 
                 let settings = {};
@@ -53,7 +53,7 @@ module.exports = {
             }
 
             if (action === 'remove') {
-                const settingsPath = require('path').join(__dirname, '..', 'data', 'settings.json');
+                const settingsPath = require('path').join(__dirname, '..', '..', 'data', 'settings.json');
                 const fs = require('fs').promises;
                 
                 let settings = {};
