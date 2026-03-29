@@ -11,6 +11,9 @@ REM ==============================
 
 REM Folder where this BAT is located
 set "BASE_DIR=%~dp0"
+set "TARGET_DIR=%BASE_DIR%"
+if "%TARGET_DIR:~-1%"=="\" set "TARGET_DIR=%TARGET_DIR:~0,-1%"
+set "BOT_START_BAT=%BASE_DIR%start_bot.bat"
 
 REM Python executable (change if needed)
 set "PYTHON_EXE=python"
@@ -39,17 +42,16 @@ if %HAS_UPDATER%==1 (
 REM If updater is available, run it; otherwise just start the bot
 if %HAS_UPDATER%==1 (
   echo [launcher] Starting with auto-update loop...
-  set "BOT_START_BAT=%BASE_DIR%start_bot.bat"
-  "%PYTHON_EXE%" "%UPDATER_PATH%" %TLS_FLAGS% redo-loop --target "%BASE_DIR%" --ref "main" --interval "60" --backup --stop-process "node.exe" --start-on-launch --start-bat "!BOT_START_BAT!"
+  "%PYTHON_EXE%" "%UPDATER_PATH%" %TLS_FLAGS% redo-loop --target "!TARGET_DIR!" --ref "main" --interval "60" --backup --stop-process "node.exe" --start-on-launch --start-bat "!BOT_START_BAT!"
   
   if errorlevel 1 (
     echo [launcher] Updater failed with exit code !errorlevel!
     echo [launcher] Falling back to direct bot startup...
-    call "%BOT_START_BAT%"
+    call "!BOT_START_BAT!"
   )
 ) else (
   echo [launcher] Updater not found - starting bot directly
-  call "%BASE_DIR%start_bot.bat"
+  call "%BOT_START_BAT%"
 )
 
 pause
