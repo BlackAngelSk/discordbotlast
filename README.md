@@ -316,7 +316,12 @@ DISCORD_TOKEN=your_bot_token_here
 DASHBOARD_ENABLED=false
 CLIENT_ID=your_bot_client_id
 CLIENT_SECRET=your_bot_client_secret
+BOT_OWNER_ID=your_discord_user_id
+ERROR_DM_USER_ID=your_discord_user_id
 ```
+
+- `BOT_OWNER_ID` is already used for owner-only bot features.
+- `ERROR_DM_USER_ID` is optional; when set, `console.error`, uncaught exceptions, and unhandled promise rejections are sent to that user's DMs. If omitted, the bot falls back to `BOT_OWNER_ID`.
 
 4. **Start the bot:**
 ```bash

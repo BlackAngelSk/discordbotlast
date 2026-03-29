@@ -6,9 +6,16 @@ class ErrorHandler {
     constructor(client) {
         this.client = client;
         this.logDirectory = path.join(__dirname, '../logs');
+        this.dmRecipientId = process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID || null;
         this.initializeLogDirectory();
         this.errorCount = 0;
+        this.notificationQueue = [];
+        this.isSendingNotification = false;
+        this.consolePatched = false;
+        this.baseConsoleError = console.error.bind(console);
         this.setupHandlers();
+        this.setupConsoleInterceptor();
+        this.setupReadyListener();
     }
 
     initializeLogDirectory() {
@@ -34,6 +41,46 @@ class ErrorHandler {
                 return;
             }
             this.logError('PROCESS_WARNING', warning);
+        });
+    }
+
+    setupConsoleInterceptor() {
+        if (this.consolePatched) {
+            return;
+        }
+
+        const originalConsoleError = this.baseConsoleError;
+
+        console.error = (...args) => {
+            originalConsoleError(...args);
+
+            const payload = this.serializeConsoleArgs(args);
+            if (!payload) {
+                return;
+            }
+
+            this.queueAdminNotification({
+                type: 'CONSOLE_ERROR',
+                message: payload.message,
+                stack: payload.details,
+                context: {
+                    source: 'console.error'
+                }
+            });
+        };
+
+        this.consolePatched = true;
+    }
+
+    setupReadyListener() {
+        if (!this.client || typeof this.client.once !== 'function') {
+            return;
+        }
+
+        this.client.once('ready', () => {
+            this.processNotificationQueue().catch((error) => {
+                this.writeInternalError('Failed to flush queued error DMs:', error);
+            });
         });
     }
 
@@ -70,8 +117,7 @@ class ErrorHandler {
             errorCount: this.errorCount
         };
 
-        // Console log
-        console.error(`[${timestamp}] ${type}:`, error);
+        this.baseConsoleError(`[${timestamp}] ${type}:`, error);
 
         // File log
         const logFile = path.join(this.logDirectory, `error-${new Date().toISOString().split('T')[0]}.json`);
@@ -84,8 +130,10 @@ class ErrorHandler {
             logs.push(logEntry);
             fs.writeFileSync(logFile, JSON.stringify(logs, null, 2));
         } catch (e) {
-            console.error('Failed to write error log:', e);
+            this.writeInternalError('Failed to write error log:', e);
         }
+
+        this.queueAdminNotification(logEntry);
 
         // Notify admin if error count is high
         if (this.errorCount > 10 && this.errorCount % 5 === 0) {
@@ -121,20 +169,147 @@ class ErrorHandler {
                 interaction.reply({ embeds: [errorEmbed], flags: 64 }).catch(() => {});
             }
         } catch (e) {
-            console.error('Failed to send error embed:', e);
+            this.writeInternalError('Failed to send error embed:', e);
         }
     }
 
     notifyAdmin(logEntry) {
-        // This would notify an admin/owner channel about critical errors
-        // Implementation depends on your setup
-        if (this.client.ownerIds && this.client.ownerIds.length > 0) {
-            try {
-                // Could send to a log channel or DM owner
-            } catch (e) {
-                console.error('Failed to notify admin:', e);
-            }
+        this.queueAdminNotification(logEntry);
+    }
+
+    serializeConsoleArgs(args = []) {
+        if (!Array.isArray(args) || args.length === 0) {
+            return null;
         }
+
+        const parts = args.map((arg) => this.normalizeErrorValue(arg));
+        const compactParts = parts.filter(Boolean);
+        const details = compactParts.join('\n');
+        if (!details) {
+            return null;
+        }
+
+        const message = compactParts[0].slice(0, 1000);
+
+        return {
+            message,
+            details: details.slice(0, 3500)
+        };
+    }
+
+    normalizeErrorValue(value) {
+        if (value instanceof Error) {
+            return value.stack || `${value.name}: ${value.message}`;
+        }
+
+        if (typeof value === 'string') {
+            return value;
+        }
+
+        if (typeof value === 'undefined') {
+            return 'undefined';
+        }
+
+        if (typeof value === 'function') {
+            return `[Function ${value.name || 'anonymous'}]`;
+        }
+
+        try {
+            return JSON.stringify(value, null, 2);
+        } catch (error) {
+            return String(value);
+        }
+    }
+
+    queueAdminNotification(logEntry) {
+        if (!this.dmRecipientId || !logEntry) {
+            return;
+        }
+
+        this.notificationQueue.push({
+            ...logEntry,
+            timestamp: logEntry.timestamp || new Date().toISOString()
+        });
+
+        this.processNotificationQueue().catch((error) => {
+            this.writeInternalError('Failed to process error DM queue:', error);
+        });
+    }
+
+    async processNotificationQueue() {
+        if (this.isSendingNotification || !this.dmRecipientId) {
+            return;
+        }
+
+        if (!this.client || !this.client.isReady || !this.client.isReady()) {
+            return;
+        }
+
+        this.isSendingNotification = true;
+
+        try {
+            const recipient = await this.client.users.fetch(this.dmRecipientId);
+            while (this.notificationQueue.length > 0) {
+                const logEntry = this.notificationQueue.shift();
+                const embed = this.buildNotificationEmbed(logEntry);
+                await recipient.send({ embeds: [embed] });
+            }
+        } catch (error) {
+            this.writeInternalError('Failed to send error DM:', error);
+        } finally {
+            this.isSendingNotification = false;
+        }
+    }
+
+    buildNotificationEmbed(logEntry) {
+        const message = (logEntry.message || 'Unknown error').slice(0, 1024);
+        const detailsSource = logEntry.stack || logEntry.message || 'No additional details';
+        const details = detailsSource.length > 1000
+            ? `${detailsSource.slice(0, 997)}...`
+            : detailsSource;
+        const context = this.formatContext(logEntry.context);
+
+        const embed = new EmbedBuilder()
+            .setColor('#ff4d4f')
+            .setTitle(`🚨 ${logEntry.type || 'ERROR'}`)
+            .addFields(
+                { name: 'Time', value: `<t:${Math.floor(new Date(logEntry.timestamp).getTime() / 1000)}:F>`, inline: false },
+                { name: 'Message', value: this.wrapCodeBlock(message), inline: false },
+                { name: 'Details', value: this.wrapCodeBlock(details), inline: false }
+            )
+            .setTimestamp(new Date(logEntry.timestamp || Date.now()));
+
+        if (context) {
+            embed.addFields({ name: 'Context', value: this.wrapCodeBlock(context), inline: false });
+        }
+
+        return embed;
+    }
+
+    formatContext(context = {}) {
+        if (!context || typeof context !== 'object' || Array.isArray(context)) {
+            return '';
+        }
+
+        const entries = Object.entries(context)
+            .filter(([, value]) => typeof value !== 'undefined')
+            .map(([key, value]) => `${key}: ${this.normalizeErrorValue(value)}`);
+
+        return entries.join('\n').slice(0, 1000);
+    }
+
+    wrapCodeBlock(value) {
+        const safeValue = String(value || 'No data').replace(/```/g, 'ʼʼʼ');
+        return `\`\`\`${safeValue.slice(0, 1000)}\`\`\``;
+    }
+
+    writeInternalError(...args) {
+        const message = args
+            .map((arg) => this.normalizeErrorValue(arg))
+            .filter(Boolean)
+            .join(' ');
+
+        process.stderr.write(`${message}\n`);
     }
 
     getErrorLogs(days = 1) {
@@ -152,7 +327,7 @@ class ErrorHandler {
                     const content = JSON.parse(fs.readFileSync(logFile, 'utf8'));
                     logs.push(...content);
                 } catch (e) {
-                    console.error(`Failed to read log file ${logFile}:`, e);
+                    this.writeInternalError(`Failed to read log file ${logFile}:`, e);
                 }
             }
         }
@@ -174,7 +349,7 @@ class ErrorHandler {
                 }
             });
         } catch (e) {
-            console.error('Failed to clear old logs:', e);
+            this.writeInternalError('Failed to clear old logs:', e);
         }
     }
 }
