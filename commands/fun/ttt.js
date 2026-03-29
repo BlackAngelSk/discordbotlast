@@ -268,8 +268,7 @@ async function playTicTacToeWithBet(message, bet) {
                 } else {
                     resultText = "🤝 It's a tie!";
                     color = 0xf1c40f;
-                    payout = bet;
-                    await economyManager.addMoney(message.guild.id, message.author.id, payout);
+                    payout = 0;
                     await gameStatsManager.recordTTT(message.author.id, 'tie');
                 }
                 const result = new EmbedBuilder()
@@ -312,8 +311,7 @@ async function playTicTacToeWithBet(message, bet) {
         } else {
             resultText = "🤝 It's a tie!";
             color = 0xf1c40f;
-            payout = bet;
-            await economyManager.addMoney(message.guild.id, message.author.id, payout);
+            payout = 0;
             await gameStatsManager.recordTTT(message.author.id, 'tie');
         }
 
