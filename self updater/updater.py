@@ -68,6 +68,40 @@ def _print(msg: str) -> None:
     print(f"[updater] {msg}")
 
 
+def _normalize_argv_start_cmd(argv: list[str]) -> list[str]:
+    normalized: list[str] = []
+    index = 0
+
+    while index < len(argv):
+        arg = argv[index]
+
+        if arg == "--start-cmd":
+            normalized.append(arg)
+            index += 1
+
+            parts: list[str] = []
+            while index < len(argv):
+                current = argv[index]
+                if current.startswith("--"):
+                    break
+                parts.append(current)
+                index += 1
+
+            normalized.append(" ".join(parts).strip())
+            continue
+
+        if arg.startswith("--start-cmd="):
+            _, value = arg.split("=", 1)
+            normalized.append(f"--start-cmd={value.strip()}")
+            index += 1
+            continue
+
+        normalized.append(arg)
+        index += 1
+
+    return normalized
+
+
 def _normalize_repo(repo: str) -> str:
     value = repo.strip()
     if value.startswith("https://github.com/"):
@@ -1310,7 +1344,7 @@ def main() -> int:
                 return 1
 
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args(_normalize_argv_start_cmd(sys.argv[1:]))
 
     global TLS_INSECURE, TLS_CAFILE
     TLS_INSECURE = bool(args.insecure)
