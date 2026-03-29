@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('./economyManager');
 
 const FILE = path.join(__dirname, '..', 'data', 'horseRaces.json');
@@ -174,19 +174,19 @@ class HorseRaceManager {
         const race = this.activeRaces.get(key);
 
         if (!race) {
-            return interaction.reply({ content: '❌ No active horse race in this channel.', ephemeral: true });
+            return interaction.reply({ content: '❌ No active horse race in this channel.', flags: MessageFlags.Ephemeral });
         }
 
         if (race.creatorId !== interaction.user.id) {
-            return interaction.reply({ content: '❌ Only the race creator can start this race.', ephemeral: true });
+            return interaction.reply({ content: '❌ Only the race creator can start this race.', flags: MessageFlags.Ephemeral });
         }
 
         if (race.started) {
-            return interaction.reply({ content: '❌ That race has already started.', ephemeral: true });
+            return interaction.reply({ content: '❌ That race has already started.', flags: MessageFlags.Ephemeral });
         }
 
         if (race.participants.length < 2) {
-            return interaction.reply({ content: '❌ At least 2 participants are required to start the race.', ephemeral: true });
+            return interaction.reply({ content: '❌ At least 2 participants are required to start the race.', flags: MessageFlags.Ephemeral });
         }
 
         race.started = true;

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const aiManager = require('../../utils/aiManager');
 
 function normalizeAIText(text) {
@@ -74,7 +74,7 @@ module.exports = {
             if (!aiManager.isConfigured()) {
                 return interaction.reply({
                     content: '❌ The AI feature is not configured. Please set the `GEMINI_API_KEY` in the .env file.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -162,7 +162,7 @@ module.exports = {
                 .setFooter({ text: 'Contact the bot developer if this persists' });
 
             if (!interaction.replied) {
-                await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+                await interaction.reply({ embeds: [errorEmbed], flags: MessageFlags.Ephemeral });
             } else {
                 await interaction.editReply({ embeds: [errorEmbed] });
             }

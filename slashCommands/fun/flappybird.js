@@ -4,7 +4,8 @@ const {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    ComponentType
+    ComponentType,
+    MessageFlags
 } = require('discord.js');
 
 const BOARD_WIDTH = 16;
@@ -32,7 +33,7 @@ module.exports = {
         if (activeFlappySessions.has(sessionKey)) {
             return interaction.reply({
                 content: '⏳ You already have an active Flappy Bird game. Finish it first.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -43,7 +44,7 @@ module.exports = {
         } catch (error) {
             console.error('Error in flappybird command:', error);
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ An error occurred while starting Flappy Bird.', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while starting Flappy Bird.', flags: MessageFlags.Ephemeral });
             }
         } finally {
             activeFlappySessions.delete(sessionKey);
@@ -240,7 +241,7 @@ async function runGame(interaction) {
             if (i.user.id !== interaction.user.id) {
                 try {
                     if (!i.replied && !i.deferred) {
-                        await i.reply({ content: '❌ This game belongs to someone else.', ephemeral: true });
+                        await i.reply({ content: '❌ This game belongs to someone else.', flags: MessageFlags.Ephemeral });
                     }
                 } catch (_error) {
                     await i.deferUpdate().catch(() => {});

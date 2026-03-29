@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -9,7 +9,7 @@ module.exports = {
         const queue = interaction.client.queues.get(interaction.guild.id);
 
         if (!queue || queue.songs.length === 0) {
-            return interaction.reply({ content: '❌ The queue is empty!', ephemeral: true });
+            return interaction.reply({ content: '❌ The queue is empty!', flags: MessageFlags.Ephemeral });
         }
 
         const embed = new EmbedBuilder()

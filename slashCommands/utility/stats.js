@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const statsManager = require('../../utils/statsManager');
 
 module.exports = {
@@ -33,7 +33,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in stats command:', error);
-            await interaction.reply({ content: '❌ An error occurred while fetching statistics!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while fetching statistics!', flags: MessageFlags.Ephemeral });
         }
     }
 };

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
@@ -12,9 +12,9 @@ module.exports = {
 
             if (!result.success) {
                 if (result.reason === 'noProposal') {
-                    return interaction.reply({ content: '❌ You don\'t have any pending proposals!', ephemeral: true });
+                    return interaction.reply({ content: '❌ You don\'t have any pending proposals!', flags: MessageFlags.Ephemeral });
                 } else if (result.reason === 'oneAlreadyMarried') {
-                    return interaction.reply({ content: '❌ One of you is already married!', ephemeral: true });
+                    return interaction.reply({ content: '❌ One of you is already married!', flags: MessageFlags.Ephemeral });
                 }
             }
 
@@ -29,7 +29,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in accept command:', error);
-            await interaction.reply({ content: '❌ An error occurred while accepting the proposal!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while accepting the proposal!', flags: MessageFlags.Ephemeral });
         }
     }
 };

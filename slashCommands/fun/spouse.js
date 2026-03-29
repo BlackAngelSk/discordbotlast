@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
@@ -16,7 +16,7 @@ module.exports = {
             const spouse = await relationshipManager.getSpouse(interaction.guild.id, user.id);
 
             if (!spouse) {
-                return interaction.reply({ content: `${user.id === interaction.user.id ? 'You are' : `${user.username} is`} not married!`, ephemeral: true });
+                return interaction.reply({ content: `${user.id === interaction.user.id ? 'You are' : `${user.username} is`} not married!`, flags: MessageFlags.Ephemeral });
             }
 
             const spouseUser = await interaction.client.users.fetch(spouse);
@@ -32,7 +32,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in spouse command:', error);
-            await interaction.reply({ content: '❌ An error occurred while checking spouse information!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while checking spouse information!', flags: MessageFlags.Ephemeral });
         }
     }
 };

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const inviteManager = require('../../utils/inviteManager');
 
 module.exports = {
@@ -45,7 +45,7 @@ module.exports = {
             await interaction.reply({ embeds: [embed] });
         } catch (error) {
             console.error('Error in invitestats slash command:', error);
-            await interaction.reply({ content: '❌ Error retrieving invite stats.', ephemeral: true });
+            await interaction.reply({ content: '❌ Error retrieving invite stats.', flags: MessageFlags.Ephemeral });
         }
     },
 };

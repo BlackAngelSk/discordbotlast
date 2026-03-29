@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const horseRaceManager = require('../../utils/horseRaceManager');
 const economyManager = require('../../utils/economyManager');
 
@@ -28,7 +28,7 @@ module.exports = {
 
             const userData = economyManager.getUserData(interaction.guild.id, interaction.user.id);
             if (userData.balance < bet) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, flags: MessageFlags.Ephemeral });
             }
 
             await economyManager.removeMoney(interaction.guild.id, interaction.user.id, bet);

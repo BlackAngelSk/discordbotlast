@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 
 module.exports = {
@@ -39,7 +39,7 @@ module.exports = {
             if (!interaction.member.permissions.has('Administrator')) {
                 return interaction.reply({
                     content: '❌ You need Administrator permission to use this command.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -89,7 +89,7 @@ module.exports = {
                 } catch (error) {
                     return interaction.reply({
                         content: `❌ Error: ${error.message}`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
             }
@@ -116,7 +116,7 @@ module.exports = {
                 } catch (error) {
                     return interaction.reply({
                         content: `❌ Error: ${error.message}`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
             }
@@ -141,7 +141,7 @@ module.exports = {
                 } catch (error) {
                     return interaction.reply({
                         content: `❌ Error: ${error.message}`,
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     });
                 }
             }
@@ -149,7 +149,7 @@ module.exports = {
             console.error('Error in prefix slash command:', error);
             await interaction.reply({
                 content: '❌ An error occurred while managing prefixes.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     },

@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -787,7 +787,7 @@ async function playRoulette(message) {
     if (betType === 'number') {
       await interaction.reply({ 
         content: '🔢 Reply with a number from **0 to 36**:', 
-        ephemeral: true 
+        flags: MessageFlags.Ephemeral
       });
       
       const numCollector = message.channel.createMessageCollector({

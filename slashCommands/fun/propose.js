@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
@@ -15,20 +15,20 @@ module.exports = {
             const user = interaction.options.getUser('user');
 
             if (user.id === interaction.user.id) {
-                return interaction.reply({ content: '❌ You cannot propose to yourself!', ephemeral: true });
+                return interaction.reply({ content: '❌ You cannot propose to yourself!', flags: MessageFlags.Ephemeral });
             }
 
             if (user.bot) {
-                return interaction.reply({ content: '❌ You cannot propose to a bot!', ephemeral: true });
+                return interaction.reply({ content: '❌ You cannot propose to a bot!', flags: MessageFlags.Ephemeral });
             }
 
             const proposal = await relationshipManager.propose(interaction.guild.id, interaction.user.id, user.id);
 
             if (!proposal.success) {
                 if (proposal.reason === 'oneAlreadyMarried') {
-                    return interaction.reply({ content: '❌ One of you is already married!', ephemeral: true });
+                    return interaction.reply({ content: '❌ One of you is already married!', flags: MessageFlags.Ephemeral });
                 } else if (proposal.reason === 'proposalExists') {
-                    return interaction.reply({ content: '❌ There is already a pending proposal between you two!', ephemeral: true });
+                    return interaction.reply({ content: '❌ There is already a pending proposal between you two!', flags: MessageFlags.Ephemeral });
                 }
             }
 
@@ -52,7 +52,7 @@ module.exports = {
         } catch (error) {
             console.error('Error in propose command:', error);
             if (!interaction.replied) {
-                await interaction.reply({ content: '❌ An error occurred while processing the proposal!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while processing the proposal!', flags: MessageFlags.Ephemeral });
             }
         }
     }

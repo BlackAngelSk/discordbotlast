@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ChannelType, MessageFlags } = require('discord.js');
 const loggingManager = require('../../utils/loggingManager');
 
 module.exports = {
@@ -18,7 +18,7 @@ module.exports = {
             if (!interaction.member.permissions.has('Administrator')) {
                 return interaction.reply({
                     content: '❌ You need Administrator permission to use this command.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -27,7 +27,7 @@ module.exports = {
             if (!channel.isTextBased()) {
                 return interaction.reply({
                     content: '❌ The channel must be a text-based channel.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -64,7 +64,7 @@ module.exports = {
             console.error('Error in logging slash command:', error);
             await interaction.reply({
                 content: '❌ An error occurred while setting up logging.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     },

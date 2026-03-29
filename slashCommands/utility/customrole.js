@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const customRoleShop = require('../../utils/customRoleShop');
 const economyManager = require('../../utils/economyManager');
 
@@ -95,7 +95,7 @@ module.exports = {
             return interaction.reply({
                 embeds: [colorEmbed, badgeEmbed],
                 components: [colorRow, badgeRow],
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -105,7 +105,7 @@ module.exports = {
             if (!customRole) {
                 return interaction.reply({
                     content: '❌ You don\'t have a custom role yet! Use `/customrole shop` to browse.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -119,7 +119,7 @@ module.exports = {
                 )
                 .setThumbnail(interaction.user.displayAvatarURL());
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 
         if (subcommand === 'remove') {
@@ -128,7 +128,7 @@ module.exports = {
             if (!customRole) {
                 return interaction.reply({
                     content: '❌ You don\'t have a custom role to remove!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -136,7 +136,7 @@ module.exports = {
 
             return interaction.reply({
                 content: '✅ Your custom role has been removed!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }

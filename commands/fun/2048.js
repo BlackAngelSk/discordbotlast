@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 
 class Game2048 {
     constructor() {
@@ -276,7 +276,7 @@ module.exports = {
                 if (!buttonInteraction.replied && !buttonInteraction.deferred) {
                     await buttonInteraction.reply({
                         content: '❌ Something went wrong. The game is ending.',
-                        ephemeral: true
+                        flags: MessageFlags.Ephemeral
                     }).catch(() => {});
                 }
                 collector.stop('error');

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const countingData = new Map();
 
@@ -15,7 +15,7 @@ module.exports = {
         if (countingData.has(key)) {
             return interaction.reply({
                 content: '⚠️ A counting game is already active in this channel!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 

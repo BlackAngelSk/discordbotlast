@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
@@ -11,7 +11,7 @@ module.exports = {
             const result = await relationshipManager.divorce(interaction.guild.id, interaction.user.id);
 
             if (!result.success) {
-                return interaction.reply({ content: '❌ You are not married!', ephemeral: true });
+                return interaction.reply({ content: '❌ You are not married!', flags: MessageFlags.Ephemeral });
             }
 
             const embed = new EmbedBuilder()
@@ -24,7 +24,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in divorce command:', error);
-            await interaction.reply({ content: '❌ An error occurred while processing the divorce!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while processing the divorce!', flags: MessageFlags.Ephemeral });
         }
     }
 };

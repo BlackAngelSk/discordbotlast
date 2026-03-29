@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { createShuffledDeck } = require('../../utils/playingCards');
@@ -21,7 +21,7 @@ module.exports = {
             // Check if user has enough money
             const userData = economyManager.getUserData(interaction.guild.id, interaction.user.id);
             if (userData.balance < bet) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, flags: MessageFlags.Ephemeral });
             }
 
             // Deduct bet from user balance
@@ -33,7 +33,7 @@ module.exports = {
         } catch (error) {
             console.error('Error in blackjack command:', error);
             if (!interaction.replied) {
-                await interaction.reply({ content: '❌ An error occurred while playing blackjack!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while playing blackjack!', flags: MessageFlags.Ephemeral });
             }
         }
     }

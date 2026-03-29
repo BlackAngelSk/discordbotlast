@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 
 const MIN_BET = 10;
@@ -29,14 +29,14 @@ module.exports = {
 
         try {
             if (activeCrashSessions.has(sessionKey)) {
-                return interaction.reply({ content: '⏳ You already have an active crash game. Finish it first.', ephemeral: true });
+                return interaction.reply({ content: '⏳ You already have an active crash game. Finish it first.', flags: MessageFlags.Ephemeral });
             }
 
             const userData = economyManager.getUserData(guildId, userId);
             if (userData.balance < bet) {
                 return interaction.reply({
                     content: `❌ You don't have enough coins! Your balance: ${userData.balance.toLocaleString()} coins`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -44,7 +44,7 @@ module.exports = {
 
             const removed = await economyManager.removeMoney(guildId, userId, bet);
             if (!removed) {
-                return interaction.reply({ content: '❌ Could not place your bet. Please try again.', ephemeral: true });
+                return interaction.reply({ content: '❌ Could not place your bet. Please try again.', flags: MessageFlags.Ephemeral });
             }
             betRemoved = true;
 
@@ -57,7 +57,7 @@ module.exports = {
             }
 
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ An error occurred while playing crash!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while playing crash!', flags: MessageFlags.Ephemeral });
             }
         } finally {
             activeCrashSessions.delete(sessionKey);
@@ -190,7 +190,7 @@ async function playCrashWithBet(interaction, bet) {
         } catch (error) {
             console.error('Error handling slash crash interaction:', error);
             if (!i.replied && !i.deferred) {
-                await i.reply({ content: '❌ Something went wrong. The game is ending.', ephemeral: true }).catch(() => {});
+                await i.reply({ content: '❌ Something went wrong. The game is ending.', flags: MessageFlags.Ephemeral }).catch(() => {});
             }
             collector.stop('error');
         }

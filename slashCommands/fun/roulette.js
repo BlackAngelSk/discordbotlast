@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 
 const rouletteData = new Map(); // Track active games
@@ -97,7 +97,7 @@ module.exports = {
                 const timeLeft = Math.ceil((muteExpire - Date.now()) / 1000);
                 return interaction.reply({
                     content: `🔇 You're muted for ${timeLeft} more seconds!`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             } else {
                 mutedUsers.delete(userId);
@@ -109,7 +109,7 @@ module.exports = {
         if (rouletteData.has(key)) {
             return interaction.reply({
                 content: '⏳ Please wait before playing again!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 

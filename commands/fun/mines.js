@@ -1,4 +1,4 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -267,7 +267,7 @@ async function playMinesWithBet(message, bet, mineCount) {
         try {
             if (interaction.customId === 'mines_cashout') {
                 if (game.revealed.size === 0) {
-                    return interaction.reply({ content: '❌ Reveal at least one safe tile before cashing out.', ephemeral: true });
+                    return interaction.reply({ content: '❌ Reveal at least one safe tile before cashing out.', flags: MessageFlags.Ephemeral });
                 }
 
                 await interaction.deferUpdate();
@@ -318,7 +318,7 @@ async function playMinesWithBet(message, bet, mineCount) {
         } catch (error) {
             console.error('Error handling mines interaction:', error);
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ Something went wrong. The game is ending.', ephemeral: true }).catch(() => {});
+                await interaction.reply({ content: '❌ Something went wrong. The game is ending.', flags: MessageFlags.Ephemeral }).catch(() => {});
             }
             collector.stop('error');
         }

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -39,19 +39,19 @@ module.exports = {
 
         try {
             if (activeMinesSessions.has(sessionKey)) {
-                return interaction.reply({ content: '⏳ You already have an active mines game. Finish it first.', ephemeral: true });
+                return interaction.reply({ content: '⏳ You already have an active mines game. Finish it first.', flags: MessageFlags.Ephemeral });
             }
 
             const userData = economyManager.getUserData(guildId, userId);
             if (userData.balance < bet) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance.toLocaleString()} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance.toLocaleString()} coins`, flags: MessageFlags.Ephemeral });
             }
 
             activeMinesSessions.add(sessionKey);
 
             const removed = await economyManager.removeMoney(guildId, userId, bet);
             if (!removed) {
-                return interaction.reply({ content: '❌ Could not place your bet. Please try again.', ephemeral: true });
+                return interaction.reply({ content: '❌ Could not place your bet. Please try again.', flags: MessageFlags.Ephemeral });
             }
             betRemoved = true;
 
@@ -64,7 +64,7 @@ module.exports = {
             }
 
             if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({ content: '❌ An error occurred while playing mines!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while playing mines!', flags: MessageFlags.Ephemeral });
             }
         } finally {
             activeMinesSessions.delete(sessionKey);
@@ -242,7 +242,7 @@ async function playMinesWithBet(interaction, bet, mineCount) {
         try {
             if (i.customId === 'smines_cashout') {
                 if (game.revealed.size === 0) {
-                    return i.reply({ content: '❌ Reveal at least one safe tile before cashing out.', ephemeral: true });
+                    return i.reply({ content: '❌ Reveal at least one safe tile before cashing out.', flags: MessageFlags.Ephemeral });
                 }
 
                 await i.deferUpdate();
@@ -293,7 +293,7 @@ async function playMinesWithBet(interaction, bet, mineCount) {
         } catch (error) {
             console.error('Error handling slash mines interaction:', error);
             if (!i.replied && !i.deferred) {
-                await i.reply({ content: '❌ Something went wrong. The game is ending.', ephemeral: true }).catch(() => {});
+                await i.reply({ content: '❌ Something went wrong. The game is ending.', flags: MessageFlags.Ephemeral }).catch(() => {});
             }
             collector.stop('error');
         }

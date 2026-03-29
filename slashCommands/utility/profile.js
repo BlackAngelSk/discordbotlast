@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const relationshipManager = require('../../utils/relationshipManager');
@@ -48,7 +48,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in profile command:', error);
-            await interaction.reply({ content: '❌ An error occurred while fetching the profile!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while fetching the profile!', flags: MessageFlags.Ephemeral });
         }
     }
 };

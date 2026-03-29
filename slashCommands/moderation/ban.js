@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,23 +21,23 @@ module.exports = {
         const member = await interaction.guild.members.fetch(target.id).catch(() => null);
 
         if (!member) {
-            return interaction.reply({ content: '❌ User not found in this server!', ephemeral: true });
+            return interaction.reply({ content: '❌ User not found in this server!', flags: MessageFlags.Ephemeral });
         }
 
         if (member.id === interaction.user.id) {
-            return interaction.reply({ content: '❌ You cannot ban yourself!', ephemeral: true });
+            return interaction.reply({ content: '❌ You cannot ban yourself!', flags: MessageFlags.Ephemeral });
         }
 
         if (member.id === interaction.client.user.id) {
-            return interaction.reply({ content: '❌ I cannot ban myself!', ephemeral: true });
+            return interaction.reply({ content: '❌ I cannot ban myself!', flags: MessageFlags.Ephemeral });
         }
 
         if (member.roles.highest.position >= interaction.member.roles.highest.position) {
-            return interaction.reply({ content: '❌ You cannot ban this user due to role hierarchy!', ephemeral: true });
+            return interaction.reply({ content: '❌ You cannot ban this user due to role hierarchy!', flags: MessageFlags.Ephemeral });
         }
 
         if (!member.bannable) {
-            return interaction.reply({ content: '❌ I cannot ban this user!', ephemeral: true });
+            return interaction.reply({ content: '❌ I cannot ban this user!', flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -55,7 +55,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error banning member:', error);
-            await interaction.reply({ content: '❌ Failed to ban the member!', ephemeral: true });
+            await interaction.reply({ content: '❌ Failed to ban the member!', flags: MessageFlags.Ephemeral });
         }
     }
 };

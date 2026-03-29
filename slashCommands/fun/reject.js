@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
 
 module.exports = {
@@ -11,7 +11,7 @@ module.exports = {
             const result = await relationshipManager.rejectProposal(interaction.guild.id, interaction.user.id);
 
             if (!result.success) {
-                return interaction.reply({ content: '❌ You don\'t have any pending proposals!', ephemeral: true });
+                return interaction.reply({ content: '❌ You don\'t have any pending proposals!', flags: MessageFlags.Ephemeral });
             }
 
             const embed = new EmbedBuilder()
@@ -24,7 +24,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in reject command:', error);
-            await interaction.reply({ content: '❌ An error occurred while rejecting the proposal!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while rejecting the proposal!', flags: MessageFlags.Ephemeral });
         }
     }
 };

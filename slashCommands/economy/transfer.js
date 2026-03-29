@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 
 module.exports = {
@@ -21,16 +21,16 @@ module.exports = {
             const amount = interaction.options.getInteger('amount');
 
             if (targetUser.id === interaction.user.id) {
-                return interaction.reply({ content: '❌ You cannot transfer coins to yourself!', ephemeral: true });
+                return interaction.reply({ content: '❌ You cannot transfer coins to yourself!', flags: MessageFlags.Ephemeral });
             }
 
             if (targetUser.bot) {
-                return interaction.reply({ content: '❌ You cannot transfer coins to bots!', ephemeral: true });
+                return interaction.reply({ content: '❌ You cannot transfer coins to bots!', flags: MessageFlags.Ephemeral });
             }
 
             const senderData = economyManager.getUserData(interaction.guild.id, interaction.user.id);
             if (senderData.balance < amount) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${senderData.balance} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${senderData.balance} coins`, flags: MessageFlags.Ephemeral });
             }
 
             await economyManager.removeMoney(interaction.guild.id, interaction.user.id, amount);
@@ -50,7 +50,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error in transfer command:', error);
-            await interaction.reply({ content: '❌ An error occurred while transferring coins!', ephemeral: true });
+            await interaction.reply({ content: '❌ An error occurred while transferring coins!', flags: MessageFlags.Ephemeral });
         }
     }
 };

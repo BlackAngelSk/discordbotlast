@@ -3,7 +3,7 @@
  * Schedule and send announcements
  */
 
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -93,7 +93,7 @@ module.exports = {
 
                 return interaction.reply({
                     content: `✅ Announcement sent to ${channel}!`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -128,7 +128,7 @@ module.exports = {
                             { name: 'Message', value: message, inline: false }
                         ]
                     }],
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -158,7 +158,7 @@ module.exports = {
 
                 return interaction.reply({
                     content: success ? '✅ Announcement cancelled!' : '❌ Announcement not found!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
         } catch (error) {

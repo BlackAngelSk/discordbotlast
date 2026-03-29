@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -14,7 +14,7 @@ module.exports = {
         const channel = interaction.options.getChannel('channel') || interaction.channel;
 
         if (!channel.permissionsFor(interaction.guild.members.me).has(PermissionFlagsBits.ManageChannels)) {
-            return interaction.reply({ content: '❌ I don\'t have permission to manage channels!', ephemeral: true });
+            return interaction.reply({ content: '❌ I don\'t have permission to manage channels!', flags: MessageFlags.Ephemeral });
         }
 
         try {
@@ -33,7 +33,7 @@ module.exports = {
 
         } catch (error) {
             console.error('Error locking channel:', error);
-            await interaction.reply({ content: '❌ Failed to lock the channel!', ephemeral: true });
+            await interaction.reply({ content: '❌ Failed to lock the channel!', flags: MessageFlags.Ephemeral });
         }
     }
 };

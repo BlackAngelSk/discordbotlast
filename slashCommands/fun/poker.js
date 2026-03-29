@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -42,12 +42,12 @@ module.exports = {
                     '**Take action:** `!poker action <fold|check|call|bet|raise> [amount]`')
                 .setFooter({ text: 'Slash commands are coming soon - use prefix commands for now!' });
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             console.error('Error in poker command:', error);
             if (!interaction.replied) {
-                await interaction.reply({ content: '❌ An error occurred!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred!', flags: MessageFlags.Ephemeral });
             }
         }
     }

@@ -84,7 +84,7 @@ module.exports = {
             if (topUsers.length === 0) {
                 return interaction.reply({
                     content: '📊 No voice activity recorded yet!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -118,7 +118,7 @@ module.exports = {
             if (afkUsers.length === 0) {
                 return interaction.reply({
                     content: `✅ No AFK users (threshold: ${minutes} minutes)`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 

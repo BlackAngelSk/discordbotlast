@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -13,7 +13,7 @@ module.exports = {
         const role = interaction.options.getRole('role');
 
         if (!role) {
-            return interaction.reply({ content: '❌ Could not find that role.', ephemeral: true });
+            return interaction.reply({ content: '❌ Could not find that role.', flags: MessageFlags.Ephemeral });
         }
 
         const permissions = role.permissions.toArray().map(perm => {

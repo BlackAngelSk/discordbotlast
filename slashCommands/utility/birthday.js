@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const birthdayManager = require('../../utils/birthdayManager');
 const economyManager = require('../../utils/economyManager');
 
@@ -52,7 +52,7 @@ module.exports = {
             if (parts.length < 2) {
                 return interaction.reply({
                     content: '❌ Invalid date format! Use MM/DD/YYYY or MM/DD',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -62,7 +62,7 @@ module.exports = {
             if (isNaN(month) || isNaN(day) || month < 1 || month > 12 || day < 1 || day > 31) {
                 return interaction.reply({
                     content: '❌ Invalid date! Month must be 1-12, day must be 1-31',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -74,7 +74,7 @@ module.exports = {
                 .setDescription(`Your birthday is now set to **${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}${year ? `/${year}` : ''}**`)
                 .setFooter({ text: 'You\'ll receive a surprise on your birthday!' });
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 
         if (subcommand === 'view') {
@@ -83,7 +83,7 @@ module.exports = {
             if (!birthday) {
                 return interaction.reply({
                     content: '❌ You haven\'t set your birthday yet! Use `/birthday set` to set it.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -99,7 +99,7 @@ module.exports = {
                 )
                 .setThumbnail(interaction.user.displayAvatarURL());
 
-            return interaction.reply({ embeds: [embed], ephemeral: true });
+            return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 
         if (subcommand === 'upcoming') {
@@ -109,7 +109,7 @@ module.exports = {
             if (upcoming.length === 0) {
                 return interaction.reply({
                     content: `🎉 No birthdays in the next ${days} days!`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -136,7 +136,7 @@ module.exports = {
             if (!birthday) {
                 return interaction.reply({
                     content: '❌ You haven\'t set a birthday to remove!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -144,7 +144,7 @@ module.exports = {
 
             return interaction.reply({
                 content: '✅ Your birthday has been removed!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }

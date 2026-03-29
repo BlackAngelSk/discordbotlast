@@ -1,4 +1,4 @@
-const { EmbedBuilder, SlashCommandBuilder } = require('discord.js');
+const { EmbedBuilder, SlashCommandBuilder, MessageFlags } = require('discord.js');
 const seasonManager = require('../../utils/seasonManager');
 const seasonLeaderboardManager = require('../../utils/seasonLeaderboardManager');
 
@@ -29,7 +29,7 @@ module.exports = {
             if (!interaction.member.permissions.has('Administrator')) {
                 return interaction.reply({
                     content: '❌ You need "Administrator" permission!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -41,7 +41,7 @@ module.exports = {
             if (!channel.isTextBased()) {
                 return interaction.reply({
                     content: '❌ Please select a text channel!',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -79,7 +79,7 @@ module.exports = {
             console.error('Error in leaderboard-channel command:', error);
             interaction.reply({
                 content: '❌ An error occurred!',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     }

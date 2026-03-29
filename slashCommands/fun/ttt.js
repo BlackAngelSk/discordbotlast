@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -18,7 +18,7 @@ module.exports = {
 
             const userData = economyManager.getUserData(interaction.guild.id, interaction.user.id);
             if (userData.balance < bet) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, flags: MessageFlags.Ephemeral });
             }
 
             await economyManager.removeMoney(interaction.guild.id, interaction.user.id, bet);
@@ -27,7 +27,7 @@ module.exports = {
         } catch (error) {
             console.error('Error in ttt command:', error);
             if (!interaction.replied) {
-                await interaction.reply({ content: '❌ An error occurred while playing tic-tac-toe!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while playing tic-tac-toe!', flags: MessageFlags.Ephemeral });
             }
         }
     }

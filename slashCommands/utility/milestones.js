@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const serverMilestones = require('../../utils/serverMilestones');
 
 module.exports = {
@@ -67,7 +67,7 @@ module.exports = {
             if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
                 return respond({
                     content: '❌ You need the **Manage Server** permission to sync milestones.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -77,7 +77,7 @@ module.exports = {
             if (syncedMilestones.length === 0) {
                 return respond({
                     content: `✅ Milestones are already synced with **${memberCount}** members.`,
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -92,7 +92,7 @@ module.exports = {
                 .setDescription(syncedList)
                 .setFooter({ text: `Current members: ${memberCount}` });
 
-            return respond({ embeds: [embed], ephemeral: true });
+            return respond({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 
         // Always keep milestone state in sync with current member count.
@@ -105,7 +105,7 @@ module.exports = {
             if (achieved.length === 0) {
                 return respond({
                     content: '📊 No milestones achieved yet! Keep growing the server! 🚀',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -129,7 +129,7 @@ module.exports = {
             if (!upcoming) {
                 return respond({
                     content: '🌟 You\'ve achieved all milestones! Congratulations! 🎉',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
 

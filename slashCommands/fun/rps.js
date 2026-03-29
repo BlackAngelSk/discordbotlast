@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
@@ -17,14 +17,14 @@ module.exports = {
             const bet = interaction.options.getInteger('bet');
             const userData = economyManager.getUserData(interaction.guild.id, interaction.user.id);
             if (userData.balance < bet) {
-                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, ephemeral: true });
+                return interaction.reply({ content: `❌ You don't have enough coins! Your balance: ${userData.balance} coins`, flags: MessageFlags.Ephemeral });
             }
             await economyManager.removeMoney(interaction.guild.id, interaction.user.id, bet);
             await playRPSWithBet(interaction, bet);
         } catch (error) {
             console.error('Error in rps command:', error);
             if (!interaction.replied) {
-                await interaction.reply({ content: '❌ An error occurred while playing rock paper scissors!', ephemeral: true });
+                await interaction.reply({ content: '❌ An error occurred while playing rock paper scissors!', flags: MessageFlags.Ephemeral });
             }
         }
     }
