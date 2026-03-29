@@ -42,7 +42,7 @@ if %HAS_UPDATER%==1 (
 REM If updater is available, run it; otherwise just start the bot
 if %HAS_UPDATER%==1 (
   echo [launcher] Starting with auto-update loop...
-  "%PYTHON_EXE%" "%UPDATER_PATH%" %TLS_FLAGS% redo-loop --target "!TARGET_DIR!" --ref "main" --interval "60" --backup --stop-process "node.exe" --start-on-launch --start-bat "!BOT_START_BAT!"
+  "%PYTHON_EXE%" "%UPDATER_PATH%" %TLS_FLAGS% redo-loop --target "!TARGET_DIR!" --ref "main" --interval "86400" --backup --stop-process "node.exe" --start-on-launch --start-bat "!BOT_START_BAT!"
   
   if errorlevel 1 (
     echo [launcher] Updater failed with exit code !errorlevel!
