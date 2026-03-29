@@ -3,6 +3,7 @@
  * Supports both MongoDB (production) and JSON (fallback)
  */
 
+const fsSync = require('fs');
 const fs = require('fs').promises;
 const path = require('path');
 const { isDevModeEnabled } = require('./devMode');
@@ -49,8 +50,12 @@ class DatabaseManager {
 
         const caFile = this.getEnvString('MONGODB_TLS_CA_FILE', '');
         if (caFile) {
-            options.tls = true;
-            options.tlsCAFile = caFile;
+            if (fsSync.existsSync(caFile)) {
+                options.tls = true;
+                options.tlsCAFile = caFile;
+            } else {
+                console.warn(`⚠️ MONGODB_TLS_CA_FILE not found at "${caFile}". Ignoring custom CA file and using system trust store.`);
+            }
         }
 
         if (this.getEnvBoolean('MONGODB_TLS_INSECURE', false)) {
