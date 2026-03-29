@@ -227,7 +227,7 @@ function getCategoryEmbed(p, category) {
                 .setDescription('Entertainment and random fun!')
                 .addFields(
                     { name: 'Commands', value: `\`/poll <question> <options>\` - Create poll\n\`/8ball <question>\` - Magic 8-ball\n\`/meme\` - Random meme\n\`/flappybird\` - Play Flappy Bird\n\`${p}hello\` - Friendly greeting\n\`${p}propose @user\` - Propose\n\`/propose @user\` - Propose (slash)\n\`${p}accept\` - Accept proposal\n\`/accept\` - Accept (slash)\n\`${p}reject\` - Reject proposal\n\`/reject\` - Reject (slash)\n\`${p}divorce\` - Divorce\n\`/divorce\` - Divorce (slash)\n\`${p}spouse [@user]\` - View spouse\n\`/spouse [@user]\` - View spouse (slash)\n\`${p}couples\` - Top couples\n\`/couples\` - Top couples (slash)` },
-                    { name: '🧪 Beta Commands', value: `\`${p}poker host <blind> [buyin]\`, \`${p}poker join <blind>\`, \`${p}poker start\`, \`${p}poker status\`, \`${p}poker leave\`\nUses button controls during turns and sends hole cards by DM.\nRequires **bot beta access** role.\nIn beta poker, balance is test-only (infinite) and does not update real economy. \n\` for now ` }
+                    { name: '🧪 Beta Commands', value: `\`${p}poker host <blind> [buyin]\`, \`${p}poker join <blind>\`, \`${p}poker start\`, \`${p}poker status\`, \`${p}poker leave\`\n\`/snake\` - Play Snake with button controls\nRequires **bot beta access** role.\nIn beta poker, balance is test-only (infinite) and does not update real economy.` }
                 );
             break;
 

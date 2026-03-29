@@ -61,6 +61,7 @@ const commandPermissionsManager = require('./utils/commandPermissionsManager');
 const Dashboard = require('./dashboard/server');
 const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 const { isDevModeEnabled } = require('./utils/devMode');
+const { notifyOwnerIfUpdated } = require('./utils/updateNotifier');
 
 // New system managers
 const ErrorHandler = require('./utils/errorHandler');
@@ -258,6 +259,12 @@ loadHandlers().then(() => {
         // Move non-critical ready work off the first ready tick
         setTimeout(async () => {
             console.log(`✅ Bot startup coordinator running as ${client.user.tag}`);
+
+            try {
+                await notifyOwnerIfUpdated(client);
+            } catch (error) {
+                console.error('Error sending update notification DM:', error);
+            }
 
             // Migrate usernames in existing seasons
             try {
