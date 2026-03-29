@@ -63,24 +63,9 @@ echo [launcher] Starting updater...
 echo [launcher] Target folder: %TARGET_DIR%
 if defined START_BAT echo [launcher] Start script: %START_BAT%
 if "%RESTART_EACH_CYCLE%"=="1" (
-  "%PYTHON_EXE%" "%BASE_DIR%updater.py" %TLS_FLAGS% redo-loop ^
-    --target "%TARGET_DIR%" ^
-    --ref "%REF%" ^
-    --interval "%INTERVAL%" ^
-    --backup ^
-    --stop-process "%STOP_PROCESS%" ^
-    --start-bat "%START_BAT%" ^
-    --start-on-launch ^
-    --restart-each-cycle
+  "%PYTHON_EXE%" "%BASE_DIR%updater.py" %TLS_FLAGS% redo-loop --target "%TARGET_DIR%" --ref "%REF%" --interval "%INTERVAL%" --backup --stop-process "%STOP_PROCESS%" --start-bat "%START_BAT%" --start-on-launch --restart-each-cycle
 ) else (
-  "%PYTHON_EXE%" "%BASE_DIR%updater.py" %TLS_FLAGS% redo-loop ^
-    --target "%TARGET_DIR%" ^
-    --ref "%REF%" ^
-    --interval "%INTERVAL%" ^
-    --backup ^
-    --stop-process "%STOP_PROCESS%" ^
-    --start-on-launch ^
-    --start-bat "%START_BAT%"
+  "%PYTHON_EXE%" "%BASE_DIR%updater.py" %TLS_FLAGS% redo-loop --target "%TARGET_DIR%" --ref "%REF%" --interval "%INTERVAL%" --backup --stop-process "%STOP_PROCESS%" --start-bat "%START_BAT%" --start-on-launch
 )
 
 if errorlevel 1 (
