@@ -3,10 +3,7 @@ const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { PokerTableManager } = require('../../utils/pokerTableManager');
 const { memberHasBetaAccess, getBetaRoleName } = require('../../utils/betaAccess');
-const {
-    pokerCommunityAttachment,
-    pokerHandAttachment
-} = require('../../utils/cardBoardRenderer');
+const { pokerCommunityAttachment, pokerHandAttachment} = require('../../utils/cardBoardRenderer');
 
 module.exports = {
     name: 'poker',
@@ -311,26 +308,52 @@ async function runGameLoop(channel, table, tableMsg = null) {
     }
 
     const gameMessage = tableMsg || await channel.send('🎴 Poker game started!');
+    const privateHandCollector = setupPrivateHandCollector(gameMessage, table);
 
     await updateGameDisplay(gameMessage, table, 'PREFLOP');
     await conductBettingRound(channel, table, gameMessage, 'PREFLOP');
-    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage);
+    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage, false, privateHandCollector);
 
     table.dealFlop();
     await updateGameDisplay(gameMessage, table, 'FLOP');
     await conductBettingRound(channel, table, gameMessage, 'FLOP');
-    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage);
+    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage, false, privateHandCollector);
 
     table.dealTurn();
     await updateGameDisplay(gameMessage, table, 'TURN');
     await conductBettingRound(channel, table, gameMessage, 'TURN');
-    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage);
+    if (table.getActivePlayers().length <= 1) return finishAndCleanup(table, gameMessage, false, privateHandCollector);
 
     table.dealRiver();
     await updateGameDisplay(gameMessage, table, 'RIVER');
     await conductBettingRound(channel, table, gameMessage, 'RIVER');
 
-    return finishAndCleanup(table, gameMessage, true);
+    return finishAndCleanup(table, gameMessage, true, privateHandCollector);
+}
+
+function setupPrivateHandCollector(gameMessage, table) {
+    const collector = gameMessage.createMessageComponentCollector({
+        filter: (i) => i.customId === `poker_viewhand_${table.tableId}`
+    });
+
+    collector.on('collect', async (interaction) => {
+        const player = table.getAllPlayers().find(p => p.userId === interaction.user.id);
+        if (!player) {
+            await interaction.reply({ content: '❌ You are not seated at this poker table.', flags: MessageFlags.Ephemeral });
+            return;
+        }
+
+        const handText = formatCards(player.hole);
+        const handEmbed = new EmbedBuilder()
+            .setColor(0x5865f2)
+            .setTitle('🃏 Your Poker Hand')
+            .setDescription(`Your cards: **${handText}**\nStack: **${player.chips}**`)
+            .setFooter({ text: 'Only you can see this.' });
+
+        await interaction.reply({ ...withPrivateHand(handEmbed, player.hole, player.username), flags: MessageFlags.Ephemeral }).catch(() => {});
+    });
+
+    return collector;
 }
 
 async function conductBettingRound(channel, table, gameMessage, phase) {
@@ -349,7 +372,7 @@ async function conductBettingRound(channel, table, gameMessage, phase) {
         const turnAvatarUrl = await getTurnAvatarUrl(channel.guild, table);
         const actionEmbed = buildStateEmbed(table, `**${current.username}** to act (${phase})`, turnAvatarUrl);
         const actionPayload = withCommunityBoard(actionEmbed, table);
-        await gameMessage.edit({ ...actionPayload, components: [buildActionRow(table, current)] }).catch(() => {});
+        await gameMessage.edit({ ...actionPayload, components: [buildActionRow(table, current), buildUtilityRow(table)] }).catch(() => {});
 
         const result = await waitForTurnAction(gameMessage, table, current, 30000);
         if (!result.acted) {
@@ -383,7 +406,7 @@ async function conductBettingRound(channel, table, gameMessage, phase) {
         table.nextPlayer();
     }
 
-    await gameMessage.edit({ components: [] }).catch(() => {});
+    await gameMessage.edit({ components: [buildUtilityRow(table)] }).catch(() => {});
 }
 
 function buildActionRow(table, currentPlayer) {
@@ -399,6 +422,15 @@ function buildActionRow(table, currentPlayer) {
         new ButtonBuilder().setCustomId(`poker_act_${table.tableId}_raise_${raiseMinTarget}`).setLabel(`Raise ${raiseMinTarget}`).setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`poker_act_${table.tableId}_raise_${raiseBigTarget}`).setLabel(`Raise ${raiseBigTarget}`).setStyle(ButtonStyle.Success),
         new ButtonBuilder().setCustomId(`poker_act_${table.tableId}_raise_${allInTarget}`).setLabel('All-in').setStyle(ButtonStyle.Secondary).setDisabled(currentPlayer.chips <= 0 || allInTarget <= table.currentBet)
+    );
+}
+
+function buildUtilityRow(table) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`poker_viewhand_${table.tableId}`)
+            .setLabel('View My Cards')
+            .setStyle(ButtonStyle.Secondary)
     );
 }
 
@@ -464,7 +496,11 @@ function applyTurnAction(table, currentPlayer, actionPart) {
     return { ok: false, error: 'Unknown action.' };
 }
 
-async function finishAndCleanup(table, gameMessage, showdown = false) {
+async function finishAndCleanup(table, gameMessage, showdown = false, privateHandCollector = null) {
+    if (privateHandCollector) {
+        privateHandCollector.stop('hand_complete');
+    }
+
     const activePlayers = table.getActivePlayers();
     let winners = [];
     let winnerHand = null;
@@ -542,7 +578,7 @@ async function updateGameDisplay(gameMessage, table, phase) {
     const turnAvatarUrl = await getTurnAvatarUrl(gameMessage.guild, table);
     const embed = buildStateEmbed(table, `Phase: **${phase}**`, turnAvatarUrl);
     const payload = withCommunityBoard(embed, table);
-    await gameMessage.edit({ ...payload, components: [] }).catch(() => {});
+    await gameMessage.edit({ ...payload, components: [buildUtilityRow(table)] }).catch(() => {});
 }
 
 function buildStateEmbed(table, subtitle, turnAvatarUrl = null) {
