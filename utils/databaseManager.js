@@ -20,6 +20,53 @@ class DatabaseManager {
         this.lastSyncedMtime = new Map();
     }
 
+    buildMongoClientOptions() {
+        const options = {
+            serverSelectionTimeoutMS: Math.max(3_000, Number(process.env.MONGODB_SERVER_SELECTION_TIMEOUT_MS) || 10_000),
+            connectTimeoutMS: Math.max(3_000, Number(process.env.MONGODB_CONNECT_TIMEOUT_MS) || 10_000)
+        };
+
+        if ((process.env.MONGODB_FORCE_IPV4 || '').toLowerCase() === 'true') {
+            options.family = 4;
+        }
+
+        const caFile = (process.env.MONGODB_TLS_CA_FILE || '').trim();
+        if (caFile) {
+            options.tls = true;
+            options.tlsCAFile = caFile;
+        }
+
+        if ((process.env.MONGODB_TLS_INSECURE || '').toLowerCase() === 'true') {
+            options.tls = true;
+            options.tlsAllowInvalidCertificates = true;
+            options.tlsAllowInvalidHostnames = true;
+        }
+
+        return options;
+    }
+
+    getMongoConnectionHint(errorMessage = '') {
+        const message = String(errorMessage || '').toLowerCase();
+
+        if (message.includes('tlsv1 alert internal error') || message.includes('ssl routines')) {
+            return 'TLS handshake failed. Check Atlas IP access list, system CA certificates, and try MONGODB_FORCE_IPV4=true. If needed, set MONGODB_TLS_CA_FILE to your CA bundle path.';
+        }
+
+        if (message.includes('authentication failed')) {
+            return 'Authentication failed. Verify username/password in MONGODB_URI and URL-encode special password characters.';
+        }
+
+        if (message.includes('querysrv') || message.includes('enotfound')) {
+            return 'DNS/SRV lookup failed. Check internet/DNS and try MONGODB_FORCE_IPV4=true.';
+        }
+
+        if (message.includes('timed out') || message.includes('server selection')) {
+            return 'Connection timed out. Check Atlas network access and firewall rules for outbound 27017/27015.';
+        }
+
+        return 'Verify MONGODB_URI, Atlas Network Access (IP allowlist), and cluster status.';
+    }
+
     isValidMongoUri(uri) {
         if (!uri || typeof uri !== 'string') return false;
         const trimmed = uri.trim();
@@ -46,7 +93,7 @@ class DatabaseManager {
                 }
 
                 const { MongoClient } = require('mongodb');
-                this.mongoClient = new MongoClient(uri);
+                this.mongoClient = new MongoClient(uri, this.buildMongoClientOptions());
                 await this.mongoClient.connect();
                 this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
                 console.log('✅ MongoDB connected successfully!');
@@ -57,6 +104,7 @@ class DatabaseManager {
                 }
             } catch (error) {
                 console.warn('⚠️ MongoDB connection failed, falling back to JSON:', error.message);
+                console.warn('💡 MongoDB hint:', this.getMongoConnectionHint(error.message));
                 this.useDB = 'json';
             }
         }
