@@ -70,6 +70,7 @@ if "%RESTART_EACH_CYCLE%"=="1" (
     --backup ^
     --stop-process "%STOP_PROCESS%" ^
     --start-bat "%START_BAT%" ^
+    --start-on-launch ^
     --restart-each-cycle
 ) else (
   "%PYTHON_EXE%" "%BASE_DIR%updater.py" %TLS_FLAGS% redo-loop ^
@@ -78,6 +79,7 @@ if "%RESTART_EACH_CYCLE%"=="1" (
     --interval "%INTERVAL%" ^
     --backup ^
     --stop-process "%STOP_PROCESS%" ^
+    --start-on-launch ^
     --start-bat "%START_BAT%"
 )
 

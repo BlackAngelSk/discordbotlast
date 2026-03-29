@@ -139,10 +139,13 @@ def _start_command(start_cmd: Optional[str]) -> None:
         return
 
     _print(f"Starting command: {start_cmd}")
-    if os.name == "nt":
-        subprocess.Popen(["cmd", "/c", start_cmd], shell=False)
-    else:
-        subprocess.Popen(start_cmd, shell=True, start_new_session=True)
+    try:
+        if os.name == "nt":
+            subprocess.Popen(["cmd", "/c", start_cmd], shell=False)
+        else:
+            subprocess.Popen(start_cmd, shell=True, start_new_session=True)
+    except Exception as e:
+        raise UpdaterError(f"Failed to start command: {e}") from e
 
 
 def _start_bat_file(start_bat: Optional[str]) -> None:
@@ -202,8 +205,10 @@ def _stop_then_start_if_changed(
     if not changed:
         return
     _stop_process(stop_process)
-    _start_bat_file(start_bat)
-    _start_command(start_cmd)
+    if start_bat:
+        _start_bat_file(start_bat)
+    else:
+        _start_command(start_cmd)
 
 
 def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
@@ -327,7 +332,10 @@ def _load_target_state(target: Path) -> Dict[str, Any]:
 def _save_target_state(target: Path, data: Dict[str, Any]) -> None:
     target.mkdir(parents=True, exist_ok=True)
     state_file = _state_file_for_target(target)
-    state_file.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    temp_file = state_file.with_suffix(state_file.suffix + ".tmp")
+    payload = json.dumps(data, indent=2, sort_keys=True)
+    temp_file.write_text(payload, encoding="utf-8")
+    os.replace(temp_file, state_file)
 
 
 def _state_key_for_repo_ref(repo: str, ref: str) -> str:
@@ -397,15 +405,37 @@ def _detect_extracted_root(extract_dir: Path) -> Path:
     return extract_dir
 
 
+def _is_within_directory(base_dir: Path, target_path: Path) -> bool:
+    try:
+        base_real = os.path.realpath(base_dir)
+        target_real = os.path.realpath(target_path)
+        return os.path.commonpath([base_real, target_real]) == base_real
+    except Exception:
+        return False
+
+
 def _extract_asset_to_dir(asset_path: Path, extract_dir: Path) -> Optional[Path]:
     if zipfile.is_zipfile(asset_path):
         with zipfile.ZipFile(asset_path, "r") as zf:
+            for member in zf.infolist():
+                member_path = extract_dir / member.filename
+                if not _is_within_directory(extract_dir, member_path):
+                    raise UpdaterError(f"Unsafe zip member path: {member.filename}")
             zf.extractall(extract_dir)
         return _detect_extracted_root(extract_dir)
 
     if tarfile.is_tarfile(asset_path):
         with tarfile.open(asset_path, "r:*") as tf:
-            tf.extractall(extract_dir)
+            safe_members = []
+            for member in tf.getmembers():
+                member_path = extract_dir / member.name
+                if not _is_within_directory(extract_dir, member_path):
+                    raise UpdaterError(f"Unsafe tar member path: {member.name}")
+                if member.issym() or member.islnk():
+                    _print(f"Skipping archive link member: {member.name}")
+                    continue
+                safe_members.append(member)
+            tf.extractall(extract_dir, members=safe_members)
         return _detect_extracted_root(extract_dir)
 
     return None
@@ -595,6 +625,7 @@ def redo_fixed_repo_loop(
     stop_process: Optional[str] = None,
     start_cmd: Optional[str] = None,
     start_bat: Optional[str] = None,
+    start_on_launch: bool = False,
     restart_each_cycle: bool = False,
     token: Optional[str] = None,
 ) -> None:
@@ -602,6 +633,17 @@ def redo_fixed_repo_loop(
         raise UpdaterError("--interval must be at least 1 second")
 
     _print(f"Starting nonstop repo watch mode (every {interval} seconds). Press Ctrl+C to stop.")
+
+    if start_on_launch:
+        _print("start_on_launch is enabled. Starting target process once before update checks.")
+        try:
+            if start_bat:
+                _start_bat_file(start_bat)
+            else:
+                _start_command(start_cmd)
+        except UpdaterError as e:
+            _print(f"Initial start warning: {e}")
+
     repo_key = _state_key_for_repo_ref(FIXED_REPO, ref)
     while True:
         _print("Checking repository for updates...")
@@ -664,12 +706,23 @@ def update_from_github_loop(
     stop_process: Optional[str] = None,
     start_cmd: Optional[str] = None,
     start_bat: Optional[str] = None,
+    start_on_launch: bool = False,
     token: Optional[str] = None,
 ) -> None:
     if interval < 1:
         raise UpdaterError("--interval must be at least 1 second")
 
     _print(f"Starting nonstop update mode (every {interval} seconds). Press Ctrl+C to stop.")
+
+    if start_on_launch:
+        _print("start_on_launch is enabled. Starting target process once before update checks.")
+        try:
+            if start_bat:
+                _start_bat_file(start_bat)
+            else:
+                _start_command(start_cmd)
+        except UpdaterError as e:
+            _print(f"Initial start warning: {e}")
 
     while True:
         _print("Checking for updates...")
@@ -1148,6 +1201,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Windows .bat file path to start after update install",
     )
     p_update_github_loop.add_argument(
+        "--start-on-launch",
+        action="store_true",
+        help="Start target process once before entering nonstop update checks",
+    )
+    p_update_github_loop.add_argument(
         "--delete-missing",
         action="store_true",
         help="When installing archive updates, remove files not present in the update",
@@ -1206,6 +1264,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_redo_loop.add_argument(
         "--start-bat",
         help="Windows .bat file path to start after update install",
+    )
+    p_redo_loop.add_argument(
+        "--start-on-launch",
+        action="store_true",
+        help="Start target process once before entering nonstop update checks",
     )
     p_redo_loop.add_argument(
         "--restart-each-cycle",
@@ -1292,6 +1355,7 @@ def main() -> int:
                     stop_process=args.stop_process,
                     start_cmd=args.start_cmd,
                     start_bat=args.start_bat,
+                    start_on_launch=args.start_on_launch,
                     token=token,
                 )
             except KeyboardInterrupt:
@@ -1328,6 +1392,7 @@ def main() -> int:
                     stop_process=args.stop_process,
                     start_cmd=args.start_cmd,
                     start_bat=args.start_bat,
+                    start_on_launch=args.start_on_launch,
                     restart_each_cycle=args.restart_each_cycle,
                     token=token,
                 )

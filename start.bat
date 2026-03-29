@@ -45,6 +45,7 @@ if %HAS_UPDATER%==1 (
     --interval "60" ^
     --backup ^
     --stop-process "node.exe" ^
+    --start-on-launch ^
     --start-cmd "npm start"
   
   if errorlevel 1 (
