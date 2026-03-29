@@ -30,6 +30,7 @@ import argparse
 import fnmatch
 import json
 import os
+import shlex
 import shutil
 import ssl
 import stat
@@ -66,6 +67,27 @@ class UpdaterError(Exception):
 
 def _print(msg: str) -> None:
     print(f"[updater] {msg}")
+
+
+def _repair_embedded_windows_args(argv: list[str]) -> list[str]:
+    repaired: list[str] = []
+
+    for arg in argv:
+        if '" --' not in arg:
+            repaired.append(arg)
+            continue
+
+        value, remainder = arg.split('"', 1)
+        repaired.append(value)
+
+        extra = remainder.strip()
+        if extra:
+            try:
+                repaired.extend(shlex.split(extra, posix=False))
+            except ValueError:
+                repaired.extend(extra.split())
+
+    return repaired
 
 
 def _normalize_argv_start_cmd(argv: list[str]) -> list[str]:
@@ -1344,7 +1366,8 @@ def main() -> int:
                 return 1
 
     parser = build_parser()
-    args = parser.parse_args(_normalize_argv_start_cmd(sys.argv[1:]))
+    normalized_argv = _normalize_argv_start_cmd(_repair_embedded_windows_args(sys.argv[1:]))
+    args = parser.parse_args(normalized_argv)
 
     global TLS_INSECURE, TLS_CAFILE
     TLS_INSECURE = bool(args.insecure)
