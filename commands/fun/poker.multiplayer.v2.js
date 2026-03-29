@@ -11,7 +11,7 @@ module.exports = {
     usage: '!poker host <blind> [buyin] | !poker join <blind> | !poker start | !poker status | !poker leave',
     aliases: ['holdem', 'txpoker'],
     category: 'fun',
-    beta: true,
+    beta: false, // Set to true to restrict to beta testers
     async execute(message, args) {
         try {
             if (!memberHasBetaAccess(message.member)) {
