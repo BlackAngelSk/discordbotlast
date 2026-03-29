@@ -84,7 +84,7 @@ if "%RESTART_EACH_CYCLE%"=="1" (
 )
 
 if errorlevel 1 (
-  echo [launcher] Updater failed with exit code %errorlevel%
+  echo [launcher] Updater failed with exit code !errorlevel!
 ) else (
   echo [launcher] Updater finished.
 )

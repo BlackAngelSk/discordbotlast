@@ -148,6 +148,19 @@ def _start_command(start_cmd: Optional[str]) -> None:
         raise UpdaterError(f"Failed to start command: {e}") from e
 
 
+def _normalize_start_cmd_arg(start_cmd: Any) -> Optional[str]:
+    if start_cmd is None:
+        return None
+    if isinstance(start_cmd, str):
+        value = start_cmd.strip()
+        return value or None
+    if isinstance(start_cmd, (list, tuple)):
+        value = " ".join(str(part) for part in start_cmd).strip()
+        return value or None
+    value = str(start_cmd).strip()
+    return value or None
+
+
 def _start_bat_file(start_bat: Optional[str]) -> None:
     if not start_bat:
         return
@@ -1158,6 +1171,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_update_github.add_argument(
         "--start-cmd",
+        nargs="+",
         help="Command to start after update install (example: cmd /c bot.bat)",
     )
     p_update_github.add_argument(
@@ -1194,6 +1208,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_update_github_loop.add_argument(
         "--start-cmd",
+        nargs="+",
         help="Command to start after update install (example: cmd /c bot.bat)",
     )
     p_update_github_loop.add_argument(
@@ -1228,6 +1243,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_redo.add_argument(
         "--start-cmd",
+        nargs="+",
         help="Command to start after update install (example: cmd /c bot.bat)",
     )
     p_redo.add_argument(
@@ -1259,6 +1275,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_redo_loop.add_argument(
         "--start-cmd",
+        nargs="+",
         help="Command to start after update install (example: cmd /c bot.bat)",
     )
     p_redo_loop.add_argument(
@@ -1309,6 +1326,7 @@ def main() -> int:
     try:
         cmd = args.command
         token = args.token
+        start_cmd = _normalize_start_cmd_arg(getattr(args, "start_cmd", None))
 
         if cmd == "download-url":
             out = download_url(args.url, Path(args.output), token=token)
@@ -1338,7 +1356,7 @@ def main() -> int:
             _stop_then_start_if_changed(
                 changed=changed,
                 stop_process=args.stop_process,
-                start_cmd=args.start_cmd,
+                start_cmd=start_cmd,
                 start_bat=args.start_bat,
             )
             _print("Update complete")
@@ -1353,7 +1371,7 @@ def main() -> int:
                     backup=args.backup,
                     delete_missing=args.delete_missing,
                     stop_process=args.stop_process,
-                    start_cmd=args.start_cmd,
+                    start_cmd=start_cmd,
                     start_bat=args.start_bat,
                     start_on_launch=args.start_on_launch,
                     token=token,
@@ -1377,7 +1395,7 @@ def main() -> int:
             _stop_then_start_if_changed(
                 changed=changed,
                 stop_process=args.stop_process,
-                start_cmd=args.start_cmd,
+                start_cmd=start_cmd,
                 start_bat=args.start_bat,
             )
             _print("Redo complete")
@@ -1390,7 +1408,7 @@ def main() -> int:
                     backup=args.backup,
                     delete_missing=args.delete_missing,
                     stop_process=args.stop_process,
-                    start_cmd=args.start_cmd,
+                    start_cmd=start_cmd,
                     start_bat=args.start_bat,
                     start_on_launch=args.start_on_launch,
                     restart_each_cycle=args.restart_each_cycle,

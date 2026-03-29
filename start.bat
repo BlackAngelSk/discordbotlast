@@ -49,7 +49,7 @@ if %HAS_UPDATER%==1 (
     --start-cmd "npm start"
   
   if errorlevel 1 (
-    echo [launcher] Updater failed with exit code %errorlevel%
+    echo [launcher] Updater failed with exit code !errorlevel!
     echo [launcher] Falling back to direct bot startup...
     npm start
   )
