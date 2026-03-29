@@ -14,10 +14,27 @@ class DatabaseManager {
         this.dbPath = path.join(__dirname, '..', 'data');
         this.mongoClient = null;
         this.db = null;
-        this.autoSyncEnabled = !this.devMode && (process.env.MONGODB_AUTOSYNC || 'true').toLowerCase() !== 'false';
+        this.autoSyncEnabled = !this.devMode && this.getEnvBoolean('MONGODB_AUTOSYNC', true);
         this.autoSyncIntervalMs = Math.max(30_000, Number(process.env.MONGODB_AUTOSYNC_INTERVAL_MS) || 60_000);
         this.autoSyncTimer = null;
         this.lastSyncedMtime = new Map();
+    }
+
+    getEnvString(name, fallback = '') {
+        const raw = process.env[name];
+        if (typeof raw !== 'string') return fallback;
+        const noInlineComment = raw.split('#')[0].trim();
+        return noInlineComment || fallback;
+    }
+
+    getEnvBoolean(name, fallback = false) {
+        const normalized = this.getEnvString(name, String(fallback)).toLowerCase();
+        return ['1', 'true', 'yes', 'on'].includes(normalized);
+    }
+
+    isTlsHandshakeError(errorMessage = '') {
+        const message = String(errorMessage || '').toLowerCase();
+        return message.includes('tlsv1 alert internal error') || message.includes('ssl routines');
     }
 
     buildMongoClientOptions() {
@@ -26,17 +43,17 @@ class DatabaseManager {
             connectTimeoutMS: Math.max(3_000, Number(process.env.MONGODB_CONNECT_TIMEOUT_MS) || 10_000)
         };
 
-        if ((process.env.MONGODB_FORCE_IPV4 || '').toLowerCase() === 'true') {
+        if (this.getEnvBoolean('MONGODB_FORCE_IPV4', false)) {
             options.family = 4;
         }
 
-        const caFile = (process.env.MONGODB_TLS_CA_FILE || '').trim();
+        const caFile = this.getEnvString('MONGODB_TLS_CA_FILE', '');
         if (caFile) {
             options.tls = true;
             options.tlsCAFile = caFile;
         }
 
-        if ((process.env.MONGODB_TLS_INSECURE || '').toLowerCase() === 'true') {
+        if (this.getEnvBoolean('MONGODB_TLS_INSECURE', false)) {
             options.tls = true;
             options.tlsAllowInvalidCertificates = true;
             options.tlsAllowInvalidHostnames = true;
@@ -48,7 +65,7 @@ class DatabaseManager {
     getMongoConnectionHint(errorMessage = '') {
         const message = String(errorMessage || '').toLowerCase();
 
-        if (message.includes('tlsv1 alert internal error') || message.includes('ssl routines')) {
+        if (this.isTlsHandshakeError(message)) {
             return 'TLS handshake failed. Check Atlas IP access list, system CA certificates, and try MONGODB_FORCE_IPV4=true. If needed, set MONGODB_TLS_CA_FILE to your CA bundle path.';
         }
 
@@ -103,6 +120,29 @@ class DatabaseManager {
                     this.startAutoSync();
                 }
             } catch (error) {
+                // One automatic retry path for common TLS handshake failures
+                if (this.isTlsHandshakeError(error?.message) && !this.getEnvBoolean('MONGODB_FORCE_IPV4', false)) {
+                    try {
+                        const { MongoClient } = require('mongodb');
+                        const retryOptions = { ...this.buildMongoClientOptions(), family: 4 };
+                        console.warn('⚠️ MongoDB TLS handshake failed. Retrying once with IPv4...');
+
+                        this.mongoClient = new MongoClient(process.env.MONGODB_URI, retryOptions);
+                        await this.mongoClient.connect();
+                        this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
+                        this.useDB = 'mongodb';
+                        console.log('✅ MongoDB connected successfully on IPv4 retry!');
+
+                        if (this.autoSyncEnabled) {
+                            await this.syncAllJsonToMongo({ force: true });
+                            this.startAutoSync();
+                        }
+                        return;
+                    } catch (retryError) {
+                        error = retryError;
+                    }
+                }
+
                 console.warn('⚠️ MongoDB connection failed, falling back to JSON:', error.message);
                 console.warn('💡 MongoDB hint:', this.getMongoConnectionHint(error.message));
                 this.useDB = 'json';
