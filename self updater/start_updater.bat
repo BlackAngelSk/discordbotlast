@@ -14,11 +14,11 @@ set "PYTHON_EXE=python"
 
 REM Detect start script first (must match the one that works when started manually)
 set "START_BAT="
-if exist "%BASE_DIR%start.bat" set "START_BAT=%BASE_DIR%start.bat"
-if not defined START_BAT if exist "%BASE_DIR%start_bot.bat" set "START_BAT=%BASE_DIR%start_bot.bat"
+if exist "%BASE_DIR%start_bot.bat" set "START_BAT=%BASE_DIR%start_bot.bat"
+if not defined START_BAT if exist "%BASE_DIR%start.bat" set "START_BAT=%BASE_DIR%start.bat"
 if not defined START_BAT if exist "%BASE_DIR%bot.bat" set "START_BAT=%BASE_DIR%bot.bat"
-if not defined START_BAT if exist "%BASE_DIR%discordbotlast\start.bat" set "START_BAT=%BASE_DIR%discordbotlast\start.bat"
 if not defined START_BAT if exist "%BASE_DIR%discordbotlast\start_bot.bat" set "START_BAT=%BASE_DIR%discordbotlast\start_bot.bat"
+if not defined START_BAT if exist "%BASE_DIR%discordbotlast\start.bat" set "START_BAT=%BASE_DIR%discordbotlast\start.bat"
 if not defined START_BAT if exist "%BASE_DIR%discordbotlast\bot.bat" set "START_BAT=%BASE_DIR%discordbotlast\bot.bat"
 
 REM Target app folder to install/update (directory of detected start script)
