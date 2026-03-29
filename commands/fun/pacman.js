@@ -46,6 +46,13 @@ const DIRECTIONS = {
     right: { x: 1, y: 0 }
 };
 
+const OPPOSITE_DIRECTIONS = {
+    up: 'down',
+    down: 'up',
+    left: 'right',
+    right: 'left'
+};
+
 module.exports = {
     name: 'pacman',
     description: 'Play a Pacman-style arcade mini game with buttons!',
@@ -214,7 +221,7 @@ function resolvePlayerGhostCollision(player, ghosts, ghostStates, powerTurnsRema
     return { playerCaught: true, ghostsEaten: 0 };
 }
 
-function getNextPosition(board, x, y, direction) {
+function getNextPosition(board, x, y, direction, allowWrap = true) {
     const delta = DIRECTIONS[direction];
     if (!delta) return { x, y, wrapped: false };
 
@@ -223,7 +230,7 @@ function getNextPosition(board, x, y, direction) {
     let wrapped = false;
 
     // Classic tunnel behavior: horizontal wrap only.
-    if (nextY >= 0 && nextY < board.length) {
+    if (allowWrap && nextY >= 0 && nextY < board.length) {
         if (nextX < 0) {
             nextX = board[0].length - 1;
             wrapped = true;
@@ -246,12 +253,13 @@ function tryMove(entity, board, direction) {
 }
 
 function tryMoveGhost(entity, board, direction, ghostState) {
-    const next = getNextPosition(board, entity.x, entity.y, direction);
+    const next = getNextPosition(board, entity.x, entity.y, direction, false);
 
-    if (isGhostBlocked(board, next.x, next.y, ghostState.released)) return;
+    if (isGhostBlocked(board, next.x, next.y, ghostState.released)) return false;
 
     entity.x = next.x;
     entity.y = next.y;
+    ghostState.lastDirection = direction;
 
     // When ghost reaches the gate for the first time, mark released and nudge it out.
     if (!ghostState.released && board[entity.y][entity.x] === '-') {
@@ -261,15 +269,21 @@ function tryMoveGhost(entity, board, direction, ghostState) {
             entity.y = outY;
         }
     }
+
+    return true;
 }
 
-function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining) {
+function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining, playerDirection = null) {
     const options = Object.keys(DIRECTIONS).filter((key) => {
-        const next = getNextPosition(board, ghost.x, ghost.y, key);
+        const next = getNextPosition(board, ghost.x, ghost.y, key, false);
         return !isGhostBlocked(board, next.x, next.y, ghostState.released);
     });
 
     if (!options.length) return null;
+
+    const opposite = ghostState.lastDirection ? OPPOSITE_DIRECTIONS[ghostState.lastDirection] : null;
+    const forwardOptions = opposite ? options.filter(option => option !== opposite) : options;
+    const movementOptions = forwardOptions.length > 0 ? forwardOptions : options;
 
     // While in the house, move toward the nearest gate tile deterministically.
     if (!ghostState.released) {
@@ -281,11 +295,11 @@ function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining) {
         }
 
         if (gates.length) {
-            let bestOption = options[0];
+            let bestOption = movementOptions[0];
             let bestDistance = Number.POSITIVE_INFINITY;
 
-            for (const option of options) {
-                const next = getNextPosition(board, ghost.x, ghost.y, option);
+            for (const option of movementOptions) {
+                const next = getNextPosition(board, ghost.x, ghost.y, option, false);
                 const nx = next.x;
                 const ny = next.y;
 
@@ -308,11 +322,11 @@ function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining) {
     if (powerTurnsRemaining > 0 && ghostState.released) {
         ghostState.frightened = true;
 
-        let safest = options[0];
+        let safest = movementOptions[0];
         let safestDistance = -1;
 
-        for (const option of options) {
-            const next = getNextPosition(board, ghost.x, ghost.y, option);
+        for (const option of movementOptions) {
+            const next = getNextPosition(board, ghost.x, ghost.y, option, false);
             const distance = Math.abs(player.x - next.x) + Math.abs(player.y - next.y);
 
             if (distance > safestDistance) {
@@ -326,19 +340,35 @@ function getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining) {
 
     ghostState.frightened = false;
 
-    const chasePlayer = Math.random() < 0.65;
+    const chasePlayer = Math.random() < 0.8;
     if (!chasePlayer) {
-        return options[Math.floor(Math.random() * options.length)];
+        return movementOptions[Math.floor(Math.random() * movementOptions.length)];
     }
 
-    let best = options[0];
+    let targetX = player.x;
+    let targetY = player.y;
+
+    if (playerDirection && DIRECTIONS[playerDirection]) {
+        const lookAhead = DIRECTIONS[playerDirection];
+        const predicted = {
+            x: player.x + lookAhead.x * 2,
+            y: player.y + lookAhead.y * 2
+        };
+
+        if (!isWall(board, predicted.x, predicted.y)) {
+            targetX = predicted.x;
+            targetY = predicted.y;
+        }
+    }
+
+    let best = movementOptions[0];
     let bestDistance = Number.POSITIVE_INFINITY;
 
-    for (const option of options) {
-        const next = getNextPosition(board, ghost.x, ghost.y, option);
+    for (const option of movementOptions) {
+        const next = getNextPosition(board, ghost.x, ghost.y, option, false);
         const nx = next.x;
         const ny = next.y;
-        const distance = Math.abs(player.x - nx) + Math.abs(player.y - ny);
+        const distance = Math.abs(targetX - nx) + Math.abs(targetY - ny);
 
         if (distance < bestDistance) {
             bestDistance = distance;
@@ -380,10 +410,12 @@ async function playPacmanGame(message) {
         released: false,
         releaseDelayTurns: index * 2,
         frightened: false,
+        lastDirection: null,
         spawn: { x: ghosts[index].x, y: ghosts[index].y }
     }));
     let turnCount = 0;
     let powerTurnsRemaining = 0;
+    let lastPlayerMove = null;
     const inactivityMs = 15_000;
     let inactivityTimer = null;
 
@@ -464,6 +496,7 @@ async function playPacmanGame(message) {
 
         try {
             const move = interaction.customId.replace('pacman_', '');
+            lastPlayerMove = move;
 
             tryMove(player, board, move);
 
@@ -509,7 +542,7 @@ async function playPacmanGame(message) {
                     continue;
                 }
 
-                const ghostMove = getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining);
+                const ghostMove = getGhostMove(board, ghost, player, ghostState, powerTurnsRemaining, lastPlayerMove);
                 if (ghostMove) {
                     tryMoveGhost(ghost, board, ghostMove, ghostState);
                 }

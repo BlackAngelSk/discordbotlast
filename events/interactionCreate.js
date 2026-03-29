@@ -8,6 +8,28 @@ const seasonLeaderboardManager = require('../utils/seasonLeaderboardManager');
 const moderationManager = require('../utils/moderationManager');
 const activityTracker = require('../utils/activityTracker');
 
+function isInteractionAckError(error) {
+    const code = error?.code ?? error?.rawError?.code;
+    return code === 10062 || code === 40060;
+}
+
+async function safeInteractionErrorResponse(interaction, content) {
+    try {
+        if (interaction.deferred) {
+            return await interaction.editReply({ content });
+        }
+        if (interaction.replied) {
+            return await interaction.followUp({ content, flags: 64 });
+        }
+        return await interaction.reply({ content, flags: 64 });
+    } catch (err) {
+        if (!isInteractionAckError(err)) {
+            console.error('Failed to send interaction error response:', err);
+        }
+        return null;
+    }
+}
+
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction, client) {
@@ -54,11 +76,14 @@ module.exports = {
                     }
                 } catch (error) {
                     console.error('Error handling shop select menu:', error);
-                    if (!interaction.replied && !interaction.deferred) {
-                        await interaction.reply({ content: '❌ An error occurred while processing your purchase.', flags: 64 });
-                    } else if (interaction.deferred) {
-                        await interaction.editReply({ content: '❌ An error occurred while processing your purchase.' });
+                    if (isInteractionAckError(error)) {
+                        return;
                     }
+
+                    await safeInteractionErrorResponse(
+                        interaction,
+                        '❌ An error occurred while processing your purchase.'
+                    );
                 }
             }
             return;
