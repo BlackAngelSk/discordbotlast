@@ -37,7 +37,7 @@
     },
     "poker": {
       "wins": 8,
-      "losses": 5,
+      "losses": 6,
       "ties": 0
     }
   },
@@ -2785,6 +2785,48 @@
     },
     "poker": {
       "wins": 0,
+      "losses": 0,
+      "ties": 0
+    }
+  },
+  "597505934209581085": {
+    "blackjack": {
+      "wins": 1,
+      "losses": 0,
+      "ties": 0
+    },
+    "roulette": {
+      "wins": 0,
+      "losses": 0
+    },
+    "slots": {
+      "wins": 0,
+      "losses": 0
+    },
+    "dice": {
+      "wins": 0,
+      "losses": 0
+    },
+    "coinflip": {
+      "wins": 0,
+      "losses": 0
+    },
+    "mines": {
+      "wins": 0,
+      "losses": 0
+    },
+    "rps": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "ttt": {
+      "wins": 0,
+      "losses": 0,
+      "ties": 0
+    },
+    "poker": {
+      "wins": 1,
       "losses": 0,
       "ties": 0
     }
