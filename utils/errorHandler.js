@@ -12,7 +12,9 @@ class ErrorHandler {
         this.notificationQueue = [];
         this.isSendingNotification = false;
         this.consolePatched = false;
+        this.warningFilterPatched = false;
         this.baseConsoleError = console.error.bind(console);
+        this.setupWarningFilter();
         this.setupHandlers();
         this.setupConsoleInterceptor();
         this.setupReadyListener();
@@ -22,6 +24,50 @@ class ErrorHandler {
         if (!fs.existsSync(this.logDirectory)) {
             fs.mkdirSync(this.logDirectory, { recursive: true });
         }
+    }
+
+    setupWarningFilter() {
+        if (this.warningFilterPatched || typeof process.emitWarning !== 'function') {
+            return;
+        }
+
+        const originalEmitWarning = process.emitWarning.bind(process);
+        process.emitWarning = (warning, ...args) => {
+            const normalizedWarning = this.normalizeWarning(warning, args);
+            if (this.shouldIgnoreWarning(normalizedWarning)) {
+                return;
+            }
+            return originalEmitWarning(warning, ...args);
+        };
+
+        this.warningFilterPatched = true;
+    }
+
+    normalizeWarning(warning, args = []) {
+        if (warning instanceof Error) {
+            return warning;
+        }
+
+        const warningName = typeof args[0] === 'string'
+            ? args[0]
+            : typeof warning?.type === 'string'
+                ? warning.type
+                : 'Warning';
+
+        const warningMessage = typeof warning === 'string'
+            ? warning
+            : typeof warning?.message === 'string'
+                ? warning.message
+                : String(warning);
+
+        const normalizedWarning = new Error(warningMessage);
+        normalizedWarning.name = warningName;
+
+        if (typeof warning?.stack === 'string') {
+            normalizedWarning.stack = warning.stack;
+        }
+
+        return normalizedWarning;
     }
 
     setupHandlers() {
@@ -89,7 +135,10 @@ class ErrorHandler {
 
         const warningName = typeof warning.name === 'string' ? warning.name : '';
         const warningMessage = typeof warning.message === 'string' ? warning.message : String(warning);
-        const isTimeoutNegative = warningName === 'TimeoutNegativeWarning' || warningMessage.includes('TimeoutNegativeWarning');
+        const isTimeoutNegative =
+            warningName === 'TimeoutNegativeWarning' ||
+            warningMessage.includes('TimeoutNegativeWarning') ||
+            warningMessage.includes('is a negative number');
         if (!isTimeoutNegative) return false;
 
         const stack = typeof warning.stack === 'string' ? warning.stack : '';

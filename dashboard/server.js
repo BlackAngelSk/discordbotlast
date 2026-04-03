@@ -18,7 +18,9 @@ const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 
 const withTimeout = (promise, ms) => new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
+    const parsedMs = Number(ms);
+    const timeoutMs = Number.isFinite(parsedMs) ? Math.max(1, parsedMs) : 3000;
+    const timer = setTimeout(() => resolve(null), timeoutMs);
     promise
         .then(result => {
             clearTimeout(timer);
