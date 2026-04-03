@@ -1,490 +1,174 @@
-# 🚀 Bot Setup Guide
+# Setup and Deployment Guide
 
-Complete installation and configuration guide for your Discord bot.
+This document explains how to install, configure, and launch the Discord bot in a clean and repeatable way.
 
-**Supports:** Windows, macOS, and Linux ✅
+## Requirements
 
----
+Before you begin, make sure you have:
 
-## 📋 Prerequisites
+- Node.js 20.16 or later
+- A Discord bot token from the Discord Developer Portal
+- A server where the bot can be invited
+- Optional: MongoDB if you want database-backed storage
 
-### Required
-- **Node.js** 20.16.0 or higher ([Download](https://nodejs.org/))
-- **Discord Bot Token** ([Get one here](https://discord.com/developers/applications))
+On Linux, you may also need build tools:
 
-### Linux-Specific Requirements
 ```bash
-# Ubuntu/Debian
+# Ubuntu or Debian
 sudo apt-get update
-sudo apt-get install build-essential python3 ffmpeg
+sudo apt-get install -y build-essential python3
 
-# Fedora/RHEL
-sudo dnf groupinstall "Development Tools"
-sudo dnf install python3 ffmpeg
+# Fedora
+sudo dnf groupinstall -y "Development Tools"
+sudo dnf install -y python3
 
-# Arch Linux
-sudo pacman -S base-devel python ffmpeg
+# Arch
+sudo pacman -S base-devel python
 ```
 
----
+## Installation
 
-## ⚡ Quick Start
+1. Clone the repository:
 
-### 1. Clone/Download the Bot
 ```bash
-cd /home/your-username/
-git clone https://github.com/your-repo/discordbotlast
+git clone <your-repository-url>
 cd discordbotlast
 ```
 
-### 2. Install Dependencies
+2. Install dependencies:
+
 ```bash
 npm install
 ```
 
-### 3. Configure Environment Variables
+3. Create or update the `.env` file in the project root.
 
-Create a `.env` file in the root directory:
+## Required Environment Variables
+
+At minimum, configure the following values:
 
 ```env
-# Required - Bot Token
-DISCORD_TOKEN=your_discord_bot_token_here
+DISCORD_TOKEN=your_bot_token
+CLIENT_ID=your_application_id
+BOT_OWNER_ID=your_discord_user_id
+```
 
-# Optional - Database (uses JSON files if not provided)
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/dbname
-MONGODB_DBNAME=discord-bot
+## Optional Environment Variables
 
-# Optional - AI Features
-GOOGLE_API_KEY=your_google_gemini_api_key
+Dashboard support:
 
-# Optional - Dashboard
-DASHBOARD_ENABLED=true
+```env
+DASHBOARD_ENABLED=false
 DASHBOARD_PORT=3000
 DASHBOARD_URL=http://localhost:3000
-CLIENT_ID=your_discord_client_id
-CLIENT_SECRET=your_discord_client_secret
-DASHBOARD_CALLBACK=http://localhost:3000/callback
-SESSION_SECRET=your_random_session_secret
-
-# Optional - Other Settings
-PREFIX=!
+CLIENT_SECRET=your_application_secret
+DASHBOARD_CALLBACK=http://127.0.0.1:3000/callback
+SESSION_SECRET=generate_a_random_secret
 ```
 
-### 4. Get Your Discord Bot Token
+MongoDB support:
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Click "New Application" and name it
-3. Go to "Bot" section → Click "Reset Token" → Copy the token
-4. Paste it into your `.env` file as `DISCORD_TOKEN`
-
-### 5. Invite Bot to Your Server
-
-Generate an invite link with these permissions:
-- Administrator (or these specific permissions):
-  - Send Messages
-  - Embed Links
-  - Attach Files
-  - Read Message History
-  - Add Reactions
-  - Use Slash Commands
-  - Manage Messages
-  - Manage Roles
-  - Manage Channels
-  - Ban Members
-  - Kick Members
-  - Moderate Members
-  - Connect (Voice)
-  - Speak (Voice)
-
-**Invite URL:**
-```
-https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands
+```env
+MONGODB_URI=
+MONGODB_DBNAME=discord-bot
+MONGODB_AUTOSYNC=true
+MONGODB_AUTOSYNC_MODE=interval
+MONGODB_AUTOSYNC_INTERVAL_MS=60000
+MONGODB_SYNC_ON_STARTUP=true
+MONGODB_SYNC_ON_SHUTDOWN=true
 ```
 
-Replace `YOUR_CLIENT_ID` with your bot's client ID from the Developer Portal.
+For complete database guidance, see [`MONGODB.md`](MONGODB.md).
 
-### 6. Start the Bot
+## Discord Application Setup
 
-**Windows:**
+In the Discord Developer Portal:
+
+1. Create or open your application
+2. Open the **Bot** page
+3. Copy the bot token into `DISCORD_TOKEN`
+4. Enable these privileged intents:
+   - Server Members Intent
+   - Message Content Intent
+5. Save the changes
+
+Invite the bot using the `bot` and `applications.commands` scopes. Administrator permissions are the simplest option during setup.
+
+## Starting the Bot
+
+Use one of the following commands:
+
 ```bash
 npm start
-# OR
+```
+
+Linux or macOS helper script:
+
+```bash
+bash start.sh
+```
+
+Windows helper script:
+
+```bash
 start.bat
 ```
 
-**Linux/macOS:**
-```bash
-npm start
-# OR
-bash start.sh
-# OR
-chmod +x start.sh && ./start.sh
-```
-
-### 7. Verify It's Running
-
-You should see:
-```
-✅ Settings manager initialized!
-✅ Economy manager initialized!
-✅ Game stats manager initialized!
-✅ Bot is ready! Logged in as YourBot#0000
-✅ Registered slash commands globally
-```
-
----
-
-## 🔧 First-Time Server Setup
-
-### Step 1: Create Essential Roles
-```
-/setup
-```
-This creates:
-- **DJ Role** - Required for music command permissions
-- **Member Role** - Automatically assigned to new members
-
-### Step 2: Configure Server Settings
-
-**Change Prefix:**
-```
-!config prefix ?
-```
-
-**Set Welcome Messages:**
-```
-!config welcomechannel #welcome
-!config welcomemessage Welcome {user} to {server}! You're member #{memberCount}!
-!config welcomeenable
-```
-
-**Set Leave Messages:**
-```
-!config leavechannel #goodbye
-!config leavemessage {user} has left the server. We now have {memberCount} members.
-!config leaveenable
-```
-
-**Configure Auto-Role:**
-```
-!config autorole Member
-```
-
-**Set DJ Role:**
-```
-!config djrole DJ
-```
-
-**Set Language:**
-```
-!config language en    # English
-!config language sk    # Slovak
-```
-
-### Step 3: Enable Auto-Moderation
-```
-/automod enable
-/automod antiinvite true
-/automod antispam true
-/automod badwords add badword1
-/modlog #mod-logs
-```
-
-### Step 4: Test Basic Commands
-
-**Music:**
-```
-/play never gonna give you up
-/queue
-/skip
-```
-
-**Economy:**
-```
-/balance
-/daily
-```
-
-**Moderation:**
-```
-/warnings add @user Test warning
-/warnings list @user
-```
-
-**Fun:**
-```
-/poll What's your favorite? Pizza|Burgers|Tacos
-/8ball Is this bot awesome?
-```
+## First-Time Server Setup
 
----
-
-## 🌐 Dashboard Setup (Optional)
+Once the bot is online, a recommended setup sequence is:
 
-### 1. Get OAuth2 Credentials
+1. Run `/setup` or `!setup`
+2. Configure server behavior with `!config`
+3. Enable moderation rules with `/automod`
+4. Set a moderation log channel with `/modlog`
+5. Test a few commands such as `/help`, `/play`, and `/balance`
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Select your bot application
-3. Go to **OAuth2** → **General**
-4. Copy **Client ID** and **Client Secret**
-5. Add redirect URL: `http://localhost:3000/callback`
-
-### 2. Generate Session Secret
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Copy the output to `SESSION_SECRET` in `.env`
-
-### 3. Update .env File
-
-```env
-DASHBOARD_ENABLED=true
-DASHBOARD_PORT=3000
-DASHBOARD_URL=http://localhost:3000
-CLIENT_ID=your_client_id
-CLIENT_SECRET=your_client_secret
-DASHBOARD_CALLBACK=http://localhost:3000/callback
-SESSION_SECRET=generated_secret_from_step_2
-```
-
-### 4. Access Dashboard
-
-1. Start the bot (`npm start`)
-2. Visit `http://localhost:3000`
-3. Click "Login with Discord"
-4. Select a server to manage
-
-**Dashboard Pages:**
-- `/dashboard/:guildId` - Main overview
-- `/dashboard/:guildId/economy` - Leaderboard
-- `/dashboard/:guildId/analytics` - Server stats
-
----
-
-## 🐧 Linux Production Deployment
-
-### Option 1: Using systemd (Recommended)
-
-Create `/etc/systemd/system/discord-bot.service`:
-
-```ini
-[Unit]
-Description=Discord Bot
-After=network.target
-
-[Service]
-Type=simple
-User=YOUR_USERNAME
-WorkingDirectory=/home/YOUR_USERNAME/discordbotlast
-ExecStart=/usr/bin/npm start
-Environment="NODE_ENV=production"
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable discord-bot
-sudo systemctl start discord-bot
-sudo systemctl status discord-bot
-```
-
-View logs:
-```bash
-sudo journalctl -u discord-bot -f
-```
-
-### Option 2: Using PM2
-
-```bash
-# Install PM2
-npm install -g pm2
-
-# Start bot
-pm2 start index.js --name "discord-bot"
-
-# Auto-start on reboot
-pm2 startup
-pm2 save
-
-# Monitor
-pm2 status
-pm2 logs discord-bot
-pm2 restart discord-bot
-```
-
-### Option 3: Using Screen/Tmux
-
-**Screen:**
-```bash
-screen -S discord-bot
-npm start
-# Detach: Ctrl+A then D
-# Reattach: screen -r discord-bot
-```
-
-**Tmux:**
-```bash
-tmux new -s discord-bot
-npm start
-# Detach: Ctrl+B then D
-# Reattach: tmux attach -t discord-bot
-```
-
-### Nginx Reverse Proxy (For Dashboard)
-
-Create `/etc/nginx/sites-available/discord-bot`:
+## Dashboard Setup
 
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
+If you want the dashboard enabled:
 
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
+1. Set `DASHBOARD_ENABLED=true`
+2. Add `CLIENT_ID`, `CLIENT_SECRET`, `DASHBOARD_CALLBACK`, and `SESSION_SECRET`
+3. Start the bot and open `http://localhost:3000`
 
-Enable:
-```bash
-sudo ln -s /etc/nginx/sites-available/discord-bot /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
+## Verification Checklist
 
-### SSL Certificate (HTTPS)
+After startup, confirm the following:
 
-```bash
-sudo apt-get install certbot python3-certbot-nginx
-sudo certbot --nginx -d yourdomain.com
-```
+- The bot logs in successfully
+- Slash commands register without errors
+- `/help` responds in Discord
+- Configuration changes persist after a restart
+- If using MongoDB, `/mongodb-sync status` reports the expected mode
 
----
+## Common Problems
 
-## 🔍 Troubleshooting
+### Bot does not start
 
-### Bot Not Starting
+- Check the bot token in `.env`
+- Confirm Node.js version is recent enough
+- Run `npm install` again if dependencies are missing
 
-**Check Node.js version:**
-```bash
-node --version  # Should be 20.16.0+
-```
+### Slash commands are missing
 
-**Check for errors:**
-```bash
-npm start
-# Read the console output for specific errors
-```
+- Make sure the invite URL includes `applications.commands`
+- If commands are global, allow time for Discord to propagate them
+- Use `TEST_GUILD_ID` for faster updates during development
 
-**Common issues:**
-- Missing `.env` file → Create it
-- Invalid token → Check Discord Developer Portal
-- Missing dependencies → Run `npm install`
+### Permission errors
 
-### Slash Commands Not Appearing
+- Confirm the bot has required server permissions
+- Make sure the bot role is high enough to manage target roles or users
 
-- Wait up to 1 hour (Discord caches global commands)
-- Ensure bot has `applications.commands` scope
-- Try kicking and re-inviting the bot
+### Music issues
 
-### Music Not Playing
+- Verify the bot can join and speak in the voice channel
+- Check console output for playback or FFmpeg-related errors
 
-**Check FFmpeg:**
-```bash
-ffmpeg -version
-```
+## Related Documentation
 
-If not installed:
-- **Windows:** Download from [ffmpeg.org](https://ffmpeg.org)
-- **Linux:** `sudo apt-get install ffmpeg`
-- **macOS:** `brew install ffmpeg`
-
-### Database Connection Failed
-
-If using MongoDB:
-- Check `MONGODB_URI` is correct
-- Verify network access to MongoDB cluster
-- Whitelist your IP address in MongoDB Atlas
-
-The bot automatically falls back to JSON files if MongoDB fails.
-
-### Dashboard Not Loading
-
-1. Check `DASHBOARD_ENABLED=true` in `.env`
-2. Verify port 3000 is not in use: `lsof -i :3000`
-3. Check `CLIENT_ID` and `CLIENT_SECRET` are correct
-4. Verify callback URL matches in Discord Developer Portal
-
-### Permission Errors (Linux)
-
-```bash
-# Fix data folder permissions
-chmod 755 data/
-chmod 644 data/*.json
-
-# Fix script permissions
-chmod +x start.sh
-```
-
----
-
-## 📊 Verify Installation
-
-Run these commands to ensure everything works:
-
-- [ ] `/help` - Shows help message
-- [ ] `/play test` - Plays music
-- [ ] `/balance` - Shows economy status
-- [ ] `/poll Question? A|B|C` - Creates poll
-- [ ] `!config` - Shows server settings
-- [ ] `/warnings add @user test` - Test moderation
-- [ ] Send messages - XP should be tracked
-
----
-
-## 🆘 Getting Help
-
-If you encounter issues:
-
-1. Check console logs for error messages
-2. Verify all environment variables are set
-3. Ensure bot has proper permissions
-4. Check file permissions (Linux)
-5. Review the error message carefully
-
-**Common Error Messages:**
-
-- `TOKEN_INVALID` → Check your Discord token
-- `ECONNREFUSED` → Database connection issue
-- `EACCES` → Permission error (run with sudo or fix file permissions)
-- `MODULE_NOT_FOUND` → Run `npm install`
-
----
-
-## ✅ Post-Setup Checklist
-
-- [ ] Bot is online in Discord
-- [ ] Slash commands appear when typing `/`
-- [ ] Prefix commands work (default: `!`)
-- [ ] Music plays correctly
-- [ ] Economy system tracks XP
-- [ ] Moderation commands work
-- [ ] Dashboard accessible (if enabled)
-- [ ] Auto-moderation active
-- [ ] Welcome messages enabled
-
----
-
-**You're all set! Check COMMANDS.md for the complete command list.**
+- [`README.md`](README.md) - project overview
+- [`COMMANDS.md`](COMMANDS.md) - command reference
+- [`GUIDE.md`](GUIDE.md) - feature and operations guide
+- [`QUICK_REFERENCE.md`](QUICK_REFERENCE.md) - short-form cheat sheet

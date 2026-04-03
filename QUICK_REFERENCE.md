@@ -1,255 +1,80 @@
-# ⚡ Quick Reference Guide
+# Quick Reference
 
-## 🚀 Getting Started (30 seconds)
+This file is intended as a short operational cheat sheet for common tasks.
+
+## Start the Bot
 
 ```bash
-# 1. Install
 npm install
-
-# 2. Start
 npm start
-
-# 3. Check health
-/botstatus health
 ```
 
----
+## Initial Checks
 
-## 📋 All New Commands
+Run these after the bot comes online:
 
-### User Commands
-
-| Command | Use Case | Example |
-|---------|----------|---------|
-| `/reminder` | Create reminders | `/reminder create message:"Meeting" time:"1h"` |
-| `/poll` | Create polls | `/poll question:"Best game?" option1:"Game1" option2:"Game2"` |
-
-### Admin Commands
-
-| Command | Use Case | Example |
-|---------|----------|---------|
-| `/botstatus` | Check bot health | `/botstatus health` |
-| `/auditlogs` | View admin logs | `/auditlogs recent` |
-| `/welcomemessage` | Setup welcome | `/welcomemessage setup channel:#general` |
-| `/roletemplate` | Create roles | `/roletemplate create template:admin` |
-
----
-
-## 🔧 System Files Location
-
-```
-📂 Core Systems
-├─ utils/errorHandler.js
-├─ utils/cooldownManager.js
-├─ utils/rateLimiter.js
-├─ utils/shutdownManager.js
-├─ utils/inputValidator.js
-├─ utils/logger.js
-├─ utils/uptimeMonitor.js
-├─ utils/autoBackup.js
-├─ utils/auditLog.js
-├─ utils/welcomeMessageManager.js
-├─ utils/reminderManager.js
-└─ utils/roleTemplateManager.js
-
-📂 Data Storage
-├─ data/reminders.json
-├─ data/welcomeMessages.json
-├─ data/roleTemplates.json
-├─ logs/bot-YYYY-MM-DD.json
-├─ logs/error-YYYY-MM-DD.json
-├─ logs/audit/audit-YYYY-MM-DD.json
-└─ data/backups/
-
-📂 New Commands
-├─ slashCommands/utility/reminder.js
-├─ slashCommands/utility/poll.js
-├─ slashCommands/admin/botstatus.js
-├─ slashCommands/admin/auditlogs.js
-├─ slashCommands/admin/welcomemessage.js
-└─ slashCommands/admin/roletemplate.js
+```text
+/help
+/botstatus
+/system-stats
 ```
 
----
+## Common Commands
 
-## ⚙️ Quick Config
+| Task | Command |
+| --- | --- |
+| Play music | `/play <query>` |
+| Check queue | `/queue` |
+| Check balance | `/balance` |
+| Claim daily reward | `/daily` |
+| Create a poll | `/poll` |
+| Configure automod | `/automod settings` |
+| Configure welcome messages | `/welcomemessage` |
+| Check MongoDB sync mode | `/mongodb-sync status` |
 
-### Backup Schedule
-**Default**: Daily 02:00 UTC, Weekly Sunday 03:00 UTC
-**File**: Edit in `index.js` line for `AutoBackup`
+## MongoDB Quick Tasks
 
-### Cooldown Settings
-**Default**: Global: None, Per-command: Configurable
-**File**: Set when creating command
+| Task | Command |
+| --- | --- |
+| View sync status | `/mongodb-sync status` |
+| Switch to manual mode | `/mongodb-sync schedule mode:manual` |
+| Set timed sync | `/mongodb-sync schedule mode:interval minutes:10` |
+| Force sync now | `/mongodb-sync run` |
+| Check storage usage | `/mongodb-space` |
 
-### Welcome Messages
-**Default**: Disabled
-**Setup**: `/welcomemessage setup channel:#general`
+## Important Files
 
-### Audit Log Retention
-**Default**: 90 days
-**File**: `utils/auditLog.js` line `this.daysToKeep`
+| File | Purpose |
+| --- | --- |
+| `.env` | Environment configuration |
+| `README.md` | Project overview |
+| `SETUP.md` | Installation and deployment guide |
+| `COMMANDS.md` | Command reference |
+| `GUIDE.md` | Operations and feature guide |
+| `MONGODB.md` | MongoDB setup and migration guide |
 
----
+## Common Troubleshooting Checks
 
-## 🛠️ Troubleshooting Checklist
+### Bot does not respond
 
-| Issue | Solution | Command |
-|-------|----------|---------|
-| Bot offline? | Restart and check logs | `npm start` & check `/logs/error-*.json` |
-| High memory? | Check status | `/botstatus health` |
-| Commands not working? | Register slash commands | Check console output |
-| Lost data? | Restore from backup | `client.autoBackup.restoreFromBackup(name)` |
-| No logs? | Check directory | Verify `/logs/` exists |
-| Backups not creating? | Check permissions | Review error logs |
+- verify `DISCORD_TOKEN`
+- confirm required Discord intents are enabled
+- check server permissions
 
----
+### Slash commands are missing
 
-## 📊 Monitoring Commands
+- confirm the bot invite includes `applications.commands`
+- restart the bot and wait for Discord to refresh commands
 
-```
-/botstatus health      # Health check
-/botstatus stats       # Statistics
-/botstatus uptime      # Uptime info
-/botstatus backups     # Backup status
-/auditlogs recent      # Recent actions
-/auditlogs stats       # Action statistics
-```
+### MongoDB problems
 
----
+- verify `MONGODB_URI`
+- run `/mongodb-sync status`
+- review the console output for connection errors
 
-## 🔐 Security Features Active
+## Recommended Admin Workflow
 
-✅ Error catching & recovery
-✅ Input validation
-✅ Cooldown protection
-✅ Rate limiting
-✅ Automatic backups
-✅ Graceful shutdown
-✅ Audit logging
-✅ Permission checking
-
----
-
-## 📁 Important Files
-
-| File | Purpose | Edit? |
-|------|---------|-------|
-| `index.js` | Main bot file | ⚠️ Caution |
-| `.env` | Configuration | ✅ Required |
-| `logs/*` | System logs | 📖 Read-only |
-| `data/backups/*` | Data backups | 📖 Read-only |
-| `utils/errorHandler.js` | Error handling | ⚠️ Caution |
-
----
-
-## 🎯 Common Tasks
-
-### Check Bot Health
-```
-/botstatus health
-```
-
-### Create a Reminder
-```
-/reminder create message:"Task" time:"2h"
-```
-
-### Setup Welcome Messages
-```
-/welcomemessage setup channel:#welcome
-```
-
-### View Recent Audit Logs
-```
-/auditlogs recent
-```
-
-### Create Admin Role
-```
-/roletemplate create template:admin
-```
-
-### Create a Poll
-```
-/poll question:"Question?" option1:"A" option2:"B"
-```
-
----
-
-## 📞 Quick Help
-
-**Bot won't start?**
-1. Check `.env` file
-2. Check node version
-3. Review `/logs/error-*.json`
-
-**Commands not showing?**
-1. Run `/botstatus stats`
-2. Restart bot
-3. Wait 30 seconds for Discord cache
-
-**Need backups?**
-1. Check `/data/backups/`
-2. Use `/botstatus backups` to view
-3. Manual: `client.autoBackup.createBackup('manual')`
-
-**Check bot status?**
-- `/botstatus health` - Overall health
-- `/botstatus uptime` - How long running
-- `/botstatus stats` - Performance metrics
-
----
-
-## 🚀 First Time Setup
-
-1. **Start the bot**
-   ```bash
-   npm start
-   ```
-
-2. **Check it's working**
-   ```
-   /botstatus health
-   ```
-
-3. **Setup welcome messages** (optional)
-   ```
-   /welcomemessage setup channel:#welcome
-   ```
-
-4. **Check backup status**
-   ```
-   /botstatus backups
-   ```
-
-5. **View logs** (if any issues)
-   ```
-   Check /logs/ folder
-   ```
-
----
-
-## 🎉 You're All Set!
-
-All features are:
-- ✅ Installed
-- ✅ Configured
-- ✅ Active
-- ✅ Ready to use
-
-**Enjoy your enhanced Discord bot!**
-
----
-
-## 📚 Full Documentation
-
-- **SYSTEM_ENHANCEMENTS.md** - Complete feature guide
-- **IMPLEMENTATION_COMPLETE.md** - Implementation details
-- **ENHANCEMENT_SUMMARY.md** - Visual summary
-
----
-
-*Quick Reference v2.0*
-*Last Updated: 2024*
-
+1. Use `/help` for discovery
+2. Use `!config` to customize the server
+3. Enable `/automod` and `/modlog`
+4. Review `/botstatus` and `/system-stats` periodically

@@ -206,13 +206,13 @@ discordbotlast/
 
 ## Documentation
 
-Additional project documentation is available in the repository:
+The documentation set has been consolidated into a smaller group of reference files:
 
-- [`SETUP.md`](SETUP.md) - setup and deployment notes
-- [`COMMANDS.md`](COMMANDS.md) - command reference
-- [`GUIDE.md`](GUIDE.md) - broader usage guide
-- [`MONGODB_SETUP.md`](MONGODB_SETUP.md) - MongoDB setup instructions
-- [`MONGODB_MIGRATION.md`](MONGODB_MIGRATION.md) - migration notes for moving from JSON to MongoDB
+- [`SETUP.md`](SETUP.md) - installation and deployment guide
+- [`COMMANDS.md`](COMMANDS.md) - structured command reference
+- [`GUIDE.md`](GUIDE.md) - feature and operations guide
+- [`QUICK_REFERENCE.md`](QUICK_REFERENCE.md) - short operational cheat sheet
+- [`MONGODB.md`](MONGODB.md) - MongoDB setup, migration, storage, and sync scheduling
 
 ## Troubleshooting
 
