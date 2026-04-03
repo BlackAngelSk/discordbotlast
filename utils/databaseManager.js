@@ -15,10 +15,14 @@ class DatabaseManager {
         this.dbPath = path.join(__dirname, '..', 'data');
         this.mongoClient = null;
         this.db = null;
-        this.autoSyncEnabled = !this.devMode && this.getEnvBoolean('MONGODB_AUTOSYNC', true);
-        this.autoSyncIntervalMs = Math.max(30_000, Number(process.env.MONGODB_AUTOSYNC_INTERVAL_MS) || 60_000);
+        this.syncConfigPath = path.join(this.dbPath, 'mongodbSyncConfig.json');
+        this.syncSettings = this.getDefaultSyncSettings();
+        this.autoSyncEnabled = !this.devMode && this.syncSettings.mode === 'interval';
+        this.autoSyncIntervalMs = this.syncSettings.intervalMs;
         this.autoSyncTimer = null;
         this.lastSyncedMtime = new Map();
+        this.lastSyncStatus = null;
+        this.nextAutoSyncAt = null;
     }
 
     getEnvString(name, fallback = '') {
@@ -31,6 +35,115 @@ class DatabaseManager {
     getEnvBoolean(name, fallback = false) {
         const normalized = this.getEnvString(name, String(fallback)).toLowerCase();
         return ['1', 'true', 'yes', 'on'].includes(normalized);
+    }
+
+    getDefaultSyncSettings() {
+        const envAutoSyncEnabled = !this.devMode && this.getEnvBoolean('MONGODB_AUTOSYNC', true);
+        const requestedMode = this.getEnvString('MONGODB_AUTOSYNC_MODE', envAutoSyncEnabled ? 'interval' : 'manual').toLowerCase();
+
+        return {
+            mode: envAutoSyncEnabled && requestedMode !== 'manual' ? 'interval' : 'manual',
+            intervalMs: Math.max(30_000, Number(process.env.MONGODB_AUTOSYNC_INTERVAL_MS) || 60_000),
+            startupSync: this.getEnvBoolean('MONGODB_SYNC_ON_STARTUP', true),
+            shutdownSync: this.getEnvBoolean('MONGODB_SYNC_ON_SHUTDOWN', true)
+        };
+    }
+
+    normalizeSyncSettings(settings = {}) {
+        const defaults = this.getDefaultSyncSettings();
+        const normalizedMode = String(settings.mode ?? defaults.mode).toLowerCase();
+        const intervalMsRaw = settings.intervalMs ?? settings.autoSyncIntervalMs ?? defaults.intervalMs;
+
+        return {
+            mode: normalizedMode === 'manual' ? 'manual' : 'interval',
+            intervalMs: Math.max(30_000, Number(intervalMsRaw) || defaults.intervalMs),
+            startupSync: typeof settings.startupSync === 'boolean' ? settings.startupSync : defaults.startupSync,
+            shutdownSync: typeof settings.shutdownSync === 'boolean' ? settings.shutdownSync : defaults.shutdownSync
+        };
+    }
+
+    async loadSyncSettings() {
+        try {
+            const raw = await fs.readFile(this.syncConfigPath, 'utf8');
+            const parsed = JSON.parse(raw);
+            this.syncSettings = this.normalizeSyncSettings(parsed);
+        } catch (error) {
+            if (error.code !== 'ENOENT') {
+                console.warn(`⚠️ Failed to load MongoDB sync config: ${error.message}`);
+            }
+            this.syncSettings = this.getDefaultSyncSettings();
+        }
+
+        this.applySyncSettings({ restartTimer: false });
+        return this.getSyncStatus();
+    }
+
+    async saveSyncSettings() {
+        await fs.mkdir(path.dirname(this.syncConfigPath), { recursive: true });
+        await fs.writeFile(this.syncConfigPath, JSON.stringify(this.syncSettings, null, 2));
+    }
+
+    stopAutoSync() {
+        if (this.autoSyncTimer) {
+            clearInterval(this.autoSyncTimer);
+            this.autoSyncTimer = null;
+        }
+        this.nextAutoSyncAt = null;
+    }
+
+    applySyncSettings({ restartTimer = true } = {}) {
+        this.autoSyncEnabled = !this.devMode && this.syncSettings.mode === 'interval';
+        this.autoSyncIntervalMs = this.syncSettings.intervalMs;
+
+        if (!restartTimer) {
+            return;
+        }
+
+        this.stopAutoSync();
+        if (this.autoSyncEnabled && this.useDB === 'mongodb' && this.db) {
+            this.startAutoSync();
+        }
+    }
+
+    getSyncStatus() {
+        return {
+            mode: this.syncSettings.mode,
+            intervalMs: this.syncSettings.intervalMs,
+            intervalMinutes: Number((this.syncSettings.intervalMs / 60_000).toFixed(2)),
+            startupSync: this.syncSettings.startupSync,
+            shutdownSync: this.syncSettings.shutdownSync,
+            autoSyncEnabled: this.autoSyncEnabled,
+            isConnected: this.useDB === 'mongodb' && !!this.db,
+            usingStorage: this.useDB,
+            nextAutoSyncAt: this.nextAutoSyncAt ? new Date(this.nextAutoSyncAt).toISOString() : null,
+            lastSyncAt: this.lastSyncStatus?.finishedAt || null,
+            lastSyncDurationMs: this.lastSyncStatus?.durationMs || null,
+            lastReason: this.lastSyncStatus?.reason || null,
+            lastResult: this.lastSyncStatus
+        };
+    }
+
+    async updateSyncSettings(updates = {}) {
+        const nextSettings = { ...this.syncSettings };
+
+        if (updates.mode) {
+            nextSettings.mode = updates.mode;
+        }
+        if (typeof updates.intervalMs === 'number') {
+            nextSettings.intervalMs = updates.intervalMs;
+        }
+        if (typeof updates.startupSync === 'boolean') {
+            nextSettings.startupSync = updates.startupSync;
+        }
+        if (typeof updates.shutdownSync === 'boolean') {
+            nextSettings.shutdownSync = updates.shutdownSync;
+        }
+
+        this.syncSettings = this.normalizeSyncSettings(nextSettings);
+        await this.saveSyncSettings();
+        this.applySyncSettings();
+
+        return this.getSyncStatus();
     }
 
     isTlsHandshakeError(errorMessage = '') {
@@ -99,6 +212,8 @@ class DatabaseManager {
     }
 
     async init() {
+        await this.loadSyncSettings();
+
         if (this.devMode) {
             console.log('🧪 DEV_MODE is enabled: MongoDB sync is disabled, using JSON storage only.');
             this.useDB = 'json';
@@ -120,9 +235,14 @@ class DatabaseManager {
                 this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
                 console.log('✅ MongoDB connected successfully!');
 
+                if (this.syncSettings.startupSync) {
+                    await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
+                }
+
                 if (this.autoSyncEnabled) {
-                    await this.syncAllJsonToMongo({ force: true });
                     this.startAutoSync();
+                } else {
+                    console.log('ℹ️ Mongo auto-sync is set to manual mode. Use /mongodb-sync run whenever you want to push updates.');
                 }
             } catch (error) {
                 // One automatic retry path for common TLS handshake failures
@@ -138,9 +258,14 @@ class DatabaseManager {
                         this.useDB = 'mongodb';
                         console.log('✅ MongoDB connected successfully on IPv4 retry!');
 
+                        if (this.syncSettings.startupSync) {
+                            await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
+                        }
+
                         if (this.autoSyncEnabled) {
-                            await this.syncAllJsonToMongo({ force: true });
                             this.startAutoSync();
+                        } else {
+                            console.log('ℹ️ Mongo auto-sync is set to manual mode. Use /mongodb-sync run whenever you want to push updates.');
                         }
                         return;
                     } catch (retryError) {
@@ -158,7 +283,7 @@ class DatabaseManager {
     async getTopLevelJsonFiles() {
         const entries = await fs.readdir(this.dbPath, { withFileTypes: true });
         return entries
-            .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.json') && entry.name !== path.basename(this.syncConfigPath))
             .map((entry) => ({
                 fileName: entry.name,
                 filePath: path.join(this.dbPath, entry.name)
@@ -217,15 +342,27 @@ class DatabaseManager {
         return { collection, skipped: false, synced: true, count: docs.length };
     }
 
-    async syncAllJsonToMongo({ force = false } = {}) {
+    async syncAllJsonToMongo({ force = false, reason = 'manual' } = {}) {
+        const startedAt = Date.now();
+
         if (this.useDB !== 'mongodb' || !this.db) {
-            return {
+            const result = {
                 totalFiles: 0,
                 syncedCount: 0,
                 skippedCount: 0,
-                failedCount: 0,
-                failures: []
+                failedCount: 1,
+                failures: [{ file: 'global', reason: 'MongoDB is not connected.' }]
             };
+
+            this.lastSyncStatus = {
+                ...result,
+                reason,
+                startedAt: new Date(startedAt).toISOString(),
+                finishedAt: new Date().toISOString(),
+                durationMs: Date.now() - startedAt
+            };
+
+            return result;
         }
 
         try {
@@ -249,33 +386,60 @@ class DatabaseManager {
                 console.log(`🔄 Mongo auto-sync updated ${syncedCount} collection(s)`);
             }
 
-            return {
+            const summary = {
                 totalFiles: files.length,
                 syncedCount,
                 skippedCount,
                 failedCount: failures.length,
                 failures
             };
+
+            this.lastSyncStatus = {
+                ...summary,
+                reason,
+                startedAt: new Date(startedAt).toISOString(),
+                finishedAt: new Date().toISOString(),
+                durationMs: Date.now() - startedAt
+            };
+
+            if (this.autoSyncEnabled) {
+                this.nextAutoSyncAt = Date.now() + this.autoSyncIntervalMs;
+            }
+
+            return summary;
         } catch (error) {
             console.warn('⚠️ Mongo auto-sync failed:', error.message);
-            return {
+            const result = {
                 totalFiles: 0,
                 syncedCount: 0,
                 skippedCount: 0,
                 failedCount: 1,
                 failures: [{ file: 'global', reason: error.message }]
             };
+
+            this.lastSyncStatus = {
+                ...result,
+                reason,
+                startedAt: new Date(startedAt).toISOString(),
+                finishedAt: new Date().toISOString(),
+                durationMs: Date.now() - startedAt
+            };
+
+            return result;
         }
     }
 
     startAutoSync() {
-        if (this.autoSyncTimer || !this.autoSyncEnabled || this.useDB !== 'mongodb') return;
+        if (this.autoSyncTimer || !this.autoSyncEnabled || this.useDB !== 'mongodb' || !this.db) return;
+
+        this.nextAutoSyncAt = Date.now() + this.autoSyncIntervalMs;
         this.autoSyncTimer = setInterval(() => {
-            this.syncAllJsonToMongo().catch((error) => {
+            this.syncAllJsonToMongo({ reason: 'interval' }).catch((error) => {
                 console.warn('⚠️ Mongo auto-sync interval error:', error.message);
             });
         }, this.autoSyncIntervalMs);
-        console.log(`✅ Mongo auto-sync enabled (every ${Math.floor(this.autoSyncIntervalMs / 1000)}s)`);
+
+        console.log(`✅ Mongo auto-sync enabled (every ${Number((this.autoSyncIntervalMs / 60_000).toFixed(2))} minute(s))`);
     }
 
     async getCollection(collection) {
@@ -390,12 +554,20 @@ class DatabaseManager {
     }
 
     async close() {
-        if (this.autoSyncTimer) {
-            clearInterval(this.autoSyncTimer);
-            this.autoSyncTimer = null;
+        this.stopAutoSync();
+
+        if (this.syncSettings.shutdownSync && this.useDB === 'mongodb' && this.db) {
+            try {
+                await this.syncAllJsonToMongo({ force: true, reason: 'shutdown' });
+            } catch (error) {
+                console.warn('⚠️ Mongo shutdown sync failed:', error.message);
+            }
         }
+
         if (this.mongoClient) {
             await this.mongoClient.close();
+            this.mongoClient = null;
+            this.db = null;
         }
     }
 }

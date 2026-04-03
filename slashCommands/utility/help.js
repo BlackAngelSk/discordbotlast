@@ -391,7 +391,7 @@ function getCategoryEmbed(p, category) {
                 .addFields(
                     {
                         name: '🔒 Owner-only Slash Commands',
-                        value: `\`/testcommands\` - Simulate all slash commands and report failures\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync\` - Force sync JSON data to MongoDB`
+                        value: `\`/testcommands\` - Simulate all slash commands and report failures\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync status\` - View the current sync schedule\n\`/mongodb-sync schedule\` - Choose automatic/manual MongoDB updates\n\`/mongodb-sync run\` - Sync JSON data to MongoDB now`
                     },
                     {
                         name: 'ℹ️ Notes',

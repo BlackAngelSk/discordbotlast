@@ -236,6 +236,9 @@ shutdownManager.onShutdown(async () => {
     if (backup) {
         logger.info('Final shutdown backup created', { backup: backup.name });
     }
+
+    await databaseManager.close();
+    logger.info('Database manager closed');
 });
 
 shutdownManager.setShutdownTimeout(30000); // 30 second timeout
