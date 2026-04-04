@@ -5,6 +5,83 @@ const settingsManager = require('../../utils/settingsManager');
 
 let commandCatalogCache = null;
 
+const OWNER_ONLY_COMMANDS = new Set([
+    'testcommands',
+    'testerror',
+    'mongodb-space',
+    'mongodb-sync'
+]);
+
+const CATEGORY_DEFINITIONS = [
+    { key: 'music', label: 'Music', emoji: '🎵', style: ButtonStyle.Primary, fieldName: '🎵 Music', fieldValue: 'Play songs, control playback, manage queue' },
+    { key: 'economy', label: 'Economy', emoji: '💰', style: ButtonStyle.Success, fieldName: '💰 Economy', fieldValue: 'Balance, daily rewards, gambling, shop' },
+    { key: 'games', label: 'Games', emoji: '🎮', style: ButtonStyle.Success, fieldName: '🎮 Games', fieldValue: 'Mini games, betting, leaderboards' },
+    { key: 'moderation', label: 'Moderation', emoji: '🛡️', style: ButtonStyle.Danger, fieldName: '🛡️ Moderation', fieldValue: 'Kick, ban, timeout, warnings, automod' },
+    { key: 'server', label: 'Server Tools', emoji: '🎫', style: ButtonStyle.Primary, fieldName: '🎫 Server Tools', fieldValue: 'Tickets, reaction roles, starboard' },
+    { key: 'stats', label: 'Stats', emoji: '📊', style: ButtonStyle.Primary, fieldName: '📊 Stats', fieldValue: 'Server stats, user profiles, activity' },
+    { key: 'custom', label: 'Custom', emoji: '📝', style: ButtonStyle.Secondary, fieldName: '📝 Custom', fieldValue: 'Custom commands (admin)' },
+    { key: 'utility', label: 'Utility', emoji: '🔧', style: ButtonStyle.Secondary, fieldName: '🔧 Utility', fieldValue: 'Config, info commands, setup' },
+    { key: 'fun', label: 'Fun', emoji: '🎭', style: ButtonStyle.Success, fieldName: '🎭 Fun', fieldValue: 'Polls, memes, 8ball' },
+    { key: 'admin', label: 'Admin', emoji: '🧰', style: ButtonStyle.Danger, fieldName: '🧰 Admin', fieldValue: 'Season tools, economy admin, backups' },
+    { key: 'owner', label: 'Owner', emoji: '👑', style: ButtonStyle.Secondary, fieldName: '👑 Owner', fieldValue: 'Bot owner-only system commands' }
+];
+
+function inferAccessLevel(file, rootDir, commandName) {
+    const relativePath = path.relative(rootDir, file);
+    const topLevelDir = relativePath.split(path.sep)[0];
+
+    if (OWNER_ONLY_COMMANDS.has(String(commandName).toLowerCase())) {
+        return 'owner';
+    }
+
+    if (topLevelDir === 'admin') {
+        return 'admin';
+    }
+
+    return 'everyone';
+}
+
+function getAccessContext(userId, member) {
+    const ownerId = process.env.BOT_OWNER_ID;
+    const isOwner = !!ownerId && userId === ownerId;
+    const isAdmin = member?.permissions?.has?.('Administrator') || false;
+
+    return { isOwner, isAdmin };
+}
+
+function canViewAccessLevel(accessLevel, accessContext) {
+    if (accessLevel === 'owner') return accessContext.isOwner;
+    if (accessLevel === 'admin') return accessContext.isOwner || accessContext.isAdmin;
+    return true;
+}
+
+function canViewCategory(category, accessContext) {
+    if (category === 'owner') return accessContext.isOwner;
+    if (category === 'admin') return accessContext.isOwner || accessContext.isAdmin;
+    return true;
+}
+
+function getVisibleCategories(accessContext) {
+    return CATEGORY_DEFINITIONS.filter(category => canViewCategory(category.key, accessContext));
+}
+
+function buildCategoryRows(visibleCategories) {
+    const rows = [];
+    for (let i = 0; i < visibleCategories.length; i += 5) {
+        const buttons = visibleCategories.slice(i, i + 5).map(category =>
+            new ButtonBuilder()
+                .setLabel(category.label)
+                .setEmoji(category.emoji)
+                .setCustomId(`help_${category.key}`)
+                .setStyle(category.style)
+        );
+
+        rows.push(new ActionRowBuilder().addComponents(buttons));
+    }
+
+    return rows;
+}
+
 function walkJsFiles(dir) {
     const files = [];
     const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -31,13 +108,15 @@ function getCommandCatalog() {
         try {
             const mod = require(file);
             if (!mod?.name) continue;
+            const accessLevel = inferAccessLevel(file, prefixDir, mod.name);
             catalog.push({
                 name: String(mod.name).toLowerCase(),
                 displayName: mod.name,
                 type: 'prefix',
                 description: mod.description || 'No description available',
                 usage: mod.usage || `!${mod.name}`,
-                aliases: Array.isArray(mod.aliases) ? mod.aliases.map(a => String(a).toLowerCase()) : []
+                aliases: Array.isArray(mod.aliases) ? mod.aliases.map(a => String(a).toLowerCase()) : [],
+                accessLevel
             });
         } catch {
             // ignore invalid command modules
@@ -49,13 +128,15 @@ function getCommandCatalog() {
             const mod = require(file);
             const name = mod?.data?.name;
             if (!name) continue;
+            const accessLevel = inferAccessLevel(file, slashDir, name);
             catalog.push({
                 name: String(name).toLowerCase(),
                 displayName: name,
                 type: 'slash',
                 description: mod?.data?.description || mod?.description || 'No description available',
                 usage: `/${name}`,
-                aliases: []
+                aliases: [],
+                accessLevel
             });
         } catch {
             // ignore invalid slash modules
@@ -82,11 +163,13 @@ module.exports = {
     async execute(interaction) {
         const commandName = interaction.options.getString('command');
         const searchTerm = interaction.options.getString('search');
+        const accessContext = getAccessContext(interaction.user.id, interaction.member);
 
         if (searchTerm) {
             const q = searchTerm.toLowerCase().trim();
             const catalog = getCommandCatalog();
             const results = catalog
+                .filter(c => canViewAccessLevel(c.accessLevel, accessContext))
                 .filter(c => c.name.includes(q)
                     || c.displayName.toLowerCase().includes(q)
                     || c.description.toLowerCase().includes(q)
@@ -119,7 +202,7 @@ module.exports = {
         if (commandName) {
             const needle = commandName.toLowerCase();
             const catalog = getCommandCatalog();
-            const command = catalog.find(c => c.name === needle || c.aliases.includes(needle));
+            const command = catalog.find(c => (c.name === needle || c.aliases.includes(needle)) && canViewAccessLevel(c.accessLevel, accessContext));
 
             if (!command) {
                 return interaction.reply({ content: `❌ Command "${commandName}" not found!`, flags: MessageFlags.Ephemeral });
@@ -143,92 +226,19 @@ module.exports = {
 
         const settings = settingsManager.get(interaction.guildId);
         const p = settings.prefix;
+        const visibleCategories = getVisibleCategories(accessContext);
 
         const embed = new EmbedBuilder()
             .setColor('#5865F2')
             .setTitle('🤖 Discord Bot - Command Categories')
             .setDescription(`**Server Prefix:** \`${p}\`\n**Slash Commands:** Type \`/\` in chat\n\nClick a button below or use \`${p}help <category>\` for detailed commands!`)
-            .addFields(
-                { name: '🎵 Music', value: 'Play songs, control playback, manage queue', inline: true },
-                { name: '💰 Economy', value: 'Balance, daily rewards, gambling, shop', inline: true },
-                { name: '🎮 Games', value: 'Mini games, betting, leaderboards', inline: true },
-                { name: '🛡️ Moderation', value: 'Kick, ban, timeout, warnings, automod', inline: true },
-                { name: '🎫 Server Tools', value: 'Tickets, reaction roles, starboard', inline: true },
-                { name: '📊 Stats', value: 'Server stats, user profiles, activity', inline: true },
-                { name: '📝 Custom', value: 'Custom commands (admin)', inline: true },
-                { name: '🔧 Utility', value: 'Config, info commands, setup', inline: true },
-                { name: '🎭 Fun', value: 'Polls, memes, 8ball', inline: true },
-                { name: '🧰 Admin', value: 'Season tools, economy admin, backups', inline: true },
-                { name: '👑 Owner', value: 'Bot owner-only system commands', inline: true }
-            )
+            .addFields(visibleCategories.map(category => ({ name: category.fieldName, value: category.fieldValue, inline: true })))
             .setFooter({ text: `Type ${p}help <category> for detailed commands | Example: ${p}help music` })
             .setTimestamp();
 
-        const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Music')
-                .setEmoji('🎵')
-                .setCustomId('help_music')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setLabel('Economy')
-                .setEmoji('💰')
-                .setCustomId('help_economy')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Games')
-                .setEmoji('🎮')
-                .setCustomId('help_games')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Moderation')
-                .setEmoji('🛡️')
-                .setCustomId('help_moderation')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setLabel('Server Tools')
-                .setEmoji('🎫')
-                .setCustomId('help_server')
-                .setStyle(ButtonStyle.Primary)
-        );
+        const rows = buildCategoryRows(visibleCategories);
 
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Stats')
-                .setEmoji('📊')
-                .setCustomId('help_stats')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setLabel('Custom')
-                .setEmoji('📝')
-                .setCustomId('help_custom')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setLabel('Utility')
-                .setEmoji('🔧')
-                .setCustomId('help_utility')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setLabel('Fun')
-                .setEmoji('🎭')
-                .setCustomId('help_fun')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Admin')
-                .setEmoji('🧰')
-                .setCustomId('help_admin')
-                .setStyle(ButtonStyle.Danger)
-        );
-
-        const row3 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Owner')
-                .setEmoji('👑')
-                .setCustomId('help_owner')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        await interaction.reply({ embeds: [embed], components: [row1, row2, row3] });
+        await interaction.reply({ embeds: [embed], components: rows });
 
         // Button interaction collector
         const message = await interaction.fetchReply();
@@ -244,13 +254,17 @@ module.exports = {
             }
 
             const category = i.customId.replace('help_', '');
+            if (!canViewCategory(category, accessContext)) {
+                return i.reply({ content: '❌ You do not have permission to view that help category.', flags: MessageFlags.Ephemeral });
+            }
+
             try {
                 if (!i.deferred && !i.replied) {
                     await i.deferUpdate();
                 }
 
-                const categoryEmbed = getCategoryEmbed(p, category);
-                await i.editReply({ embeds: [categoryEmbed], components: [row1, row2, row3] });
+                const categoryEmbed = getCategoryEmbed(p, category, accessContext);
+                await i.editReply({ embeds: [categoryEmbed], components: rows });
             } catch (error) {
                 // Ignore expired interaction edge-cases from stale button clicks
                 if (error?.code !== 10062) {
@@ -261,18 +275,23 @@ module.exports = {
 
         collector.on('end', () => {
             // Disable buttons after timeout
-            row1.components.forEach(btn => btn.setDisabled(true));
-            row2.components.forEach(btn => btn.setDisabled(true));
-            row3.components.forEach(btn => btn.setDisabled(true));
-            interaction.editReply({ components: [row1, row2, row3] }).catch(() => {});
+            rows.forEach(row => row.components.forEach(btn => btn.setDisabled(true)));
+            interaction.editReply({ components: rows }).catch(() => {});
         });
     }
 };
 
-function getCategoryEmbed(p, category) {
+function getCategoryEmbed(p, category, accessContext) {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
         .setTimestamp();
+
+    if (!canViewCategory(category, accessContext)) {
+        return embed
+            .setTitle('❌ Access Denied')
+            .setDescription('You do not have permission to view this category.')
+            .setColor('#ed4245');
+    }
 
     switch (category) {
         case 'music':
@@ -401,8 +420,9 @@ function getCategoryEmbed(p, category) {
             break;
 
         default:
+            const visibleCategoryList = getVisibleCategories(accessContext).map(c => `\`${c.key}\``).join(', ');
             embed.setTitle('❌ Unknown Category')
-                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n\`music\`, \`economy\`, \`games\`, \`moderation\`, \`server\`, \`stats\`, \`custom\`, \`utility\`, \`fun\`, \`admin\`, \`owner\``)
+                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n${visibleCategoryList}`)
                 .setColor('#ed4245');
     }
 

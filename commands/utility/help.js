@@ -1,6 +1,54 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 
+const CATEGORY_DEFINITIONS = [
+    { key: 'music', label: 'Music', emoji: '🎵', style: ButtonStyle.Primary, fieldName: '🎵 Music', fieldValue: 'Play songs, control playback, manage queue' },
+    { key: 'economy', label: 'Economy', emoji: '💰', style: ButtonStyle.Success, fieldName: '💰 Economy', fieldValue: 'Balance, daily rewards, gambling, shop' },
+    { key: 'games', label: 'Games', emoji: '🎮', style: ButtonStyle.Success, fieldName: '🎮 Games', fieldValue: 'Mini games, betting, leaderboards' },
+    { key: 'moderation', label: 'Moderation', emoji: '🛡️', style: ButtonStyle.Danger, fieldName: '🛡️ Moderation', fieldValue: 'Kick, ban, timeout, warnings, automod' },
+    { key: 'server', label: 'Server Tools', emoji: '🎫', style: ButtonStyle.Primary, fieldName: '🎫 Server Tools', fieldValue: 'Tickets, reaction roles, starboard' },
+    { key: 'stats', label: 'Stats', emoji: '📊', style: ButtonStyle.Primary, fieldName: '📊 Stats', fieldValue: 'Server stats, user profiles, activity' },
+    { key: 'custom', label: 'Custom', emoji: '📝', style: ButtonStyle.Secondary, fieldName: '📝 Custom', fieldValue: 'Custom commands (admin)' },
+    { key: 'utility', label: 'Utility', emoji: '🔧', style: ButtonStyle.Secondary, fieldName: '🔧 Utility', fieldValue: 'Config, info commands, setup' },
+    { key: 'fun', label: 'Fun', emoji: '🎭', style: ButtonStyle.Success, fieldName: '🎭 Fun', fieldValue: 'Polls, memes, 8ball' },
+    { key: 'admin', label: 'Admin', emoji: '🧰', style: ButtonStyle.Danger, fieldName: '🧰 Admin', fieldValue: 'Season tools, economy admin, backups' },
+    { key: 'owner', label: 'Owner', emoji: '👑', style: ButtonStyle.Secondary, fieldName: '👑 Owner', fieldValue: 'Bot owner-only system commands' }
+];
+
+function getAccessContext(userId, member) {
+    const ownerId = process.env.BOT_OWNER_ID;
+    const isOwner = !!ownerId && userId === ownerId;
+    const isAdmin = member?.permissions?.has('Administrator') || false;
+
+    return { isOwner, isAdmin };
+}
+
+function canViewCategory(category, accessContext) {
+    if (category === 'owner') return accessContext.isOwner;
+    if (category === 'admin') return accessContext.isOwner || accessContext.isAdmin;
+    return true;
+}
+
+function getVisibleCategories(accessContext) {
+    return CATEGORY_DEFINITIONS.filter(category => canViewCategory(category.key, accessContext));
+}
+
+function buildCategoryRows(visibleCategories) {
+    const rows = [];
+    for (let i = 0; i < visibleCategories.length; i += 5) {
+        const buttons = visibleCategories.slice(i, i + 5).map(category =>
+            new ButtonBuilder()
+                .setLabel(category.label)
+                .setEmoji(category.emoji)
+                .setCustomId(`help_${category.key}`)
+                .setStyle(category.style)
+        );
+
+        rows.push(new ActionRowBuilder().addComponents(buttons));
+    }
+    return rows;
+}
+
 module.exports = {
     name: 'help',
     description: 'Show available commands',
@@ -8,12 +56,17 @@ module.exports = {
     async execute(message, args, client) {
         const settings = settingsManager.get(message.guild.id);
         const p = settings.prefix;
+        const accessContext = getAccessContext(message.author.id, message.member);
+        const visibleCategories = getVisibleCategories(accessContext);
 
         // Show specific category help if requested
         const category = args[0]?.toLowerCase();
 
         if (category) {
-            return sendCategoryHelp(message, p, category);
+            if (!canViewCategory(category, accessContext)) {
+                return message.reply('❌ You do not have permission to view that help category.');
+            }
+            return sendCategoryHelp(message, p, category, accessContext);
         }
 
         // Main help menu with categories
@@ -21,87 +74,12 @@ module.exports = {
             .setColor('#5865F2')
             .setTitle('🤖 Discord Bot - Command Categories')
             .setDescription(`**Server Prefix:** \`${p}\`\n**Slash Commands:** Type \`/\` in chat\n\nClick a button below or use \`${p}help <category>\` for detailed commands!`)
-            .addFields(
-                { name: '🎵 Music', value: 'Play songs, control playback, manage queue', inline: true },
-                { name: '💰 Economy', value: 'Balance, daily rewards, gambling, shop', inline: true },
-                { name: '🎮 Games', value: 'Mini games, betting, leaderboards', inline: true },
-                { name: '🛡️ Moderation', value: 'Kick, ban, timeout, warnings, automod', inline: true },
-                { name: '🎫 Server Tools', value: 'Tickets, reaction roles, starboard', inline: true },
-                { name: '📊 Stats', value: 'Server stats, user profiles, activity', inline: true },
-                { name: '📝 Custom', value: 'Custom commands (admin)', inline: true },
-                { name: '🔧 Utility', value: 'Config, info commands, setup', inline: true },
-                { name: '🎭 Fun', value: 'Polls, memes, 8ball', inline: true },
-                { name: '🧰 Admin', value: 'Season tools, economy admin, backups', inline: true },
-                { name: '👑 Owner', value: 'Bot owner-only system commands', inline: true }
-            )
+            .addFields(visibleCategories.map(category => ({ name: category.fieldName, value: category.fieldValue, inline: true })))
             .setFooter({ text: `Type ${p}help <category> for detailed commands | Example: ${p}help music` })
             .setTimestamp();
 
-        const row1 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Music')
-                .setEmoji('🎵')
-                .setCustomId('help_music')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setLabel('Economy')
-                .setEmoji('💰')
-                .setCustomId('help_economy')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Games')
-                .setEmoji('🎮')
-                .setCustomId('help_games')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Moderation')
-                .setEmoji('🛡️')
-                .setCustomId('help_moderation')
-                .setStyle(ButtonStyle.Danger),
-            new ButtonBuilder()
-                .setLabel('Server Tools')
-                .setEmoji('🎫')
-                .setCustomId('help_server')
-                .setStyle(ButtonStyle.Primary)
-        );
-
-        const row2 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Stats')
-                .setEmoji('📊')
-                .setCustomId('help_stats')
-                .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-                .setLabel('Custom')
-                .setEmoji('📝')
-                .setCustomId('help_custom')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setLabel('Utility')
-                .setEmoji('🔧')
-                .setCustomId('help_utility')
-                .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-                .setLabel('Fun')
-                .setEmoji('🎭')
-                .setCustomId('help_fun')
-                .setStyle(ButtonStyle.Success),
-            new ButtonBuilder()
-                .setLabel('Admin')
-                .setEmoji('🧰')
-                .setCustomId('help_admin')
-                .setStyle(ButtonStyle.Danger)
-        );
-
-        const row3 = new ActionRowBuilder().addComponents(
-            new ButtonBuilder()
-                .setLabel('Owner')
-                .setEmoji('👑')
-                .setCustomId('help_owner')
-                .setStyle(ButtonStyle.Secondary)
-        );
-
-        const reply = await message.reply({ embeds: [mainEmbed], components: [row1, row2, row3] });
+        const rows = buildCategoryRows(visibleCategories);
+        const reply = await message.reply({ embeds: [mainEmbed], components: rows });
 
         // Button interaction collector
         const collector = reply.createMessageComponentCollector({ time: 300000 }); // 5 minutes
@@ -112,26 +90,35 @@ module.exports = {
             }
 
             const category = i.customId.replace('help_', '');
+            if (!canViewCategory(category, accessContext)) {
+                return i.reply({ content: '❌ You do not have permission to view that help category.', flags: MessageFlags.Ephemeral });
+            }
+
             await i.deferUpdate();
             
-            const categoryEmbed = getCategoryEmbed(p, category);
-            await i.editReply({ embeds: [categoryEmbed], components: [row1, row2, row3] });
+            const categoryEmbed = getCategoryEmbed(p, category, accessContext);
+            await i.editReply({ embeds: [categoryEmbed], components: rows });
         });
 
         collector.on('end', () => {
             // Disable buttons after timeout
-            row1.components.forEach(btn => btn.setDisabled(true));
-            row2.components.forEach(btn => btn.setDisabled(true));
-            row3.components.forEach(btn => btn.setDisabled(true));
-            reply.edit({ components: [row1, row2, row3] }).catch(() => {});
+            rows.forEach(row => row.components.forEach(btn => btn.setDisabled(true)));
+            reply.edit({ components: rows }).catch(() => {});
         });
     }
 };
 
-function getCategoryEmbed(p, category) {
+function getCategoryEmbed(p, category, accessContext) {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
         .setTimestamp();
+
+    if (!canViewCategory(category, accessContext)) {
+        return embed
+            .setTitle('❌ Access Denied')
+            .setDescription('You do not have permission to view this category.')
+            .setColor('#ed4245');
+    }
 
     switch (category) {
         case 'music':
@@ -260,8 +247,9 @@ function getCategoryEmbed(p, category) {
             break;
 
         default:
+            const visibleCategoryList = getVisibleCategories(accessContext).map(c => `\`${c.key}\``).join(', ');
             embed.setTitle('❌ Unknown Category')
-                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n\`music\`, \`economy\`, \`games\`, \`moderation\`, \`server\`, \`stats\`, \`custom\`, \`utility\`, \`fun\`, \`admin\`, \`owner\``)
+                .setDescription(`Category "${category}" not found!\n\nAvailable categories:\n${visibleCategoryList}`)
                 .setColor('#ed4245');
     }
 
@@ -269,7 +257,7 @@ function getCategoryEmbed(p, category) {
     return embed;
 }
 
-function sendCategoryHelp(message, p, category) {
-    const embed = getCategoryEmbed(p, category);
+function sendCategoryHelp(message, p, category, accessContext) {
+    const embed = getCategoryEmbed(p, category, accessContext);
     message.reply({ embeds: [embed] });
 }
