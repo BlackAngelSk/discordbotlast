@@ -42,6 +42,7 @@ class EconomyManager {
                 balance: 0,
                 xp: 0,
                 level: 1,
+                highestLevelReached: 1,
                 lastDaily: null,
                 lastWeekly: null,
                 inventory: [],
@@ -49,6 +50,22 @@ class EconomyManager {
                 streakBonusMultiplier: 1,
                 seasonalCoins: 0
             };
+        } else {
+            // Backfill newer economy fields for existing users and repair level drift.
+            const user = this.data.users[key];
+            user.balance = Number.isFinite(user.balance) ? user.balance : 0;
+            user.xp = Number.isFinite(user.xp) ? Math.max(0, user.xp) : 0;
+            user.inventory = Array.isArray(user.inventory) ? user.inventory : [];
+            user.dailyStreak = Number.isFinite(user.dailyStreak) ? user.dailyStreak : 0;
+            user.streakBonusMultiplier = Number.isFinite(user.streakBonusMultiplier) ? user.streakBonusMultiplier : 1;
+            user.seasonalCoins = Number.isFinite(user.seasonalCoins) ? user.seasonalCoins : 0;
+
+            const inferredLevel = Math.floor(Math.sqrt(user.xp / 100)) + 1;
+            const storedLevel = Number.isFinite(user.level) ? Math.max(1, user.level) : 1;
+            user.level = Math.max(storedLevel, inferredLevel);
+
+            const highestStored = Number.isFinite(user.highestLevelReached) ? Math.max(1, user.highestLevelReached) : 1;
+            user.highestLevelReached = Math.max(highestStored, user.level);
         }
         return this.data.users[key];
     }
@@ -74,8 +91,12 @@ class EconomyManager {
         
         // Calculate level (xp = level^2 * 100)
         const newLevel = Math.floor(Math.sqrt(userData.xp / 100)) + 1;
-        const leveledUp = newLevel > userData.level;
+        const previousHighest = Number.isFinite(userData.highestLevelReached)
+            ? userData.highestLevelReached
+            : userData.level;
+        const leveledUp = newLevel > previousHighest;
         userData.level = newLevel;
+        userData.highestLevelReached = Math.max(previousHighest, newLevel);
         
         await this.save();
         return { leveledUp, level: newLevel };
