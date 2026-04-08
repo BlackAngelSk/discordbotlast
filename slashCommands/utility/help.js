@@ -9,7 +9,8 @@ const OWNER_ONLY_COMMANDS = new Set([
     'testcommands',
     'testerror',
     'mongodb-space',
-    'mongodb-sync'
+    'mongodb-sync',
+    'force-update'
 ]);
 
 const CATEGORY_DEFINITIONS = [
@@ -410,7 +411,7 @@ function getCategoryEmbed(p, category, accessContext) {
                 .addFields(
                     {
                         name: '🔒 Owner-only Slash Commands',
-                        value: `\`/testcommands\` - Simulate all slash commands and report failures\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync status\` - View the current sync schedule\n\`/mongodb-sync schedule\` - Choose automatic/manual MongoDB updates\n\`/mongodb-sync run\` - Sync JSON data to MongoDB now`
+                        value: `\`/testcommands\` - Simulate all slash commands and report failures\n\`/force-update [ref] [restart] [delete_missing]\` - Force-update bot files now\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync status\` - View the current sync schedule\n\`/mongodb-sync schedule\` - Choose automatic/manual MongoDB updates\n\`/mongodb-sync run\` - Sync JSON data to MongoDB now`
                     },
                     {
                         name: 'ℹ️ Notes',
