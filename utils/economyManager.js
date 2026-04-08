@@ -1,6 +1,14 @@
 const fs = require('fs').promises;
 const path = require('path');
 
+const MAX_LEVEL = 10000000000;
+
+function calculateLevelFromXP(xp) {
+    const safeXP = Number.isFinite(xp) ? Math.max(0, xp) : 0;
+    const rawLevel = Math.floor(Math.sqrt(safeXP / 100)) + 1;
+    return Math.min(MAX_LEVEL, rawLevel);
+}
+
 class EconomyManager {
     constructor() {
         this.dataPath = path.join(__dirname, '..', 'data', 'economy.json');
@@ -60,12 +68,12 @@ class EconomyManager {
             user.streakBonusMultiplier = Number.isFinite(user.streakBonusMultiplier) ? user.streakBonusMultiplier : 1;
             user.seasonalCoins = Number.isFinite(user.seasonalCoins) ? user.seasonalCoins : 0;
 
-            const inferredLevel = Math.floor(Math.sqrt(user.xp / 100)) + 1;
+            const inferredLevel = calculateLevelFromXP(user.xp);
             const storedLevel = Number.isFinite(user.level) ? Math.max(1, user.level) : 1;
-            user.level = Math.max(storedLevel, inferredLevel);
+            user.level = Math.min(MAX_LEVEL, Math.max(storedLevel, inferredLevel));
 
             const highestStored = Number.isFinite(user.highestLevelReached) ? Math.max(1, user.highestLevelReached) : 1;
-            user.highestLevelReached = Math.max(highestStored, user.level);
+            user.highestLevelReached = Math.min(MAX_LEVEL, Math.max(highestStored, user.level));
         }
         return this.data.users[key];
     }
@@ -90,13 +98,13 @@ class EconomyManager {
         userData.xp += xp;
         
         // Calculate level (xp = level^2 * 100)
-        const newLevel = Math.floor(Math.sqrt(userData.xp / 100)) + 1;
+        const newLevel = calculateLevelFromXP(userData.xp);
         const previousHighest = Number.isFinite(userData.highestLevelReached)
             ? userData.highestLevelReached
             : userData.level;
         const leveledUp = newLevel > previousHighest;
         userData.level = newLevel;
-        userData.highestLevelReached = Math.max(previousHighest, newLevel);
+        userData.highestLevelReached = Math.min(MAX_LEVEL, Math.max(previousHighest, newLevel));
         
         await this.save();
         return { leveledUp, level: newLevel };
@@ -128,7 +136,7 @@ class EconomyManager {
                     // Combine stats across all guilds for the same user
                     existing.balance += user.balance;
                     existing.xp += user.xp;
-                    existing.level = Math.floor(Math.sqrt((existing.xp) / 100)) + 1;
+                    existing.level = calculateLevelFromXP(existing.xp);
                     existing.totalCoins = (existing.totalCoins || 0) + (user.seasonalCoins || 0);
                 } else {
                     acc.push({
