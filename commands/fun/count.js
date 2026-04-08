@@ -26,8 +26,7 @@ module.exports = {
 
         // Listen for messages in this channel
         const messageCollector = message.channel.createMessageCollector({ 
-            filter: (msg) => !msg.author.bot,
-            time: 3600000 // 1 hour timeout
+            filter: (msg) => !msg.author.bot
         });
 
         messageCollector.on('collect', async (msg) => {
@@ -140,7 +139,6 @@ module.exports = {
             if (gameState && gameState.gameActive) {
                 gameState.gameActive = false;
                 countingData.delete(key);
-                message.channel.send('⏱️ Counting game timed out! (60 minutes)');
             }
         });
     }

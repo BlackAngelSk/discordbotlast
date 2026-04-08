@@ -176,7 +176,7 @@ class MusicQueue {
             }
 
             const { createAudioResource, StreamType } = require('@discordjs/voice');
-            const { spawn } = require('child_process');
+            const { spawn, spawnSync } = require('child_process');
             const path = require('path');
             const fs = require('fs');
 
@@ -208,27 +208,41 @@ class MusicQueue {
                 this.ytdlpProcess = null;
             }
 
-            // Get yt-dlp path
-            const os = require('os');
-            const homeDir = os.homedir();
-            
-            // Try to use system yt-dlp first (Linux), fallback to bundled .exe (Windows)
-            let ytdlpPath = path.join(homeDir, '.local', 'bin', 'yt-dlp');
-            
-            if (!fs.existsSync(ytdlpPath)) {
-                // Fallback to bundled version
+            // Resolve yt-dlp path (PATH first, then common local path, then bundled fallback)
+            const ytdlpFromPath = spawnSync('which', ['yt-dlp'], { encoding: 'utf8' });
+            let ytdlpPath = ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.trim() : '';
+
+            if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
+                const os = require('os');
+                const homeDir = os.homedir();
+                const localYtdlp = path.join(homeDir, '.local', 'bin', 'yt-dlp');
+                if (fs.existsSync(localYtdlp)) {
+                    ytdlpPath = localYtdlp;
+                }
+            }
+
+            if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
                 const ytdlp = require('@distube/yt-dlp');
-                ytdlpPath = typeof ytdlp === 'string' ? ytdlp : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+                ytdlpPath = typeof ytdlp === 'string'
+                    ? ytdlp
+                    : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
             }
             
             console.log(`📥 Using yt-dlp from: ${ytdlpPath}`);
 
             // Spawn yt-dlp to download and output audio to stdout
             const ytdlpProcess = spawn(ytdlpPath, [
-                '--format', 'bestaudio',
+                '--format', 'bestaudio/best',
                 '--no-playlist',
                 '--no-warnings',
                 '--quiet',
+                '--force-ipv4',
+                '--extractor-retries', '3',
+                '--fragment-retries', '3',
+                '--retry-sleep', '2',
+                '--geo-bypass',
+                '--extractor-args', 'youtube:player_client=android,web',
+                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
                 '--buffer-size', '512K',
                 '--output', '-',
                 song.url
