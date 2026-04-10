@@ -11,7 +11,7 @@ This repository is designed for servers that want a single bot to handle day-to-
 | Area | Capabilities |
 | --- | --- |
 | Moderation | warnings, timeouts, softbans, purge tools, audit logs, anti-spam, anti-invite, bad-word filtering |
-| Music | YouTube playback, queue controls, autoplay, loop modes, lyrics, previous track, jump, playlist support |
+| Music | YouTube playback, queue controls, autoplay, loop modes, lyrics, previous track, jump, and user custom playlists |
 | Economy and Levels | XP, levels, daily and weekly rewards, balance tracking, leaderboards, shop system |
 | Community Tools | polls, profiles, invite tracking, birthdays, suggestions, reminders, activity tracking |
 | Automation | welcome and leave messages, auto-role, scheduled messages, seasonal leaderboard updates |
@@ -85,6 +85,12 @@ Optional startup scripts are also included:
 ./start.sh
 ```
 
+For automatic restart after crashes and automatic startup after server reboot:
+
+```bash
+./start.sh --pm2-auto
+```
+
 On Windows, you can use:
 
 ```bash
@@ -137,6 +143,12 @@ Examples:
 - `/skip`
 - `/loop <mode>`
 - `/autoplay`
+- `/playlist create <name> [description]`
+- `/playlist add <playlist> <song>`
+- `/playlist list`
+- `/playlist load <playlist>`
+- `/playlist remove <playlist> <song_number>`
+- `/playlist delete <playlist>`
 - `!play <query>`
 
 ### Moderation
@@ -201,6 +213,10 @@ discordbotlast/
 | --- | --- |
 | `npm start` | Start the bot |
 | `npm run dev` | Start the bot in development mode |
+| `npm run pm2:start` | Start bot with PM2 process manager |
+| `npm run pm2:restart` | Restart PM2 bot process |
+| `npm run pm2:logs` | View PM2 bot logs |
+| `npm run pm2:save` | Persist PM2 process list for reboot |
 | `npm run slots:sim` | Run the slot simulation utility |
 | `npm run test:slots` | Run slot logic tests |
 

@@ -108,6 +108,18 @@ Linux or macOS helper script:
 bash start.sh
 ```
 
+For production uptime with auto-restart and auto-start after reboot:
+
+```bash
+bash start.sh --pm2-auto
+```
+
+If PM2 prints a `sudo` command during startup setup, run it once, then run:
+
+```bash
+pm2 save
+```
+
 Windows helper script:
 
 ```bash

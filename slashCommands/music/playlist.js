@@ -4,6 +4,10 @@
  */
 
 const { SlashCommandBuilder } = require('discord.js');
+const { joinVoiceChannel } = require('@discordjs/voice');
+const play = require('play-dl');
+const queues = require('../../utils/queues');
+const MusicQueue = require('../../utils/MusicQueue');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -34,11 +38,46 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('add')
-                .setDescription('Add current song to playlist')
+                .setDescription('Add a song to a playlist')
                 .addStringOption(option =>
                     option
                         .setName('playlist')
                         .setDescription('Target playlist')
+                        .setRequired(true)
+                )
+                .addStringOption(option =>
+                    option
+                        .setName('song')
+                        .setDescription('Song name or URL')
+                        .setRequired(true)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('remove')
+                .setDescription('Remove a song from a playlist')
+                .addStringOption(option =>
+                    option
+                        .setName('playlist')
+                        .setDescription('Target playlist')
+                        .setRequired(true)
+                )
+                .addIntegerOption(option =>
+                    option
+                        .setName('song_number')
+                        .setDescription('Song number in the playlist list (starting at 1)')
+                        .setRequired(true)
+                        .setMinValue(1)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('delete')
+                .setDescription('Delete one of your playlists')
+                .addStringOption(option =>
+                    option
+                        .setName('playlist')
+                        .setDescription('Playlist to delete')
                         .setRequired(true)
                 )
         )
@@ -83,6 +122,11 @@ module.exports = {
             if (subcommand === 'create') {
                 const name = interaction.options.getString('name');
                 const description = interaction.options.getString('description') || '';
+                const existing = await musicPlaylistManager.getUserPlaylists(interaction.user.id);
+
+                if (existing.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                    return interaction.reply('❌ You already have a playlist with that name.');
+                }
 
                 const playlist = await musicPlaylistManager.createPlaylist(interaction.user.id, name, description);
 
@@ -118,6 +162,90 @@ module.exports = {
                 return interaction.reply({ embeds: [embed] });
             }
 
+            if (subcommand === 'add') {
+                const playlistName = interaction.options.getString('playlist');
+                const songQuery = interaction.options.getString('song');
+                const playlists = await musicPlaylistManager.getUserPlaylists(interaction.user.id);
+                const playlist = playlists.find(p => p.name.toLowerCase() === playlistName.toLowerCase());
+
+                if (!playlist) {
+                    return interaction.reply('❌ Playlist not found!');
+                }
+
+                const song = await resolveSongFromQuery(songQuery, interaction.user.tag);
+                if (!song) {
+                    return interaction.reply('❌ Could not find that song. Try a different name or URL.');
+                }
+
+                const addedSong = await musicPlaylistManager.addSongToPlaylist(interaction.user.id, playlist.id, song);
+                if (!addedSong) {
+                    return interaction.reply('❌ Failed to add song to playlist.');
+                }
+
+                return interaction.reply({
+                    embeds: [{
+                        color: 0x57F287,
+                        title: '✅ Song Added',
+                        description: `Added **${addedSong.title}** to **${playlist.name}**`,
+                        fields: [
+                            { name: 'Total songs', value: `${playlist.songs.length + 1}`, inline: true }
+                        ]
+                    }]
+                });
+            }
+
+            if (subcommand === 'remove') {
+                const playlistName = interaction.options.getString('playlist');
+                const songNumber = interaction.options.getInteger('song_number');
+                const playlists = await musicPlaylistManager.getUserPlaylists(interaction.user.id);
+                const playlist = playlists.find(p => p.name.toLowerCase() === playlistName.toLowerCase());
+
+                if (!playlist) {
+                    return interaction.reply('❌ Playlist not found!');
+                }
+
+                if (!playlist.songs.length) {
+                    return interaction.reply('❌ That playlist is empty.');
+                }
+
+                const songIndex = songNumber - 1;
+                const targetSong = playlist.songs[songIndex];
+
+                if (!targetSong) {
+                    return interaction.reply(`❌ Song number must be between 1 and ${playlist.songs.length}.`);
+                }
+
+                const removed = await musicPlaylistManager.removeSongFromPlaylist(interaction.user.id, playlist.id, targetSong.id);
+                if (!removed) {
+                    return interaction.reply('❌ Failed to remove that song.');
+                }
+
+                return interaction.reply({
+                    embeds: [{
+                        color: 0x57F287,
+                        title: '✅ Song Removed',
+                        description: `Removed **${targetSong.title}** from **${playlist.name}**`
+                    }]
+                });
+            }
+
+            if (subcommand === 'delete') {
+                const playlistName = interaction.options.getString('playlist');
+                const playlists = await musicPlaylistManager.getUserPlaylists(interaction.user.id);
+                const playlist = playlists.find(p => p.name.toLowerCase() === playlistName.toLowerCase());
+
+                if (!playlist) {
+                    return interaction.reply('❌ Playlist not found!');
+                }
+
+                const deleted = await musicPlaylistManager.deletePlaylist(interaction.user.id, playlist.id);
+                if (!deleted) {
+                    return interaction.reply('❌ Failed to delete playlist.');
+                }
+
+                return interaction.reply(`✅ Deleted playlist **${playlist.name}**.`);
+            }
+
             if (subcommand === 'load') {
                 const playlistName = interaction.options.getString('playlist');
                 const playlists = await musicPlaylistManager.getUserPlaylists(interaction.user.id);
@@ -127,7 +255,48 @@ module.exports = {
                     return interaction.reply('❌ Playlist not found!');
                 }
 
-                // Queue functionality would be integrated with music system
+                if (!playlist.songs.length) {
+                    return interaction.reply('❌ This playlist is empty. Add songs first using `/playlist add`.');
+                }
+
+                const member = interaction.member;
+                const voiceChannel = member.voice.channel;
+
+                if (!voiceChannel) {
+                    return interaction.reply('❌ You need to be in a voice channel to load a playlist.');
+                }
+
+                const permissions = voiceChannel.permissionsFor(interaction.client.user);
+                if (!permissions.has('Connect') || !permissions.has('Speak')) {
+                    return interaction.reply('❌ I need permissions to join and speak in your voice channel!');
+                }
+
+                let queue = queues.get(interaction.guildId);
+                if (!queue) {
+                    const connection = joinVoiceChannel({
+                        channelId: voiceChannel.id,
+                        guildId: interaction.guildId,
+                        adapterCreator: interaction.guild.voiceAdapterCreator
+                    });
+
+                    queue = new MusicQueue(interaction.guildId);
+                    await queue.setupConnection(connection);
+                    queues.set(interaction.guildId, queue);
+                }
+
+                for (const song of playlist.songs) {
+                    queue.addSong({
+                        title: song.title,
+                        url: song.url,
+                        duration: song.duration || 0,
+                        requester: interaction.user.tag
+                    });
+                }
+
+                if (!queue.isPlaying) {
+                    queue.playNext();
+                }
+
                 return interaction.reply({
                     embeds: [{
                         color: 0x57F287,
@@ -208,3 +377,36 @@ module.exports = {
         }
     }
 };
+
+async function resolveSongFromQuery(query, requesterTag) {
+    try {
+        const isYoutubeUrl = query.includes('youtube.com') || query.includes('youtu.be');
+        if (isYoutubeUrl && play.yt_validate(query) === 'video') {
+            const info = await play.video_info(query);
+            const video = info.video_details;
+
+            return {
+                title: video.title,
+                url: video.url,
+                duration: video.durationInSec || 0,
+                requester: requesterTag
+            };
+        }
+
+        const results = await play.search(query, { limit: 1 });
+        if (!results || !results.length) {
+            return null;
+        }
+
+        const top = results[0];
+        return {
+            title: top.title,
+            url: top.url,
+            duration: top.durationInSec || 0,
+            requester: requesterTag
+        };
+    } catch (error) {
+        console.error('Failed to resolve song query:', error);
+        return null;
+    }
+}

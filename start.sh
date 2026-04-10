@@ -6,6 +6,7 @@ set -euo pipefail
 #   ./start.sh            # start in foreground
 #   ./start.sh --bg       # start in background (nohup)
 #   ./start.sh --pm2      # start with pm2 (pm2 must be installed)
+#   ./start.sh --pm2-auto # start with pm2 and configure startup persistence
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -43,7 +44,34 @@ case "${1:-}" in
       exit 1
     fi
     echo "Starting bot with pm2 (name: discord-bot)"
-    pm2 start index.js --name discord-bot -- --no-deprecation
+    if [ -f ecosystem.config.js ]; then
+      pm2 start ecosystem.config.js
+    else
+      pm2 start index.js --name discord-bot --node-args="--no-deprecation"
+    fi
+    ;;
+  --pm2-auto)
+    if ! command -v pm2 >/dev/null 2>&1; then
+      echo "pm2 not found. Install it with: sudo npm install -g pm2" >&2
+      exit 1
+    fi
+
+    echo "Starting bot with pm2 (name: discord-bot)"
+    if [ -f ecosystem.config.js ]; then
+      pm2 start ecosystem.config.js
+    else
+      pm2 start index.js --name discord-bot --node-args="--no-deprecation"
+    fi
+
+    echo "Saving current PM2 process list"
+    pm2 save
+
+    echo "Configuring PM2 startup on boot"
+    if pm2 startup systemd -u "$USER" --hp "$HOME"; then
+      echo "PM2 startup configured. If prompted by PM2, run the printed sudo command once."
+    else
+      echo "PM2 startup setup requires sudo. Copy and run the command shown above, then run: pm2 save"
+    fi
     ;;
   *)
     echo "Starting bot in foreground (Ctrl-C to stop)"
