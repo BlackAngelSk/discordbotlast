@@ -1,4 +1,4 @@
-# Discord Bot
+# Discord Bot 1.3
 
 A feature-rich Discord bot built with `discord.js` v14 for community management, music playback, moderation, engagement systems, and server automation. The project supports both slash commands and prefix commands, includes an optional web dashboard, and can run on either JSON storage or MongoDB.
 
