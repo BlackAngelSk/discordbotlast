@@ -16,6 +16,8 @@ class EconomyManager {
             users: {},
             shops: {}
         };
+        // Double XP events: { guildId: { multiplier, endsAt } }
+        this.xpEvents = new Map();
     }
 
     async init() {
@@ -221,21 +223,21 @@ class EconomyManager {
         return this.data.shops[guildId];
     }
 
-    addShopItem(guildId, item) {
+    async addShopItem(guildId, item) {
         if (!this.data.shops[guildId]) {
             this.data.shops[guildId] = [];
         }
         this.data.shops[guildId].push(item);
-        this.saveData();
+        await this.save();
     }
 
-    removeShopItem(guildId, itemId) {
+    async removeShopItem(guildId, itemId) {
         if (this.data.shops[guildId]) {
             const before = this.data.shops[guildId].length;
             this.data.shops[guildId] = this.data.shops[guildId].filter(item => item.id !== itemId);
             const after = this.data.shops[guildId].length;
             if (before > after) {
-                this.saveData();
+                await this.save();
                 return true;
             }
         }
@@ -261,6 +263,36 @@ class EconomyManager {
         userData.balance = amount;
         await this.save();
         return userData.balance;
+    }
+
+    // ── XP Event methods ──────────────────────────────────────────────────────
+    startXPEvent(guildId, multiplier, durationMs) {
+        const endsAt = Date.now() + durationMs;
+        this.xpEvents.set(guildId, { multiplier, endsAt });
+        // Auto-clean after duration
+        setTimeout(() => {
+            const ev = this.xpEvents.get(guildId);
+            if (ev && ev.endsAt <= Date.now()) this.xpEvents.delete(guildId);
+        }, durationMs + 1000);
+    }
+
+    stopXPEvent(guildId) {
+        this.xpEvents.delete(guildId);
+    }
+
+    getXPEvent(guildId) {
+        const ev = this.xpEvents.get(guildId);
+        if (!ev) return null;
+        if (ev.endsAt <= Date.now()) {
+            this.xpEvents.delete(guildId);
+            return null;
+        }
+        return ev;
+    }
+
+    getXPMultiplier(guildId) {
+        const ev = this.getXPEvent(guildId);
+        return ev ? ev.multiplier : 1;
     }
 }
 

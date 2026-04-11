@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> — Commands</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+            <div class="sidebar-guild">
+                <% if (guild.icon) { %>
+                    <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+                <% } else { %>
+                    <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+                <% } %>
+                <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
+            </div>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="sidebar-section-label">Server</div>
+            <a href="/dashboard/<%= guild.id %>" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
+            <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link"><i class="fas fa-coins"></i> Economy</a>
+            <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
+            <a href="/dashboard/<%= guild.id %>/commands" class="sidebar-link active"><i class="fas fa-terminal"></i> Commands</a>
+            <div class="sidebar-section-label">Moderation</div>
+            <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link"><i class="fas fa-shield-halved"></i> Moderation</a>
+            <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link"><i class="fas fa-robot"></i> Auto-Mod</a>
+            <div class="sidebar-section-label">Stats</div>
+            <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
+            <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
+        </nav>
+        <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+                <div><div class="topbar-title">Commands</div><div class="topbar-subtitle"><%= guild.name %></div></div>
+            </div>
+            <div class="topbar-right">
+                <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
+                <div class="topbar-user">
+                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+                    <span class="topbar-user-name"><%= user.username %></span>
+                </div>
+            </div>
+        </header>
+
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fas fa-terminal" style="color:var(--brand);margin-right:8px"></i>Command Manager</h1>
+                <p>Enable, disable, and lock commands to roles for <strong><%= guild.name %></strong></p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Total Commands</span><div class="stat-card-icon blue"><i class="fas fa-terminal"></i></div></div>
+                    <div class="stat-card-value"><%= commands.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-layer-group"></i> Prefix + slash</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Enabled</span><div class="stat-card-icon green"><i class="fas fa-circle-check"></i></div></div>
+                    <div class="stat-card-value"><%= commands.filter(c => c.enabled).length %></div>
+                    <div class="stat-card-change"><i class="fas fa-bolt"></i> Active commands</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Restricted</span><div class="stat-card-icon yellow"><i class="fas fa-lock"></i></div></div>
+                    <div class="stat-card-value"><%= commands.filter(c => c.requiredRoleId).length %></div>
+                    <div class="stat-card-change"><i class="fas fa-user-shield"></i> Role-protected</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Custom Commands</span><div class="stat-card-icon purple"><i class="fas fa-wand-magic-sparkles"></i></div></div>
+                    <div class="stat-card-value"><%= customCommands ? customCommands.length : 0 %></div>
+                    <div class="stat-card-change"><i class="fas fa-sliders"></i> On settings page</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-sliders"></i> Built-in Commands</div>
+                        <div class="card-subtitle">Changes apply to both prefix and slash versions of the same command</div>
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-bottom:16px">
+                    <div class="form-group" style="flex:2">
+                        <label class="form-label">Search Commands</label>
+                        <input id="commandSearch" type="text" class="form-control" placeholder="Search by name, description, alias, or category...">
+                    </div>
+                    <div class="form-group" style="max-width:220px">
+                        <label class="form-label">Category Filter</label>
+                        <select id="categoryFilter" class="form-control">
+                            <option value="">All categories</option>
+                            <% Array.from(new Set(commands.map(c => c.category))).sort().forEach(category => { %>
+                                <option value="<%= category %>"><%= category %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+
+                <% if (commands.length > 0) { %>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Command</th>
+                                    <th>Category</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                    <th>Required Role</th>
+                                </tr>
+                            </thead>
+                            <tbody id="commandsTableBody">
+                                <% commands.forEach(command => { %>
+                                    <tr data-command="<%= command.name %>" data-category="<%= command.category %>" data-search="<%= [command.name, command.description, command.category, ...(command.aliases || [])].join(' ').toLowerCase() %>">
+                                        <td>
+                                            <div style="display:flex;flex-direction:column;gap:6px">
+                                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                                                    <code>!<%= command.name %></code>
+                                                    <% if (command.aliases && command.aliases.length) { %>
+                                                        <span class="badge badge-purple">Aliases: <%= command.aliases.join(', ') %></span>
+                                                    <% } %>
+                                                </div>
+                                                <div style="color:var(--text-2);font-size:13px"><%= command.description || 'No description provided.' %></div>
+                                                <% if (command.usage) { %>
+                                                    <div class="form-hint">Usage: <code><%= command.usage %></code></div>
+                                                <% } %>
+                                            </div>
+                                        </td>
+                                        <td><span class="badge badge-brand"><%= command.category %></span></td>
+                                        <td>
+                                            <div style="display:flex;gap:6px;flex-wrap:wrap">
+                                                <% if (command.prefix) { %><span class="badge badge-blue">Prefix</span><% } %>
+                                                <% if (command.slash) { %><span class="badge badge-green">Slash</span><% } %>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <label class="toggle-switch">
+                                                    <input type="checkbox" class="cmd-enabled-toggle" <%= command.enabled ? 'checked' : '' %>>
+                                                    <span class="toggle-slider"></span>
+                                                </label>
+                                                <span class="badge <%= command.enabled ? 'badge-green' : 'badge-red' %> cmd-status-label"><%= command.enabled ? 'Enabled' : 'Disabled' %></span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <select class="form-control cmd-role-select">
+                                                <option value="">No role restriction</option>
+                                                <% roles.forEach(role => { %>
+                                                    <option value="<%= role.id %>" <%= command.requiredRoleId === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                                <% }) %>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fas fa-terminal"></i>No commands found</div>
+                <% } %>
+            </div>
+
+            <% if (customCommands && customCommands.length > 0) { %>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title"><i class="fas fa-wand-magic-sparkles"></i> Custom Commands</div>
+                            <div class="card-subtitle">These are user-created commands from the server settings page</div>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr><th>Name</th><th>Response Preview</th></tr>
+                            </thead>
+                            <tbody>
+                                <% customCommands.forEach(command => { %>
+                                    <tr>
+                                        <td><code><%= command.name %></code></td>
+                                        <td style="color:var(--text-2)"><%= String(command.response || '').slice(0, 180) %></td>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            <% } %>
+        </main>
+    </div>
+</div>
+
+<script>
+const guildId = '<%= guild.id %>';
+const searchInput = document.getElementById('commandSearch');
+const categoryFilter = document.getElementById('categoryFilter');
+
+function filterCommands() {
+    const search = (searchInput.value || '').toLowerCase().trim();
+    const category = categoryFilter.value;
+    document.querySelectorAll('#commandsTableBody tr').forEach(row => {
+        const matchesSearch = !search || row.dataset.search.includes(search);
+        const matchesCategory = !category || row.dataset.category === category;
+        row.style.display = matchesSearch && matchesCategory ? '' : 'none';
+    });
+}
+
+searchInput?.addEventListener('input', filterCommands);
+categoryFilter?.addEventListener('change', filterCommands);
+
+document.querySelectorAll('#commandsTableBody tr').forEach(row => {
+    const toggle = row.querySelector('.cmd-enabled-toggle');
+    const roleSelect = row.querySelector('.cmd-role-select');
+    const statusLabel = row.querySelector('.cmd-status-label');
+
+    roleSelect.dataset.lastValue = roleSelect.value || '';
+
+    const save = async () => {
+        const commandName = row.dataset.command;
+        const previousOpacity = row.style.opacity;
+        const previousEnabled = statusLabel.textContent === 'Enabled';
+        const previousRoleId = roleSelect.dataset.lastValue || roleSelect.value || '';
+        row.style.opacity = '0.65';
+
+        try {
+            const response = await fetch(`/api/command-permissions/${guildId}/${encodeURIComponent(commandName)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    enabled: toggle.checked,
+                    requiredRoleId: roleSelect.value || null
+                })
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Failed to save command settings');
+            }
+
+            roleSelect.dataset.lastValue = roleSelect.value || '';
+            statusLabel.textContent = toggle.checked ? 'Enabled' : 'Disabled';
+            statusLabel.className = `badge ${toggle.checked ? 'badge-green' : 'badge-red'} cmd-status-label`;
+        } catch (error) {
+            toggle.checked = previousEnabled;
+            roleSelect.value = previousRoleId;
+            alert(error.message || 'Failed to update command settings.');
+        } finally {
+            row.style.opacity = previousOpacity;
+        }
+    };
+
+    toggle?.addEventListener('change', save);
+    roleSelect?.addEventListener('change', save);
+});
+
+const themeToggle = document.getElementById('themeToggle');
+const root = document.documentElement;
+const savedTheme = localStorage.getItem('theme') || 'dark';
+root.setAttribute('data-theme', savedTheme);
+if (themeToggle) themeToggle.innerHTML = savedTheme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+themeToggle?.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    themeToggle.innerHTML = next === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
+});
+
+const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+const sidebar = document.getElementById('sidebar');
+const sidebarOverlay = document.getElementById('sidebarOverlay');
+mobileMenuBtn?.addEventListener('click', () => { sidebar.classList.toggle('open'); sidebarOverlay.classList.toggle('show'); });
+sidebarOverlay?.addEventListener('click', () => { sidebar.classList.remove('open'); sidebarOverlay.classList.remove('show'); });
+</script>
+</body>
+</html>

@@ -7,6 +7,8 @@ const economyManager = require('../utils/economyManager');
 const seasonLeaderboardManager = require('../utils/seasonLeaderboardManager');
 const moderationManager = require('../utils/moderationManager');
 const activityTracker = require('../utils/activityTracker');
+const verificationManager = require('../utils/verificationManager');
+const roleMenuManager = require('../utils/roleMenuManager');
 
 function isInteractionAckError(error) {
     const code = error?.code ?? error?.rawError?.code;
@@ -85,12 +87,124 @@ module.exports = {
                         '❌ An error occurred while processing your purchase.'
                     );
                 }
+            // ── Role menu select ──────────────────────────────────────────────
+            } else if (interaction.customId.startsWith('rolemenu:')) {
+                try {
+                    await interaction.deferReply({ flags: 64 });
+                    const [, guildId, menuId] = interaction.customId.split(':');
+                    const menu = roleMenuManager.getMenu(guildId, menuId);
+                    if (!menu) return interaction.editReply('❌ This role menu no longer exists.');
+
+                    const selectedRoleIds = interaction.values.map(v => v.split('_').pop());
+                    const menuRoleIds = menu.roles.map(r => r.roleId);
+
+                    const added = [];
+                    const removed = [];
+
+                    for (const rId of menuRoleIds) {
+                        const role = interaction.guild.roles.cache.get(rId);
+                        if (!role) continue;
+                        if (selectedRoleIds.includes(rId)) {
+                            if (!interaction.member.roles.cache.has(rId)) {
+                                await interaction.member.roles.add(role, 'Role menu selection').catch(() => {});
+                                added.push(role.name);
+                            }
+                        } else {
+                            if (interaction.member.roles.cache.has(rId)) {
+                                await interaction.member.roles.remove(role, 'Role menu deselection').catch(() => {});
+                                removed.push(role.name);
+                            }
+                        }
+                    }
+
+                    const lines = [];
+                    if (added.length) lines.push(`✅ Added: ${added.map(r => `**${r}**`).join(', ')}`);
+                    if (removed.length) lines.push(`🗑️ Removed: ${removed.map(r => `**${r}**`).join(', ')}`);
+                    if (!lines.length) lines.push('No changes made.');
+
+                    return interaction.editReply(lines.join('\n'));
+                } catch (err) {
+                    console.error('Role menu interaction error:', err);
+                    return interaction.editReply('❌ Failed to update roles.').catch(() => {});
+                }
             }
             return;
         }
 
         if (!interaction.isButton()) return;
 
+        // ── Verification gate ─────────────────────────────────────────────────
+        if (interaction.customId.startsWith('verify_')) {
+            try {
+                const guildId = interaction.customId.split('_')[1];
+                if (guildId !== interaction.guildId) return;
+                const config = verificationManager.get(guildId);
+                if (!config) return interaction.reply({ content: '❌ Verification is not configured.', flags: 64 });
+                const role = interaction.guild.roles.cache.get(config.roleId);
+                if (!role) return interaction.reply({ content: '❌ Verification role not found. Contact an admin.', flags: 64 });
+                if (interaction.member.roles.cache.has(config.roleId)) {
+                    return interaction.reply({ content: '✅ You are already verified!', flags: 64 });
+                }
+                await interaction.member.roles.add(role, 'Verification gate');
+                return interaction.reply({ content: `✅ You have been verified and given the **${role.name}** role!`, flags: 64 });
+            } catch (err) {
+                console.error('Verification button error:', err);
+                return interaction.reply({ content: '❌ Something went wrong during verification.', flags: 64 });
+            }
+        }
+        // ── Confession delete ──────────────────────────────────────────────────
+        if (interaction.customId.startsWith('confession_delete_')) {
+            try {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+                    return interaction.reply({ content: '❌ You need the Manage Messages permission to delete confessions.', flags: 64 });
+                }
+                await interaction.message.delete();
+                return interaction.reply({ content: '🗑️ Confession deleted.', flags: 64 });
+            } catch (err) {
+                console.error('Confession delete button error:', err);
+                return interaction.reply({ content: '❌ Failed to delete the confession.', flags: 64 });
+            }
+        }
+        // ── Report resolve / dismiss ──────────────────────────────────────────
+        if (interaction.customId.startsWith('report_resolve_') || interaction.customId.startsWith('report_dismiss_')) {
+            try {
+                if (!interaction.member.permissions.has(PermissionFlagsBits.ManageMessages)) {
+                    return interaction.reply({ content: '❌ You need the **Manage Messages** permission to handle reports.', flags: 64 });
+                }
+
+                const isResolve = interaction.customId.startsWith('report_resolve_');
+                const label = isResolve ? '✅ Resolved' : '🚫 Dismissed';
+                const color = isResolve ? 0x00c851 : 0x9e9e9e;
+
+                const originalEmbed = interaction.message.embeds[0];
+                if (!originalEmbed) return interaction.reply({ content: '❌ Could not find the report embed.', flags: 64 });
+
+                const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                    .setColor(color)
+                    .setTitle(`🚨 User Report — ${label}`)
+                    .addFields({ name: '🔧 Handled By', value: `${interaction.user.tag} (${interaction.user.id}) at <t:${Math.floor(Date.now() / 1000)}:f>` });
+
+                const disabledRow = new ActionRowBuilder().addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(interaction.message.components[0].components[0].customId)
+                        .setLabel('✅ Resolve')
+                        .setStyle(ButtonStyle.Success)
+                        .setDisabled(true),
+                    new ButtonBuilder()
+                        .setCustomId(interaction.message.components[0].components[1].customId)
+                        .setLabel('🚫 Dismiss')
+                        .setStyle(ButtonStyle.Secondary)
+                        .setDisabled(true)
+                );
+
+                await interaction.update({ embeds: [updatedEmbed], components: [disabledRow] });
+            } catch (err) {
+                console.error('Report button error:', err);
+                return safeInteractionErrorResponse(interaction, '❌ Failed to handle the report.');
+            }
+            return;
+        }
+        // ─────────────────────────────────────────────────────────────────────
         if (interaction.customId.startsWith('automod_toggle:')) {
             try {
                 if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {

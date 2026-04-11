@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
+const achievementManager = require('../../utils/achievementManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,12 +20,21 @@ module.exports = {
             });
         }
 
+        const unlocked = await achievementManager.syncUser(interaction.guildId, interaction.user.id);
+
         const embed = new EmbedBuilder()
             .setColor('#00FF00')
             .setTitle('🎁 Daily Reward Claimed!')
             .setDescription(`You received **${result.amount}** coins!`)
             .setFooter({ text: 'Come back tomorrow for more!' })
             .setTimestamp();
+
+        if (unlocked.length > 0) {
+            embed.addFields({
+                name: '🏅 Achievements Unlocked',
+                value: unlocked.map(a => `${a.emoji} **${a.name}**`).join('\n').substring(0, 1024)
+            });
+        }
 
         await interaction.reply({ embeds: [embed] });
     },

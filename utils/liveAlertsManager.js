@@ -1,0 +1,208 @@
+/**
+ * Live Alerts Manager
+ * Polls Twitch & YouTube Data API periodically and posts to configured channels.
+ * Twitch: Uses Helix API (requires CLIENT_ID + APP_ACCESS_TOKEN)
+ * YouTube: Uses Data API v3 (requires YOUTUBE_API_KEY)
+ */
+const fs = require('fs').promises;
+const path = require('path');
+const https = require('https');
+
+const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
+
+const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+function httpsGet(url, headers = {}) {
+    return new Promise((resolve, reject) => {
+        const req = https.get(url, { headers, timeout: 8000 }, res => {
+            let data = '';
+            res.on('data', c => (data += c));
+            res.on('end', () => {
+                try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
+                catch { resolve({ status: res.statusCode, body: data }); }
+            });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+    });
+}
+
+class LiveAlertsManager {
+    constructor() {
+        // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, discordChannelId, roleId?, lastVideoId }] } }
+        this.data = {};
+        this._twitchToken = null;
+        this._twitchTokenExpiry = 0;
+        this._interval = null;
+    }
+
+    async init(client) {
+        try {
+            const raw = await fs.readFile(DATA_FILE, 'utf8');
+            this.data = JSON.parse(raw);
+        } catch {
+            await this.save();
+        }
+        this._client = client;
+        this._startPolling();
+    }
+
+    async save() {
+        await fs.writeFile(DATA_FILE, JSON.stringify(this.data, null, 2));
+    }
+
+    // ── Config methods ────────────────────────────────────────────────────────
+    async addTwitchAlert(guildId, twitchUsername, discordChannelId, roleId = null) {
+        if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
+        const existing = this.data[guildId].twitch.find(e => e.username.toLowerCase() === twitchUsername.toLowerCase());
+        if (existing) { existing.channelId = discordChannelId; existing.roleId = roleId; }
+        else this.data[guildId].twitch.push({ username: twitchUsername.toLowerCase(), channelId: discordChannelId, roleId, lastLive: false });
+        await this.save();
+    }
+
+    async removeTwitchAlert(guildId, twitchUsername) {
+        if (!this.data[guildId]) return;
+        this.data[guildId].twitch = this.data[guildId].twitch.filter(e => e.username !== twitchUsername.toLowerCase());
+        await this.save();
+    }
+
+    async addYouTubeAlert(guildId, ytChannelId, discordChannelId, roleId = null) {
+        if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
+        const existing = this.data[guildId].youtube.find(e => e.channelId === ytChannelId);
+        if (existing) { existing.discordChannelId = discordChannelId; existing.roleId = roleId; }
+        else this.data[guildId].youtube.push({ channelId: ytChannelId, discordChannelId, roleId, lastVideoId: null });
+        await this.save();
+    }
+
+    async removeYouTubeAlert(guildId, ytChannelId) {
+        if (!this.data[guildId]) return;
+        this.data[guildId].youtube = this.data[guildId].youtube.filter(e => e.channelId !== ytChannelId);
+        await this.save();
+    }
+
+    getAlerts(guildId) {
+        return this.data[guildId] || { twitch: [], youtube: [] };
+    }
+
+    // ── Twitch ────────────────────────────────────────────────────────────────
+    async _getTwitchToken() {
+        if (this._twitchToken && Date.now() < this._twitchTokenExpiry) return this._twitchToken;
+        const clientId = process.env.TWITCH_CLIENT_ID;
+        const clientSecret = process.env.TWITCH_CLIENT_SECRET;
+        if (!clientId || !clientSecret) return null;
+        try {
+            const res = await httpsGet(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`);
+            if (res.body.access_token) {
+                this._twitchToken = res.body.access_token;
+                this._twitchTokenExpiry = Date.now() + (res.body.expires_in - 60) * 1000;
+                return this._twitchToken;
+            }
+        } catch (err) {
+            console.error('Twitch token error:', err.message);
+        }
+        return null;
+    }
+
+    async _checkTwitch(entry, guildId) {
+        const token = await this._getTwitchToken();
+        if (!token) return;
+        const clientId = process.env.TWITCH_CLIENT_ID;
+        try {
+            const res = await httpsGet(
+                `https://api.twitch.tv/helix/streams?user_login=${entry.username}`,
+                { 'Client-ID': clientId, 'Authorization': `Bearer ${token}` }
+            );
+            const stream = res.body?.data?.[0];
+            const isLive = !!stream;
+
+            if (isLive && !entry.lastLive) {
+                entry.lastLive = true;
+                await this.save();
+                await this._postTwitchAlert(guildId, entry, stream);
+            } else if (!isLive && entry.lastLive) {
+                entry.lastLive = false;
+                await this.save();
+            }
+        } catch (err) {
+            console.error(`Twitch check error (${entry.username}):`, err.message);
+        }
+    }
+
+    async _postTwitchAlert(guildId, entry, stream) {
+        if (!this._client) return;
+        const channel = this._client.channels.cache.get(entry.channelId);
+        if (!channel) return;
+        const { EmbedBuilder } = require('discord.js');
+        const embed = new EmbedBuilder()
+            .setColor(0x9146ff)
+            .setTitle(`🔴 ${stream.user_name} is now live on Twitch!`)
+            .setURL(`https://twitch.tv/${entry.username}`)
+            .setDescription(stream.title || 'No title')
+            .addFields(
+                { name: '🎮 Game', value: stream.game_name || 'Unknown', inline: true },
+                { name: '👥 Viewers', value: stream.viewer_count?.toString() || '0', inline: true },
+            )
+            .setThumbnail(`https://static-cdn.jtvnw.net/previews-ttv/live_user_${entry.username}-320x180.jpg`)
+            .setTimestamp();
+        const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
+        await channel.send({ content: `${mention}🔴 **${stream.user_name}** is live!`, embeds: [embed] }).catch(() => {});
+    }
+
+    // ── YouTube ───────────────────────────────────────────────────────────────
+    async _checkYouTube(entry, guildId) {
+        const apiKey = process.env.YOUTUBE_API_KEY;
+        if (!apiKey) return;
+        try {
+            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${entry.channelId}&part=snippet,id&order=date&maxResults=1&type=video&eventType=live`;
+            const res = await httpsGet(url);
+            const item = res.body?.items?.[0];
+            if (!item) return;
+            const videoId = item.id?.videoId;
+            if (!videoId || videoId === entry.lastVideoId) return;
+            entry.lastVideoId = videoId;
+            await this.save();
+            await this._postYouTubeAlert(guildId, entry, item);
+        } catch (err) {
+            console.error(`YouTube check error (${entry.channelId}):`, err.message);
+        }
+    }
+
+    async _postYouTubeAlert(guildId, entry, item) {
+        if (!this._client) return;
+        const channel = this._client.channels.cache.get(entry.discordChannelId);
+        if (!channel) return;
+        const { EmbedBuilder } = require('discord.js');
+        const title = item.snippet?.title || 'New Live Stream';
+        const channelTitle = item.snippet?.channelTitle || 'YouTube Channel';
+        const videoId = item.id?.videoId;
+        const embed = new EmbedBuilder()
+            .setColor(0xff0000)
+            .setTitle(`▶️ ${channelTitle} is live on YouTube!`)
+            .setURL(`https://youtube.com/watch?v=${videoId}`)
+            .setDescription(title)
+            .setThumbnail(item.snippet?.thumbnails?.medium?.url || null)
+            .setTimestamp();
+        const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
+        await channel.send({ content: `${mention}▶️ **${channelTitle}** is now live!`, embeds: [embed] }).catch(() => {});
+    }
+
+    // ── Polling ───────────────────────────────────────────────────────────────
+    _startPolling() {
+        if (this._interval) clearInterval(this._interval);
+        this._interval = setInterval(() => this._poll(), POLL_INTERVAL);
+        setTimeout(() => this._poll(), 10000);
+    }
+
+    async _poll() {
+        for (const [guildId, config] of Object.entries(this.data)) {
+            for (const entry of (config.twitch || [])) {
+                await this._checkTwitch(entry, guildId);
+            }
+            for (const entry of (config.youtube || [])) {
+                await this._checkYouTube(entry, guildId);
+            }
+        }
+    }
+}
+
+module.exports = new LiveAlertsManager();

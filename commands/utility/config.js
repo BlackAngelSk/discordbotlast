@@ -183,6 +183,16 @@ module.exports = {
                 await settingsManager.reset(guildId);
                 return message.reply(languageManager.get(guildId, 'config.reset'));
 
+            case 'confession':
+            case 'confessionchannel': {
+                const confessionChannel = message.mentions.channels.first();
+                if (!confessionChannel) {
+                    return message.reply(`❌ Please mention a channel. Example: \`${prefix}config confession #confessions\``);
+                }
+                await settingsManager.set(guildId, 'confessionChannel', confessionChannel.id);
+                return message.reply(`✅ Confession channel set to <#${confessionChannel.id}>. Users can now use \`${prefix}confess <message>\`.`);
+            }
+
             default:
                 return message.reply(languageManager.get(guildId, 'config.unknownSetting'));
         }

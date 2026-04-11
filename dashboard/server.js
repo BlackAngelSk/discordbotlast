@@ -11,6 +11,7 @@ const loggingManager = require('../utils/loggingManager');
 const inviteManager = require('../utils/inviteManager');
 const economyManager = require('../utils/economyManager');
 const customCommandManager = require('../utils/customCommandManager');
+const commandPermissionsManager = require('../utils/commandPermissionsManager');
 const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
@@ -45,6 +46,58 @@ const resolveGlobalUsername = async (client, userId) => {
     if (cached) return cached.username || `Unknown (${userId})`;
     const user = await withTimeout(client.users.fetch(userId).catch(() => null), 3000);
     return user ? user.username : `Unknown (${userId})`;
+};
+
+const collectDashboardCommands = (client, guildId) => {
+    const merged = new Map();
+
+    const upsert = (name, patch) => {
+        const current = merged.get(name) || {
+            name,
+            description: '',
+            category: 'other',
+            usage: '',
+            aliases: [],
+            prefix: false,
+            slash: false
+        };
+
+        merged.set(name, {
+            ...current,
+            ...patch,
+            aliases: Array.from(new Set([...(current.aliases || []), ...(patch.aliases || [])]))
+        });
+    };
+
+    for (const [lookupName, command] of client.commandHandler?.commands || new Map()) {
+        if (!command?.name || lookupName !== command.name) continue; // skip aliases
+        upsert(command.name, {
+            description: command.description || '',
+            category: command.category || 'other',
+            usage: command.usage || '',
+            aliases: Array.isArray(command.aliases) ? command.aliases : [],
+            prefix: true
+        });
+    }
+
+    for (const [name, command] of client.slashCommandHandler?.commands || new Map()) {
+        upsert(name, {
+            description: command?.data?.description || merged.get(name)?.description || '',
+            category: command.category || merged.get(name)?.category || 'other',
+            slash: true
+        });
+    }
+
+    return Array.from(merged.values())
+        .map((command) => ({
+            ...command,
+            enabled: commandPermissionsManager.isCommandEnabled(guildId, command.name),
+            requiredRoleId: commandPermissionsManager.getRequiredRole(guildId, command.name)
+        }))
+        .sort((a, b) => {
+            const catCompare = String(a.category).localeCompare(String(b.category));
+            return catCompare !== 0 ? catCompare : a.name.localeCompare(b.name);
+        });
 };
 
 class Dashboard {
@@ -102,6 +155,23 @@ class Dashboard {
     setupRoutes() {
         // Import the advanced dashboard routes
         dashboardRoutes(this.app, this.client, this.checkAuth, this.checkGuildAccess);
+
+        // ── Health endpoint ───────────────────────────────────────────────────
+        this.app.get('/health', (req, res) => {
+            const botReady = this.client?.isReady?.() ?? false;
+            const uptimeSeconds = process.uptime();
+            const memUsage = process.memoryUsage();
+            res.json({
+                status: botReady ? 'ok' : 'starting',
+                uptime: Math.floor(uptimeSeconds),
+                ping: this.client?.ws?.ping ?? -1,
+                guilds: this.client?.guilds?.cache?.size ?? 0,
+                users: this.client?.users?.cache?.size ?? 0,
+                memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+                timestamp: new Date().toISOString()
+            });
+        });
+        // ─────────────────────────────────────────────────────────────────────
 
         // Home page
         this.app.get('/', (req, res) => {
@@ -428,6 +498,34 @@ class Dashboard {
             }
         });
 
+        // Command permission management
+        this.app.post('/api/command-permissions/:guildId/:commandName', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId, commandName } = req.params;
+                const available = collectDashboardCommands(this.client, guildId);
+                const exists = available.some(cmd => cmd.name === commandName);
+
+                if (!exists) {
+                    return res.status(404).json({ success: false, error: 'Command not found' });
+                }
+
+                const enabled = !(req.body.enabled === false || req.body.enabled === 'false' || req.body.enabled === '0');
+                const requiredRoleId = req.body.requiredRoleId || null;
+
+                if (enabled) {
+                    await commandPermissionsManager.enableCommand(guildId, commandName);
+                } else {
+                    await commandPermissionsManager.disableCommand(guildId, commandName);
+                }
+
+                await commandPermissionsManager.setCommandRole(guildId, commandName, requiredRoleId);
+                res.json({ success: true, commandName, enabled, requiredRoleId });
+            } catch (error) {
+                console.error('Error updating command permissions:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         // ========== NEW DASHBOARD ROUTES ==========
 
         // Analytics Dashboard
@@ -445,6 +543,28 @@ class Dashboard {
             } catch (error) {
                 console.error('Analytics page error:', error);
                 res.status(500).send('Error loading analytics');
+            }
+        });
+
+        // Command Management
+        this.app.get('/dashboard/:guildId/commands', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const commands = collectDashboardCommands(this.client, guildId);
+                const customCommands = Object.entries(customCommandManager.getCommands(guildId) || {})
+                    .map(([name, response]) => ({ name, response }));
+
+                res.render('commands', {
+                    guild,
+                    commands,
+                    customCommands,
+                    roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Commands page error:', error);
+                res.status(500).send('Error loading commands dashboard');
             }
         });
 

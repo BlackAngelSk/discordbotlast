@@ -21,6 +21,8 @@ class MusicQueue {
         this.loop = 'off'; // 'off', 'song', or 'queue'
         this.previousSongs = []; // Track song history
         this.filters = {}; // Audio filters
+        this.activeFilter = null; // Active audio filter name
+        this.stay247 = false; // 24/7 mode — never auto-disconnect
         this.ffmpegProcess = null;
         this.ffmpegPath = null;
 
@@ -132,6 +134,12 @@ class MusicQueue {
             this.isPlaying = false;
             this.currentSong = null;
             
+            // In 24/7 mode, never disconnect
+            if (this.stay247) {
+                console.log('🔄 24/7 mode active — staying in channel');
+                return;
+            }
+
             // Set a timer to disconnect after 15 seconds of inactivity
             console.log('⏱️ Setting 15 second disconnect timer');
             this.disconnectTimer = setTimeout(() => {
@@ -252,18 +260,42 @@ class MusicQueue {
             });
 
             // Spawn FFmpeg to convert audio to Opus
-            const ffmpegProcess = spawn(ffmpegPath, [
+            // Build ffmpeg audio filter arguments
+            const AUDIO_FILTERS = {
+                bassboost:   'bass=g=10,dynaudnorm=f=150:g=15',
+                nightcore:   'aresample=48000,asetrate=48000*1.25',
+                vaporwave:   'aresample=48000,asetrate=48000*0.8',
+                '8d':        'apulsator=hz=0.09',
+                karaoke:     'stereotools=mlev=0.015',
+                echo:        'aecho=0.8:0.88:60:0.4',
+                loud:        'dynaudnorm=f=200',
+                earrape:     'acrusher=level_in=8:level_out=18:bits=8:mode=log:aa=1',
+                tremolo:     'tremolo=5:0.9',
+                vibrato:     'vibrato=f=6.5:d=0.5',
+                reverse:     'areverse',
+                soft:        'volume=0.3',
+            };
+
+            const filterKey = this.activeFilter && AUDIO_FILTERS[this.activeFilter];
+            const ffmpegArgs = [
                 '-i', 'pipe:0',
                 '-analyzeduration', '0',
                 '-probesize', '32',
                 '-loglevel', '0',
+            ];
+            if (filterKey) {
+                ffmpegArgs.push('-af', filterKey);
+            }
+            ffmpegArgs.push(
                 '-acodec', 'pcm_s16le',
                 '-f', 's16le',
                 '-ar', '48000',
                 '-ac', '2',
                 '-bufsize', '512k',
                 'pipe:1'
-            ], {
+            );
+
+            const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs, {
                 windowsHide: true,
                 stdio: ['pipe', 'pipe', 'ignore']
             });

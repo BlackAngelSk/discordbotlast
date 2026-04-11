@@ -1,4 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
+const https = require('https');
 const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const statsManager = require('../utils/statsManager');
@@ -7,10 +8,38 @@ const settingsManager = require('../utils/settingsManager');
 const afkManager = require('../utils/afkManager');
 const activityTracker = require('../utils/activityTracker');
 const levelRewardsManager = require('../utils/levelRewardsManager');
+const achievementManager = require('../utils/achievementManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
+const stickyMessages = require('../utils/stickyMessages');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
+
+// ── Anti-phishing / anti-invite helpers ──────────────────────────────────────
+const INVITE_REGEX = /discord(?:\.gg|app\.com\/invite|\.com\/invite)\/([a-zA-Z0-9-]+)/gi;
+const URL_REGEX = /https?:\/\/[^\s]+/gi;
+
+// Simple in-memory cache so we don't re-check the same domain
+const phishCache = new Map();
+
+async function isPhishingDomain(domain) {
+    if (phishCache.has(domain)) return phishCache.get(domain);
+    return new Promise(resolve => {
+        const req = https.get(`https://phish.sinking.yachts/v2/check/${encodeURIComponent(domain)}`, { timeout: 3000 }, res => {
+            let data = '';
+            res.on('data', chunk => (data += chunk));
+            res.on('end', () => {
+                const result = data.trim() === 'true';
+                phishCache.set(domain, result);
+                setTimeout(() => phishCache.delete(domain), 30 * 60 * 1000); // expire after 30 min
+                resolve(result);
+            });
+        });
+        req.on('error', () => resolve(false));
+        req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
     name: Events.MessageCreate,
@@ -163,6 +192,86 @@ module.exports = {
             }
         }
 
+        // ── Anti-phishing check (skip for bot owner) ──────────────────────────
+        if (!isBotOwner) {
+            try {
+                const settings = moderationManager.getAutomodSettings(message.guildId);
+                if (settings.enabled) {
+                    const urls = message.content.match(URL_REGEX) || [];
+                    for (const rawUrl of urls) {
+                        let hostname;
+                        try { hostname = new URL(rawUrl).hostname.replace(/^www\./, ''); } catch { continue; }
+                        const phishing = await isPhishingDomain(hostname);
+                        if (phishing) {
+                            await message.delete().catch(() => {});
+                            const warn = await message.channel.send(`🚨 ${message.author}, that link has been flagged as a **phishing** URL and was removed.`);
+                            setTimeout(() => warn.delete().catch(() => {}), 8000);
+                            const modLogChannel = moderationManager.getModLogChannel(message.guildId);
+                            if (modLogChannel) {
+                                const ch = await client.channels.fetch(modLogChannel).catch(() => null);
+                                if (ch) {
+                                    const embed = new EmbedBuilder()
+                                        .setColor(0xff0000)
+                                        .setTitle('🚨 Phishing Link Detected')
+                                        .addFields(
+                                            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
+                                            { name: 'Channel', value: message.channel.toString(), inline: true },
+                                            { name: 'Domain', value: hostname },
+                                            { name: 'Message', value: message.content.substring(0, 500) }
+                                        )
+                                        .setTimestamp();
+                                    await ch.send({ embeds: [embed] });
+                                }
+                            }
+                            return;
+                        }
+                    }
+
+                    // Anti-invite filter — block external Discord invites
+                    if (settings.blockInvites) {
+                        const inviteMatches = message.content.match(INVITE_REGEX);
+                        if (inviteMatches && inviteMatches.length > 0) {
+                            const guildInvites = await message.guild.invites.fetch().catch(() => null);
+                            const ownCodes = guildInvites ? new Set([...guildInvites.values()].map(i => i.code)) : new Set();
+                            const hasExternal = inviteMatches.some(m => {
+                                const code = m.split('/').pop();
+                                return !ownCodes.has(code);
+                            });
+                            if (hasExternal) {
+                                await message.delete().catch(() => {});
+                                const warn = await message.channel.send(`⚠️ ${message.author}, external Discord invites are not allowed here.`);
+                                setTimeout(() => warn.delete().catch(() => {}), 6000);
+                                return;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Anti-phishing/invite check error:', err);
+            }
+        }
+
+        // ── Bump reminder detection (Disboard bot) ────────────────────────────
+        if (message.author.id === '302050872383242240' && message.embeds.length > 0) {
+            const embedDesc = message.embeds[0]?.description || '';
+            if (embedDesc.includes('Bump done') || embedDesc.includes('bump done') || embedDesc.toLowerCase().includes('bumped')) {
+                try {
+                    const bumpSettings = settingsManager.get(message.guildId);
+                    if (bumpSettings?.bumpReminderEnabled && bumpSettings?.bumpReminderChannel) {
+                        const ch = await client.channels.fetch(bumpSettings.bumpReminderChannel).catch(() => null);
+                        if (ch) {
+                            setTimeout(async () => {
+                                const mention = bumpSettings.bumpReminderRole ? `<@&${bumpSettings.bumpReminderRole}>` : '@here';
+                                await ch.send(`🔔 ${mention} It's been **2 hours** — time to \`/bump\` the server on Disboard!`).catch(() => {});
+                            }, 2 * 60 * 60 * 1000);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Bump reminder error:', err);
+                }
+            }
+        }
+
         // Track message statistics
         try {
             await activityTracker.recordActivity(message.guildId, message.author.id, 'message');
@@ -171,16 +280,26 @@ module.exports = {
             console.error('Stats tracking error:', error);
         }
 
+        try {
+            await achievementManager.syncUser(message.guildId, message.author.id, { firstMessage: true });
+        } catch (error) {
+            console.error('Achievement tracking error:', error);
+        }
+
+        // ── Sticky messages ───────────────────────────────────────────────────
+        stickyMessages.handleMessage(message).catch(() => {});
+
         // Add XP (5-15 XP per message, with cooldown)
         try {
             const xpCooldown = 60000; // 1 minute cooldown
             const lastXpKey = `${message.guildId}_${message.author.id}_lastXP`;
             
             if (!global[lastXpKey] || Date.now() - global[lastXpKey] > xpCooldown) {
-                // Apply channel XP multiplier
-                const multiplier = levelRewardsManager.getXPMultiplier(message.guildId, message.channelId);
+                // Apply channel XP multiplier + global XP event multiplier
+                const channelMultiplier = levelRewardsManager.getXPMultiplier(message.guildId, message.channelId);
+                const eventMultiplier = economyManager.getXPMultiplier(message.guildId);
                 const baseXP = Math.floor(Math.random() * 11) + 5; // 5-15 XP
-                const xpGain = Math.floor(baseXP * multiplier);
+                const xpGain = Math.floor(baseXP * channelMultiplier * eventMultiplier);
                 
                 const result = await economyManager.addXP(message.guildId, message.author.id, xpGain);
                 

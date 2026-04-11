@@ -4,6 +4,7 @@ const play = require('play-dl');
 const https = require('https');
 const MusicQueue = require('../../utils/MusicQueue');
 const queues = require('../../utils/queues');
+const achievementManager = require('../../utils/achievementManager');
 const { parseDuration, formatDuration } = require('../../utils/helpers');
 
 module.exports = {
@@ -159,6 +160,8 @@ module.exports = {
                     queue.addSong(song);
                     songs.push(song);
                 }
+
+                await achievementManager.syncUser(message.guild.id, message.author.id, { songPlayed: true });
                 
                 const playlistEmbed = new EmbedBuilder()
                     .setColor(0x00ff00)
@@ -271,6 +274,7 @@ module.exports = {
             }
 
             queue.addSong(song);
+            await achievementManager.syncUser(message.guild.id, message.author.id, { songPlayed: true });
 
             const isFirstSong = !queue.isPlaying;
             

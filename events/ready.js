@@ -98,5 +98,27 @@ module.exports = {
         } catch (error) {
             console.error('Error starting rainbow updates:', error);
         }
+
+        // Start live stream alerts polling
+        setTimeout(async () => {
+            try {
+                const liveAlertsManager = require('../utils/liveAlertsManager');
+                await liveAlertsManager.init(readyClient);
+                console.log('✅ Live alerts polling started');
+            } catch (error) {
+                console.error('Error starting live alerts:', error);
+            }
+        }, 15000);
+
+        // Start stat channel updater
+        setTimeout(async () => {
+            try {
+                const statChannelsManager = require('../utils/statChannelsManager');
+                await statChannelsManager.startUpdater(readyClient);
+                console.log('✅ Stat channel updater started');
+            } catch (error) {
+                console.error('Error starting stat channels:', error);
+            }
+        }, 20000);
     }
 };

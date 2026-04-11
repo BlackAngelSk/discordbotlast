@@ -4,6 +4,22 @@ require('dotenv').config({
     override: true
 });
 
+// ── Environment variable validation ───────────────────────────────────────────
+(function validateEnv() {
+    const REQUIRED = ['DISCORD_TOKEN'];
+    const OPTIONAL_WARN = ['CLIENT_ID', 'DASHBOARD_PORT', 'SESSION_SECRET'];
+    const missing = REQUIRED.filter(k => !process.env[k]);
+    if (missing.length > 0) {
+        console.error(`\x1b[31m❌ Missing required environment variables: ${missing.join(', ')}\nPlease set them in your .env file.\x1b[0m`);
+        process.exit(1);
+    }
+    const missingOpt = OPTIONAL_WARN.filter(k => !process.env[k]);
+    if (missingOpt.length > 0) {
+        console.warn(`\x1b[33m⚠️ Optional env vars not set (features may be limited): ${missingOpt.join(', ')}\x1b[0m`);
+    }
+})();
+// ─────────────────────────────────────────────────────────────────────────────
+
 // ── Timestamp console override ────────────────────────────────────────────────
 (function patchConsole() {
     const getTimestamp = () => {
@@ -44,6 +60,7 @@ const starboardManager = require('./utils/starboardManager');
 const customCommandManager = require('./utils/customCommandManager');
 const ticketManager = require('./utils/ticketManager');
 const relationshipManager = require('./utils/relationshipManager');
+const achievementManager = require('./utils/achievementManager');
 const databaseManager = require('./utils/databaseManager');
 const analyticsManager = require('./utils/analyticsManager');
 const musicPlaylistManager = require('./utils/musicPlaylistManager');
@@ -125,6 +142,10 @@ const commandHandler = new CommandHandler(client);
 const eventHandler = new EventHandler(client);
 const slashCommandHandler = new SlashCommandHandler(client);
 
+// Expose handlers on client for hot-reload and dashboard access
+client.commandHandler = commandHandler;
+client.slashCommandHandler = slashCommandHandler;
+
 // Initialize new systems
 const errorHandler = new ErrorHandler(client);
 const cooldownManager = new CooldownManager();
@@ -183,7 +204,8 @@ async function loadHandlers() {
             runInitStep('AFK manager', () => afkManager.init()),
             runInitStep('Voice rewards manager', () => voiceRewardsManager.init()),
             runInitStep('Raid protection manager', () => raidProtectionManager.init()),
-            runInitStep('Birthday manager', () => birthdayManager.init())
+            runInitStep('Birthday manager', () => birthdayManager.init()),
+            runInitStep('Achievement manager', () => achievementManager.init())
         ]);
 
         // Feature managers (parallel)

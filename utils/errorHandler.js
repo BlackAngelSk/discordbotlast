@@ -7,6 +7,7 @@ class ErrorHandler {
         this.client = client;
         this.logDirectory = path.join(__dirname, '../logs');
         this.dmRecipientId = process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID || null;
+        this.errorChannelId = process.env.ERROR_CHANNEL_ID || null;
         this.initializeLogDirectory();
         this.errorCount = 0;
         this.notificationQueue = [];
@@ -123,7 +124,7 @@ class ErrorHandler {
             return;
         }
 
-        this.client.once('ready', () => {
+        this.client.once('clientReady', () => {
             this.processNotificationQueue().catch((error) => {
                 this.writeInternalError('Failed to flush queued error DMs:', error);
             });
@@ -271,7 +272,7 @@ class ErrorHandler {
     }
 
     queueAdminNotification(logEntry) {
-        if (!this.dmRecipientId || !logEntry) {
+        if ((!this.dmRecipientId && !this.errorChannelId) || !logEntry) {
             return;
         }
 
@@ -281,12 +282,12 @@ class ErrorHandler {
         });
 
         this.processNotificationQueue().catch((error) => {
-            this.writeInternalError('Failed to process error DM queue:', error);
+            this.writeInternalError('Failed to process error notification queue:', error);
         });
     }
 
     async processNotificationQueue() {
-        if (this.isSendingNotification || !this.dmRecipientId) {
+        if (this.isSendingNotification || (!this.dmRecipientId && !this.errorChannelId)) {
             return;
         }
 
@@ -297,14 +298,22 @@ class ErrorHandler {
         this.isSendingNotification = true;
 
         try {
-            const recipient = await this.client.users.fetch(this.dmRecipientId);
+            const recipient = this.dmRecipientId
+                ? await this.client.users.fetch(this.dmRecipientId).catch(() => null)
+                : null;
+
+            const errorChannel = this.errorChannelId
+                ? await this.client.channels.fetch(this.errorChannelId).catch(() => null)
+                : null;
+
             while (this.notificationQueue.length > 0) {
                 const logEntry = this.notificationQueue.shift();
                 const embed = this.buildNotificationEmbed(logEntry);
-                await recipient.send({ embeds: [embed] });
+                if (recipient) await recipient.send({ embeds: [embed] }).catch(() => {});
+                if (errorChannel?.isTextBased?.()) await errorChannel.send({ embeds: [embed] }).catch(() => {});
             }
         } catch (error) {
-            this.writeInternalError('Failed to send error DM:', error);
+            this.writeInternalError('Failed to send error notification:', error);
         } finally {
             this.isSendingNotification = false;
         }

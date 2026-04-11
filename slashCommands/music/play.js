@@ -4,6 +4,7 @@ const play = require('play-dl');
 const https = require('https');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
+const achievementManager = require('../../utils/achievementManager');
 const { parseDuration } = require('../../utils/helpers');
 
 const createMusicControls = (disabled = false) => {
@@ -173,6 +174,7 @@ async function handleYouTubeVideo(url, queue, interaction) {
         };
 
         queue.addSong(song);
+        await achievementManager.syncUser(interaction.guildId, interaction.user.id, { songPlayed: true });
 
         const embed = new EmbedBuilder()
             .setColor('#00FF00')
@@ -237,6 +239,8 @@ async function handleYouTubePlaylist(url, queue, interaction) {
         }
     }
 
+    await achievementManager.syncUser(interaction.guildId, interaction.user.id, { songPlayed: true });
+
     const embed = new EmbedBuilder()
         .setColor('#00FF00')
         .setTitle('📃 Playlist Added')
@@ -270,6 +274,7 @@ async function handleYouTubeSearch(query, queue, interaction) {
         };
 
         queue.addSong(song);
+        await achievementManager.syncUser(interaction.guildId, interaction.user.id, { songPlayed: true });
 
         const embed = new EmbedBuilder()
             .setColor('#00FF00')
@@ -339,6 +344,7 @@ async function handleSoundCloud(url, queue, interaction) {
         };
 
         queue.addSong(song);
+        await achievementManager.syncUser(interaction.guildId, interaction.user.id, { songPlayed: true });
 
         const embed = new EmbedBuilder()
             .setColor('#FF5500')

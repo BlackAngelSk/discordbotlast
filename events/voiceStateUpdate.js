@@ -2,6 +2,7 @@ const { Events } = require('discord.js');
 const voiceRewardsManager = require('../utils/voiceRewardsManager');
 const activityTracker = require('../utils/activityTracker');
 const seasonManager = require('../utils/seasonManager');
+const tempVoiceManager = require('../utils/tempVoiceManager');
 
 module.exports = {
     name: Events.VoiceStateUpdate,
@@ -9,6 +10,17 @@ module.exports = {
         try {
             const guildId = newState.guild.id;
             const userId = newState.member.id;
+
+            // ── Temp Voice Channels ──────────────────────────────────────────
+            // Joined a channel
+            if (newState.channelId && newState.channelId !== oldState?.channelId) {
+                await tempVoiceManager.handleJoin(newState.member, newState.channel);
+            }
+            // Left a channel
+            if (oldState.channelId && oldState.channelId !== newState?.channelId) {
+                await tempVoiceManager.handleLeave(oldState.member, oldState.channel);
+            }
+            // ────────────────────────────────────────────────────────────────
 
             // User joined a voice channel
             if (!oldState.channelId && newState.channelId) {

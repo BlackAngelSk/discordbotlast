@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
+const achievementManager = require('../../utils/achievementManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -17,6 +18,8 @@ module.exports = {
                     return interaction.reply({ content: '❌ One of you is already married!', flags: MessageFlags.Ephemeral });
                 }
             }
+
+            await achievementManager.syncUser(interaction.guild.id, interaction.user.id);
 
             const embed = new EmbedBuilder()
                 .setColor(0x00ff00)

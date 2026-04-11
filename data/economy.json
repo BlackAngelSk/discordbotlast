@@ -1,15 +1,16 @@
 {
   "users": {
     "421968526547353601_396685113804587009": {
-      "balance": 126,
-      "xp": 13798,
-      "level": 12,
-      "lastDaily": 1773865706318,
-      "lastWeekly": 1773345236650,
+      "balance": 6568,
+      "xp": 15188,
+      "level": 13,
+      "lastDaily": 1775915698104,
+      "lastWeekly": 1775915700265,
       "inventory": [],
-      "dailyStreak": 5,
-      "streakBonusMultiplier": 2,
-      "seasonalCoins": 13000
+      "dailyStreak": 1,
+      "streakBonusMultiplier": 1.2,
+      "seasonalCoins": 14200,
+      "highestLevelReached": 13
     },
     "421968526547353601_280776802492874765": {
       "balance": 4264,
@@ -23,40 +24,43 @@
       "seasonalCoins": 0
     },
     "421968526547353601_195140009748201472": {
-      "balance": 4315,
-      "xp": 21598,
+      "balance": 104004,
+      "xp": 22056,
       "level": 15,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "highestLevelReached": 15
     },
     "421968526547353601_534769701297979392": {
-      "balance": 5093,
-      "xp": 25477,
-      "level": 16,
+      "balance": 5368,
+      "xp": 26852,
+      "level": 17,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "highestLevelReached": 17
     },
     "421968526547353601_349649557896036354": {
-      "balance": 853229,
-      "xp": 14398,
-      "level": 12,
-      "lastDaily": 1772370263903,
+      "balance": 718754,
+      "xp": 14980,
+      "level": 13,
+      "lastDaily": 1775919046103,
       "lastWeekly": 1772370268655,
       "inventory": [],
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 2400
+      "seasonalCoins": 3600,
+      "highestLevelReached": 13
     },
     "421968526547353601_373827871212568576": {
-      "balance": 2561,
+      "balance": 1089,
       "xp": 14234,
       "level": 12,
       "lastDaily": null,
@@ -64,7 +68,8 @@
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "highestLevelReached": 12
     },
     "421968526547353601_269854360798756864": {
       "balance": 0,
@@ -672,15 +677,16 @@
       "seasonalCoins": 0
     },
     "421968526547353601_692862875865186344": {
-      "balance": 1065,
-      "xp": 5371,
+      "balance": 1159,
+      "xp": 5852,
       "level": 8,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "highestLevelReached": 8
     },
     "421968526547353601_293459633715150849": {
       "balance": 0,
@@ -882,25 +888,27 @@
     },
     "865544990625497088_349649557896036354": {
       "balance": 6184,
-      "xp": 79,
+      "xp": 98,
       "level": 1,
       "lastDaily": 1774212717908,
       "lastWeekly": 1773691498991,
       "inventory": [],
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 1200
+      "seasonalCoins": 1200,
+      "highestLevelReached": 1
     },
     "421968526547353601_373924787975618571": {
-      "balance": 3018,
-      "xp": 15090,
+      "balance": 3020,
+      "xp": 15100,
       "level": 13,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "highestLevelReached": 13
     },
     "1414776322500333723_349649557896036354": {
       "balance": 6200,
@@ -923,32 +931,34 @@
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
       "seasonalCoins": 1200
+    },
+    "null_349649557896036354": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0
+    },
+    "421968526547353601_blackangelsk": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0
     }
   },
   "shops": {
-    "421968526547353601": [
-      {
-        "id": "vip",
-        "name": "VIP Role",
-        "price": 10000,
-        "type": "role",
-        "description": "Get VIP status in the server"
-      },
-      {
-        "id": "custom_role",
-        "name": "Custom Role Color",
-        "price": 5000,
-        "type": "role",
-        "description": "Choose your own role color"
-      },
-      {
-        "id": "premium",
-        "name": "Premium Badge",
-        "price": 15000,
-        "type": "badge",
-        "description": "Premium member badge"
-      }
-    ],
+    "421968526547353601": [],
     "865544990625497088": [
       {
         "id": "vip",

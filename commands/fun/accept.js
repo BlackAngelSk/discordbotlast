@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const relationshipManager = require('../../utils/relationshipManager');
+const achievementManager = require('../../utils/achievementManager');
 
 module.exports = {
     name: 'accept',
@@ -24,6 +25,11 @@ module.exports = {
                     const result = await relationshipManager.acceptProposal(message.guild.id, message.author.id, proposals[0].proposerId);
 
                     if (result.success) {
+                        await Promise.all([
+                            achievementManager.syncUser(message.guild.id, message.author.id),
+                            achievementManager.syncUser(message.guild.id, proposals[0].proposerId)
+                        ]);
+
                         const embed = new EmbedBuilder()
                             .setColor(0xff69b4)
                             .setTitle('💍 Wedding!')
@@ -42,6 +48,11 @@ module.exports = {
                 if (!result.success) {
                     return message.reply('❌ There is no proposal from this user!');
                 }
+
+                await Promise.all([
+                    achievementManager.syncUser(message.guild.id, message.author.id),
+                    achievementManager.syncUser(message.guild.id, user.id)
+                ]);
 
                 const embed = new EmbedBuilder()
                     .setColor(0xff69b4)
