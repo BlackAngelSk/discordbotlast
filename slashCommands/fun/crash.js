@@ -12,6 +12,7 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('crash')
         .setDescription('Risk your bet and cash out before the game crashes!')
+        .setDMPermission(false)
         .addIntegerOption(option =>
             option.setName('bet')
                 .setDescription('Amount to bet (minimum 10)')
@@ -20,8 +21,16 @@ module.exports = {
                 .setMaxValue(MAX_BET)),
 
     async execute(interaction) {
-        const guildId = interaction.guild.id;
+        const guildId = interaction.guildId;
         const userId = interaction.user.id;
+
+        if (!guildId) {
+            return interaction.reply({
+                content: '❌ This command can only be used in a server.',
+                flags: MessageFlags.Ephemeral
+            });
+        }
+
         const sessionKey = `${guildId}_${userId}`;
         const bet = interaction.options.getInteger('bet');
 
@@ -150,7 +159,7 @@ async function playCrashWithBet(interaction, bet) {
         stopLoop();
 
         const payout = Math.floor(game.bet * game.multiplier);
-        await economyManager.addMoney(interaction.guild.id, interaction.user.id, payout);
+        await economyManager.addMoney(interaction.guildId, interaction.user.id, payout);
 
         const embed = createEmbed(
             interaction,
