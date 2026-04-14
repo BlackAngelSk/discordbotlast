@@ -68,11 +68,12 @@ module.exports = {
 
             if (platform === 'twitch') {
                 await liveAlertsManager.addTwitchAlert(message.guild.id, identifier, discordChannel.id, roleId);
+                const missingTwitchConfig = !process.env.TWITCH_CLIENT_ID || !process.env.TWITCH_CLIENT_SECRET;
                 const embed = new EmbedBuilder()
                     .setColor(0x9146ff)
                     .setTitle('✅ Twitch Alert Added')
-                    .setDescription(`Now watching **${identifier}** on Twitch.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.`)
-                    .setFooter({ text: 'Checked every 5 minutes' });
+                    .setDescription(`Now watching **${identifier}** on Twitch.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.${missingTwitchConfig ? '\n\n⚠️ Twitch API credentials are not configured yet, so messages will not send until they are added to the env file.' : ''}`)
+                    .setFooter({ text: 'Checked immediately and every 5 minutes' });
                 return message.reply({ embeds: [embed] });
             }
 

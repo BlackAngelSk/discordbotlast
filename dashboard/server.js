@@ -15,6 +15,7 @@ const commandPermissionsManager = require('../utils/commandPermissionsManager');
 const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
+const liveAlertsManager = require('../utils/liveAlertsManager');
 const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 
@@ -223,6 +224,8 @@ class Dashboard {
                 const customCommands = customCommandManager.getCommands(req.params.guildId);
                 const allTickets = ticketManager.getGuildTickets(req.params.guildId);
                 const activeTickets = Object.values(allTickets).filter(t => t.status === 'open').length;
+                const liveAlerts = liveAlertsManager.getAlerts(req.params.guildId);
+                const liveAlertsCount = (liveAlerts.twitch?.length || 0) + (liveAlerts.youtube?.length || 0);
                 
                 res.render('server', {
                     user: req.user,
@@ -236,6 +239,7 @@ class Dashboard {
                     economyLeaderboard: economyLeaderboard,
                     customCommands: customCommands,
                     activeTickets: activeTickets,
+                    liveAlertsCount: liveAlertsCount,
                     roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
                 });
@@ -498,6 +502,100 @@ class Dashboard {
             }
         });
 
+        // API: Live alerts
+        this.app.get('/api/live-alerts/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const alerts = liveAlertsManager.getAlerts(guildId);
+
+                const twitch = (alerts.twitch || []).map(entry => ({
+                    ...entry,
+                    discordChannelName: guild?.channels?.cache?.get(entry.channelId)?.name || `Unknown (${entry.channelId})`,
+                    roleName: entry.roleId ? (guild?.roles?.cache?.get(entry.roleId)?.name || `Unknown (${entry.roleId})`) : null
+                }));
+
+                const youtube = (alerts.youtube || []).map(entry => ({
+                    ...entry,
+                    discordChannelName: guild?.channels?.cache?.get(entry.discordChannelId)?.name || `Unknown (${entry.discordChannelId})`,
+                    roleName: entry.roleId ? (guild?.roles?.cache?.get(entry.roleId)?.name || `Unknown (${entry.roleId})`) : null
+                }));
+
+                res.json({ success: true, alerts: { twitch, youtube } });
+            } catch (error) {
+                console.error('Error fetching live alerts:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/live-alerts/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { platform, identifier, discordChannelId, roleId } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!platform || !identifier || !discordChannelId) {
+                    return res.status(400).json({ success: false, error: 'Platform, identifier, and channel are required' });
+                }
+
+                const normalizedPlatform = String(platform).toLowerCase();
+                const normalizedIdentifier = String(identifier).trim();
+
+                if (!['twitch', 'youtube'].includes(normalizedPlatform)) {
+                    return res.status(400).json({ success: false, error: 'Platform must be twitch or youtube' });
+                }
+
+                const channel = guild.channels.cache.get(discordChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const safeRoleId = roleId && guild.roles.cache.has(roleId) ? roleId : null;
+
+                if (normalizedPlatform === 'twitch') {
+                    await liveAlertsManager.addTwitchAlert(guildId, normalizedIdentifier, discordChannelId, safeRoleId);
+                } else {
+                    await liveAlertsManager.addYouTubeAlert(guildId, normalizedIdentifier, discordChannelId, safeRoleId);
+                }
+
+                res.json({ success: true, message: 'Live alert saved successfully' });
+            } catch (error) {
+                console.error('Error saving live alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/live-alerts/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const { platform, identifier } = req.body;
+
+                if (!platform || !identifier) {
+                    return res.status(400).json({ success: false, error: 'Platform and identifier are required' });
+                }
+
+                const normalizedPlatform = String(platform).toLowerCase();
+                const normalizedIdentifier = String(identifier).trim();
+
+                if (normalizedPlatform === 'twitch') {
+                    await liveAlertsManager.removeTwitchAlert(guildId, normalizedIdentifier);
+                } else if (normalizedPlatform === 'youtube') {
+                    await liveAlertsManager.removeYouTubeAlert(guildId, normalizedIdentifier);
+                } else {
+                    return res.status(400).json({ success: false, error: 'Platform must be twitch or youtube' });
+                }
+
+                res.json({ success: true, message: 'Live alert removed successfully' });
+            } catch (error) {
+                console.error('Error removing live alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         // Command permission management
         this.app.post('/api/command-permissions/:guildId/:commandName', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
@@ -543,6 +641,30 @@ class Dashboard {
             } catch (error) {
                 console.error('Analytics page error:', error);
                 res.status(500).send('Error loading analytics');
+            }
+        });
+
+        // Live Alerts Dashboard
+        this.app.get('/dashboard/:guildId/live-alerts', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const alerts = liveAlertsManager.getAlerts(guildId);
+
+                res.render('live-alerts', {
+                    guild,
+                    alerts,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
+                    envStatus: {
+                        twitch: !!(process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET),
+                        youtube: !!process.env.YOUTUBE_API_KEY
+                    },
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Live alerts page error:', error);
+                res.status(500).send('Error loading live alerts');
             }
         });
 

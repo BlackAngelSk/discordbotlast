@@ -12,9 +12,16 @@ const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
-function httpsGet(url, headers = {}) {
+function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
     return new Promise((resolve, reject) => {
-        const req = https.get(url, { headers, timeout: 8000 }, res => {
+        const payload = typeof body === 'string' ? body : body ? JSON.stringify(body) : null;
+        const requestHeaders = { ...headers };
+
+        if (payload && !requestHeaders['Content-Length']) {
+            requestHeaders['Content-Length'] = Buffer.byteLength(payload);
+        }
+
+        const req = https.request(url, { method, headers: requestHeaders, timeout: 8000 }, res => {
             let data = '';
             res.on('data', c => (data += c));
             res.on('end', () => {
@@ -22,9 +29,17 @@ function httpsGet(url, headers = {}) {
                 catch { resolve({ status: res.statusCode, body: data }); }
             });
         });
+
         req.on('error', reject);
         req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+
+        if (payload) req.write(payload);
+        req.end();
     });
+}
+
+function httpsGet(url, headers = {}) {
+    return httpsRequest(url, { method: 'GET', headers });
 }
 
 class LiveAlertsManager {
@@ -34,6 +49,8 @@ class LiveAlertsManager {
         this._twitchToken = null;
         this._twitchTokenExpiry = 0;
         this._interval = null;
+        this._warnedMissingTwitchCredentials = false;
+        this._warnedTwitchAuthFailure = false;
     }
 
     async init(client) {
@@ -58,6 +75,7 @@ class LiveAlertsManager {
         if (existing) { existing.channelId = discordChannelId; existing.roleId = roleId; }
         else this.data[guildId].twitch.push({ username: twitchUsername.toLowerCase(), channelId: discordChannelId, roleId, lastLive: false });
         await this.save();
+        setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
     }
 
     async removeTwitchAlert(guildId, twitchUsername) {
@@ -72,6 +90,7 @@ class LiveAlertsManager {
         if (existing) { existing.discordChannelId = discordChannelId; existing.roleId = roleId; }
         else this.data[guildId].youtube.push({ channelId: ytChannelId, discordChannelId, roleId, lastVideoId: null });
         await this.save();
+        setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
     }
 
     async removeYouTubeAlert(guildId, ytChannelId) {
@@ -87,15 +106,43 @@ class LiveAlertsManager {
     // ── Twitch ────────────────────────────────────────────────────────────────
     async _getTwitchToken() {
         if (this._twitchToken && Date.now() < this._twitchTokenExpiry) return this._twitchToken;
+
         const clientId = process.env.TWITCH_CLIENT_ID;
         const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-        if (!clientId || !clientSecret) return null;
+
+        if (!clientId || !clientSecret) {
+            if (!this._warnedMissingTwitchCredentials) {
+                console.warn('Twitch live alerts are disabled: TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are missing.');
+                this._warnedMissingTwitchCredentials = true;
+            }
+            return null;
+        }
+
         try {
-            const res = await httpsGet(`https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`);
-            if (res.body.access_token) {
+            const body = new URLSearchParams({
+                client_id: clientId,
+                client_secret: clientSecret,
+                grant_type: 'client_credentials'
+            }).toString();
+
+            const res = await httpsRequest('https://id.twitch.tv/oauth2/token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body
+            });
+
+            if (res.body?.access_token) {
                 this._twitchToken = res.body.access_token;
-                this._twitchTokenExpiry = Date.now() + (res.body.expires_in - 60) * 1000;
+                this._twitchTokenExpiry = Date.now() + ((res.body.expires_in || 3600) - 60) * 1000;
+                this._warnedTwitchAuthFailure = false;
                 return this._twitchToken;
+            }
+
+            if (!this._warnedTwitchAuthFailure) {
+                console.error('Twitch token request failed:', res.body?.message || `HTTP ${res.status}`);
+                this._warnedTwitchAuthFailure = true;
             }
         } catch (err) {
             console.error('Twitch token error:', err.message);
@@ -193,14 +240,21 @@ class LiveAlertsManager {
         setTimeout(() => this._poll(), 10000);
     }
 
+    async _pollGuild(guildId) {
+        const config = this.data[guildId];
+        if (!config) return;
+
+        for (const entry of (config.twitch || [])) {
+            await this._checkTwitch(entry, guildId);
+        }
+        for (const entry of (config.youtube || [])) {
+            await this._checkYouTube(entry, guildId);
+        }
+    }
+
     async _poll() {
-        for (const [guildId, config] of Object.entries(this.data)) {
-            for (const entry of (config.twitch || [])) {
-                await this._checkTwitch(entry, guildId);
-            }
-            for (const entry of (config.youtube || [])) {
-                await this._checkYouTube(entry, guildId);
-            }
+        for (const guildId of Object.keys(this.data)) {
+            await this._pollGuild(guildId);
         }
     }
 }
