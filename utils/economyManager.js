@@ -9,6 +9,22 @@ function calculateLevelFromXP(xp) {
     return Math.min(MAX_LEVEL, rawLevel);
 }
 
+function createDefaultUserData() {
+    return {
+        balance: 0,
+        xp: 0,
+        level: 1,
+        highestLevelReached: 1,
+        lastDaily: null,
+        lastWeekly: null,
+        inventory: [],
+        dailyStreak: 0,
+        streakBonusMultiplier: 1,
+        seasonalCoins: 0,
+        guilds: []
+    };
+}
+
 class EconomyManager {
     constructor() {
         this.dataPath = path.join(__dirname, '..', 'data', 'economy.json');
@@ -28,6 +44,13 @@ class EconomyManager {
 
             const data = await fs.readFile(this.dataPath, 'utf8');
             this.data = JSON.parse(data);
+            this.data.users = this.data.users || {};
+            this.data.shops = this.data.shops || {};
+
+            const migrated = this.migrateToGlobalUsers();
+            if (migrated) {
+                await this.save();
+            }
         } catch (error) {
             if (error.code === 'ENOENT') {
                 await this.save();
@@ -45,38 +68,94 @@ class EconomyManager {
         }
     }
 
-    getUserData(guildId, userId) {
-        const key = `${guildId}_${userId}`;
-        if (!this.data.users[key]) {
-            this.data.users[key] = {
-                balance: 0,
-                xp: 0,
-                level: 1,
-                highestLevelReached: 1,
-                lastDaily: null,
-                lastWeekly: null,
-                inventory: [],
-                dailyStreak: 0,
-                streakBonusMultiplier: 1,
-                seasonalCoins: 0
-            };
-        } else {
-            // Backfill newer economy fields for existing users and repair level drift.
-            const user = this.data.users[key];
-            user.balance = Number.isFinite(user.balance) ? user.balance : 0;
-            user.xp = Number.isFinite(user.xp) ? Math.max(0, user.xp) : 0;
-            user.inventory = Array.isArray(user.inventory) ? user.inventory : [];
-            user.dailyStreak = Number.isFinite(user.dailyStreak) ? user.dailyStreak : 0;
-            user.streakBonusMultiplier = Number.isFinite(user.streakBonusMultiplier) ? user.streakBonusMultiplier : 1;
-            user.seasonalCoins = Number.isFinite(user.seasonalCoins) ? user.seasonalCoins : 0;
+    getUserKey(userId) {
+        return String(userId);
+    }
 
-            const inferredLevel = calculateLevelFromXP(user.xp);
-            const storedLevel = Number.isFinite(user.level) ? Math.max(1, user.level) : 1;
-            user.level = Math.min(MAX_LEVEL, Math.max(storedLevel, inferredLevel));
+    normalizeUserData(userData, guildId = null) {
+        const user = userData || createDefaultUserData();
+        user.balance = Number.isFinite(user.balance) ? user.balance : 0;
+        user.xp = Number.isFinite(user.xp) ? Math.max(0, user.xp) : 0;
+        user.inventory = Array.isArray(user.inventory) ? user.inventory : [];
+        user.dailyStreak = Number.isFinite(user.dailyStreak) ? user.dailyStreak : 0;
+        user.streakBonusMultiplier = Number.isFinite(user.streakBonusMultiplier) ? user.streakBonusMultiplier : 1;
+        user.seasonalCoins = Number.isFinite(user.seasonalCoins) ? user.seasonalCoins : 0;
+        user.guilds = Array.isArray(user.guilds) ? [...new Set(user.guilds.map(String))] : [];
 
-            const highestStored = Number.isFinite(user.highestLevelReached) ? Math.max(1, user.highestLevelReached) : 1;
-            user.highestLevelReached = Math.min(MAX_LEVEL, Math.max(highestStored, user.level));
+        if (guildId !== null && guildId !== undefined) {
+            const normalizedGuildId = String(guildId);
+            if (normalizedGuildId && normalizedGuildId !== 'null' && normalizedGuildId !== 'undefined' && !user.guilds.includes(normalizedGuildId)) {
+                user.guilds.push(normalizedGuildId);
+            }
         }
+
+        const inferredLevel = calculateLevelFromXP(user.xp);
+        const storedLevel = Number.isFinite(user.level) ? Math.max(1, user.level) : 1;
+        user.level = Math.min(MAX_LEVEL, Math.max(storedLevel, inferredLevel));
+
+        const highestStored = Number.isFinite(user.highestLevelReached) ? Math.max(1, user.highestLevelReached) : 1;
+        user.highestLevelReached = Math.min(MAX_LEVEL, Math.max(highestStored, user.level));
+
+        return user;
+    }
+
+    mergeUserData(targetData = {}, sourceData = {}, guildId = null) {
+        const target = this.normalizeUserData({ ...createDefaultUserData(), ...targetData });
+        const source = this.normalizeUserData({ ...createDefaultUserData(), ...sourceData }, guildId);
+
+        const merged = {
+            balance: target.balance + source.balance,
+            xp: target.xp + source.xp,
+            level: Math.max(target.level, source.level),
+            highestLevelReached: Math.max(target.highestLevelReached, source.highestLevelReached),
+            lastDaily: Math.max(target.lastDaily || 0, source.lastDaily || 0) || null,
+            lastWeekly: Math.max(target.lastWeekly || 0, source.lastWeekly || 0) || null,
+            inventory: [...new Set([...target.inventory, ...source.inventory])],
+            dailyStreak: Math.max(target.dailyStreak, source.dailyStreak),
+            streakBonusMultiplier: Math.max(target.streakBonusMultiplier, source.streakBonusMultiplier),
+            seasonalCoins: target.seasonalCoins + source.seasonalCoins,
+            guilds: [...new Set([...target.guilds, ...source.guilds])]
+        };
+
+        return this.normalizeUserData(merged);
+    }
+
+    migrateToGlobalUsers() {
+        if (!this.data.users || typeof this.data.users !== 'object') {
+            this.data.users = {};
+            return false;
+        }
+
+        const migratedUsers = {};
+        let changed = false;
+
+        for (const [key, userData] of Object.entries(this.data.users)) {
+            const legacyMatch = String(key).match(/^([^_]+)_(.+)$/);
+            const userId = legacyMatch ? legacyMatch[2] : String(key);
+            const guildId = legacyMatch ? legacyMatch[1] : null;
+
+            if (legacyMatch) {
+                changed = true;
+            }
+
+            migratedUsers[userId] = this.mergeUserData(migratedUsers[userId], userData, guildId);
+        }
+
+        const originalKeys = Object.keys(this.data.users).length;
+        const migratedKeys = Object.keys(migratedUsers).length;
+
+        this.data.users = migratedUsers;
+        return changed || originalKeys !== migratedKeys;
+    }
+
+    getUserData(guildId, userId) {
+        const key = this.getUserKey(userId);
+
+        if (!this.data.users[key]) {
+            this.data.users[key] = createDefaultUserData();
+        }
+
+        this.normalizeUserData(this.data.users[key], guildId);
         return this.data.users[key];
     }
 
@@ -113,48 +192,33 @@ class EconomyManager {
     }
 
     getLeaderboard(guildId, type = 'balance', limit = 10) {
-        const guildUsers = Object.entries(this.data.users)
-            .filter(([key]) => key.startsWith(`${guildId}_`))
-            .map(([key, data]) => ({
-                userId: key.split('_')[1],
-                ...data
+        const normalizedGuildId = guildId ? String(guildId) : null;
+
+        return Object.entries(this.data.users)
+            .map(([userId, data]) => ({
+                userId,
+                ...this.normalizeUserData(data)
             }))
-            .sort((a, b) => b[type] - a[type])
+            .filter(user => {
+                if (!normalizedGuildId) return true;
+                return !user.guilds.length || user.guilds.includes(normalizedGuildId);
+            })
+            .sort((a, b) => (b[type] || 0) - (a[type] || 0))
             .slice(0, limit);
-        
-        return guildUsers;
     }
 
     getGlobalLeaderboard(type = 'balance', limit = 100) {
-        const globalUsers = Object.entries(this.data.users)
-            .map(([key, data]) => ({
-                userId: key.split('_')[1],
-                guildId: key.split('_')[0],
-                ...data
-            }))
-            .reduce((acc, user) => {
-                const existing = acc.find(u => u.userId === user.userId);
-                if (existing) {
-                    // Combine stats across all guilds for the same user
-                    existing.balance += user.balance;
-                    existing.xp += user.xp;
-                    existing.level = calculateLevelFromXP(existing.xp);
-                    existing.totalCoins = (existing.totalCoins || 0) + (user.seasonalCoins || 0);
-                } else {
-                    acc.push({
-                        userId: user.userId,
-                        balance: user.balance,
-                        xp: user.xp,
-                        level: user.level,
-                        totalCoins: user.seasonalCoins || 0
-                    });
-                }
-                return acc;
-            }, [])
-            .sort((a, b) => b[type] - a[type])
+        return Object.entries(this.data.users)
+            .map(([userId, data]) => {
+                const user = this.normalizeUserData(data);
+                return {
+                    userId,
+                    ...user,
+                    totalCoins: user.seasonalCoins || 0
+                };
+            })
+            .sort((a, b) => (b[type] || 0) - (a[type] || 0))
             .slice(0, limit);
-        
-        return globalUsers;
     }
 
     async claimDaily(guildId, userId) {

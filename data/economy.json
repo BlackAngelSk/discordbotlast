@@ -1,938 +1,1238 @@
 {
   "users": {
-    "421968526547353601_396685113804587009": {
+    "396685113804587009": {
       "balance": 6568,
       "xp": 15188,
       "level": 13,
+      "highestLevelReached": 13,
       "lastDaily": 1775915698104,
       "lastWeekly": 1775915700265,
       "inventory": [],
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
       "seasonalCoins": 14200,
-      "highestLevelReached": 13
+      "guilds": [
+        "421968526547353601"
+      ]
     },
-    "421968526547353601_280776802492874765": {
+    "280776802492874765": {
       "balance": 4264,
       "xp": 21320,
       "level": 15,
+      "highestLevelReached": 15,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
     },
-    "421968526547353601_195140009748201472": {
+    "195140009748201472": {
       "balance": 104004,
       "xp": 22056,
       "level": 15,
+      "highestLevelReached": 15,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
       "seasonalCoins": 0,
-      "highestLevelReached": 15
+      "guilds": [
+        "421968526547353601"
+      ]
     },
-    "421968526547353601_534769701297979392": {
+    "534769701297979392": {
       "balance": 5368,
       "xp": 26852,
       "level": 17,
+      "highestLevelReached": 17,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
       "seasonalCoins": 0,
-      "highestLevelReached": 17
+      "guilds": [
+        "421968526547353601"
+      ]
     },
-    "421968526547353601_349649557896036354": {
-      "balance": 718754,
-      "xp": 14980,
+    "349649557896036354": {
+      "balance": 731138,
+      "xp": 15096,
       "level": 13,
+      "highestLevelReached": 13,
       "lastDaily": 1775919046103,
-      "lastWeekly": 1772370268655,
-      "inventory": [],
-      "dailyStreak": 1,
-      "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 3600,
-      "highestLevelReached": 13
-    },
-    "421968526547353601_373827871212568576": {
-      "balance": 1089,
-      "xp": 14234,
-      "level": 12,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0,
-      "highestLevelReached": 12
-    },
-    "421968526547353601_269854360798756864": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_225638691933126657": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_464508178789302273": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_602916178951798808": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1119276903400996966": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_639204942141194242": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_331069140330872832": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_786159684552753195": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_724541487681110047": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_461621228600295426": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_722035390986584134": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_711862424583667733": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_301345060019240960": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_712008097543225435": {
-      "balance": 0,
-      "xp": 15,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_742823072486129725": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_752960748711575552": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_473948254472503297": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_360790644932870144": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_285196278541844480": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_341672750131445762": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_651487779506618379": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_510545249601323011": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_601487785542680639": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_323211958482370571": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_406841667560275988": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_547042320227500035": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1465732108004888668": {
-      "balance": 2571,
-      "xp": 12886,
-      "level": 12,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_721669183758270474": {
-      "balance": 1984,
-      "xp": 9920,
-      "level": 10,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_460495715173662722": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_814874910765482025": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_962741807408640020": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_418819536922345482": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_664130274094743572": {
-      "balance": 1861,
-      "xp": 9305,
-      "level": 10,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1455190625048854611": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_900822440513527818": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_334003778636349442": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_481017558376382464": {
-      "balance": 2251,
-      "xp": 11255,
-      "level": 11,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_676405031871840287": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_330309766628900866": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1156392147038253057": {
-      "balance": 5,
-      "xp": 25,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_607284845034471445": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_202411181787447306": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_450681872545087501": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_632229220483072020": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_229539260087140353": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_360427589858492417": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_584005943935631360": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1021071579251216496": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_282957332089143297": {
-      "balance": 2633,
-      "xp": 13201,
-      "level": 12,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_246285714399035393": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_752565394673369221": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_878050921085558794": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_380339213805158401": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_277448148559855618": {
-      "balance": 331,
-      "xp": 1655,
-      "level": 5,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_521415948201361419": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_692862875865186344": {
-      "balance": 1159,
-      "xp": 5852,
-      "level": 8,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0,
-      "highestLevelReached": 8
-    },
-    "421968526547353601_293459633715150849": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_418484187277033473": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_252096628259946507": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_655821913855361025": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_999320722604298281": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_446376069440733184": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_549962044888186883": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_505869331251593217": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_680050711916314642": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_764185629743120404": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_153196871710408704": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_566622880402505728": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_299520760249319424": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_311844360608153600": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_1364265413982031973": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_232077418033053698": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_791754936870240278": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_340562486002712576": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "865544990625497088_349649557896036354": {
-      "balance": 6184,
-      "xp": 98,
-      "level": 1,
-      "lastDaily": 1774212717908,
-      "lastWeekly": 1773691498991,
-      "inventory": [],
-      "dailyStreak": 1,
-      "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 1200,
-      "highestLevelReached": 1
-    },
-    "421968526547353601_373924787975618571": {
-      "balance": 3020,
-      "xp": 15100,
-      "level": 13,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0,
-      "highestLevelReached": 13
-    },
-    "1414776322500333723_349649557896036354": {
-      "balance": 6200,
-      "xp": 18,
-      "level": 1,
-      "lastDaily": 1774772506100,
       "lastWeekly": 1774772508729,
       "inventory": [],
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 1200
+      "seasonalCoins": 6000,
+      "guilds": [
+        "421968526547353601",
+        "865544990625497088",
+        "1414776322500333723"
+      ]
     },
-    "1414776322500333723_597505934209581085": {
+    "373827871212568576": {
+      "balance": 1089,
+      "xp": 14234,
+      "level": 12,
+      "highestLevelReached": 12,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "269854360798756864": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "225638691933126657": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "464508178789302273": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "602916178951798808": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1119276903400996966": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "639204942141194242": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "331069140330872832": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "786159684552753195": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "724541487681110047": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "461621228600295426": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "722035390986584134": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "711862424583667733": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "301345060019240960": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "712008097543225435": {
+      "balance": 0,
+      "xp": 15,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "742823072486129725": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "752960748711575552": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "473948254472503297": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "360790644932870144": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "285196278541844480": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "341672750131445762": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "651487779506618379": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "510545249601323011": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "601487785542680639": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "323211958482370571": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "406841667560275988": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "547042320227500035": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1465732108004888668": {
+      "balance": 2571,
+      "xp": 12886,
+      "level": 12,
+      "highestLevelReached": 12,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "721669183758270474": {
+      "balance": 1984,
+      "xp": 9920,
+      "level": 10,
+      "highestLevelReached": 10,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "460495715173662722": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "814874910765482025": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "962741807408640020": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "418819536922345482": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "664130274094743572": {
+      "balance": 1861,
+      "xp": 9305,
+      "level": 10,
+      "highestLevelReached": 10,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1455190625048854611": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "900822440513527818": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "334003778636349442": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "481017558376382464": {
+      "balance": 2251,
+      "xp": 11255,
+      "level": 11,
+      "highestLevelReached": 11,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "676405031871840287": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "330309766628900866": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1156392147038253057": {
+      "balance": 5,
+      "xp": 25,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "607284845034471445": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "202411181787447306": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "450681872545087501": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "632229220483072020": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "229539260087140353": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "360427589858492417": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "584005943935631360": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1021071579251216496": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "282957332089143297": {
+      "balance": 2633,
+      "xp": 13201,
+      "level": 12,
+      "highestLevelReached": 12,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "246285714399035393": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "752565394673369221": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "878050921085558794": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "380339213805158401": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "277448148559855618": {
+      "balance": 331,
+      "xp": 1655,
+      "level": 5,
+      "highestLevelReached": 5,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "521415948201361419": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "692862875865186344": {
+      "balance": 1159,
+      "xp": 5852,
+      "level": 8,
+      "highestLevelReached": 8,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "293459633715150849": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "418484187277033473": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "252096628259946507": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "655821913855361025": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "999320722604298281": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "446376069440733184": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "549962044888186883": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "505869331251593217": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "680050711916314642": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "764185629743120404": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "153196871710408704": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "566622880402505728": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "299520760249319424": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "311844360608153600": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "1364265413982031973": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "232077418033053698": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "791754936870240278": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "340562486002712576": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "373924787975618571": {
+      "balance": 3020,
+      "xp": 15100,
+      "level": 13,
+      "highestLevelReached": 13,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "597505934209581085": {
       "balance": 7700,
       "xp": 11,
       "level": 1,
+      "highestLevelReached": 1,
       "lastDaily": 1774772503342,
       "lastWeekly": 1774772505927,
       "inventory": [],
       "dailyStreak": 1,
       "streakBonusMultiplier": 1.2,
-      "seasonalCoins": 1200
+      "seasonalCoins": 1200,
+      "guilds": [
+        "1414776322500333723"
+      ]
     },
-    "null_349649557896036354": {
+    "blackangelsk": {
       "balance": 0,
       "xp": 0,
       "level": 1,
@@ -942,19 +1242,10 @@
       "inventory": [],
       "dailyStreak": 0,
       "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
-    },
-    "421968526547353601_blackangelsk": {
-      "balance": 0,
-      "xp": 0,
-      "level": 1,
-      "highestLevelReached": 1,
-      "lastDaily": null,
-      "lastWeekly": null,
-      "inventory": [],
-      "dailyStreak": 0,
-      "streakBonusMultiplier": 1,
-      "seasonalCoins": 0
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
     }
   },
   "shops": {
