@@ -1,0 +1,21 @@
+<%
+const resolvedTopbarSubtitle = typeof topbarSubtitle === 'string' && topbarSubtitle.length > 0
+  ? topbarSubtitle
+  : guild.name;
+%>
+<header class="topbar">
+  <div class="topbar-left">
+    <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+    <div>
+      <div class="topbar-title"><%= topbarTitle %></div>
+      <div class="topbar-subtitle"><%= resolvedTopbarSubtitle %></div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+    <div class="topbar-user">
+      <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+      <span class="topbar-user-name"><%= user.username %></span>
+    </div>
+  </div>
+</header>

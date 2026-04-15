@@ -1,4 +1,4 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const settingsManager = require('../utils/settingsManager');
 const statsManager = require('../utils/statsManager');
 const inviteManager = require('../utils/inviteManager');
@@ -9,6 +9,31 @@ const gameStatsManager = require('../utils/gameStatsManager');
 const activityTracker = require('../utils/activityTracker');
 const fs = require('fs').promises;
 const path = require('path');
+
+function getRoleAssignabilityIssue(member, role) {
+    if (!role) return 'Role not found';
+
+    const me = member.guild.members.me;
+    if (!me) return 'Bot member cache unavailable';
+
+    if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
+        return 'Bot lacks Manage Roles permission';
+    }
+
+    if (role.managed) {
+        return 'Role is managed by an integration and cannot be assigned manually';
+    }
+
+    if (role.id === member.guild.id) {
+        return 'Cannot assign the @everyone role';
+    }
+
+    if (me.roles.highest.comparePositionTo(role) <= 0) {
+        return 'Role is higher than or equal to the bot\'s highest role';
+    }
+
+    return null;
+}
 
 module.exports = {
     name: Events.GuildMemberAdd,
@@ -124,24 +149,46 @@ module.exports = {
             
             // Auto-assign role if configured
             if (settings.autoRole) {
-                const role = member.guild.roles.cache.find(r => r.name === settings.autoRole);
-                
+                const configuredRole = String(settings.autoRole).trim();
+                const role = member.guild.roles.cache.get(configuredRole)
+                    || member.guild.roles.cache.find(r => r.name === configuredRole);
+
                 if (role) {
-                    await member.roles.add(role);
-                    console.log(`✅ Assigned ${settings.autoRole} role to ${member.user.tag}`);
+                    const issue = getRoleAssignabilityIssue(member, role);
+                    if (issue) {
+                        console.warn(`⚠️ Could not assign auto-role "${role.name}" to ${member.user.tag}: ${issue}`);
+                    } else {
+                        try {
+                            await member.roles.add(role, 'Auto-role on member join');
+                            console.log(`✅ Assigned ${role.name} role to ${member.user.tag}`);
+                        } catch (error) {
+                            console.error(`❌ Error assigning auto-role "${role.name}" to ${member.user.tag}:`, error.message);
+                        }
+                    }
                 } else {
                     console.log(`⚠️ Role "${settings.autoRole}" not found in guild ${member.guild.name}`);
                     // Optionally create the role if it doesn't exist
                     try {
-                        const newRole = await member.guild.roles.create({
-                            name: settings.autoRole,
-                            color: 0x99AAB5, // Grey color
-                            reason: 'Auto-created default member role',
-                        });
-                        await member.roles.add(newRole);
-                        console.log(`✅ Created and assigned ${settings.autoRole} role to ${member.user.tag}`);
+                        const me = member.guild.members.me;
+                        if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+                            console.warn(`⚠️ Cannot create auto-role "${settings.autoRole}" in ${member.guild.name}: missing Manage Roles permission`);
+                        } else {
+                            const newRole = await member.guild.roles.create({
+                                name: settings.autoRole,
+                                color: 0x99AAB5,
+                                reason: 'Auto-created default member role',
+                            });
+
+                            const issue = getRoleAssignabilityIssue(member, newRole);
+                            if (issue) {
+                                console.warn(`⚠️ Created role "${newRole.name}" but could not assign it to ${member.user.tag}: ${issue}`);
+                            } else {
+                                await member.roles.add(newRole, 'Auto-role on member join');
+                                console.log(`✅ Created and assigned ${settings.autoRole} role to ${member.user.tag}`);
+                            }
+                        }
                     } catch (error) {
-                        console.error('❌ Error creating role:', error);
+                        console.error('❌ Error creating role:', error.message);
                     }
                 }
             }

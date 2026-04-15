@@ -11,6 +11,30 @@ const fs = require('fs');
 const path = require('path');
 
 const AUDIT_LOG_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
+let auditWriteQueue = Promise.resolve();
+
+function queueAuditWrite(entry) {
+    auditWriteQueue = auditWriteQueue
+        .then(async () => {
+            let logs = [];
+
+            try {
+                const content = await fs.promises.readFile(AUDIT_LOG_FILE, 'utf8');
+                logs = JSON.parse(content);
+            } catch (error) {
+                if (error.code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+
+            logs.push(entry);
+            if (logs.length > 500) logs = logs.slice(-500);
+            await fs.promises.writeFile(AUDIT_LOG_FILE, JSON.stringify(logs, null, 2));
+        })
+        .catch((err) => {
+            console.error('Dashboard audit log error:', err.message);
+        });
+}
 
 function auditLog(req, action, details = {}) {
     try {
@@ -23,14 +47,7 @@ function auditLog(req, action, details = {}) {
             details,
             ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
         };
-        let logs = [];
-        if (fs.existsSync(AUDIT_LOG_FILE)) {
-            try { logs = JSON.parse(fs.readFileSync(AUDIT_LOG_FILE, 'utf8')); } catch { logs = []; }
-        }
-        logs.push(entry);
-        // Keep last 500 entries
-        if (logs.length > 500) logs = logs.slice(-500);
-        fs.writeFileSync(AUDIT_LOG_FILE, JSON.stringify(logs, null, 2));
+        queueAuditWrite(entry);
     } catch (err) {
         console.error('Dashboard audit log error:', err.message);
     }

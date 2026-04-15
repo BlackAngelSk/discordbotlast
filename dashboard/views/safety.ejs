@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Safety Center</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+  <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+  <div class="main-wrapper">
+    <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Safety Center' }) %>
+
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-user-shield" style="color:var(--brand);margin-right:8px"></i>Safety Center</h1>
+        <p>Manage starboard and anti-raid protections for <strong><%= guild.name %></strong></p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Starboard</span><div class="stat-card-icon yellow"><i class="fas fa-star"></i></div></div><div class="stat-card-value"><%= settings.starboardChannel ? 'On' : 'Off' %></div><div class="stat-card-change">Threshold: <%= settings.starboardThreshold || 3 %></div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Featured Posts</span><div class="stat-card-icon blue"><i class="fas fa-fire"></i></div></div><div class="stat-card-value"><%= featuredCount %></div><div class="stat-card-change">Messages on starboard</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Raid Watch</span><div class="stat-card-icon red"><i class="fas fa-bell"></i></div></div><div class="stat-card-value"><%= raidSettings.enabled ? 'On' : 'Off' %></div><div class="stat-card-change"><%= raidStatus.joinCount || 0 %> recent joins</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Lockdown</span><div class="stat-card-icon purple"><i class="fas fa-lock"></i></div></div><div class="stat-card-value"><%= locked ? 'Locked' : 'Open' %></div><div class="stat-card-change">Manual emergency mode</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-star"></i> Starboard Setup</div><div class="card-subtitle">Feature the most-loved messages in a dedicated channel</div></div></div>
+        <form id="starboardForm">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Starboard Channel</label><select class="form-control" name="channelId"><option value="">Disabled</option><% channels.forEach(channel => { %><option value="<%= channel.id %>" <%= settings.starboardChannel === channel.id ? 'selected' : '' %>>#<%= channel.name %></option><% }) %></select></div>
+            <div class="form-group"><label class="form-label">Star Threshold</label><input class="form-control" type="number" name="threshold" min="1" value="<%= settings.starboardThreshold || 3 %>"></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Starboard</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-shield-virus"></i> Raid Protection</div><div class="card-subtitle">Detect join spikes and tighten verification when needed</div></div></div>
+        <form id="raidForm">
+          <div class="toggle-group"><div class="toggle-info"><h4>Enable Raid Protection</h4><p>Monitor join spikes and suspicious accounts</p></div><label class="toggle-switch"><input type="checkbox" name="enabled" <%= raidSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Require Verification</h4><p>Only verified members receive the verified role</p></div><label class="toggle-switch"><input type="checkbox" name="verificationEnabled" <%= raidSettings.verificationEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Auto Kick New Accounts</h4><p>Kick users whose accounts are too new</p></div><label class="toggle-switch"><input type="checkbox" name="autoKickNewAccounts" <%= raidSettings.autoKickNewAccounts ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Auto Kick Confirmed Raiders</h4><p>Remove accounts when raid conditions are detected</p></div><label class="toggle-switch"><input type="checkbox" name="autoKickRaiders" <%= raidSettings.autoKickRaiders ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Join Rate Limit</label><input class="form-control" type="number" name="joinRateLimit" min="2" value="<%= raidSettings.joinRateLimit %>"></div>
+            <div class="form-group"><label class="form-label">Time Window (seconds)</label><input class="form-control" type="number" name="timeWindow" min="5" value="<%= raidSettings.timeWindow %>"></div>
+            <div class="form-group"><label class="form-label">Minimum Account Age (days)</label><input class="form-control" type="number" name="accountAgeRequired" min="0" value="<%= raidSettings.accountAgeRequired %>"></div>
+          </div>
+          <div class="form-group" style="max-width:420px"><label class="form-label">Verification Role</label><select class="form-control" name="verificationRole"><option value="">None</option><% roles.forEach(role => { %><option value="<%= role.id %>" <%= raidSettings.verificationRole === role.id ? 'selected' : '' %>><%= role.name %></option><% }) %></select></div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Raid Protection</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-lock"></i> Emergency Lockdown</div><div class="card-subtitle">Quick toggle for high-risk moments</div></div></div>
+        <p style="margin-bottom:12px;color:var(--text-2)">Current status: <strong><%= locked ? 'Locked down' : 'Normal' %></strong></p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-danger" onclick="toggleLockdown(true)"><i class="fas fa-lock"></i> Enable Lockdown</button>
+          <button class="btn btn-secondary" onclick="toggleLockdown(false)"><i class="fas fa-unlock"></i> Disable Lockdown</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+document.getElementById('starboardForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch(`/api/safety/${guildId}/starboard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channelId: fd.get('channelId'), threshold: Number(fd.get('threshold')) })
+  });
+  const j = await r.json();
+  if (j.success) toast('Starboard settings saved');
+  else toast(j.error || 'Failed to save', 'error');
+});
+document.getElementById('raidForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {
+    enabled: fd.get('enabled') === 'on',
+    verificationEnabled: fd.get('verificationEnabled') === 'on',
+    autoKickNewAccounts: fd.get('autoKickNewAccounts') === 'on',
+    autoKickRaiders: fd.get('autoKickRaiders') === 'on',
+    joinRateLimit: Number(fd.get('joinRateLimit')),
+    timeWindow: Number(fd.get('timeWindow')),
+    accountAgeRequired: Number(fd.get('accountAgeRequired')),
+    verificationRole: fd.get('verificationRole')
+  };
+  const r = await fetch(`/api/safety/${guildId}/raid`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if (j.success) toast('Raid protection saved');
+  else toast(j.error || 'Failed to save', 'error');
+});
+async function toggleLockdown(locked) {
+  const r = await fetch(`/api/safety/${guildId}/lockdown`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ locked })
+  });
+  const j = await r.json();
+  if (j.success) { toast(locked ? 'Lockdown enabled' : 'Lockdown disabled'); setTimeout(() => location.reload(), 700); }
+  else toast(j.error || 'Failed to update', 'error');
+}
+</script>
+</body>
+</html>

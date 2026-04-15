@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Voice Tools</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+  <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+  <div class="main-wrapper">
+    <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Voice Tools' }) %>
+
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-microphone-lines" style="color:var(--brand);margin-right:8px"></i>Voice Tools</h1>
+        <p>Configure temporary channels and voice rewards for <strong><%= guild.name %></strong></p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Active Sessions</span><div class="stat-card-icon blue"><i class="fas fa-headset"></i></div></div><div class="stat-card-value"><%= activeSessions %></div><div class="stat-card-change">Users in tracked voice</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Temp VC Hub</span><div class="stat-card-icon purple"><i class="fas fa-door-open"></i></div></div><div class="stat-card-value"><%= hubChannelId ? 'On' : 'Off' %></div><div class="stat-card-change"><%= hubChannelId ? 'Hub selected' : 'Not configured' %></div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Rewards</span><div class="stat-card-icon green"><i class="fas fa-coins"></i></div></div><div class="stat-card-value"><%= voiceSettings.enabled ? 'On' : 'Off' %></div><div class="stat-card-change"><%= voiceSettings.coinsPerHour %> coins per hour</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Tracked Users</span><div class="stat-card-icon yellow"><i class="fas fa-chart-bar"></i></div></div><div class="stat-card-value"><%= leaderboard.length %></div><div class="stat-card-change">Leaderboard entries</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-door-open"></i> Temporary Voice Hub</div><div class="card-subtitle">When members join this voice channel, the bot creates a private room for them</div></div></div>
+        <form id="tempVcForm">
+          <div class="form-group" style="max-width:420px">
+            <label class="form-label">Hub Voice Channel</label>
+            <select class="form-control" name="hubChannelId">
+              <option value="">Disabled</option>
+              <% channels.forEach(channel => { %>
+                <option value="<%= channel.id %>" <%= hubChannelId === channel.id ? 'selected' : '' %>><%= channel.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Temp VC</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-award"></i> Voice Rewards</div><div class="card-subtitle">Reward active members with coins and XP for hanging out in voice chat</div></div></div>
+        <form id="voiceRewardsForm">
+          <div class="toggle-group"><div class="toggle-info"><h4>Enable Voice Rewards</h4><p>Track activity and reward eligible users</p></div><label class="toggle-switch"><input type="checkbox" name="enabled" <%= voiceSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Exclude AFK Channels</h4><p>Ignore users sitting idle in AFK rooms</p></div><label class="toggle-switch"><input type="checkbox" name="afkChannelExcluded" <%= voiceSettings.afkChannelExcluded ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">XP per Minute</label><input class="form-control" type="number" name="xpPerMinute" min="0" value="<%= voiceSettings.xpPerMinute %>"></div>
+            <div class="form-group"><label class="form-label">Coins per Hour</label><input class="form-control" type="number" name="coinsPerHour" min="0" value="<%= voiceSettings.coinsPerHour %>"></div>
+            <div class="form-group"><label class="form-label">Minimum Users Required</label><input class="form-control" type="number" name="minUsersRequired" min="1" value="<%= voiceSettings.minUsersRequired %>"></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Rewards</button></div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-trophy"></i> Voice Leaderboard</div><div class="card-subtitle">Members with the most recorded voice time</div></div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Rank</th><th>User</th><th>Total Minutes</th><th>Hours</th></tr></thead>
+            <tbody>
+              <% if (leaderboard.length > 0) { %>
+                <% leaderboard.forEach((entry, index) => { %>
+                  <tr>
+                    <td><span class="rank-badge <%= index===0?'gold':index===1?'silver':index===2?'bronze':'normal' %>"><%= index + 1 %></span></td>
+                    <td><strong><%= entry.username %></strong></td>
+                    <td><%= entry.totalMinutes %></td>
+                    <td><%= (entry.totalMinutes / 60).toFixed(1) %>h</td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="4" class="table-empty"><i class="fas fa-headset"></i> No voice activity data yet</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+document.getElementById('tempVcForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const r = await fetch(`/api/voice-tools/${guildId}/tempvc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hubChannelId: fd.get('hubChannelId') })
+  });
+  const j = await r.json();
+  if (j.success) toast('Temporary voice settings saved');
+  else toast(j.error || 'Failed to save', 'error');
+});
+document.getElementById('voiceRewardsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {
+    enabled: fd.get('enabled') === 'on',
+    afkChannelExcluded: fd.get('afkChannelExcluded') === 'on',
+    xpPerMinute: Number(fd.get('xpPerMinute')),
+    coinsPerHour: Number(fd.get('coinsPerHour')),
+    minUsersRequired: Number(fd.get('minUsersRequired'))
+  };
+  const r = await fetch(`/api/voice-tools/${guildId}/rewards`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if (j.success) toast('Voice rewards saved');
+  else toast(j.error || 'Failed to save', 'error');
+});
+</script>
+</body>
+</html>

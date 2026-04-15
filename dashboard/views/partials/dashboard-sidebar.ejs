@@ -1,0 +1,38 @@
+<%
+const activePath = typeof currentPath === 'string' ? currentPath : '';
+const dashboardBasePath = `/dashboard/${guild.id}`;
+const isActive = (path) => activePath === path ? ' active' : '';
+%>
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
+    <div class="sidebar-guild">
+      <% if (guild.icon) { %>
+        <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
+      <% } else { %>
+        <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
+      <% } %>
+      <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Server</div>
+    <a href="<%= dashboardBasePath %>" class="sidebar-link<%= isActive(dashboardBasePath) %>"><i class="fas fa-cog"></i> Settings</a>
+    <a href="<%= `${dashboardBasePath}/economy` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/economy`) %>"><i class="fas fa-coins"></i> Economy</a>
+    <a href="<%= `${dashboardBasePath}/shop` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/shop`) %>"><i class="fas fa-store"></i> Shop</a>
+    <a href="<%= `${dashboardBasePath}/commands` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/commands`) %>"><i class="fas fa-terminal"></i> Commands</a>
+    <a href="<%= `${dashboardBasePath}/live-alerts` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/live-alerts`) %>"><i class="fas fa-satellite-dish"></i> Live Alerts</a>
+    <a href="<%= `${dashboardBasePath}/community` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/community`) %>"><i class="fas fa-users-gear"></i> Community</a>
+    <a href="<%= `${dashboardBasePath}/voice-tools` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/voice-tools`) %>"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
+    <div class="sidebar-section-label">Moderation</div>
+    <a href="<%= `${dashboardBasePath}/moderation` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/moderation`) %>"><i class="fas fa-shield-halved"></i> Moderation</a>
+    <a href="<%= `${dashboardBasePath}/automod` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/automod`) %>"><i class="fas fa-robot"></i> Auto-Mod</a>
+    <a href="<%= `${dashboardBasePath}/safety` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/safety`) %>"><i class="fas fa-user-shield"></i> Safety Center</a>
+    <div class="sidebar-section-label">Stats</div>
+    <a href="<%= `${dashboardBasePath}/analytics` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/analytics`) %>"><i class="fas fa-chart-line"></i> Analytics</a>
+    <a href="<%= `${dashboardBasePath}/health` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/health`) %>"><i class="fas fa-heart-pulse"></i> Bot Health</a>
+    <a href="/global-leaderboard" class="sidebar-link<%= isActive('/global-leaderboard') %>"><i class="fas fa-globe"></i> Global Leaderboard</a>
+  </nav>
+  <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+</aside>
+<div class="sidebar-overlay" id="sidebarOverlay"></div>

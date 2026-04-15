@@ -19,8 +19,7 @@ module.exports = {
             }
 
             // Check for reaction roles
-            const reactionRoles = reactionRoleManager.getReactionRoles(message.guildId, message.id);
-            const roleId = reactionRoles[reaction.emoji.toString()];
+            const roleId = reactionRoleManager.getRoleForReaction(message.guildId, message.id, reaction.emoji.toString());
 
             if (roleId) {
                 try {
@@ -45,11 +44,12 @@ module.exports = {
             }
 
             const starboardChannelId = settings[message.guildId]?.starboardChannel;
+            const starboardThreshold = Math.max(1, Number(settings[message.guildId]?.starboardThreshold) || 3);
             if (starboardChannelId && (reaction.emoji.name === 'star' || reaction.emoji.toString() === '⭐')) {
                 const starCount = reaction.count;
 
-                // Add to starboard if 3+ stars
-                if (starCount >= 3) {
+                // Add to starboard if threshold is reached
+                if (starCount >= starboardThreshold) {
                     const isInStarboard = starboardManager.isInStarboard(message.guildId, message.id);
 
                     if (!isInStarboard) {

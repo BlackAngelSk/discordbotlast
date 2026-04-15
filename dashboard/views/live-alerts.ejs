@@ -9,50 +9,10 @@
 </head>
 <body>
 <div class="app-layout">
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
-            <div class="sidebar-guild">
-                <% if (guild.icon) { %>
-                    <img class="sidebar-guild-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>">
-                <% } else { %>
-                    <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
-                <% } %>
-                <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
-            </div>
-        </div>
-        <nav class="sidebar-nav">
-            <div class="sidebar-section-label">Server</div>
-            <a href="/dashboard/<%= guild.id %>" class="sidebar-link"><i class="fas fa-cog"></i> Settings</a>
-            <a href="/dashboard/<%= guild.id %>/economy" class="sidebar-link"><i class="fas fa-coins"></i> Economy</a>
-            <a href="/dashboard/<%= guild.id %>/shop" class="sidebar-link"><i class="fas fa-store"></i> Shop</a>
-            <a href="/dashboard/<%= guild.id %>/commands" class="sidebar-link"><i class="fas fa-terminal"></i> Commands</a>
-            <a href="/dashboard/<%= guild.id %>/live-alerts" class="sidebar-link active"><i class="fas fa-satellite-dish"></i> Live Alerts</a>
-            <div class="sidebar-section-label">Moderation</div>
-            <a href="/dashboard/<%= guild.id %>/moderation" class="sidebar-link"><i class="fas fa-shield-halved"></i> Moderation</a>
-            <a href="/dashboard/<%= guild.id %>/automod" class="sidebar-link"><i class="fas fa-robot"></i> Auto-Mod</a>
-            <div class="sidebar-section-label">Stats</div>
-            <a href="/dashboard/<%= guild.id %>/analytics" class="sidebar-link"><i class="fas fa-chart-line"></i> Analytics</a>
-            <a href="/global-leaderboard" class="sidebar-link"><i class="fas fa-globe"></i> Global Leaderboard</a>
-        </nav>
-        <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
-    </aside>
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
     <div class="main-wrapper">
-        <header class="topbar">
-            <div class="topbar-left">
-                <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
-                <div><div class="topbar-title">Live Alerts</div><div class="topbar-subtitle"><%= guild.name %></div></div>
-            </div>
-            <div class="topbar-right">
-                <button class="icon-btn" id="themeToggle"><i class="fas fa-moon"></i></button>
-                <div class="topbar-user">
-                    <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
-                    <span class="topbar-user-name"><%= user.username %></span>
-                </div>
-            </div>
-        </header>
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Live Alerts' }) %>
 
         <main class="content">
             <div class="page-header">
@@ -226,24 +186,9 @@
 
 <div class="toast-container" id="toasts"></div>
 
+<%- include('partials/dashboard-common-scripts') %>
 <script>
 const guildId = '<%= guild.id %>';
-const saved = localStorage.getItem('theme') || 'dark';
-document.documentElement.setAttribute('data-theme', saved);
-const themeBtn = document.getElementById('themeToggle');
-themeBtn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-themeBtn.addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme');
-    const next = cur === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    themeBtn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-});
-const sidebar = document.getElementById('sidebar');
-const overlay = document.getElementById('sidebarOverlay');
-document.getElementById('mobileMenuBtn').addEventListener('click', () => { sidebar.classList.toggle('open'); overlay.classList.toggle('active'); });
-overlay.addEventListener('click', () => { sidebar.classList.remove('open'); overlay.classList.remove('active'); });
-
 function toast(msg, type = 'success') {
     const c = document.getElementById('toasts');
     const t = document.createElement('div');

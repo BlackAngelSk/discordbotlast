@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Community Tools</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+  <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+  <div class="main-wrapper">
+    <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Community Tools' }) %>
+
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-users-gear" style="color:var(--brand);margin-right:8px"></i>Community Tools</h1>
+        <p>Manage reaction roles, giveaways, and suggestions for <strong><%= guild.name %></strong></p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Reaction Roles</span><div class="stat-card-icon blue"><i class="fas fa-face-smile"></i></div></div><div class="stat-card-value"><%= reactionRoles.length %></div><div class="stat-card-change">Mapped reactions</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Role Menus</span><div class="stat-card-icon purple"><i class="fas fa-list"></i></div></div><div class="stat-card-value"><%= roleMenus.length %></div><div class="stat-card-change">Dropdown menus</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Giveaways</span><div class="stat-card-icon yellow"><i class="fas fa-gift"></i></div></div><div class="stat-card-value"><%= giveaways.filter(g => Number(g.endTime || 0) > Date.now()).length %></div><div class="stat-card-change">Currently active</div></div>
+        <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Suggestions</span><div class="stat-card-icon green"><i class="fas fa-lightbulb"></i></div></div><div class="stat-card-value"><%= suggestions.length %></div><div class="stat-card-change">Recent items</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-face-smile"></i> Reaction Roles</div><div class="card-subtitle">Write the message here and the bot will post it in your server with the selected reaction role</div></div></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Channel</label><select class="form-control" id="rrChannelId"><option value="">Select channel</option><% channels.forEach(channel => { %><option value="<%= channel.id %>">#<%= channel.name %></option><% }) %></select></div>
+          <div class="form-group">
+            <label class="form-label">Emoji</label>
+            <input class="form-control" id="rrEmoji" placeholder="Select below or type custom emoji">
+            <div class="form-hint">Pick a common emoji, choose one from this server, or paste a custom emoji code.</div>
+          </div>
+          <div class="form-group"><label class="form-label">Role</label><select class="form-control" id="rrRoleId"><option value="">Select role</option><% roles.forEach(role => { %><option value="<%= role.id %>"><%= role.name %></option><% }) %></select></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quick Emoji Select</label>
+          <div class="emoji-picker-grid" id="rrEmojiPresets">
+            <% ['⭐', '✅', '🎮', '🔔', '🔥', '🎵', '📢', '💬', '🧠', '🎉', '💚', '🛡️'].forEach(emoji => { %>
+              <button type="button" class="emoji-choice-btn" data-emoji="<%= emoji %>"><%= emoji %></button>
+            <% }) %>
+          </div>
+        </div>
+        <% if (guildEmojis && guildEmojis.length > 0) { %>
+          <div class="form-group">
+            <label class="form-label">Server Emojis</label>
+            <select class="form-control" id="rrServerEmojiSelect">
+              <option value="">Choose a server emoji</option>
+              <% guildEmojis.forEach(emoji => { %>
+                <option value="<%= emoji.value %>"><%= emoji.preview %> :<%= emoji.name %>:</option>
+              <% }) %>
+            </select>
+          </div>
+        <% } %>
+        <div class="emoji-selection-preview" id="rrEmojiPreview">No emoji selected</div>
+        <div class="form-group"><label class="form-label">Message</label><textarea class="form-control" id="rrMessageContent" rows="4" placeholder="Write the message that the bot should post for users to react to."></textarea></div>
+        <div class="form-actions"><button class="btn btn-primary" onclick="addReactionRole()"><i class="fas fa-paper-plane"></i> Post Reaction Role Message</button></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Channel</th><th>Message</th><th>Emoji</th><th>Role</th><th>Action</th></tr></thead>
+            <tbody>
+              <% if (reactionRoles.length > 0) { %>
+                <% reactionRoles.forEach(item => { %>
+                  <tr>
+                    <td><%= item.channelName %></td>
+                    <td style="max-width:320px">
+                      <% if (item.messageUrl) { %>
+                        <a href="<%= item.messageUrl %>" target="_blank" rel="noopener noreferrer"><%= item.messageContent || item.messageId %></a>
+                      <% } else { %>
+                        <code><%= item.messageId %></code>
+                      <% } %>
+                    </td>
+                    <td style="font-size:18px"><%= item.emoji %></td>
+                    <td><%= item.roleName %></td>
+                    <td><button class="btn btn-danger btn-sm" onclick="removeReactionRole('<%= item.messageId %>', '<%= item.emoji.replace(/'/g, "\\'") %>')"><i class="fas fa-trash"></i></button></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="5" class="table-empty"><i class="fas fa-inbox"></i> No reaction roles configured yet</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-list-check"></i> Role Menus</div><div class="card-subtitle">Overview of dropdown role menus already stored by the bot</div></div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>ID</th><th>Title</th><th>Roles</th><th>Mode</th><th>Channel</th></tr></thead>
+            <tbody>
+              <% if (roleMenus.length > 0) { %>
+                <% roleMenus.forEach(menu => { %>
+                  <tr>
+                    <td><strong><%= menu.id %></strong></td>
+                    <td><%= menu.title || 'Untitled menu' %></td>
+                    <td><%= menu.roleCount %></td>
+                    <td><span class="badge badge-info"><%= menu.multiSelect ? 'Multi select' : 'Single select' %></span></td>
+                    <td><%= menu.channelName || 'Not posted yet' %></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="5" class="table-empty"><i class="fas fa-list"></i> No role menus saved yet</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-gift"></i> Giveaways</div><div class="card-subtitle">Track active and ended giveaways created by the bot</div></div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Prize</th><th>Winners</th><th>Ends</th><th>Status</th></tr></thead>
+            <tbody>
+              <% if (giveaways.length > 0) { %>
+                <% giveaways.forEach(giveaway => { %>
+                  <tr>
+                    <td><strong><%= giveaway.prize || 'Unknown prize' %></strong></td>
+                    <td><%= giveaway.winners || 1 %></td>
+                    <td><%= giveaway.endTime ? new Date(giveaway.endTime).toLocaleString() : 'Unknown' %></td>
+                    <td><span class="badge <%= Number(giveaway.endTime || 0) > Date.now() ? 'badge-success' : 'badge-secondary' %>"><%= Number(giveaway.endTime || 0) > Date.now() ? 'Active' : 'Ended' %></span></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="4" class="table-empty"><i class="fas fa-gift"></i> No giveaways found</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-lightbulb"></i> Suggestion Center</div><div class="card-subtitle">Set the suggestion channel and review recent suggestions</div></div></div>
+        <form id="suggestionSettingsForm">
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Suggestion Channel</label><select class="form-control" name="channelId"><option value="">Disabled</option><% channels.forEach(channel => { %><option value="<%= channel.id %>" <%= suggestionSettings.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option><% }) %></select></div>
+            <div class="form-group"><label class="form-label">Staff Role</label><select class="form-control" name="staffRoleId"><option value="">None</option><% roles.forEach(role => { %><option value="<%= role.id %>" <%= suggestionSettings.staffRoleId === role.id ? 'selected' : '' %>><%= role.name %></option><% }) %></select></div>
+          </div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Enable Suggestions</h4><p>Allow members to submit ideas</p></div><label class="toggle-switch"><input type="checkbox" name="enabled" <%= suggestionSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Voting Enabled</h4><p>Let members vote up or down</p></div><label class="toggle-switch"><input type="checkbox" name="votingEnabled" <%= suggestionSettings.votingEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="toggle-group"><div class="toggle-info"><h4>Auto Thread</h4><p>Create a discussion thread for each suggestion</p></div><label class="toggle-switch"><input type="checkbox" name="autoThread" <%= suggestionSettings.autoThread ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+          <div class="form-actions"><button class="btn btn-primary" type="submit"><i class="fas fa-save"></i> Save Suggestion Settings</button></div>
+        </form>
+
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>User</th><th>Suggestion</th><th>Votes</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+              <% if (suggestions.length > 0) { %>
+                <% suggestions.forEach(item => { %>
+                  <tr>
+                    <td><%= item.username %></td>
+                    <td style="max-width:360px"><%= item.content %></td>
+                    <td>👍 <%= item.upvotes || 0 %> / 👎 <%= item.downvotes || 0 %></td>
+                    <td><span class="badge badge-info"><%= item.status %></span></td>
+                    <td>
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <button class="btn btn-success btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'approved')"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-danger btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'denied')"><i class="fas fa-xmark"></i></button>
+                        <button class="btn btn-secondary btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'pending')"><i class="fas fa-rotate-left"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="5" class="table-empty"><i class="fas fa-lightbulb"></i> No suggestions yet</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+const rrEmojiInput = document.getElementById('rrEmoji');
+const rrEmojiPreview = document.getElementById('rrEmojiPreview');
+const rrServerEmojiSelect = document.getElementById('rrServerEmojiSelect');
+
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  const icons = { success: 'fa-check-circle', error: 'fa-xmark-circle' };
+  t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+function updateReactionEmojiPreview() {
+  const emoji = rrEmojiInput.value.trim();
+  rrEmojiPreview.textContent = emoji ? `Selected emoji: ${emoji}` : 'No emoji selected';
+}
+
+function selectReactionEmoji(emoji) {
+  rrEmojiInput.value = emoji;
+  updateReactionEmojiPreview();
+  if (rrServerEmojiSelect) {
+    rrServerEmojiSelect.value = emoji;
+  }
+}
+
+document.querySelectorAll('#rrEmojiPresets .emoji-choice-btn').forEach((button) => {
+  button.addEventListener('click', () => selectReactionEmoji(button.dataset.emoji));
+});
+
+rrServerEmojiSelect?.addEventListener('change', (event) => {
+  if (event.target.value) {
+    selectReactionEmoji(event.target.value);
+  }
+});
+
+rrEmojiInput.addEventListener('input', updateReactionEmojiPreview);
+updateReactionEmojiPreview();
+
+async function addReactionRole() {
+  const channelId = document.getElementById('rrChannelId').value;
+  const emoji = document.getElementById('rrEmoji').value.trim();
+  const roleId = document.getElementById('rrRoleId').value;
+  const messageContent = document.getElementById('rrMessageContent').value.trim();
+  if (!channelId || !emoji || !roleId || !messageContent) return toast('Fill in channel, message, emoji, and role', 'error');
+  const r = await fetch(`/api/community/${guildId}/reaction-roles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channelId, messageContent, emoji, roleId })
+  });
+  const j = await r.json();
+  if (j.success) { toast(`Reaction role message posted in #${j.channelName}`); setTimeout(() => location.reload(), 700); }
+  else toast(j.error || 'Failed to save', 'error');
+}
+async function removeReactionRole(messageId, emoji) {
+  const r = await fetch(`/api/community/${guildId}/reaction-roles`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messageId, emoji })
+  });
+  const j = await r.json();
+  if (j.success) { toast('Reaction role removed'); setTimeout(() => location.reload(), 700); }
+  else toast(j.error || 'Failed to remove', 'error');
+}
+document.getElementById('suggestionSettingsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const payload = {
+    channelId: fd.get('channelId'),
+    staffRoleId: fd.get('staffRoleId'),
+    enabled: fd.get('enabled') === 'on',
+    votingEnabled: fd.get('votingEnabled') === 'on',
+    autoThread: fd.get('autoThread') === 'on'
+  };
+  const r = await fetch(`/api/community/${guildId}/suggestions/settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const j = await r.json();
+  if (j.success) toast('Suggestion settings saved');
+  else toast(j.error || 'Failed to save', 'error');
+});
+async function updateSuggestionStatus(id, status) {
+  const r = await fetch(`/api/community/${guildId}/suggestions/${id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  const j = await r.json();
+  if (j.success) { toast('Suggestion updated'); setTimeout(() => location.reload(), 700); }
+  else toast(j.error || 'Failed to update', 'error');
+}
+</script>
+</body>
+</html>

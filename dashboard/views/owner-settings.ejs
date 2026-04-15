@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bot Owner Settings</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="server-picker owner-dashboard-shell">
+  <nav class="landing-nav">
+    <div class="container">
+      <a href="/dashboard" class="landing-nav-brand">
+        <div class="landing-nav-brand-icon"><i class="fas fa-crown" style="color:white;font-size:16px"></i></div>
+        Bot Owner
+      </a>
+      <div class="landing-nav-links">
+        <a href="/dashboard" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-left"></i> All Servers</a>
+        <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+        <a href="/logout" class="btn btn-secondary btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="server-picker-content">
+    <div class="page-header">
+      <h1><i class="fas fa-crown" style="color:var(--yellow);margin-right:8px"></i>Bot Owner Settings</h1>
+      <p>Global controls for bot-wide behavior and maintenance tasks.</p>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-card-header"><span class="stat-card-label">Storage</span><div class="stat-card-icon <%= ownerStatus.isMongoConnected ? 'green' : 'yellow' %>"><i class="fas fa-database"></i></div></div>
+        <div class="stat-card-value"><%= ownerStatus.storageMode === 'mongodb' ? 'MongoDB' : 'JSON' %></div>
+        <div class="stat-card-change"><%= ownerStatus.isMongoConnected ? 'Connected and live' : 'Fallback or disconnected' %></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header"><span class="stat-card-label">Sync Mode</span><div class="stat-card-icon brand"><i class="fas fa-rotate"></i></div></div>
+        <div class="stat-card-value"><%= syncStatus.mode === 'manual' ? 'Manual' : 'Auto' %></div>
+        <div class="stat-card-change"><%= syncStatus.intervalMinutes %> min interval</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header"><span class="stat-card-label">Servers</span><div class="stat-card-icon blue"><i class="fas fa-server"></i></div></div>
+        <div class="stat-card-value"><%= ownerStatus.guildCount %></div>
+        <div class="stat-card-change"><%= ownerStatus.userCount %> cached users</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-header"><span class="stat-card-label">Runtime</span><div class="stat-card-icon purple"><i class="fas fa-heart-pulse"></i></div></div>
+        <div class="stat-card-value"><%= Math.floor(ownerStatus.uptimeSeconds / 3600) %>h</div>
+        <div class="stat-card-change"><%= ownerStatus.ping %>ms gateway ping</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><i class="fas fa-user-shield"></i> Owner Access Overview</div>
+          <div class="card-subtitle">Environment-backed bot-wide configuration</div>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <tbody>
+            <tr>
+              <th>BOT_OWNER_ID</th>
+              <td><code><%= ownerStatus.ownerId || 'not configured' %></code></td>
+            </tr>
+            <tr>
+              <th>Error DM Recipient</th>
+              <td><code><%= ownerStatus.errorDmRecipientId || 'not configured' %></code></td>
+            </tr>
+            <tr>
+              <th>Dashboard Callback</th>
+              <td><code><%= ownerStatus.dashboardCallback %></code></td>
+            </tr>
+            <tr>
+              <th>DEV Mode</th>
+              <td>
+                <span class="badge <%= ownerStatus.devMode ? 'badge-yellow' : 'badge-green' %>">
+                  <i class="fas <%= ownerStatus.devMode ? 'fa-flask' : 'fa-check' %>"></i>
+                  <%= ownerStatus.devMode ? 'Enabled' : 'Disabled' %>
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>Heap / RSS</th>
+              <td><%= ownerStatus.heapMemoryMb %> MB / <%= ownerStatus.rssMemoryMb %> MB</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="form-hint">Values in this block come from runtime environment or process state. Change the environment if you need to move owner access or notification targets.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><i class="fas fa-arrows-rotate"></i> MongoDB Sync Settings</div>
+          <div class="card-subtitle">Same controls as the owner slash command, but in the dashboard</div>
+        </div>
+        <button type="button" class="btn btn-secondary" id="runSyncBtn"><i class="fas fa-play"></i> Run Sync Now</button>
+      </div>
+
+      <form id="mongoSyncForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="syncMode">Sync Mode</label>
+            <select class="form-control" id="syncMode" name="mode">
+              <option value="interval" <%= syncStatus.mode === 'interval' ? 'selected' : '' %>>Automatic interval</option>
+              <option value="manual" <%= syncStatus.mode === 'manual' ? 'selected' : '' %>>Manual only</option>
+            </select>
+            <div class="form-hint">Manual mode disables the timer and only syncs when you trigger it.</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="intervalMinutes">Interval Minutes</label>
+            <input class="form-control" id="intervalMinutes" name="intervalMinutes" type="number" min="1" max="1440" value="<%= Math.max(1, Math.round(syncStatus.intervalMs / 60000)) %>">
+            <div class="form-hint">Used when automatic mode is enabled.</div>
+          </div>
+        </div>
+
+        <div class="toggle-group">
+          <div class="toggle-info"><h4>Sync On Startup</h4><p>Push JSON data into MongoDB once after the bot boots.</p></div>
+          <label class="toggle-switch"><input type="checkbox" id="startupSync" <%= syncStatus.startupSync ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+        </div>
+
+        <div class="toggle-group">
+          <div class="toggle-info"><h4>Sync On Shutdown</h4><p>Attempt one final sync before the process exits.</p></div>
+          <label class="toggle-switch"><input type="checkbox" id="shutdownSync" <%= syncStatus.shutdownSync ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+        </div>
+
+        <div class="table-wrapper" style="margin-top:16px;margin-bottom:16px">
+          <table>
+            <tbody>
+              <tr>
+                <th>Connection</th>
+                <td>
+                  <span class="badge <%= syncStatus.isConnected ? 'badge-green' : 'badge-yellow' %>">
+                    <i class="fas <%= syncStatus.isConnected ? 'fa-circle-check' : 'fa-triangle-exclamation' %>"></i>
+                    <%= syncStatus.isConnected ? 'Connected' : 'Not connected' %>
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <th>Next Auto Sync</th>
+                <td id="nextAutoSyncValue"><%= syncStatus.nextAutoSyncAt ? new Date(syncStatus.nextAutoSyncAt).toLocaleString() : 'Not scheduled' %></td>
+              </tr>
+              <tr>
+                <th>Last Sync</th>
+                <td id="lastSyncValue"><%= syncStatus.lastSyncAt ? `${new Date(syncStatus.lastSyncAt).toLocaleString()} (${syncStatus.lastReason || 'unknown'})` : 'No sync recorded yet' %></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg" id="saveSyncBtn"><i class="fas fa-save"></i> Save Owner Settings</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title"><i class="fas fa-code-branch"></i> Current Build</div>
+          <div class="card-subtitle">Latest update fingerprint recorded by the bot</div>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <tbody>
+            <tr>
+              <th>Version</th>
+              <td><%= updateState?.version || 'unknown' %></td>
+            </tr>
+            <tr>
+              <th>Commit</th>
+              <td><code><%= updateState?.commit || 'unknown' %></code></td>
+            </tr>
+            <tr>
+              <th>Branch</th>
+              <td><%= updateState?.branch || 'unknown' %></td>
+            </tr>
+            <tr>
+              <th>Detected Update</th>
+              <td><%= updateState?.updatedAt ? new Date(updateState.updatedAt).toLocaleString() : 'unknown' %></td>
+            </tr>
+            <tr>
+              <th>Last Owner Notification</th>
+              <td><%= updateState?.lastNotifiedAt ? new Date(updateState.lastNotifiedAt).toLocaleString() : 'No DM recorded' %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/dashboard-common.js"></script>
+<script>
+  dashboardUI.initPage();
+
+  const syncForm = document.getElementById('mongoSyncForm');
+  const runSyncBtn = document.getElementById('runSyncBtn');
+  const saveSyncBtn = document.getElementById('saveSyncBtn');
+  const nextAutoSyncValue = document.getElementById('nextAutoSyncValue');
+  const lastSyncValue = document.getElementById('lastSyncValue');
+
+  function setButtonBusy(button, isBusy, busyLabel, idleHtml) {
+    if (!button) return;
+    button.disabled = isBusy;
+    button.innerHTML = isBusy ? '<span class="spinner"></span> ' + busyLabel : idleHtml;
+  }
+
+  function updateSyncStatus(syncStatus) {
+    if (!syncStatus) return;
+    nextAutoSyncValue.textContent = syncStatus.nextAutoSyncAt
+      ? new Date(syncStatus.nextAutoSyncAt).toLocaleString()
+      : 'Not scheduled';
+    lastSyncValue.textContent = syncStatus.lastSyncAt
+      ? new Date(syncStatus.lastSyncAt).toLocaleString() + ' (' + (syncStatus.lastReason || 'unknown') + ')'
+      : 'No sync recorded yet';
+  }
+
+  syncForm.addEventListener('submit', async function (event) {
+    event.preventDefault();
+    setButtonBusy(saveSyncBtn, true, 'Saving...', '<i class="fas fa-save"></i> Save Owner Settings');
+
+    try {
+      const response = await fetch('/api/owner/settings/mongodb-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: document.getElementById('syncMode').value,
+          intervalMinutes: Number(document.getElementById('intervalMinutes').value),
+          startupSync: document.getElementById('startupSync').checked,
+          shutdownSync: document.getElementById('shutdownSync').checked
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save owner settings.');
+      }
+
+      updateSyncStatus(data.syncStatus);
+      dashboardUI.showToast('Owner sync settings updated.', 'success');
+    } catch (error) {
+      dashboardUI.showToast(error.message || 'Failed to save owner settings.', 'error');
+    } finally {
+      setButtonBusy(saveSyncBtn, false, 'Saving...', '<i class="fas fa-save"></i> Save Owner Settings');
+    }
+  });
+
+  runSyncBtn.addEventListener('click', async function () {
+    setButtonBusy(runSyncBtn, true, 'Running...', '<i class="fas fa-play"></i> Run Sync Now');
+
+    try {
+      const response = await fetch('/api/owner/mongodb-sync/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to start MongoDB sync.');
+      }
+
+      updateSyncStatus(data.syncStatus);
+      dashboardUI.showToast(data.message || 'MongoDB sync finished.', data.success ? 'success' : 'warning');
+    } catch (error) {
+      dashboardUI.showToast(error.message || 'Failed to start MongoDB sync.', 'error');
+    } finally {
+      setButtonBusy(runSyncBtn, false, 'Running...', '<i class="fas fa-play"></i> Run Sync Now');
+    }
+  });
+</script>
+</body>
+</html>

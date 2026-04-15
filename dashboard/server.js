@@ -2,9 +2,13 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
+const { PermissionFlagsBits } = require('discord.js');
 require('dotenv').config();
 
+const databaseManager = require('../utils/databaseManager');
 const settingsManager = require('../utils/settingsManager');
 const moderationManager = require('../utils/moderationManager');
 const loggingManager = require('../utils/loggingManager');
@@ -16,6 +20,13 @@ const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
 const liveAlertsManager = require('../utils/liveAlertsManager');
+const suggestionManager = require('../utils/suggestionManager');
+const reactionRoleManager = require('../utils/reactionRoleManager');
+const roleMenuManager = require('../utils/roleMenuManager');
+const tempVoiceManager = require('../utils/tempVoiceManager');
+const voiceRewardsManager = require('../utils/voiceRewardsManager');
+const raidProtectionManager = require('../utils/raidProtectionManager');
+const starboardManager = require('../utils/starboardManager');
 const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 
@@ -47,6 +58,59 @@ const resolveGlobalUsername = async (client, userId) => {
     if (cached) return cached.username || `Unknown (${userId})`;
     const user = await withTimeout(client.users.fetch(userId).catch(() => null), 3000);
     return user ? user.username : `Unknown (${userId})`;
+};
+
+const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');
+const DASHBOARD_AUDIT_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
+const BOT_UPDATE_STATE_FILE = path.join(__dirname, '..', 'data', 'botUpdateState.json');
+
+let dashboardAuditWriteQueue = Promise.resolve();
+
+const readJsonFile = (filePath, fallback) => {
+    try {
+        if (!fs.existsSync(filePath)) return fallback;
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+        return fallback;
+    }
+};
+
+const queueDashboardAuditEntry = (entry) => {
+    dashboardAuditWriteQueue = dashboardAuditWriteQueue
+        .then(async () => {
+            let logs = [];
+
+            try {
+                const content = await fs.promises.readFile(DASHBOARD_AUDIT_FILE, 'utf8');
+                logs = JSON.parse(content);
+            } catch (error) {
+                if (error.code !== 'ENOENT') {
+                    throw error;
+                }
+            }
+
+            logs.push(entry);
+            if (logs.length > 500) {
+                logs = logs.slice(-500);
+            }
+
+            await fs.promises.writeFile(DASHBOARD_AUDIT_FILE, JSON.stringify(logs, null, 2));
+        })
+        .catch((error) => {
+            console.error('Dashboard audit log error:', error.message);
+        });
+};
+
+const logDashboardAudit = (req, action, details = {}) => {
+    queueDashboardAuditEntry({
+        timestamp: new Date().toISOString(),
+        userId: req.user?.id || 'unknown',
+        username: req.user?.username || 'unknown',
+        guildId: req.params?.guildId || details.guildId || null,
+        action,
+        details,
+        ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
+    });
 };
 
 const collectDashboardCommands = (client, guildId) => {
@@ -106,10 +170,16 @@ class Dashboard {
         this.client = client;
         this.app = express();
         this.port = process.env.DASHBOARD_PORT || 3000;
+        this.sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+
+        if (!process.env.SESSION_SECRET) {
+            console.warn('Dashboard SESSION_SECRET is not set. Using an ephemeral secret for this process.');
+        }
         
         // Bind middleware methods to preserve 'this' context
         this.checkAuth = this.checkAuth.bind(this);
         this.checkGuildAccess = this.checkGuildAccess.bind(this);
+        this.checkOwnerAccess = this.checkOwnerAccess.bind(this);
         
         this.setupMiddleware();
         this.setupAuth();
@@ -117,6 +187,12 @@ class Dashboard {
     }
 
     setupMiddleware() {
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        if (isProduction) {
+            this.app.set('trust proxy', 1);
+        }
+
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
         this.app.use(express.static(path.join(__dirname, 'public')));
@@ -124,11 +200,24 @@ class Dashboard {
         this.app.set('views', path.join(__dirname, 'views'));
 
         this.app.use(session({
-            secret: process.env.SESSION_SECRET || 'your-secret-key-change-this',
+            name: 'discordbot.sid',
+            secret: this.sessionSecret,
             resave: false,
             saveUninitialized: false,
-            cookie: { maxAge: 60000 * 60 * 24 } // 24 hours
+            proxy: isProduction,
+            unset: 'destroy',
+            cookie: {
+                maxAge: 60000 * 60 * 24,
+                httpOnly: true,
+                sameSite: 'lax',
+                secure: isProduction
+            }
         }));
+
+        this.app.use((req, res, next) => {
+            res.locals.currentPath = req.path;
+            next();
+        });
 
         this.app.use(passport.initialize());
         this.app.use(passport.session());
@@ -200,14 +289,129 @@ class Dashboard {
 
         // Dashboard - list servers
         this.app.get('/dashboard', this.checkAuth, (req, res) => {
+            const adminPermission = PermissionFlagsBits.Administrator;
             const guilds = req.user.guilds.filter(guild => {
-                return this.client.guilds.cache.has(guild.id);
+                if (!this.client.guilds.cache.has(guild.id)) {
+                    return false;
+                }
+
+                try {
+                    return (BigInt(guild.permissions) & adminPermission) === adminPermission;
+                } catch {
+                    return false;
+                }
             });
 
             res.render('dashboard', {
                 user: req.user,
-                guilds: guilds
+                guilds: guilds,
+                isBotOwner: this.isBotOwner(req.user?.id)
             });
+        });
+
+        // Bot owner settings page
+        this.app.get('/dashboard/owner', this.checkAuth, this.checkOwnerAccess, (req, res) => {
+            const syncStatus = databaseManager.getSyncStatus();
+            const updateState = readJsonFile(BOT_UPDATE_STATE_FILE, null);
+            const memoryUsage = process.memoryUsage();
+
+            res.render('owner-settings', {
+                user: req.user,
+                syncStatus,
+                updateState,
+                ownerStatus: {
+                    ownerId: process.env.BOT_OWNER_ID || null,
+                    errorDmRecipientId: process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID || null,
+                    dashboardPort: this.port,
+                    dashboardCallback: process.env.DASHBOARD_CALLBACK || `http://localhost:${this.port}/callback`,
+                    devMode: databaseManager.devMode,
+                    storageMode: databaseManager.useDB,
+                    isMongoConnected: databaseManager.useDB === 'mongodb' && !!databaseManager.db,
+                    guildCount: this.client.guilds.cache.size,
+                    userCount: this.client.users.cache.size,
+                    ping: this.client.ws?.ping ?? -1,
+                    uptimeSeconds: Math.floor(process.uptime()),
+                    heapMemoryMb: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+                    rssMemoryMb: Math.round(memoryUsage.rss / 1024 / 1024)
+                }
+            });
+        });
+
+        // API: Update owner MongoDB sync settings
+        this.app.post('/api/owner/settings/mongodb-sync', this.checkAuth, this.checkOwnerAccess, async (req, res) => {
+            try {
+                const { mode, intervalMinutes, startupSync, shutdownSync } = req.body;
+                const updates = {};
+
+                if (mode !== undefined) {
+                    if (!['manual', 'interval'].includes(mode)) {
+                        return res.status(400).json({ success: false, error: 'Mode must be manual or interval.' });
+                    }
+
+                    updates.mode = mode;
+                }
+
+                if (intervalMinutes !== undefined && intervalMinutes !== null && intervalMinutes !== '') {
+                    const parsedMinutes = Number(intervalMinutes);
+                    if (!Number.isFinite(parsedMinutes) || parsedMinutes < 1 || parsedMinutes > 1440) {
+                        return res.status(400).json({ success: false, error: 'Interval must be between 1 and 1440 minutes.' });
+                    }
+
+                    updates.intervalMs = Math.round(parsedMinutes * 60_000);
+                }
+
+                if (typeof startupSync === 'boolean') {
+                    updates.startupSync = startupSync;
+                }
+
+                if (typeof shutdownSync === 'boolean') {
+                    updates.shutdownSync = shutdownSync;
+                }
+
+                if (Object.keys(updates).length === 0) {
+                    return res.status(400).json({ success: false, error: 'No owner settings were provided.' });
+                }
+
+                const syncStatus = await databaseManager.updateSyncSettings(updates);
+                logDashboardAudit(req, 'OWNER_UPDATE_MONGODB_SYNC', {
+                    mode: syncStatus.mode,
+                    intervalMs: syncStatus.intervalMs,
+                    startupSync: syncStatus.startupSync,
+                    shutdownSync: syncStatus.shutdownSync
+                });
+
+                res.json({ success: true, syncStatus });
+            } catch (error) {
+                console.error('Error updating owner MongoDB sync settings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Trigger owner MongoDB sync now
+        this.app.post('/api/owner/mongodb-sync/run', this.checkAuth, this.checkOwnerAccess, async (req, res) => {
+            try {
+                const result = await databaseManager.syncAllJsonToMongo({ force: true, reason: 'dashboard-owner' });
+                const syncStatus = databaseManager.getSyncStatus();
+
+                logDashboardAudit(req, 'OWNER_RUN_MONGODB_SYNC', {
+                    failedCount: result.failedCount,
+                    syncedCount: result.syncedCount,
+                    skippedCount: result.skippedCount,
+                    reason: 'dashboard-owner'
+                });
+
+                res.json({
+                    success: result.failedCount === 0,
+                    result,
+                    syncStatus,
+                    message: result.failedCount > 0
+                        ? 'MongoDB sync completed with some issues.'
+                        : 'MongoDB sync completed successfully.'
+                });
+            } catch (error) {
+                console.error('Error running owner MongoDB sync:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
         });
 
         // Server settings page
@@ -230,6 +434,7 @@ class Dashboard {
                 res.render('server', {
                     user: req.user,
                     guild: guild,
+                    isBotOwner: this.isBotOwner(req.user?.id),
                     settings: settings,
                     modSettings: modSettings,
                     modLogChannel: modLogChannel,
@@ -596,6 +801,392 @@ class Dashboard {
             }
         });
 
+        // Community tools dashboard
+        this.app.get('/dashboard/:guildId/community', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const suggestionSettings = suggestionManager.getSettings(guildId);
+
+                const reactionRoles = Object.entries(reactionRoleManager.data || {})
+                    .filter(([key]) => key.startsWith(`${guildId}_`))
+                    .flatMap(([key, mapping]) => {
+                        const messageId = key.slice(guildId.length + 1);
+                        return Object.entries(mapping || {}).map(([emoji, entry]) => {
+                            const normalizedEntry = reactionRoleManager.normalizeEntry(entry);
+                            const roleId = normalizedEntry?.roleId || null;
+                            const channelId = normalizedEntry?.channelId || null;
+
+                            return {
+                            messageId,
+                            emoji,
+                            roleId,
+                            roleName: roleId ? (guild?.roles?.cache?.get(roleId)?.name || `Unknown (${roleId})`) : 'Unknown role',
+                            channelId,
+                            channelName: channelId ? (guild?.channels?.cache?.get(channelId)?.name || `Unknown (${channelId})`) : 'Unknown channel',
+                            messageContent: normalizedEntry?.messageContent || null,
+                            messageUrl: normalizedEntry?.messageUrl || `https://discord.com/channels/${guildId}/${channelId || '@me'}/${messageId}`
+                        };
+                        });
+                    });
+
+                const roleMenus = roleMenuManager.getMenus(guildId).map(menu => ({
+                    ...menu,
+                    roleCount: Array.isArray(menu.roles) ? menu.roles.length : 0,
+                    channelName: menu.channelId ? (guild?.channels?.cache?.get(menu.channelId)?.name || `Unknown (${menu.channelId})`) : null
+                }));
+
+                const giveaways = readJsonFile(GIVEAWAYS_FILE, [])
+                    .filter(entry => entry.guildId === guildId)
+                    .sort((a, b) => Number(b.endTime || 0) - Number(a.endTime || 0));
+
+                let suggestions = suggestionManager.getGuildSuggestions(guildId)
+                    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+                    .slice(0, 50);
+
+                suggestions = await Promise.all(suggestions.map(async (entry) => ({
+                    ...entry,
+                    username: await resolveGuildUsername(guild, entry.userId)
+                })));
+
+                res.render('community', {
+                    guild,
+                    user: req.user,
+                    reactionRoles,
+                    roleMenus,
+                    giveaways,
+                    suggestions,
+                    suggestionSettings,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
+                    guildEmojis: Array.from(guild.emojis.cache.values())
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map(emoji => ({
+                            id: emoji.id,
+                            name: emoji.name,
+                            animated: emoji.animated,
+                            value: `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`,
+                            preview: `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`
+                        }))
+                });
+            } catch (error) {
+                console.error('Community tools page error:', error);
+                res.status(500).send('Error loading community tools');
+            }
+        });
+
+        this.app.post('/api/community/:guildId/reaction-roles', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { emoji, roleId, channelId, messageContent } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!emoji || !roleId || !channelId || !messageContent) {
+                    return res.status(400).json({ success: false, error: 'Channel, message, emoji, and role are required' });
+                }
+
+                const trimmedEmoji = String(emoji).trim();
+                const trimmedRoleId = String(roleId).trim();
+                const trimmedChannelId = String(channelId).trim();
+                const trimmedMessageContent = String(messageContent).trim();
+
+                if (!trimmedMessageContent) {
+                    return res.status(400).json({ success: false, error: 'Message content cannot be empty' });
+                }
+
+                const role = guild.roles.cache.get(trimmedRoleId);
+                if (!role || role.name === '@everyone') {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid role' });
+                }
+
+                const channel = guild.channels.cache.get(trimmedChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember) {
+                    return res.status(500).json({ success: false, error: 'Bot member is unavailable in this guild' });
+                }
+
+                const channelPermissions = channel.permissionsFor(botMember);
+                if (!channelPermissions?.has(PermissionFlagsBits.ViewChannel | PermissionFlagsBits.SendMessages | PermissionFlagsBits.AddReactions)) {
+                    return res.status(400).json({ success: false, error: 'Bot needs View Channel, Send Messages, and Add Reactions in the selected channel' });
+                }
+
+                if (!botMember.permissions.has(PermissionFlagsBits.ManageRoles) || botMember.roles.highest.comparePositionTo(role) <= 0) {
+                    return res.status(400).json({ success: false, error: 'Bot cannot manage the selected role because of missing Manage Roles permission or role hierarchy' });
+                }
+
+                const postedMessage = await channel.send({ content: trimmedMessageContent });
+
+                try {
+                    await postedMessage.react(trimmedEmoji);
+                } catch (error) {
+                    await postedMessage.delete().catch(() => null);
+                    return res.status(400).json({ success: false, error: 'Bot could not add that emoji as a reaction. Use a valid emoji the bot can access.' });
+                }
+
+                await reactionRoleManager.addReactionRole(guildId, postedMessage.id, trimmedEmoji, trimmedRoleId, {
+                    channelId: channel.id,
+                    messageContent: postedMessage.content.slice(0, 180),
+                    messageUrl: postedMessage.url
+                });
+
+                res.json({
+                    success: true,
+                    messageId: postedMessage.id,
+                    messageUrl: postedMessage.url,
+                    channelName: channel.name
+                });
+            } catch (error) {
+                console.error('Error saving reaction role:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/community/:guildId/reaction-roles', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const { messageId, emoji } = req.body;
+
+                if (!messageId || !emoji) {
+                    return res.status(400).json({ success: false, error: 'Message ID and emoji are required' });
+                }
+
+                await reactionRoleManager.removeReactionRole(guildId, String(messageId).trim(), String(emoji).trim());
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error removing reaction role:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/community/:guildId/suggestions/settings', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const isTrue = (value) => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
+
+                await suggestionManager.updateSettings(guildId, {
+                    enabled: isTrue(req.body.enabled),
+                    autoThread: isTrue(req.body.autoThread),
+                    votingEnabled: isTrue(req.body.votingEnabled),
+                    channelId: req.body.channelId || null,
+                    staffRoleId: req.body.staffRoleId || null
+                });
+
+                res.json({ success: true, settings: suggestionManager.getSettings(guildId) });
+            } catch (error) {
+                console.error('Error updating suggestion settings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/community/:guildId/suggestions/:suggestionId/status', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId, suggestionId } = req.params;
+                const { status, reason } = req.body;
+
+                if (!['pending', 'approved', 'denied'].includes(status)) {
+                    return res.status(400).json({ success: false, error: 'Invalid status' });
+                }
+
+                const updated = await suggestionManager.updateSuggestionStatus(guildId, suggestionId, status, reason || null);
+                if (!updated) {
+                    return res.status(404).json({ success: false, error: 'Suggestion not found' });
+                }
+
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error updating suggestion status:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // Voice tools dashboard
+        this.app.get('/dashboard/:guildId/voice-tools', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const voiceSettings = voiceRewardsManager.getSettings(guildId);
+                const hubChannelId = tempVoiceManager.getHub(guildId);
+                const activeSessions = Object.keys(voiceRewardsManager.data.sessions?.[guildId] || {}).length;
+
+                let leaderboard = voiceRewardsManager.getVoiceLeaderboard(guildId, 20);
+                leaderboard = await Promise.all(leaderboard.map(async (entry) => ({
+                    ...entry,
+                    username: await resolveGuildUsername(guild, entry.userId)
+                })));
+
+                res.render('voice-tools', {
+                    guild,
+                    user: req.user,
+                    voiceSettings,
+                    hubChannelId,
+                    activeSessions,
+                    leaderboard,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 2)
+                });
+            } catch (error) {
+                console.error('Voice tools page error:', error);
+                res.status(500).send('Error loading voice tools');
+            }
+        });
+
+        this.app.post('/api/voice-tools/:guildId/tempvc', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const hubChannelId = req.body.hubChannelId || null;
+
+                if (hubChannelId) {
+                    await tempVoiceManager.setHub(guildId, hubChannelId);
+                } else {
+                    await tempVoiceManager.removeHub(guildId);
+                }
+
+                res.json({ success: true, hubChannelId: tempVoiceManager.getHub(guildId) });
+            } catch (error) {
+                console.error('Error updating temp voice hub:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/voice-tools/:guildId/rewards', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const isTrue = (value) => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
+
+                await voiceRewardsManager.updateSettings(guildId, {
+                    enabled: isTrue(req.body.enabled),
+                    xpPerMinute: Math.max(0, Number(req.body.xpPerMinute) || 0),
+                    coinsPerHour: Math.max(0, Number(req.body.coinsPerHour) || 0),
+                    minUsersRequired: Math.max(1, Number(req.body.minUsersRequired) || 1),
+                    afkChannelExcluded: isTrue(req.body.afkChannelExcluded)
+                });
+
+                res.json({ success: true, settings: voiceRewardsManager.getSettings(guildId) });
+            } catch (error) {
+                console.error('Error updating voice rewards:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // Safety center dashboard
+        this.app.get('/dashboard/:guildId/safety', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const settings = settingsManager.get(guildId);
+                const raidSettings = raidProtectionManager.getSettings(guildId);
+                const raidStatus = raidProtectionManager.checkRaidAlert(guildId);
+                const starboardEntries = Object.values(starboardManager.data?.[guildId] || {});
+
+                res.render('safety', {
+                    guild,
+                    user: req.user,
+                    settings,
+                    raidSettings,
+                    raidStatus,
+                    featuredCount: starboardEntries.length,
+                    locked: raidProtectionManager.isLocked(guildId),
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone')
+                });
+            } catch (error) {
+                console.error('Safety page error:', error);
+                res.status(500).send('Error loading safety center');
+            }
+        });
+
+        this.app.post('/api/safety/:guildId/starboard', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const channelId = req.body.channelId || null;
+                const threshold = Math.max(1, Number(req.body.threshold) || 3);
+
+                await settingsManager.setMultiple(guildId, {
+                    starboardChannel: channelId,
+                    starboardThreshold: threshold
+                });
+
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error updating starboard settings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/safety/:guildId/raid', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const isTrue = (value) => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
+
+                await raidProtectionManager.updateSettings(guildId, {
+                    enabled: isTrue(req.body.enabled),
+                    joinRateLimit: Math.max(2, Number(req.body.joinRateLimit) || 5),
+                    timeWindow: Math.max(5, Number(req.body.timeWindow) || 10),
+                    accountAgeRequired: Math.max(0, Number(req.body.accountAgeRequired) || 0),
+                    verificationEnabled: isTrue(req.body.verificationEnabled),
+                    verificationRole: req.body.verificationRole || null,
+                    autoKickNewAccounts: isTrue(req.body.autoKickNewAccounts),
+                    autoKickRaiders: isTrue(req.body.autoKickRaiders)
+                });
+
+                res.json({ success: true, settings: raidProtectionManager.getSettings(guildId) });
+            } catch (error) {
+                console.error('Error updating raid settings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/safety/:guildId/lockdown', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const locked = req.body.locked === true || req.body.locked === 'true' || req.body.locked === 'on';
+                await raidProtectionManager.setLockdown(guildId, locked);
+                res.json({ success: true, locked });
+            } catch (error) {
+                console.error('Error toggling lockdown:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // Bot health dashboard
+        this.app.get('/dashboard/:guildId/health', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const memUsage = process.memoryUsage();
+                const auditLogs = readJsonFile(DASHBOARD_AUDIT_FILE, [])
+                    .filter(entry => !entry.guildId || entry.guildId === guildId)
+                    .slice(-30)
+                    .reverse();
+
+                res.render('health', {
+                    guild,
+                    user: req.user,
+                    health: {
+                        status: this.client?.isReady?.() ? 'Online' : 'Starting',
+                        uptime: Math.floor(process.uptime()),
+                        ping: this.client?.ws?.ping ?? -1,
+                        guilds: this.client?.guilds?.cache?.size ?? 0,
+                        users: this.client?.users?.cache?.size ?? 0,
+                        memoryMB: Math.round(memUsage.heapUsed / 1024 / 1024),
+                        rssMB: Math.round(memUsage.rss / 1024 / 1024),
+                        cpuLoad: Math.round((process.cpuUsage().user + process.cpuUsage().system) / 1000)
+                    },
+                    auditLogs
+                });
+            } catch (error) {
+                console.error('Health page error:', error);
+                res.status(500).send('Error loading health dashboard');
+            }
+        });
+
         // Command permission management
         this.app.post('/api/command-permissions/:guildId/:commandName', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
@@ -777,29 +1368,50 @@ class Dashboard {
         res.redirect('/login');
     }
 
-    checkGuildAccess(req, res, next) {
-        const guildId = req.params.guildId;
-        
-        // Check if bot is in the guild
-        if (!this.client.guilds.cache.has(guildId)) {
-            return res.status(403).send('Bot is not in this server');
+    isBotOwner(userId) {
+        return Boolean(process.env.BOT_OWNER_ID) && userId === process.env.BOT_OWNER_ID;
+    }
+
+    checkOwnerAccess(req, res, next) {
+        if (!process.env.BOT_OWNER_ID) {
+            return res.status(403).send('BOT_OWNER_ID is not configured');
         }
 
-        // Check if user has access to this guild
-        const userGuild = req.user.guilds.find(g => g.id === guildId);
-        if (!userGuild) {
-            return res.status(403).send('You do not have access to this server');
-        }
-
-        // Check if user has admin permissions
-        const permissions = BigInt(userGuild.permissions);
-        const ADMINISTRATOR = 0x0000000000000008n;
-        
-        if ((permissions & ADMINISTRATOR) !== ADMINISTRATOR) {
-            return res.status(403).send('You need Administrator permissions');
+        if (!this.isBotOwner(req.user?.id)) {
+            return res.status(403).send('Only the bot owner can access this dashboard area');
         }
 
         next();
+    }
+
+    async checkGuildAccess(req, res, next) {
+        try {
+            const guildId = req.params.guildId;
+            const guild = this.client.guilds.cache.get(guildId);
+
+            if (!guild) {
+                return res.status(403).send('Bot is not in this server');
+            }
+
+            const userGuild = req.user.guilds.find(g => g.id === guildId);
+            if (!userGuild) {
+                return res.status(403).send('You do not have access to this server');
+            }
+
+            const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+            if (!member) {
+                return res.status(403).send('Unable to verify your current server permissions');
+            }
+
+            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return res.status(403).send('You need Administrator permissions');
+            }
+
+            next();
+        } catch (error) {
+            console.error('Dashboard guild access check failed:', error);
+            res.status(500).send('Failed to verify dashboard access');
+        }
     }
 
     start() {

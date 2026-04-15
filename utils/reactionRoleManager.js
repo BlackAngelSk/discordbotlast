@@ -7,6 +7,22 @@ class ReactionRoleManager {
         this.data = {};
     }
 
+    normalizeEntry(entry) {
+        if (!entry) return null;
+        if (typeof entry === 'string') {
+            return { roleId: entry, channelId: null, messageContent: null, messageUrl: null };
+        }
+        if (typeof entry === 'object' && typeof entry.roleId === 'string') {
+            return {
+                roleId: entry.roleId,
+                channelId: entry.channelId || null,
+                messageContent: entry.messageContent || null,
+                messageUrl: entry.messageUrl || null
+            };
+        }
+        return null;
+    }
+
     async init() {
         try {
             // Ensure data directory exists
@@ -32,12 +48,17 @@ class ReactionRoleManager {
         }
     }
 
-    async addReactionRole(guildId, messageId, emoji, roleId) {
+    async addReactionRole(guildId, messageId, emoji, roleId, metadata = {}) {
         const key = `${guildId}_${messageId}`;
         if (!this.data[key]) {
             this.data[key] = {};
         }
-        this.data[key][emoji] = roleId;
+        this.data[key][emoji] = {
+            roleId,
+            channelId: metadata.channelId || null,
+            messageContent: metadata.messageContent || null,
+            messageUrl: metadata.messageUrl || null
+        };
         await this.save();
     }
 
@@ -57,9 +78,14 @@ class ReactionRoleManager {
         return this.data[key] || {};
     }
 
-    getRoleForReaction(guildId, messageId, emoji) {
+    getReactionRoleEntry(guildId, messageId, emoji) {
         const reactionRoles = this.getReactionRoles(guildId, messageId);
-        return reactionRoles[emoji];
+        return this.normalizeEntry(reactionRoles[emoji]);
+    }
+
+    getRoleForReaction(guildId, messageId, emoji) {
+        const entry = this.getReactionRoleEntry(guildId, messageId, emoji);
+        return entry?.roleId || null;
     }
 }
 
