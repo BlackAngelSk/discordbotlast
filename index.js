@@ -473,18 +473,16 @@ async function updateSeasonLeaderboards(client) {
                 let messageEdited = false;
 
                 // Try to edit existing message
-                if (existingMessageId) {
-                    try {
-                        const msg = await withTimeout(seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId), 5000);
-                        if (msg) {
-                            await withTimeout(msg.edit({ embeds: [embeds[0]], components }), 5000);
-                            leaderboardMessage = msg;
-                            messageEdited = true;
-                            console.log(`✅ Edited existing leaderboard message ${existingMessageId} for guild ${guildId}`);
-                        }
-                    } catch (error) {
-                        console.warn(`Could not fetch/edit message ${existingMessageId}: ${error.message}`);
+                try {
+                    const msg = await withTimeout(seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId), 5000);
+                    if (msg) {
+                        await withTimeout(msg.edit({ embeds: [embeds[0]], components }), 5000);
+                        leaderboardMessage = msg;
+                        messageEdited = true;
+                        console.log(`✅ Edited existing leaderboard message ${msg.id} for guild ${guildId}`);
                     }
+                } catch (error) {
+                    console.warn(`Could not fetch/edit leaderboard message for guild ${guildId}: ${error.message}`);
                 }
 
                 // If couldn't edit, create new message

@@ -540,17 +540,13 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
     const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
 
     let leaderboardMessage;
-    if (existingMessageId) {
-        try {
-            const message = await seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId);
-            if (!message) {
-                throw new Error('Existing leaderboard message not found');
-            }
-            leaderboardMessage = await message.edit({ embeds: [embeds[0]], components });
-        } catch (error) {
-            leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+    try {
+        const message = await seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId);
+        if (!message) {
+            throw new Error('Existing leaderboard message not found');
         }
-    } else {
+        leaderboardMessage = await message.edit({ embeds: [embeds[0]], components });
+    } catch (error) {
         leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
     }
 

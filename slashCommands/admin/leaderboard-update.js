@@ -136,17 +136,13 @@ module.exports = {
             }
 
             let leaderboardMessage;
-            if (existingMessageId) {
-                try {
-                    const msg = await seasonLeaderboardManager.findLeaderboardMessage(channel, interaction.guildId, existingMessageId);
-                    if (!msg) {
-                        throw new Error('Existing leaderboard message not found');
-                    }
-                    leaderboardMessage = await msg.edit({ embeds: [embeds[0]], components });
-                } catch (error) {
-                    leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+            try {
+                const msg = await seasonLeaderboardManager.findLeaderboardMessage(channel, interaction.guildId, existingMessageId);
+                if (!msg) {
+                    throw new Error('Existing leaderboard message not found');
                 }
-            } else {
+                leaderboardMessage = await msg.edit({ embeds: [embeds[0]], components });
+            } catch (error) {
                 leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
             }
 

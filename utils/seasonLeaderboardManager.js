@@ -324,7 +324,9 @@ class SeasonLeaderboardManager {
     async setLeaderboardMessages(guildId, messageIds = []) {
         const cfg = this.getGuildConfig(guildId);
         cfg.messageIds = messageIds;
-        cfg.messageId = messageIds[0] || null; // Backward compatibility
+        if (messageIds.length > 0) {
+            cfg.messageId = messageIds[0]; // Backward compatibility
+        }
         await this.save();
     }
 
