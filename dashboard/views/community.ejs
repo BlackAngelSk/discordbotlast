@@ -58,8 +58,13 @@
           </div>
         <% } %>
         <div class="emoji-selection-preview" id="rrEmojiPreview">No emoji selected</div>
+        <input type="hidden" id="rrEditingMessageId">
+        <input type="hidden" id="rrEditingOriginalEmoji">
         <div class="form-group"><label class="form-label">Message</label><textarea class="form-control" id="rrMessageContent" rows="4" placeholder="Write the message that the bot should post for users to react to."></textarea></div>
-        <div class="form-actions"><button class="btn btn-primary" onclick="addReactionRole()"><i class="fas fa-paper-plane"></i> Post Reaction Role Message</button></div>
+        <div class="form-actions">
+          <button class="btn btn-primary" type="button" id="rrSubmitBtn"><i class="fas fa-paper-plane"></i> Post Reaction Role Message</button>
+          <button class="btn btn-secondary" type="button" id="rrCancelEditBtn" style="display:none"><i class="fas fa-xmark"></i> Cancel Edit</button>
+        </div>
         <div class="table-wrapper">
           <table>
             <thead><tr><th>Channel</th><th>Message</th><th>Emoji</th><th>Role</th><th>Action</th></tr></thead>
@@ -77,7 +82,23 @@
                     </td>
                     <td style="font-size:18px"><%= item.emoji %></td>
                     <td><%= item.roleName %></td>
-                    <td><button class="btn btn-danger btn-sm" onclick="removeReactionRole('<%= item.messageId %>', '<%= item.emoji.replace(/'/g, "\\'") %>')"><i class="fas fa-trash"></i></button></td>
+                    <td>
+                      <div class="table-action-row">
+                        <button
+                          class="btn btn-secondary btn-sm rr-edit-btn"
+                          data-message-id="<%= item.messageId %>"
+                          data-channel-id="<%= item.channelId %>"
+                          data-emoji="<%= encodeURIComponent(item.emoji) %>"
+                          data-role-id="<%= item.roleId %>"
+                          data-message-content="<%= encodeURIComponent(item.messageContent || '') %>"
+                        ><i class="fas fa-pen"></i></button>
+                        <button
+                          class="btn btn-danger btn-sm rr-remove-btn"
+                          data-message-id="<%= item.messageId %>"
+                          data-emoji="<%= item.emoji %>"
+                        ><i class="fas fa-trash"></i></button>
+                      </div>
+                    </td>
                   </tr>
                 <% }) %>
               <% } else { %>
@@ -160,10 +181,10 @@
                     <td>👍 <%= item.upvotes || 0 %> / 👎 <%= item.downvotes || 0 %></td>
                     <td><span class="badge badge-info"><%= item.status %></span></td>
                     <td>
-                      <div style="display:flex;gap:6px;flex-wrap:wrap">
-                        <button class="btn btn-success btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'approved')"><i class="fas fa-check"></i></button>
-                        <button class="btn btn-danger btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'denied')"><i class="fas fa-xmark"></i></button>
-                        <button class="btn btn-secondary btn-sm" onclick="updateSuggestionStatus('<%= item.id %>', 'pending')"><i class="fas fa-rotate-left"></i></button>
+                      <div class="table-action-row">
+                        <button class="btn btn-success btn-sm suggestion-status-btn" data-suggestion-id="<%= item.id %>" data-status="approved"><i class="fas fa-check"></i></button>
+                        <button class="btn btn-danger btn-sm suggestion-status-btn" data-suggestion-id="<%= item.id %>" data-status="denied"><i class="fas fa-xmark"></i></button>
+                        <button class="btn btn-secondary btn-sm suggestion-status-btn" data-suggestion-id="<%= item.id %>" data-status="pending"><i class="fas fa-rotate-left"></i></button>
                       </div>
                     </td>
                   </tr>
@@ -186,6 +207,13 @@ const guildId = '<%= guild.id %>';
 const rrEmojiInput = document.getElementById('rrEmoji');
 const rrEmojiPreview = document.getElementById('rrEmojiPreview');
 const rrServerEmojiSelect = document.getElementById('rrServerEmojiSelect');
+const rrChannelIdInput = document.getElementById('rrChannelId');
+const rrRoleIdInput = document.getElementById('rrRoleId');
+const rrMessageContentInput = document.getElementById('rrMessageContent');
+const rrEditingMessageIdInput = document.getElementById('rrEditingMessageId');
+const rrEditingOriginalEmojiInput = document.getElementById('rrEditingOriginalEmoji');
+const rrSubmitBtn = document.getElementById('rrSubmitBtn');
+const rrCancelEditBtn = document.getElementById('rrCancelEditBtn');
 
 function toast(msg, type = 'success') {
   const c = document.getElementById('toasts');
@@ -210,6 +238,35 @@ function selectReactionEmoji(emoji) {
   }
 }
 
+function resetReactionRoleEditor() {
+  rrEditingMessageIdInput.value = '';
+  rrEditingOriginalEmojiInput.value = '';
+  rrChannelIdInput.disabled = false;
+  rrChannelIdInput.value = '';
+  rrEmojiInput.value = '';
+  rrRoleIdInput.value = '';
+  rrMessageContentInput.value = '';
+  rrSubmitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Reaction Role Message';
+  rrCancelEditBtn.style.display = 'none';
+  updateReactionEmojiPreview();
+  if (rrServerEmojiSelect) {
+    rrServerEmojiSelect.value = '';
+  }
+}
+
+function enterReactionRoleEditMode(button) {
+  rrEditingMessageIdInput.value = button.dataset.messageId || '';
+  rrEditingOriginalEmojiInput.value = decodeURIComponent(button.dataset.emoji || '');
+  rrChannelIdInput.value = button.dataset.channelId || '';
+  rrChannelIdInput.disabled = true;
+  rrRoleIdInput.value = button.dataset.roleId || '';
+  rrMessageContentInput.value = decodeURIComponent(button.dataset.messageContent || '');
+  selectReactionEmoji(decodeURIComponent(button.dataset.emoji || ''));
+  rrSubmitBtn.innerHTML = '<i class="fas fa-save"></i> Update Reaction Role Message';
+  rrCancelEditBtn.style.display = '';
+  rrMessageContentInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 document.querySelectorAll('#rrEmojiPresets .emoji-choice-btn').forEach((button) => {
   button.addEventListener('click', () => selectReactionEmoji(button.dataset.emoji));
 });
@@ -223,19 +280,45 @@ rrServerEmojiSelect?.addEventListener('change', (event) => {
 rrEmojiInput.addEventListener('input', updateReactionEmojiPreview);
 updateReactionEmojiPreview();
 
+document.querySelectorAll('.rr-remove-btn').forEach((button) => {
+  button.addEventListener('click', () => {
+    removeReactionRole(button.dataset.messageId, button.dataset.emoji);
+  });
+});
+
+document.querySelectorAll('.rr-edit-btn').forEach((button) => {
+  button.addEventListener('click', () => enterReactionRoleEditMode(button));
+});
+
+rrCancelEditBtn.addEventListener('click', resetReactionRoleEditor);
+
+document.querySelectorAll('.suggestion-status-btn').forEach((button) => {
+  button.addEventListener('click', () => {
+    updateSuggestionStatus(button.dataset.suggestionId, button.dataset.status);
+  });
+});
+
 async function addReactionRole() {
-  const channelId = document.getElementById('rrChannelId').value;
-  const emoji = document.getElementById('rrEmoji').value.trim();
-  const roleId = document.getElementById('rrRoleId').value;
-  const messageContent = document.getElementById('rrMessageContent').value.trim();
+  const channelId = rrChannelIdInput.value;
+  const emoji = rrEmojiInput.value.trim();
+  const roleId = rrRoleIdInput.value;
+  const messageContent = rrMessageContentInput.value.trim();
+  const editingMessageId = rrEditingMessageIdInput.value;
+  const originalEmoji = rrEditingOriginalEmojiInput.value;
   if (!channelId || !emoji || !roleId || !messageContent) return toast('Fill in channel, message, emoji, and role', 'error');
   const r = await fetch(`/api/community/${guildId}/reaction-roles`, {
-    method: 'POST',
+    method: editingMessageId ? 'PUT' : 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ channelId, messageContent, emoji, roleId })
+    body: JSON.stringify(editingMessageId
+      ? { messageId: editingMessageId, originalEmoji, messageContent, emoji, roleId }
+      : { channelId, messageContent, emoji, roleId })
   });
   const j = await r.json();
-  if (j.success) { toast(`Reaction role message posted in #${j.channelName}`); setTimeout(() => location.reload(), 700); }
+  if (j.success) {
+    toast(editingMessageId ? 'Reaction role updated' : `Reaction role message posted in #${j.channelName}`);
+    resetReactionRoleEditor();
+    setTimeout(() => location.reload(), 700);
+  }
   else toast(j.error || 'Failed to save', 'error');
 }
 async function removeReactionRole(messageId, emoji) {
@@ -277,6 +360,7 @@ async function updateSuggestionStatus(id, status) {
   if (j.success) { toast('Suggestion updated'); setTimeout(() => location.reload(), 700); }
   else toast(j.error || 'Failed to update', 'error');
 }
+rrSubmitBtn.addEventListener('click', addReactionRole);
 </script>
 </body>
 </html>

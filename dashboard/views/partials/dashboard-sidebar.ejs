@@ -24,12 +24,14 @@ const isActive = (path) => activePath === path ? ' active' : '';
     <a href="<%= `${dashboardBasePath}/live-alerts` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/live-alerts`) %>"><i class="fas fa-satellite-dish"></i> Live Alerts</a>
     <a href="<%= `${dashboardBasePath}/community` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/community`) %>"><i class="fas fa-users-gear"></i> Community</a>
     <a href="<%= `${dashboardBasePath}/voice-tools` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/voice-tools`) %>"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
+    <a href="<%= `${dashboardBasePath}/permissions` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/permissions`) %>"><i class="fas fa-user-lock"></i> Delegation</a>
     <div class="sidebar-section-label">Moderation</div>
     <a href="<%= `${dashboardBasePath}/moderation` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/moderation`) %>"><i class="fas fa-shield-halved"></i> Moderation</a>
     <a href="<%= `${dashboardBasePath}/automod` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/automod`) %>"><i class="fas fa-robot"></i> Auto-Mod</a>
     <a href="<%= `${dashboardBasePath}/safety` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/safety`) %>"><i class="fas fa-user-shield"></i> Safety Center</a>
     <div class="sidebar-section-label">Stats</div>
     <a href="<%= `${dashboardBasePath}/analytics` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/analytics`) %>"><i class="fas fa-chart-line"></i> Analytics</a>
+    <a href="<%= `${dashboardBasePath}/activity` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/activity`) %>"><i class="fas fa-clock-rotate-left"></i> Activity</a>
     <a href="<%= `${dashboardBasePath}/health` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/health`) %>"><i class="fas fa-heart-pulse"></i> Bot Health</a>
     <a href="/global-leaderboard" class="sidebar-link<%= isActive('/global-leaderboard') %>"><i class="fas fa-globe"></i> Global Leaderboard</a>
   </nav>

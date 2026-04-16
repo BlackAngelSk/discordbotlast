@@ -17,7 +17,7 @@
         <main class="content">
             <div class="page-header">
                 <h1><i class="fas fa-coins" style="color:var(--brand);margin-right:8px"></i>Economy Leaderboard</h1>
-                <p>Top earners in <strong><%= guild.name %></strong></p>
+                <p>Top earners and season leaderboard controls for <strong><%= guild.name %></strong></p>
             </div>
 
             <div class="stats-row">
@@ -41,6 +41,257 @@
                     <div class="stat-card-value">Lv <%= leaderboard.length > 0 ? Math.max(...leaderboard.map(u=>u.level||0)) : 0 %></div>
                     <div class="stat-card-change"><i class="fas fa-star"></i> Highest rank</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Current Season</span><div class="stat-card-icon brand"><i class="fas fa-calendar-days"></i></div></div>
+                    <div class="stat-card-value"><%= currentSeasonName || 'None' %></div>
+                    <div class="stat-card-change"><i class="fas fa-chart-line"></i> <%= currentSeason ? `${currentSeason.totalPlayers || 0} tracked players` : 'Preview uses sample data' %></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Season Preview</span><div class="stat-card-icon purple"><i class="fas fa-eye"></i></div></div>
+                    <div class="stat-card-value"><%= seasonLeaderboardPreview.mode === 'live' ? 'Live' : 'Sample' %></div>
+                    <div class="stat-card-change"><i class="fas fa-layer-group"></i> <%= seasonLeaderboardPreview.embeds.length %> embed <%= seasonLeaderboardPreview.embeds.length === 1 ? 'page' : 'pages' %></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-trophy"></i> Season Leaderboard Settings</div>
+                        <div class="card-subtitle">Edit the live season leaderboard from the dashboard and preview how it will look before posting updates.</div>
+                    </div>
+                    <div class="dashboard-inline-badges">
+                        <span class="badge badge-info" id="seasonPreviewModeBadge"><%= seasonLeaderboardPreview.mode === 'live' ? 'Live preview' : 'Sample preview' %></span>
+                        <span class="badge <%= seasonLeaderboardConfig.enabled ? 'badge-green' : 'badge-yellow' %>" id="seasonEnabledBadge"><%= seasonLeaderboardConfig.enabled ? 'Enabled' : 'Disabled' %></span>
+                    </div>
+                </div>
+
+                <div class="dashboard-inline-summary" id="seasonLeaderboardSummary">
+                    <span><i class="fas fa-calendar-days"></i> Current season: <strong id="seasonNameValue"><%= currentSeasonName || 'None' %></strong></span>
+                    <span><i class="fas fa-hashtag"></i> Channel: <strong id="seasonChannelValue"><%= seasonLeaderboardConfig.channelId ? `#${(channels.find(channel => channel.id === seasonLeaderboardConfig.channelId) || {}).name || 'Unknown'}` : 'Not set' %></strong></span>
+                    <span><i class="fas fa-clock"></i> Interval: <strong id="seasonIntervalValue"><%= seasonLeaderboardConfig.updateIntervalMinutes %> min</strong></span>
+                    <span><i class="fas fa-users"></i> Players: <strong id="seasonPlayersValue"><%= currentSeason ? (currentSeason.totalPlayers || 0) : 0 %></strong></span>
+                </div>
+
+                <form id="seasonLeaderboardForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="seasonLeaderboardChannel">Leaderboard Channel</label>
+                            <select class="form-control" id="seasonLeaderboardChannel" name="channelId">
+                                <option value="">Not set</option>
+                                <% channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>" <%= seasonLeaderboardConfig.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">This is the text channel where the bot posts the season leaderboard message.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="seasonLeaderboardRole">Force Update Role</label>
+                            <select class="form-control" id="seasonLeaderboardRole" name="allowedRoleId">
+                                <option value="">Administrator only</option>
+                                <% roles.forEach(role => { %>
+                                    <option value="<%= role.id %>" <%= seasonLeaderboardConfig.allowedRoleId === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">Members with this role can use the manual leaderboard update command.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="seasonLeaderboardInterval">Update Interval</label>
+                            <input class="form-control" id="seasonLeaderboardInterval" name="updateIntervalMinutes" type="number" min="5" max="1440" value="<%= seasonLeaderboardConfig.updateIntervalMinutes %>">
+                            <div class="form-hint">How often the auto-updater refreshes the posted leaderboard.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="seasonLeaderboardPruneDays">Prune Inactive Players</label>
+                            <input class="form-control" id="seasonLeaderboardPruneDays" name="pruneDays" type="number" min="0" max="3650" value="<%= seasonLeaderboardConfig.pruneDays %>">
+                            <div class="form-hint"><strong>0</strong> disables pruning. Any other value removes inactive players after that many days.</div>
+                        </div>
+                    </div>
+
+                    <div class="toggle-group">
+                        <div class="toggle-info"><h4>Enable leaderboard updates</h4><p>Turns automatic and manual season leaderboard posting on or off.</p></div>
+                        <label class="toggle-switch"><input type="checkbox" id="seasonLeaderboardEnabled" name="enabled" <%= seasonLeaderboardConfig.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                    </div>
+
+                    <div class="toggle-group">
+                        <div class="toggle-info"><h4>Compact mode</h4><p>Use shorter leaderboards with smaller top lists and fewer preview rows.</p></div>
+                        <label class="toggle-switch"><input type="checkbox" id="seasonLeaderboardCompactMode" name="compactMode" <%= seasonLeaderboardConfig.compactMode ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                    </div>
+
+                    <div class="form-section" style="margin-top:16px">
+                        <div class="form-section-title"><i class="fas fa-palette"></i> Embed Appearance</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonLayoutDensity">Layout Density</label>
+                                <select class="form-control" id="seasonLayoutDensity" name="layoutDensity">
+                                    <option value="standard" <%= seasonLeaderboardConfig.appearance.layoutDensity === 'standard' ? 'selected' : '' %>>Standard</option>
+                                    <option value="compact" <%= seasonLeaderboardConfig.appearance.layoutDensity === 'compact' ? 'selected' : '' %>>Compact</option>
+                                    <option value="minimal" <%= seasonLeaderboardConfig.appearance.layoutDensity === 'minimal' ? 'selected' : '' %>>Minimal</option>
+                                </select>
+                                <div class="form-hint">Standard keeps full gambling detail. Compact uses one short summary per game. Minimal trims it down even further.</div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonHeaderColor">Header Color</label>
+                                <input class="form-control" id="seasonHeaderColor" name="headerColor" type="color" value="<%= seasonLeaderboardConfig.appearance.headerColor %>">
+                                <div class="form-hint">Accent color for the main header embed.</div>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonHeaderTitle">Header Title</label>
+                                <input class="form-control" id="seasonHeaderTitle" name="headerTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.headerTitle %>">
+                                <div class="form-hint">Supports <code>{season}</code>, <code>{players}</code>, <code>{interval}</code>, <code>{started}</code>, <code>{status}</code>.</div>
+                            </div>
+                            <div class="form-group"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="seasonHeaderDescription">Header Description</label>
+                            <textarea class="form-control" id="seasonHeaderDescription" name="headerDescription" rows="3"><%= seasonLeaderboardConfig.appearance.headerDescription %></textarea>
+                            <div class="form-hint">Use this to change the message text shown under the leaderboard title.</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonCustomBlockTitle">Custom Note Title</label>
+                                <input class="form-control" id="seasonCustomBlockTitle" name="customBlockTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.customBlockTitle %>">
+                                <div class="form-hint">This becomes an extra embed block when the note body is filled in.</div>
+                            </div>
+                            <div class="form-group"></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="seasonCustomBlockBody">Custom Note Body</label>
+                            <textarea class="form-control" id="seasonCustomBlockBody" name="customBlockBody" rows="4"><%= seasonLeaderboardConfig.appearance.customBlockBody %></textarea>
+                            <div class="form-hint">Write any extra message you want shown in the leaderboard embed. Supports <code>{season}</code>, <code>{players}</code>, <code>{interval}</code>, <code>{started}</code>, and <code>{status}</code>.</div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonBalanceTitle">Balance Section Title</label>
+                                <input class="form-control" id="seasonBalanceTitle" name="balanceTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.balanceTitle %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonBalanceColor">Balance Section Color</label>
+                                <input class="form-control" id="seasonBalanceColor" name="balanceColor" type="color" value="<%= seasonLeaderboardConfig.appearance.balanceColor %>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonVoiceTitle">Voice Section Title</label>
+                                <input class="form-control" id="seasonVoiceTitle" name="voiceTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.voiceTitle %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonVoiceColor">Voice Section Color</label>
+                                <input class="form-control" id="seasonVoiceColor" name="voiceColor" type="color" value="<%= seasonLeaderboardConfig.appearance.voiceColor %>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section" style="margin-top:16px">
+                        <div class="form-section-title"><i class="fas fa-sliders"></i> Visible Sections</div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show balance leaderboard</h4><p>Include the seasonal balance rankings in the message.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowBalance" name="showBalance" <%= seasonLeaderboardConfig.appearance.showBalance ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show voice leaderboard</h4><p>Include tracked voice hours when the season has any voice data.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowVoice" name="showVoice" <%= seasonLeaderboardConfig.appearance.showVoice ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show gambling leaderboards</h4><p>Include per-game win, win-rate, and total-games leaderboards.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowGambling" name="showGambling" <%= seasonLeaderboardConfig.appearance.showGambling ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                    </div>
+
+                    <div class="form-section" style="margin-top:16px">
+                        <div class="form-section-title"><i class="fas fa-gamepad"></i> Gambling Sections</div>
+                        <div class="season-game-grid">
+                            <% seasonLeaderboardGames.forEach(game => { %>
+                                <label class="season-game-option">
+                                    <input type="checkbox" name="enabledGames" value="<%= game.key %>" <%= (seasonLeaderboardConfig.appearance.enabledGames || []).includes(game.key) ? 'checked' : '' %>>
+                                    <span><%= game.name %></span>
+                                </label>
+                            <% }) %>
+                        </div>
+                        <div class="form-hint">Choose which gambling leaderboards can appear when the gambling section is enabled.</div>
+                    </div>
+
+                    <div class="form-section" style="margin-top:16px">
+                        <div class="form-section-title"><i class="fas fa-coins"></i> Winner Payouts</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonPayout1">1st Place</label>
+                                <input class="form-control" id="seasonPayout1" name="payout1" type="number" min="0" value="<%= (seasonLeaderboardConfig.payouts || [])[0] || 0 %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonPayout2">2nd Place</label>
+                                <input class="form-control" id="seasonPayout2" name="payout2" type="number" min="0" value="<%= (seasonLeaderboardConfig.payouts || [])[1] || 0 %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonPayout3">3rd Place</label>
+                                <input class="form-control" id="seasonPayout3" name="payout3" type="number" min="0" value="<%= (seasonLeaderboardConfig.payouts || [])[2] || 0 %>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section" style="margin-top:16px">
+                        <div class="form-section-title"><i class="fas fa-medal"></i> Reward Roles</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonRewardRole1">1st Place Role</label>
+                                <select class="form-control" id="seasonRewardRole1" name="rewardRole1">
+                                    <option value="">No role reward</option>
+                                    <% roles.forEach(role => { %>
+                                        <option value="<%= role.id %>" <%= (seasonLeaderboardConfig.rewardRoles || [])[0] === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonRewardRole2">2nd Place Role</label>
+                                <select class="form-control" id="seasonRewardRole2" name="rewardRole2">
+                                    <option value="">No role reward</option>
+                                    <% roles.forEach(role => { %>
+                                        <option value="<%= role.id %>" <%= (seasonLeaderboardConfig.rewardRoles || [])[1] === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonRewardRole3">3rd Place Role</label>
+                                <select class="form-control" id="seasonRewardRole3" name="rewardRole3">
+                                    <option value="">No role reward</option>
+                                    <% roles.forEach(role => { %>
+                                        <option value="<%= role.id %>" <%= (seasonLeaderboardConfig.rewardRoles || [])[2] === role.id ? 'selected' : '' %>><%= role.name %></option>
+                                    <% }) %>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary btn-lg" id="seasonLeaderboardPreviewBtn"><i class="fas fa-eye"></i> Update Preview</button>
+                        <button type="submit" class="btn btn-primary btn-lg" id="seasonLeaderboardSaveBtn"><i class="fas fa-save"></i> Save Season Leaderboard</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-eye"></i> Dashboard Preview</div>
+                        <div class="card-subtitle">This matches the current settings. It uses live season data when available and falls back to a sample preview when there is no active season data yet.</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-inline-summary" id="seasonPreviewMeta">
+                    <span><i class="fas fa-layer-group"></i> <strong id="seasonPreviewCount"><%= seasonLeaderboardPreview.embeds.length %></strong> preview pages</span>
+                    <span><i class="fas fa-signal"></i> Source: <strong id="seasonPreviewSource"><%= seasonLeaderboardPreview.mode === 'live' ? 'Live season data' : 'Sample preview data' %></strong></span>
+                </div>
+
+                <div class="season-preview-grid" id="seasonPreviewContainer"></div>
             </div>
 
             <% if (leaderboard.length >= 3) { %>
@@ -97,7 +348,235 @@
     </div>
 </div>
 <%- include('partials/dashboard-common-scripts') %>
+<script id="seasonPreviewData" type="application/json"><%- JSON.stringify(seasonLeaderboardPreview).replace(/</g, '\\u003c') %></script>
+<script id="seasonChannelNameData" type="application/json"><%- JSON.stringify(Object.fromEntries(channels.map(function (channel) { return [channel.id, channel.name]; }))).replace(/</g, '\\u003c') %></script>
 <script>
+dashboardUI.initPage();
+
+const guildId = '<%= guild.id %>';
+const channelsById = JSON.parse(document.getElementById('seasonChannelNameData').textContent);
+const seasonPreviewContainer = document.getElementById('seasonPreviewContainer');
+const seasonPreviewModeBadge = document.getElementById('seasonPreviewModeBadge');
+const seasonEnabledBadge = document.getElementById('seasonEnabledBadge');
+const seasonPreviewCount = document.getElementById('seasonPreviewCount');
+const seasonPreviewSource = document.getElementById('seasonPreviewSource');
+const seasonNameValue = document.getElementById('seasonNameValue');
+const seasonChannelValue = document.getElementById('seasonChannelValue');
+const seasonIntervalValue = document.getElementById('seasonIntervalValue');
+const seasonPlayersValue = document.getElementById('seasonPlayersValue');
+const saveButton = document.getElementById('seasonLeaderboardSaveBtn');
+const previewButton = document.getElementById('seasonLeaderboardPreviewBtn');
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function formatDiscordTimestamp(unixSeconds, style) {
+    const timestamp = Number(unixSeconds) * 1000;
+    if (!Number.isFinite(timestamp)) {
+        return '';
+    }
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+        return '';
+    }
+
+    if (style === 'R') {
+        const diffMs = timestamp - Date.now();
+        const diffMinutes = Math.round(diffMs / 60000);
+        if (Math.abs(diffMinutes) < 1) return 'now';
+        if (Math.abs(diffMinutes) < 60) return diffMinutes > 0 ? `in ${diffMinutes} min` : `${Math.abs(diffMinutes)} min ago`;
+        const diffHours = Math.round(diffMinutes / 60);
+        if (Math.abs(diffHours) < 24) return diffHours > 0 ? `in ${diffHours} hr` : `${Math.abs(diffHours)} hr ago`;
+        const diffDays = Math.round(diffHours / 24);
+        return diffDays > 0 ? `in ${diffDays} days` : `${Math.abs(diffDays)} days ago`;
+    }
+
+    return date.toLocaleString();
+}
+
+function renderDiscordTokens(value) {
+    return value
+        .replace(/&lt;t:(\d+):([A-Za-z])&gt;/g, function (_, unixSeconds, style) {
+            const label = formatDiscordTimestamp(unixSeconds, style);
+            return '<span class="season-preview-token">' + escapeHtml(label || `<t:${unixSeconds}:${style}>`) + '</span>';
+        })
+        .replace(/&lt;@!?([0-9]+)&gt;/g, function (_, userId) {
+            return '<span class="season-preview-token">@user-' + escapeHtml(String(userId).slice(-4)) + '</span>';
+        })
+        .replace(/&lt;@&([0-9]+)&gt;/g, function (_, roleId) {
+            return '<span class="season-preview-token">@role-' + escapeHtml(String(roleId).slice(-4)) + '</span>';
+        })
+        .replace(/&lt;#([0-9]+)&gt;/g, function (_, channelId) {
+            return '<span class="season-preview-token">#channel-' + escapeHtml(String(channelId).slice(-4)) + '</span>';
+        });
+}
+
+function renderEmbedText(value) {
+    return renderDiscordTokens(escapeHtml(value)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\n/g, '<br>'));
+}
+
+function renderSeasonPreview(preview) {
+    const safePreview = preview || { mode: 'sample', embeds: [] };
+    seasonPreviewModeBadge.textContent = safePreview.mode === 'live' ? 'Live preview' : 'Sample preview';
+    seasonPreviewModeBadge.className = 'badge ' + (safePreview.mode === 'live' ? 'badge-green' : 'badge-info');
+    seasonPreviewCount.textContent = String((safePreview.embeds || []).length);
+    seasonPreviewSource.textContent = safePreview.mode === 'live' ? 'Live season data' : 'Sample preview data';
+
+    if (!Array.isArray(safePreview.embeds) || safePreview.embeds.length === 0) {
+        seasonPreviewContainer.innerHTML = '<div class="table-empty"><i class="fas fa-eye-slash"></i>No preview is available yet.</div>';
+        return;
+    }
+
+    seasonPreviewContainer.innerHTML = safePreview.embeds.map((embed, index) => {
+        const fieldsHtml = Array.isArray(embed.fields) && embed.fields.length > 0
+            ? '<div class="season-preview-fields">' + embed.fields.map((field) => {
+                    const inlineClass = field.inline ? ' season-preview-field-inline' : ' season-preview-field-block';
+                    return '<div class="season-preview-field' + inlineClass + '">' +
+                        '<div class="season-preview-field-name">' + renderEmbedText(field.name) + '</div>' +
+                        '<div class="season-preview-field-value">' + renderEmbedText(field.value) + '</div>' +
+                    '</div>';
+                }).join('') + '</div>'
+            : '';
+
+        const footerParts = [];
+        if (embed.footer) {
+            footerParts.push(renderEmbedText(embed.footer));
+        }
+        if (embed.timestamp) {
+            footerParts.push(escapeHtml(new Date(embed.timestamp).toLocaleString()));
+        }
+
+        const footerHtml = footerParts.length > 0
+            ? '<div class="season-preview-footer">' + footerParts.join('<span class="season-preview-footer-sep">•</span>') + '</div>'
+            : '';
+
+        return '<article class="season-preview-card" style="--preview-accent:' + escapeHtml(embed.color || '#5865F2') + '">' +
+            '<div class="season-preview-card-header">' +
+                '<span class="badge badge-info">Page ' + (index + 1) + '</span>' +
+            '</div>' +
+            '<div class="season-preview-title">' + renderEmbedText(embed.title) + '</div>' +
+            '<div class="season-preview-description">' + renderEmbedText(embed.description) + '</div>' +
+            fieldsHtml +
+            footerHtml +
+        '</article>';
+    }).join('');
+}
+
+function updateSummary(config, preview, seasonInfo) {
+    const selectedChannelId = config.channelId || '';
+    const currentSeasonName = preview.currentSeasonName || 'None';
+    seasonNameValue.textContent = currentSeasonName;
+    seasonChannelValue.textContent = selectedChannelId ? '#' + (channelsById[selectedChannelId] || 'Unknown') : 'Not set';
+    seasonIntervalValue.textContent = String(config.updateIntervalMinutes || 15) + ' min';
+    seasonPlayersValue.textContent = String((seasonInfo && seasonInfo.totalPlayers) || 0);
+    seasonEnabledBadge.textContent = config.enabled ? 'Enabled' : 'Disabled';
+    seasonEnabledBadge.className = 'badge ' + (config.enabled ? 'badge-green' : 'badge-yellow');
+}
+
+const initialPreview = JSON.parse(document.getElementById('seasonPreviewData').textContent);
+renderSeasonPreview(initialPreview);
+
+function collectSeasonFormPayload() {
+    return {
+        channelId: document.getElementById('seasonLeaderboardChannel').value,
+        allowedRoleId: document.getElementById('seasonLeaderboardRole').value,
+        enabled: document.getElementById('seasonLeaderboardEnabled').checked,
+        compactMode: document.getElementById('seasonLeaderboardCompactMode').checked,
+        updateIntervalMinutes: Number(document.getElementById('seasonLeaderboardInterval').value),
+        pruneDays: Number(document.getElementById('seasonLeaderboardPruneDays').value),
+        headerTitle: document.getElementById('seasonHeaderTitle').value,
+        headerDescription: document.getElementById('seasonHeaderDescription').value,
+        headerColor: document.getElementById('seasonHeaderColor').value,
+        layoutDensity: document.getElementById('seasonLayoutDensity').value,
+        customBlockTitle: document.getElementById('seasonCustomBlockTitle').value,
+        customBlockBody: document.getElementById('seasonCustomBlockBody').value,
+        balanceTitle: document.getElementById('seasonBalanceTitle').value,
+        balanceColor: document.getElementById('seasonBalanceColor').value,
+        voiceTitle: document.getElementById('seasonVoiceTitle').value,
+        voiceColor: document.getElementById('seasonVoiceColor').value,
+        showBalance: document.getElementById('seasonShowBalance').checked,
+        showVoice: document.getElementById('seasonShowVoice').checked,
+        showGambling: document.getElementById('seasonShowGambling').checked,
+        enabledGames: Array.from(document.querySelectorAll('input[name="enabledGames"]:checked')).map((input) => input.value),
+        payout1: Number(document.getElementById('seasonPayout1').value),
+        payout2: Number(document.getElementById('seasonPayout2').value),
+        payout3: Number(document.getElementById('seasonPayout3').value),
+        rewardRole1: document.getElementById('seasonRewardRole1').value,
+        rewardRole2: document.getElementById('seasonRewardRole2').value,
+        rewardRole3: document.getElementById('seasonRewardRole3').value
+    };
+}
+
+async function requestSeasonPreview(payload) {
+    const response = await fetch(`/api/economy/${guildId}/season-leaderboard-preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update preview.');
+    }
+
+    return data.preview;
+}
+
+previewButton.addEventListener('click', async function () {
+    previewButton.disabled = true;
+    previewButton.innerHTML = '<span class="spinner"></span> Previewing...';
+
+    try {
+        const preview = await requestSeasonPreview(collectSeasonFormPayload());
+        renderSeasonPreview(preview);
+        dashboardUI.showToast('Preview updated. Changes are not saved yet.', 'info');
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to update preview.', 'error');
+    } finally {
+        previewButton.disabled = false;
+        previewButton.innerHTML = '<i class="fas fa-eye"></i> Update Preview';
+    }
+});
+
+document.getElementById('seasonLeaderboardForm').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner"></span> Saving...';
+
+    const payload = collectSeasonFormPayload();
+
+    try {
+        const response = await fetch(`/api/economy/${guildId}/season-leaderboard-config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to save season leaderboard settings.');
+        }
+
+        updateSummary(data.config, data.preview, data.seasonInfo);
+        renderSeasonPreview(data.preview);
+        dashboardUI.showToast('Season leaderboard settings updated.', 'success');
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to save season leaderboard settings.', 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = '<i class="fas fa-save"></i> Save Season Leaderboard';
+    }
+});
 </script>
 </body>
 </html>

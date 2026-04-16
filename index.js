@@ -79,6 +79,7 @@ const serverMilestones = require('./utils/serverMilestones');
 const seasonManager = require('./utils/seasonManager');
 const seasonLeaderboardManager = require('./utils/seasonLeaderboardManager');
 const commandPermissionsManager = require('./utils/commandPermissionsManager');
+const { dashboardPermissionsManager } = require('./utils/dashboardPermissionsManager');
 const Dashboard = require('./dashboard/server');
 const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 const { isDevModeEnabled } = require('./utils/devMode');
@@ -196,6 +197,7 @@ async function loadHandlers() {
             runInitStep('Economy manager', () => economyManager.init()),
             runInitStep('Moderation manager', () => moderationManager.init()),
             runInitStep('Command permissions manager', () => commandPermissionsManager.init()),
+            runInitStep('Dashboard permissions manager', () => dashboardPermissionsManager.init()),
             runInitStep('Game stats manager', () => gameStatsManager.init()),
             runInitStep('Stats manager', () => statsManager.init()),
             runInitStep('Level rewards manager', () => levelRewardsManager.init()),

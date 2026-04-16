@@ -70,7 +70,14 @@
                                         <td><strong><%= cmd.count %></strong></td>
                                         <td><span class="badge badge-success"><i class="fas fa-check"></i> <%= cmd.success %></span></td>
                                         <td><span class="badge badge-danger"><i class="fas fa-xmark"></i> <%= cmd.failed %></span></td>
-                                        <td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:<%= rate %>%;background:var(--green);border-radius:3px"></div></div><span style="font-size:12px;color:var(--text-2)"><%= rate %>%</span></div></td>
+                                        <td>
+                                            <div class="analytics-rate-row">
+                                                <div class="analytics-rate-track">
+                                                    <div class="analytics-rate-fill" data-rate="<%= rate %>"></div>
+                                                </div>
+                                                <span class="analytics-rate-label"><%= rate %>%</span>
+                                            </div>
+                                        </td>
                                     </tr>
                                 <% }); %>
                             <% } else { %>
@@ -85,12 +92,20 @@
 </div>
 
 <%- include('partials/dashboard-common-scripts') %>
+<script type="application/json" id="analyticsTopCommands"><%- JSON.stringify(analytics.topCommands || []) %></script>
+<script type="application/json" id="analyticsDailyActivity"><%- JSON.stringify(analytics.dailyActivity || {}) %></script>
 <script>
-const topCmds = <%- JSON.stringify(analytics.topCommands || []) %>;
-const dailyAct = <%- JSON.stringify(analytics.dailyActivity || {}) %>;
+const topCmds = JSON.parse(document.getElementById('analyticsTopCommands').textContent);
+const dailyAct = JSON.parse(document.getElementById('analyticsDailyActivity').textContent);
 const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
 const textColor = isDark ? '#94a3b8' : '#64748b';
+
+document.querySelectorAll('.analytics-rate-fill').forEach((element) => {
+    const rate = Number(element.dataset.rate) || 0;
+    element.style.width = Math.max(0, Math.min(100, rate)) + '%';
+});
+
 Chart.defaults.color = textColor;
 Chart.defaults.borderColor = gridColor;
 new Chart(document.getElementById('cmdChart'), {

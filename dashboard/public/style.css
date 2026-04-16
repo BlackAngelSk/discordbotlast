@@ -244,6 +244,7 @@ table tbody tr:hover td { background: var(--bg-hover); }
 .badge-green  { background: var(--green-bg);  color: var(--green); }
 .badge-red    { background: var(--red-bg);    color: var(--red); }
 .badge-blue   { background: var(--blue-bg);   color: var(--blue); }
+.badge-info   { background: var(--blue-bg);   color: var(--blue); }
 .badge-yellow { background: var(--yellow-bg); color: #b8a400; }
 .badge-purple { background: var(--purple-bg); color: var(--purple); }
 .badge-brand  { background: var(--brand-glow);color: var(--brand); }
@@ -436,6 +437,52 @@ code { background: var(--bg-card-2); padding: 2px 6px; border-radius: 4px; font-
 /* ============ CHART ============ */
 .chart-wrapper { position: relative; height: 260px; }
 
+.analytics-rate-row { display: flex; align-items: center; gap: 8px; }
+.analytics-rate-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.analytics-rate-fill {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  border-radius: 3px;
+}
+.analytics-rate-label { font-size: 12px; color: var(--text-2); }
+
+.permission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.permission-card { background: var(--bg-card-2); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; }
+.permission-card-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.permission-card-header h3 { font-size: 14px; font-weight: 700; color: var(--text-1); }
+.permission-role-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.permission-role-option { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-1); }
+.permission-role-option input { accent-color: var(--brand); }
+.quick-action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.table-action-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.dashboard-inline-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dashboard-inline-summary { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; padding: 14px 16px; background: var(--bg-card-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-2); }
+.dashboard-inline-summary span { display: inline-flex; align-items: center; gap: 8px; }
+.season-game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.season-game-option { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg-card-2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); font-size: 13px; }
+.season-game-option input { accent-color: var(--brand); }
+.season-preview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.season-preview-card { background: #2b2d31; border: 1px solid rgba(255,255,255,0.06); border-left: 4px solid var(--preview-accent, var(--brand)); border-radius: 4px; padding: 16px; box-shadow: var(--shadow-sm); min-width: 0; }
+.season-preview-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.season-preview-title { font-size: 16px; font-weight: 700; color: #f2f3f5; margin-bottom: 8px; line-height: 1.35; }
+.season-preview-description { color: #dbdee1; font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
+.season-preview-fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 10px; }
+.season-preview-field { min-width: 0; grid-column: span 4; }
+.season-preview-field-inline { min-height: 100%; }
+.season-preview-field-block { grid-column: 1 / -1; }
+.season-preview-field-name { color: #ffffff; font-size: 12px; font-weight: 700; margin-bottom: 4px; line-height: 1.35; }
+.season-preview-field-value { color: #dbdee1; font-size: 12px; line-height: 1.45; word-break: break-word; }
+.season-preview-token { display: inline-flex; align-items: center; padding: 1px 4px; border-radius: 3px; background: rgba(88, 101, 242, 0.18); color: #c9cdfb; font-size: 0.95em; }
+.season-preview-footer { margin-top: 12px; color: #b5bac1; font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.season-preview-footer-sep { opacity: 0.7; }
+
 /* ============ PODIUM ============ */
 .leaderboard-podium { display: flex; justify-content: center; align-items: flex-end; gap: 14px; margin-bottom: 28px; padding: 22px; background: var(--bg-card-2); border-radius: var(--radius-lg); border: 1px solid var(--border); }
 .podium-item { text-align: center; flex: 0 0 110px; }
@@ -464,6 +511,10 @@ code { background: var(--bg-card-2); padding: 2px 6px; border-radius: 4px; font-
   .stats-row { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .topbar { padding: 0 16px; }
+  .dashboard-inline-summary { flex-direction: column; align-items: flex-start; }
+  .season-game-grid { grid-template-columns: 1fr; }
+  .season-preview-fields { grid-template-columns: 1fr; }
+  .season-preview-field { grid-column: 1 / -1; }
   .leaderboard-podium { gap: 8px; }
   .podium-item { flex: 0 0 90px; }
 }

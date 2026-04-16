@@ -62,6 +62,7 @@
           <div class="card-title"><i class="fas fa-user-shield"></i> Owner Access Overview</div>
           <div class="card-subtitle">Environment-backed bot-wide configuration</div>
         </div>
+        <button type="button" class="btn btn-secondary" id="testNotificationBtn"><i class="fas fa-paper-plane"></i> Send Test Notification</button>
       </div>
       <div class="table-wrapper">
         <table>
@@ -198,6 +199,51 @@
         </table>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-header"><div><div class="card-title"><i class="fas fa-bug"></i> Recent Errors</div><div class="card-subtitle">Latest captured process and command errors</div></div></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Time</th><th>Type</th><th>Message</th></tr></thead>
+          <tbody>
+            <% if (recentErrors.length > 0) { %>
+              <% recentErrors.forEach(entry => { %>
+                <tr>
+                  <td><%= new Date(entry.timestamp).toLocaleString() %></td>
+                  <td><span class="badge badge-red"><%= entry.type || 'ERROR' %></span></td>
+                  <td><%= entry.message || 'Unknown error' %></td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr><td colspan="3" class="table-empty"><i class="fas fa-check-circle"></i> No recent errors captured</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div><div class="card-title"><i class="fas fa-scroll"></i> Recent Owner Dashboard Actions</div><div class="card-subtitle">Latest dashboard actions across all guilds and owner tools</div></div></div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+          <tbody>
+            <% if (recentOwnerAudits.length > 0) { %>
+              <% recentOwnerAudits.forEach(entry => { %>
+                <tr>
+                  <td><%= new Date(entry.timestamp).toLocaleString() %></td>
+                  <td><%= entry.username || entry.userId || 'Unknown' %></td>
+                  <td><strong><%= entry.action %></strong></td>
+                  <td><code><%= JSON.stringify(entry.details || {}) %></code></td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr><td colspan="4" class="table-empty"><i class="fas fa-scroll"></i> No owner actions logged yet</td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
 </div>
 
@@ -207,6 +253,7 @@
 
   const syncForm = document.getElementById('mongoSyncForm');
   const runSyncBtn = document.getElementById('runSyncBtn');
+  const testNotificationBtn = document.getElementById('testNotificationBtn');
   const saveSyncBtn = document.getElementById('saveSyncBtn');
   const nextAutoSyncValue = document.getElementById('nextAutoSyncValue');
   const lastSyncValue = document.getElementById('lastSyncValue');
@@ -277,6 +324,25 @@
       dashboardUI.showToast(error.message || 'Failed to start MongoDB sync.', 'error');
     } finally {
       setButtonBusy(runSyncBtn, false, 'Running...', '<i class="fas fa-play"></i> Run Sync Now');
+    }
+  });
+
+  testNotificationBtn.addEventListener('click', async function () {
+    setButtonBusy(testNotificationBtn, true, 'Sending...', '<i class="fas fa-paper-plane"></i> Send Test Notification');
+    try {
+      const response = await fetch('/api/owner/test-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send test notification.');
+      }
+      dashboardUI.showToast(data.message || 'Test notification sent.', 'success');
+    } catch (error) {
+      dashboardUI.showToast(error.message || 'Failed to send test notification.', 'error');
+    } finally {
+      setButtonBusy(testNotificationBtn, false, 'Sending...', '<i class="fas fa-paper-plane"></i> Send Test Notification');
     }
   });
 </script>

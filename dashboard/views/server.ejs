@@ -56,7 +56,9 @@
           <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-users-gear"></i> Community Center</a>
           <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
           <a href="/dashboard/<%= guild.id %>/safety" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-user-shield"></i> Safety Center</a>
+          <a href="/dashboard/<%= guild.id %>/activity" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-clock-rotate-left"></i> Activity Center</a>
           <a href="/dashboard/<%= guild.id %>/health" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-heart-pulse"></i> Bot Health</a>
+          <a href="/dashboard/<%= guild.id %>/permissions" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-user-lock"></i> Delegation</a>
           <% if (isBotOwner) { %>
             <a href="/dashboard/owner" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-crown"></i> Bot Owner Settings</a>
           <% } %>
@@ -76,11 +78,11 @@
               <% settings.prefixes.forEach((prefix, index) => { %>
                 <div class="prefix-item">
                   <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" placeholder="!">
-                  <button type="button" class="btn btn-danger btn-sm" onclick="removePrefix(this)"><i class="fas fa-trash"></i></button>
+                  <button type="button" class="btn btn-danger btn-sm prefix-remove-btn"><i class="fas fa-trash"></i></button>
                 </div>
               <% }); %>
             </div>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addPrefix()" style="margin-top:6px"><i class="fas fa-plus"></i> Add Prefix</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="addPrefixBtn" style="margin-top:6px"><i class="fas fa-plus"></i> Add Prefix</button>
             <div class="form-hint">Up to 5 prefixes. All will trigger bot commands.</div>
           </div>
           <div class="form-row">
@@ -128,6 +130,7 @@
               <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
             </div>
           </div>
+          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="welcome"><i class="fas fa-flask"></i> Send Test Welcome</button></div>
         </div>
 
         <!-- Leave Messages -->
@@ -152,6 +155,7 @@
               <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
             </div>
           </div>
+          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="leave"><i class="fas fa-flask"></i> Send Test Leave</button></div>
         </div>
 
         <!-- Logging -->
@@ -166,6 +170,17 @@
               <% }); %>
             </select>
             <div class="form-hint">Logs message edits/deletes, member joins/leaves, role changes, channel events</div>
+          </div>
+          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="logging"><i class="fas fa-flask"></i> Send Test Log</button></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><div class="card-title"><i class="fas fa-vial"></i> Quick Tests</div><div class="card-subtitle">Send safe test messages to verify key channels before your members do.</div></div></div>
+          <div class="quick-action-row">
+            <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="welcome"><i class="fas fa-hand-wave"></i> Welcome</button>
+            <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="leave"><i class="fas fa-door-open"></i> Leave</button>
+            <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="logging"><i class="fas fa-scroll"></i> Logging</button>
+            <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="suggestions"><i class="fas fa-lightbulb"></i> Suggestions</button>
           </div>
         </div>
 
@@ -243,11 +258,11 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title"><i class="fas fa-triangle-exclamation" style="color:var(--red)"></i> Reset Settings</div>
-      <button class="modal-close" onclick="closeModal()"><i class="fas fa-xmark"></i></button>
+      <button class="modal-close" id="closeResetModalBtn"><i class="fas fa-xmark"></i></button>
     </div>
     <div class="modal-body">Are you sure you want to reset all settings to defaults? This cannot be undone.</div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-secondary" id="cancelResetModalBtn">Cancel</button>
       <button class="btn btn-danger" id="confirmReset"><i class="fas fa-rotate-left"></i> Reset</button>
     </div>
   </div>
@@ -270,7 +285,7 @@ function addPrefix() {
   if (c.children.length >= 5) { toast('Maximum 5 prefixes', 'error'); return; }
   const d = document.createElement('div');
   d.className = 'prefix-item';
-  d.innerHTML = '<input type="text" class="prefix-input" maxlength="5" placeholder="!"><button type="button" class="btn btn-danger btn-sm" onclick="removePrefix(this)"><i class="fas fa-trash"></i></button>';
+  d.innerHTML = '<input type="text" class="prefix-input" maxlength="5" placeholder="!"><button type="button" class="btn btn-danger btn-sm prefix-remove-btn"><i class="fas fa-trash"></i></button>';
   c.appendChild(d);
 }
 function removePrefix(btn) {
@@ -279,6 +294,14 @@ function removePrefix(btn) {
   btn.closest('.prefix-item').remove();
 }
 function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
+document.getElementById('addPrefixBtn').addEventListener('click', addPrefix);
+document.getElementById('closeResetModalBtn').addEventListener('click', closeModal);
+document.getElementById('cancelResetModalBtn').addEventListener('click', closeModal);
+document.getElementById('prefixContainer').addEventListener('click', event => {
+  const button = event.target.closest('.prefix-remove-btn');
+  if (!button) return;
+  removePrefix(button);
+});
 document.getElementById('resetBtn').addEventListener('click', () => document.getElementById('resetModal').classList.add('active'));
 document.getElementById('confirmReset').addEventListener('click', async () => {
   closeModal();
@@ -315,4 +338,26 @@ document.getElementById('settingsForm').addEventListener('submit', async e => {
 });
 </script>
 </body>
+document.querySelectorAll('.dashboard-test-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Testing...';
+    try {
+      const r = await fetch(`/api/settings/${guildId}/test`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: btn.dataset.testType })
+      });
+      const j = await r.json();
+      if (j.success) toast(j.message || 'Test sent successfully', 'success');
+      else toast(j.error || 'Test failed', 'error');
+    } catch (error) {
+      toast('Failed: ' + error.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  });
+});
 </html>

@@ -5,15 +5,18 @@ const DiscordStrategy = require('passport-discord').Strategy;
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { PermissionFlagsBits } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 require('dotenv').config();
 
 const databaseManager = require('../utils/databaseManager');
+const { dashboardPermissionsManager, DASHBOARD_PERMISSION_SECTION_KEYS } = require('../utils/dashboardPermissionsManager');
 const settingsManager = require('../utils/settingsManager');
 const moderationManager = require('../utils/moderationManager');
 const loggingManager = require('../utils/loggingManager');
 const inviteManager = require('../utils/inviteManager');
 const economyManager = require('../utils/economyManager');
+const seasonManager = require('../utils/seasonManager');
+const seasonLeaderboardManager = require('../utils/seasonLeaderboardManager');
 const customCommandManager = require('../utils/customCommandManager');
 const commandPermissionsManager = require('../utils/commandPermissionsManager');
 const statsManager = require('../utils/statsManager');
@@ -29,6 +32,9 @@ const raidProtectionManager = require('../utils/raidProtectionManager');
 const starboardManager = require('../utils/starboardManager');
 const { formatNumber } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
+const seasonLeaderboardGames = Array.isArray(seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES)
+    ? seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES
+    : [];
 
 const withTimeout = (promise, ms) => new Promise((resolve) => {
     const parsedMs = Number(ms);
@@ -101,6 +107,326 @@ const queueDashboardAuditEntry = (entry) => {
         });
 };
 
+const DASHBOARD_SECTION_LABELS = {
+    settings: 'Server Settings',
+    economy: 'Economy',
+    shop: 'Shop',
+    commands: 'Commands',
+    liveAlerts: 'Live Alerts',
+    community: 'Community',
+    voiceTools: 'Voice Tools',
+    moderation: 'Moderation',
+    automod: 'Auto-Mod',
+    safety: 'Safety Center',
+    analytics: 'Analytics',
+    activity: 'Activity Center',
+    health: 'Bot Health'
+};
+
+const getDashboardSectionLabel = (sectionKey) => DASHBOARD_SECTION_LABELS[sectionKey] || sectionKey;
+
+const inferDashboardSectionKey = (requestPath) => {
+    const pathValue = String(requestPath || '');
+
+    if (/^\/dashboard\/[^/]+$/.test(pathValue) || /^\/api\/settings\/[^/]+/.test(pathValue)) return 'settings';
+    if (/^\/dashboard\/[^/]+\/economy$/.test(pathValue) || /^\/api\/economy\/[^/]+/.test(pathValue) || /^\/api\/[^/]+\/leaderboard$/.test(pathValue)) return 'economy';
+    if (/^\/dashboard\/[^/]+\/shop$/.test(pathValue)) return 'shop';
+    if (/^\/dashboard\/[^/]+\/commands$/.test(pathValue) || /^\/api\/commands\/[^/]+/.test(pathValue) || /^\/api\/command-permissions\/[^/]+/.test(pathValue)) return 'commands';
+    if (/^\/dashboard\/[^/]+\/live-alerts$/.test(pathValue) || /^\/api\/live-alerts\/[^/]+/.test(pathValue)) return 'liveAlerts';
+    if (/^\/dashboard\/[^/]+\/community$/.test(pathValue) || /^\/api\/community\/[^/]+/.test(pathValue)) return 'community';
+    if (/^\/dashboard\/[^/]+\/voice-tools$/.test(pathValue) || /^\/api\/voice-tools\/[^/]+/.test(pathValue)) return 'voiceTools';
+    if (/^\/dashboard\/[^/]+\/moderation$/.test(pathValue) || /^\/api\/[^/]+\/moderation(?:\/|$)/.test(pathValue)) return 'moderation';
+    if (/^\/dashboard\/[^/]+\/automod$/.test(pathValue) || /^\/api\/[^/]+\/automod(?:\/|$)/.test(pathValue)) return 'automod';
+    if (/^\/dashboard\/[^/]+\/safety$/.test(pathValue) || /^\/api\/safety\/[^/]+/.test(pathValue)) return 'safety';
+    if (/^\/dashboard\/[^/]+\/analytics$/.test(pathValue) || /^\/api\/[^/]+\/analytics$/.test(pathValue)) return 'analytics';
+    if (/^\/dashboard\/[^/]+\/activity$/.test(pathValue) || /^\/api\/[^/]+\/activity(?:\/|$)/.test(pathValue) || /^\/api\/[^/]+\/audit-log$/.test(pathValue)) return 'activity';
+    if (/^\/dashboard\/[^/]+\/health$/.test(pathValue)) return 'health';
+
+    return null;
+};
+
+const resolveStoredTextChannel = (guild, storedValue) => {
+    const normalizedValue = String(storedValue || '').trim();
+    if (!guild || !normalizedValue) return null;
+
+    return guild.channels.cache.get(normalizedValue)
+        || guild.channels.cache.find((channel) => channel.type === 0 && channel.name === normalizedValue)
+        || null;
+};
+
+const replaceMemberTemplateTokens = (template, member, guild) => {
+    return String(template || '')
+        .replaceAll('{user}', member ? `<@${member.id}>` : 'Test User')
+        .replaceAll('{server}', guild?.name || 'Server');
+};
+
+const readRecentErrorEntries = (limit = 20) => {
+    try {
+        const logsDirectory = path.join(__dirname, '..', 'logs');
+        if (!fs.existsSync(logsDirectory)) {
+            return [];
+        }
+
+        const files = fs.readdirSync(logsDirectory)
+            .filter((fileName) => fileName.startsWith('error-') && fileName.endsWith('.json'))
+            .sort()
+            .reverse()
+            .slice(0, 5);
+
+        const entries = [];
+        for (const fileName of files) {
+            const content = JSON.parse(fs.readFileSync(path.join(logsDirectory, fileName), 'utf8'));
+            entries.push(...content);
+        }
+
+        return entries
+            .sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp))
+            .slice(0, limit);
+    } catch (error) {
+        console.error('Failed to read recent error entries:', error);
+        return [];
+    }
+};
+
+const readDashboardAuditEntries = ({ guildId = null, limit = 50 } = {}) => {
+    const entries = readJsonFile(DASHBOARD_AUDIT_FILE, []);
+    return entries
+        .filter((entry) => !guildId || !entry.guildId || entry.guildId === guildId)
+        .sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp))
+        .slice(0, limit);
+};
+
+const normalizeEmbedPreviewColor = (colorValue) => {
+    const parsed = Number(colorValue);
+    const safeValue = Number.isFinite(parsed) ? parsed : 0x5865F2;
+    return `#${safeValue.toString(16).padStart(6, '0')}`;
+};
+
+const normalizeHexColorInput = (value, fallback = '#5865F2') => {
+    const normalized = String(value || '').trim();
+    const candidate = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+    if (!candidate) return fallback;
+    if (!/^[0-9A-Fa-f]{6}$/.test(candidate)) return fallback;
+    return `#${candidate.toUpperCase()}`;
+};
+
+const normalizeTextInput = (value, fallback, maxLength = 256) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return String(fallback || '');
+    return trimmed.slice(0, maxLength);
+};
+
+const parseDashboardBoolean = (value) => value === true || value === 'true' || value === 'on' || value === '1' || value === 1;
+
+const applyPreviewTemplate = (template, context = {}) => String(template || '').replace(/\{(\w+)\}/g, (match, token) => {
+    if (!Object.prototype.hasOwnProperty.call(context, token)) {
+        return match;
+    }
+    return String(context[token] ?? '');
+});
+
+const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) => {
+    const defaultAppearance = typeof seasonLeaderboardManager.getDefaultAppearance === 'function'
+        ? seasonLeaderboardManager.getDefaultAppearance()
+        : {};
+    const currentAppearance = {
+        ...defaultAppearance,
+        ...((existingConfig && existingConfig.appearance) || {})
+    };
+    const enabledGames = Array.isArray(body.enabledGames)
+        ? body.enabledGames.map((gameKey) => String(gameKey || '').trim()).filter(Boolean)
+        : [];
+
+    return {
+        hasChannelField: Object.prototype.hasOwnProperty.call(body, 'channelId'),
+        channelId: String(body.channelId || '').trim() || null,
+        configUpdate: {
+            enabled: parseDashboardBoolean(body.enabled),
+            updateIntervalMinutes: Number(body.updateIntervalMinutes),
+            compactMode: parseDashboardBoolean(body.compactMode),
+            allowedRoleId: String(body.allowedRoleId || '').trim() || null,
+            pruneDays: Number(body.pruneDays),
+            payouts: [body.payout1, body.payout2, body.payout3].map((value) => Number(value) || 0),
+            rewardRoles: [body.rewardRole1, body.rewardRole2, body.rewardRole3]
+                .map((roleId) => String(roleId || '').trim())
+                .filter(Boolean)
+                .slice(0, 3),
+            appearance: {
+                headerTitle: normalizeTextInput(body.headerTitle, currentAppearance.headerTitle, 256),
+                headerDescription: normalizeTextInput(body.headerDescription, currentAppearance.headerDescription, 4096),
+                headerColor: normalizeHexColorInput(body.headerColor, currentAppearance.headerColor),
+                balanceTitle: normalizeTextInput(body.balanceTitle, currentAppearance.balanceTitle, 256),
+                balanceColor: normalizeHexColorInput(body.balanceColor, currentAppearance.balanceColor),
+                voiceTitle: normalizeTextInput(body.voiceTitle, currentAppearance.voiceTitle, 256),
+                voiceColor: normalizeHexColorInput(body.voiceColor, currentAppearance.voiceColor),
+                layoutDensity: ['standard', 'compact', 'minimal'].includes(String(body.layoutDensity || '').trim())
+                    ? String(body.layoutDensity).trim()
+                    : currentAppearance.layoutDensity,
+                customBlockTitle: normalizeTextInput(body.customBlockTitle, currentAppearance.customBlockTitle, 256),
+                customBlockBody: normalizeTextInput(body.customBlockBody, currentAppearance.customBlockBody, 1024),
+                showBalance: parseDashboardBoolean(body.showBalance),
+                showVoice: parseDashboardBoolean(body.showVoice),
+                showGambling: parseDashboardBoolean(body.showGambling),
+                enabledGames
+            }
+        }
+    };
+};
+
+const serializeEmbedPreview = (embed) => {
+    const data = typeof embed?.toJSON === 'function' ? embed.toJSON() : (embed || {});
+
+    return {
+        title: String(data.title || ''),
+        description: String(data.description || ''),
+        fields: Array.isArray(data.fields)
+            ? data.fields.map((field) => ({
+                name: String(field?.name || ''),
+                value: String(field?.value || ''),
+                inline: Boolean(field?.inline)
+            }))
+            : [],
+        footer: String(data.footer?.text || ''),
+        color: normalizeEmbedPreviewColor(data.color),
+        timestamp: data.timestamp || null
+    };
+};
+
+const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-season') => {
+    const compactMode = Boolean(config.compactMode);
+    const intervalMinutes = Number(config.updateIntervalMinutes) || 15;
+    const layoutDensity = config.appearance?.layoutDensity || 'standard';
+    const playerCount = compactMode || layoutDensity !== 'standard' ? 3 : 6;
+    const appearance = config.appearance || {};
+    const previewContext = {
+        season: seasonName,
+        players: 42,
+        interval: intervalMinutes,
+        started: new Date().toLocaleDateString(),
+        status: 'Active'
+    };
+    const balancePlayers = [
+        { medal: '🥇', username: 'Atlas', value: '145,230 coins' },
+        { medal: '🥈', username: 'Nova', value: '128,940 coins' },
+        { medal: '🥉', username: 'Echo', value: '117,580 coins' },
+        { medal: '4.', username: 'Pixel', value: '98,410 coins' },
+        { medal: '5.', username: 'Rune', value: '84,002 coins' },
+        { medal: '6.', username: 'Astra', value: '73,115 coins' }
+    ].slice(0, playerCount);
+    const voicePlayers = [
+        { medal: '🥇', username: 'Nova', value: '41h 20m' },
+        { medal: '🥈', username: 'Atlas', value: '37h 45m' },
+        { medal: '🥉', username: 'Echo', value: '33h 10m' },
+        { medal: '4.', username: 'Pixel', value: '29h 05m' },
+        { medal: '5.', username: 'Rune', value: '21h 44m' },
+        { medal: '6.', username: 'Astra', value: '19h 18m' }
+    ].slice(0, playerCount);
+
+    const leaderboardToDescription = (players) => players
+        .map((player) => `${player.medal} **${player.username}** • **${player.value}**`)
+        .join('\n');
+
+    const headerEmbed = new EmbedBuilder()
+        .setColor(parseInt(String(appearance.headerColor || '#5865F2').replace('#', ''), 16))
+        .setTitle(applyPreviewTemplate(appearance.headerTitle || '📊 {season} - Live Leaderboards', previewContext))
+        .setDescription(applyPreviewTemplate(appearance.headerDescription || 'Updated every {interval} minutes • Total Players: {players}', previewContext))
+        .addFields(
+            { name: '🕐 Started', value: new Date().toLocaleDateString(), inline: true },
+            { name: '📝 Status', value: '🟢 Active', inline: true },
+            { name: '⏭️ Next Update', value: 'In preview', inline: true }
+        )
+        .setTimestamp();
+
+    const embeds = [headerEmbed];
+
+    const customBlockBody = applyPreviewTemplate(appearance.customBlockBody || '', previewContext).trim();
+    if (customBlockBody) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.headerColor || '#5865F2').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.customBlockTitle || '📝 Server Note', previewContext))
+                .setDescription(customBlockBody)
+        );
+    }
+
+    if (appearance.showBalance !== false) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.balanceColor || '#57F287').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.balanceTitle || '💰 Season Balance Leaderboard', previewContext))
+                .setDescription(leaderboardToDescription(balancePlayers))
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
+        );
+    }
+
+    if (appearance.showVoice !== false) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.voiceColor || '#9C27B0').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.voiceTitle || '🎙️ Season Voice Channel Hours', previewContext))
+                .setDescription(leaderboardToDescription(voicePlayers))
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
+        );
+    }
+
+    const enabledGames = new Set(Array.isArray(appearance.enabledGames) ? appearance.enabledGames : []);
+    const firstGame = seasonLeaderboardGames.find((game) => enabledGames.has(game.key));
+    if (appearance.showGambling !== false && firstGame) {
+        const compactLines = layoutDensity === 'standard'
+            ? [
+                '🥇 **Atlas** • **28** wins (73.7%)',
+                '🥈 **Nova** • **25** wins (69.4%)',
+                '🥉 **Echo** • **18** wins (60.0%)'
+            ]
+            : layoutDensity === 'compact'
+                ? [
+                    'Wins: **Atlas** (28)',
+                    'Rate: **Nova** (69.4%)',
+                    'Games: **Echo** (31)'
+                ]
+                : [
+                    'Wins: **Atlas** (28)',
+                    'Rate: **Nova** (69.4%)'
+                ];
+
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(0xF39C12)
+                .setTitle(layoutDensity === 'standard' ? `${firstGame.name} - Most Wins` : firstGame.name)
+                .setDescription(compactLines.join('\n'))
+                .setFooter({ text: layoutDensity === 'minimal' ? 'Minimal layout' : compactMode ? 'Top 3 Players' : 'Top 5 Players' })
+        );
+    }
+
+    return embeds;
+};
+
+const buildSeasonLeaderboardPreviewPayload = async (guildId, client, configOverride = null) => {
+    const currentSeasonName = seasonManager.getCurrentSeason(guildId);
+    const previewConfig = configOverride
+        ? seasonLeaderboardManager.buildConfigPreview(guildId, configOverride)
+        : seasonLeaderboardManager.getGuildConfig(guildId);
+    let previewMode = 'sample';
+    let embeds = [];
+
+    if (currentSeasonName && seasonManager.getSeason(guildId, currentSeasonName)) {
+        embeds = await seasonLeaderboardManager.generateSeasonEmbeds(guildId, seasonManager, currentSeasonName, client, previewConfig);
+        if (embeds.length > 0) {
+            previewMode = 'live';
+        }
+    }
+
+    if (embeds.length === 0) {
+        embeds = buildSampleSeasonPreviewEmbeds(previewConfig, currentSeasonName || 'preview-season');
+    }
+
+    return {
+        mode: previewMode,
+        currentSeasonName,
+        embeds: embeds.map(serializeEmbedPreview)
+    };
+};
+
 const logDashboardAudit = (req, action, details = {}) => {
     queueDashboardAuditEntry({
         timestamp: new Date().toISOString(),
@@ -163,6 +489,83 @@ const collectDashboardCommands = (client, guildId) => {
             const catCompare = String(a.category).localeCompare(String(b.category));
             return catCompare !== 0 ? catCompare : a.name.localeCompare(b.name);
         });
+};
+
+const buildLeaderboardPageComponents = (guildId, page, totalPages) => {
+    const prevPage = Math.max(0, page - 1);
+    const nextPage = Math.min(totalPages - 1, page + 1);
+
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`lb_page:${guildId}:${prevPage}`)
+            .setLabel('⬅️ Prev')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+        new ButtonBuilder()
+            .setCustomId(`lb_page:${guildId}:${nextPage}`)
+            .setLabel('Next ➡️')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === totalPages - 1),
+        new ButtonBuilder()
+            .setCustomId(`lb_page:${guildId}:${page}`)
+            .setLabel(`Page ${page + 1}/${totalPages}`)
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(true)
+    );
+};
+
+const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, seasonName }) => {
+    if (!guild || !guildId || !seasonName) {
+        return { updated: false, reason: 'missing-season-or-guild' };
+    }
+
+    const channelId = seasonLeaderboardManager.getLeaderboardChannel(guildId);
+    if (!channelId) {
+        return { updated: false, reason: 'no-channel-configured' };
+    }
+
+    const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel || !channel.isTextBased()) {
+        return { updated: false, reason: 'invalid-channel' };
+    }
+
+    const embeds = await seasonLeaderboardManager.generateSeasonEmbeds(guildId, seasonManager, seasonName, client);
+    if (!embeds.length) {
+        return { updated: false, reason: 'no-embeds-generated' };
+    }
+
+    const components = embeds.length > 1
+        ? [buildLeaderboardPageComponents(guildId, 0, embeds.length)]
+        : [];
+    const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
+
+    let leaderboardMessage;
+    if (existingMessageId) {
+        try {
+            const message = await channel.messages.fetch(existingMessageId);
+            leaderboardMessage = await message.edit({ embeds: [embeds[0]], components });
+        } catch (error) {
+            leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+        }
+    } else {
+        leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+    }
+
+    await seasonLeaderboardManager.setLeaderboardMessage(guildId, leaderboardMessage.id);
+    await seasonLeaderboardManager.setLeaderboardMessages(guildId, []);
+    await seasonLeaderboardManager.setIndexMessage(guildId, null);
+    seasonLeaderboardManager.setPageCache(guildId, {
+        embeds,
+        messageId: leaderboardMessage.id,
+        channelId: channel.id
+    });
+
+    return {
+        updated: true,
+        messageId: leaderboardMessage.id,
+        embedCount: embeds.length,
+        channelId: channel.id
+    };
 };
 
 class Dashboard {
@@ -314,11 +717,15 @@ class Dashboard {
             const syncStatus = databaseManager.getSyncStatus();
             const updateState = readJsonFile(BOT_UPDATE_STATE_FILE, null);
             const memoryUsage = process.memoryUsage();
+            const recentErrors = readRecentErrorEntries(12);
+            const recentOwnerAudits = readDashboardAuditEntries({ limit: 20 });
 
             res.render('owner-settings', {
                 user: req.user,
                 syncStatus,
                 updateState,
+                recentErrors,
+                recentOwnerAudits,
                 ownerStatus: {
                     ownerId: process.env.BOT_OWNER_ID || null,
                     errorDmRecipientId: process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID || null,
@@ -383,6 +790,39 @@ class Dashboard {
                 res.json({ success: true, syncStatus });
             } catch (error) {
                 console.error('Error updating owner MongoDB sync settings:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/owner/test-notification', this.checkAuth, this.checkOwnerAccess, async (req, res) => {
+            try {
+                const recipientId = process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID;
+                if (!recipientId) {
+                    return res.status(400).json({ success: false, error: 'No owner notification recipient is configured.' });
+                }
+
+                const recipient = await this.client.users.fetch(recipientId).catch(() => null);
+                if (!recipient) {
+                    return res.status(404).json({ success: false, error: 'Owner notification recipient could not be fetched.' });
+                }
+
+                const embed = new EmbedBuilder()
+                    .setColor(0x5865F2)
+                    .setTitle('🧪 Dashboard Test Notification')
+                    .setDescription('This is a test DM triggered from the dashboard owner page.')
+                    .addFields(
+                        { name: 'Triggered By', value: `${req.user?.username || 'Unknown'} (${req.user?.id || 'unknown'})`, inline: false },
+                        { name: 'Bot', value: this.client.user?.tag || 'Unknown bot', inline: true },
+                        { name: 'Storage', value: databaseManager.useDB, inline: true }
+                    )
+                    .setTimestamp();
+
+                await recipient.send({ embeds: [embed] });
+                logDashboardAudit(req, 'OWNER_TEST_NOTIFICATION', { recipientId });
+
+                res.json({ success: true, message: `Test notification sent to ${recipient.username}.` });
+            } catch (error) {
+                console.error('Error sending owner test notification:', error);
                 res.status(500).json({ success: false, error: error.message });
             }
         });
@@ -521,6 +961,12 @@ class Dashboard {
                 }
 
                 const modSettings = moderationManager.getAutomodSettings(guildId);
+                logDashboardAudit(req, 'UPDATE_SERVER_SETTINGS', {
+                    updatedFields: Object.keys(settingsUpdates),
+                    updatedAutoModFields: Object.keys(autoModUpdates),
+                    loggingChannel: updates.loggingChannel !== undefined ? (updates.loggingChannel || null) : undefined,
+                    modLogChannel: updates.modLogChannel !== undefined ? (updates.modLogChannel || null) : undefined
+                });
                 res.json({ success: true, settings, modSettings });
             } catch (error) {
                 console.error('Error updating settings:', error);
@@ -532,9 +978,94 @@ class Dashboard {
         this.app.post('/api/settings/:guildId/reset', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
                 await settingsManager.reset(req.params.guildId);
+                logDashboardAudit(req, 'RESET_SERVER_SETTINGS', {});
                 const settings = settingsManager.get(req.params.guildId);
                 res.json({ success: true, settings });
             } catch (error) {
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const type = String(req.body.type || '').trim();
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+                if (!member) {
+                    return res.status(404).json({ success: false, error: 'Could not resolve your guild member profile for the test.' });
+                }
+
+                if (type === 'welcome') {
+                    const settings = settingsManager.get(guildId);
+                    const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
+                    if (!settings.welcomeEnabled || !channel) {
+                        return res.status(400).json({ success: false, error: 'Welcome messages are not fully configured yet.' });
+                    }
+
+                    const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
+                    await channel.send(`🧪 Test welcome message\n${message}`);
+                } else if (type === 'leave') {
+                    const settings = settingsManager.get(guildId);
+                    const channel = resolveStoredTextChannel(guild, settings.leaveChannel);
+                    if (!settings.leaveEnabled || !channel) {
+                        return res.status(400).json({ success: false, error: 'Leave messages are not fully configured yet.' });
+                    }
+
+                    const message = replaceMemberTemplateTokens(settings.leaveMessage, member, guild);
+                    await channel.send(`🧪 Test leave message\n${message}`);
+                } else if (type === 'logging') {
+                    const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
+                    if (!loggingChannelId) {
+                        return res.status(400).json({ success: false, error: 'No logging channel is configured.' });
+                    }
+
+                    const embed = new EmbedBuilder()
+                        .setColor(0x5865F2)
+                        .setTitle('🧪 Logging Channel Test')
+                        .setDescription('This is a test log entry from the dashboard.')
+                        .addFields(
+                            { name: 'Triggered By', value: `${member.user.tag}`, inline: true },
+                            { name: 'Server', value: guild.name, inline: true }
+                        )
+                        .setTimestamp();
+
+                    await loggingManager.sendLog(guildId, embed, this.client);
+                } else if (type === 'suggestions') {
+                    const suggestionSettings = suggestionManager.getSettings(guildId);
+                    const channel = suggestionSettings.channelId ? guild.channels.cache.get(suggestionSettings.channelId) : null;
+                    if (!suggestionSettings.enabled || !channel || !channel.isTextBased()) {
+                        return res.status(400).json({ success: false, error: 'Suggestions are not fully configured yet.' });
+                    }
+
+                    const staffMention = suggestionSettings.staffRoleId ? `<@&${suggestionSettings.staffRoleId}>` : 'No staff role configured';
+                    await channel.send({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setColor(0x57F287)
+                                .setTitle('🧪 Suggestion System Test')
+                                .setDescription('This is a dashboard test message for the suggestion channel.')
+                                .addFields(
+                                    { name: 'Voting Enabled', value: suggestionSettings.votingEnabled ? 'Yes' : 'No', inline: true },
+                                    { name: 'Auto Thread', value: suggestionSettings.autoThread ? 'Yes' : 'No', inline: true },
+                                    { name: 'Staff Role', value: staffMention, inline: false }
+                                )
+                                .setTimestamp()
+                        ]
+                    });
+                } else {
+                    return res.status(400).json({ success: false, error: 'Unknown test action.' });
+                }
+
+                logDashboardAudit(req, 'RUN_SERVER_TEST', { type });
+                res.json({ success: true, message: `Sent ${type} test successfully.` });
+            } catch (error) {
+                console.error('Error running dashboard test action:', error);
                 res.status(500).json({ success: false, error: error.message });
             }
         });
@@ -937,6 +1468,13 @@ class Dashboard {
                     messageUrl: postedMessage.url
                 });
 
+                logDashboardAudit(req, 'ADD_REACTION_ROLE', {
+                    messageId: postedMessage.id,
+                    channelId: channel.id,
+                    emoji: trimmedEmoji,
+                    roleId: trimmedRoleId
+                });
+
                 res.json({
                     success: true,
                     messageId: postedMessage.id,
@@ -945,6 +1483,93 @@ class Dashboard {
                 });
             } catch (error) {
                 console.error('Error saving reaction role:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.put('/api/community/:guildId/reaction-roles', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { messageId, originalEmoji, emoji, roleId, messageContent } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!messageId || !originalEmoji || !emoji || !roleId || !messageContent) {
+                    return res.status(400).json({ success: false, error: 'Message ID, original emoji, emoji, role, and message are required.' });
+                }
+
+                const existingEntry = reactionRoleManager.getReactionRoleEntry(guildId, String(messageId).trim(), String(originalEmoji).trim());
+                if (!existingEntry) {
+                    return res.status(404).json({ success: false, error: 'Reaction role entry not found.' });
+                }
+
+                const role = guild.roles.cache.get(String(roleId).trim());
+                if (!role || role.name === '@everyone') {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid role.' });
+                }
+
+                const channel = guild.channels.cache.get(existingEntry.channelId || '');
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'The original reaction role channel is no longer available.' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember || !botMember.permissions.has(PermissionFlagsBits.ManageRoles) || botMember.roles.highest.comparePositionTo(role) <= 0) {
+                    return res.status(400).json({ success: false, error: 'Bot cannot manage the selected role because of role hierarchy or missing Manage Roles.' });
+                }
+
+                const targetMessage = await channel.messages.fetch(String(messageId).trim()).catch(() => null);
+                if (!targetMessage) {
+                    return res.status(404).json({ success: false, error: 'The original dashboard-posted message could not be fetched.' });
+                }
+
+                await targetMessage.edit({ content: String(messageContent).trim() });
+
+                const nextEmoji = String(emoji).trim();
+                const previousEmoji = String(originalEmoji).trim();
+                if (nextEmoji !== previousEmoji) {
+                    try {
+                        const previousReaction = targetMessage.reactions.cache.find((reaction) => {
+                            const rendered = reaction.emoji.toString();
+                            const identifier = reaction.emoji.identifier ? decodeURIComponent(reaction.emoji.identifier) : null;
+                            return rendered === previousEmoji || identifier === previousEmoji;
+                        });
+
+                        if (previousReaction) {
+                            await previousReaction.users.remove(this.client.user.id).catch(() => null);
+                        }
+                    } catch {
+                        // Ignore cleanup failures and continue to the new reaction.
+                    }
+
+                    try {
+                        await targetMessage.react(nextEmoji);
+                    } catch {
+                        return res.status(400).json({ success: false, error: 'Bot could not add the updated emoji reaction.' });
+                    }
+
+                    await reactionRoleManager.removeReactionRole(guildId, String(messageId).trim(), previousEmoji);
+                }
+
+                await reactionRoleManager.addReactionRole(guildId, targetMessage.id, nextEmoji, role.id, {
+                    channelId: channel.id,
+                    messageContent: targetMessage.content.slice(0, 180),
+                    messageUrl: targetMessage.url
+                });
+
+                logDashboardAudit(req, 'UPDATE_REACTION_ROLE', {
+                    messageId: targetMessage.id,
+                    previousEmoji,
+                    emoji: nextEmoji,
+                    roleId: role.id
+                });
+
+                res.json({ success: true, messageId: targetMessage.id, messageUrl: targetMessage.url });
+            } catch (error) {
+                console.error('Error updating reaction role:', error);
                 res.status(500).json({ success: false, error: error.message });
             }
         });
@@ -959,6 +1584,7 @@ class Dashboard {
                 }
 
                 await reactionRoleManager.removeReactionRole(guildId, String(messageId).trim(), String(emoji).trim());
+                logDashboardAudit(req, 'REMOVE_REACTION_ROLE', { messageId: String(messageId).trim(), emoji: String(emoji).trim() });
                 res.json({ success: true });
             } catch (error) {
                 console.error('Error removing reaction role:', error);
@@ -972,6 +1598,14 @@ class Dashboard {
                 const isTrue = (value) => value === true || value === 'true' || value === 'on' || value === 1 || value === '1';
 
                 await suggestionManager.updateSettings(guildId, {
+                    enabled: isTrue(req.body.enabled),
+                    autoThread: isTrue(req.body.autoThread),
+                    votingEnabled: isTrue(req.body.votingEnabled),
+                    channelId: req.body.channelId || null,
+                    staffRoleId: req.body.staffRoleId || null
+                });
+
+                logDashboardAudit(req, 'UPDATE_SUGGESTION_SETTINGS', {
                     enabled: isTrue(req.body.enabled),
                     autoThread: isTrue(req.body.autoThread),
                     votingEnabled: isTrue(req.body.votingEnabled),
@@ -999,6 +1633,8 @@ class Dashboard {
                 if (!updated) {
                     return res.status(404).json({ success: false, error: 'Suggestion not found' });
                 }
+
+                logDashboardAudit(req, 'UPDATE_SUGGESTION_STATUS', { suggestionId, status, reason: reason || null });
 
                 res.json({ success: true });
             } catch (error) {
@@ -1155,16 +1791,34 @@ class Dashboard {
             }
         });
 
+        this.app.get('/dashboard/:guildId/activity', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const dashboardAuditLogs = readDashboardAuditEntries({ guildId, limit: 80 });
+                const serverAuditLogs = this.client.auditLog?.getAuditLogs({ guildId, limit: 40, days: 14 }) || [];
+                const serverAuditStats = this.client.auditLog?.getStats({ guildId, days: 14 }) || { total: 0, byCategory: {}, bySeverity: {} };
+
+                res.render('activity', {
+                    guild,
+                    user: req.user,
+                    dashboardAuditLogs,
+                    serverAuditLogs,
+                    serverAuditStats
+                });
+            } catch (error) {
+                console.error('Activity page error:', error);
+                res.status(500).send('Error loading activity center');
+            }
+        });
+
         // Bot health dashboard
         this.app.get('/dashboard/:guildId/health', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const memUsage = process.memoryUsage();
-                const auditLogs = readJsonFile(DASHBOARD_AUDIT_FILE, [])
-                    .filter(entry => !entry.guildId || entry.guildId === guildId)
-                    .slice(-30)
-                    .reverse();
+                const auditLogs = readDashboardAuditEntries({ guildId, limit: 30 });
 
                 res.render('health', {
                     guild,
@@ -1184,6 +1838,56 @@ class Dashboard {
             } catch (error) {
                 console.error('Health page error:', error);
                 res.status(500).send('Error loading health dashboard');
+            }
+        });
+
+        this.app.get('/dashboard/:guildId/permissions', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+
+                if (!member?.permissions?.has?.(PermissionFlagsBits.Administrator)) {
+                    return res.status(403).send('You need Administrator permissions to manage dashboard delegation');
+                }
+
+                res.render('permissions', {
+                    guild,
+                    user: req.user,
+                    sectionLabels: DASHBOARD_PERMISSION_SECTION_KEYS.map((sectionKey) => ({
+                        key: sectionKey,
+                        label: getDashboardSectionLabel(sectionKey)
+                    })),
+                    sectionConfig: dashboardPermissionsManager.getSectionConfig(guildId),
+                    roles: Array.from(guild.roles.cache.values()).filter((role) => role.name !== '@everyone')
+                });
+            } catch (error) {
+                console.error('Permissions page error:', error);
+                res.status(500).send('Error loading dashboard permissions');
+            }
+        });
+
+        this.app.post('/api/:guildId/dashboard-permissions', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { guildId } = req.params;
+                const guild = this.client.guilds.cache.get(guildId);
+                const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+
+                if (!member?.permissions?.has?.(PermissionFlagsBits.Administrator)) {
+                    return res.status(403).json({ success: false, error: 'Administrator permissions are required to manage dashboard delegation.' });
+                }
+
+                const nextConfig = {};
+                for (const sectionKey of DASHBOARD_PERMISSION_SECTION_KEYS) {
+                    nextConfig[sectionKey] = Array.isArray(req.body[sectionKey]) ? req.body[sectionKey] : [];
+                }
+
+                const sectionConfig = await dashboardPermissionsManager.setSectionConfig(guildId, nextConfig);
+                logDashboardAudit(req, 'UPDATE_DASHBOARD_DELEGATION', { sectionConfig });
+                res.json({ success: true, sectionConfig });
+            } catch (error) {
+                console.error('Error saving dashboard delegation:', error);
+                res.status(500).json({ success: false, error: error.message });
             }
         });
 
@@ -1287,6 +1991,18 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 let leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
+                const seasonLeaderboardConfig = seasonLeaderboardManager.getGuildConfig(guildId);
+                const currentSeasonName = seasonManager.getCurrentSeason(guildId);
+                const currentSeason = currentSeasonName ? seasonManager.getSeason(guildId, currentSeasonName) : null;
+                const seasonLeaderboardPreview = await buildSeasonLeaderboardPreviewPayload(guildId, this.client);
+                const channels = guild.channels.cache
+                    .filter((channel) => channel.type === 0)
+                    .sort((left, right) => left.rawPosition - right.rawPosition)
+                    .map((channel) => ({ id: channel.id, name: channel.name }));
+                const roles = guild.roles.cache
+                    .filter((role) => role.id !== guild.id)
+                    .sort((left, right) => right.position - left.position)
+                    .map((role) => ({ id: role.id, name: role.name }));
 
                 // Resolve usernames for leaderboard
                 leaderboard = await Promise.all(leaderboard.map(async (user) => ({
@@ -1298,12 +2014,163 @@ class Dashboard {
                     guildId,
                     guild,
                     leaderboard,
+                    channels,
+                    roles,
+                    seasonLeaderboardGames,
+                    seasonLeaderboardConfig,
+                    seasonLeaderboardPreview,
+                    currentSeasonName,
+                    currentSeason,
                     formatNumber,
                     user: req.user
                 });
             } catch (error) {
                 console.error('Economy page error:', error);
                 res.status(500).send('Error loading economy');
+            }
+        });
+
+        this.app.post('/api/economy/:guildId/season-leaderboard-config', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const config = seasonLeaderboardManager.getGuildConfig(guildId);
+                const { hasChannelField, channelId, configUpdate } = buildSeasonLeaderboardDashboardOptions(req.body || {}, config);
+                const validGameKeys = new Set(seasonLeaderboardGames.map((game) => game.key));
+
+                if (!Number.isFinite(configUpdate.updateIntervalMinutes) || configUpdate.updateIntervalMinutes < 5 || configUpdate.updateIntervalMinutes > 1440) {
+                    return res.status(400).json({ success: false, error: 'Update interval must be between 5 and 1440 minutes.' });
+                }
+
+                if (!Number.isFinite(configUpdate.pruneDays) || configUpdate.pruneDays < 0 || configUpdate.pruneDays > 3650) {
+                    return res.status(400).json({ success: false, error: 'Prune days must be between 0 and 3650.' });
+                }
+
+                if (configUpdate.payouts.some((value) => !Number.isFinite(value) || value < 0)) {
+                    return res.status(400).json({ success: false, error: 'Payout values must be zero or greater.' });
+                }
+
+                if (hasChannelField && channelId) {
+                    const channel = guild.channels.cache.get(channelId)
+                        || await guild.channels.fetch(channelId).catch(() => null);
+                    if (!channel || !channel.isTextBased()) {
+                        return res.status(400).json({ success: false, error: 'Please choose a valid text channel for leaderboard updates.' });
+                    }
+                }
+
+                if (configUpdate.allowedRoleId && !guild.roles.cache.has(configUpdate.allowedRoleId)) {
+                    return res.status(400).json({ success: false, error: 'The selected force update role was not found in this server.' });
+                }
+
+                if (configUpdate.rewardRoles.some((roleId) => !guild.roles.cache.has(roleId))) {
+                    return res.status(400).json({ success: false, error: 'One or more reward roles were not found in this server.' });
+                }
+
+                if ((configUpdate.appearance.enabledGames || []).some((gameKey) => !validGameKeys.has(gameKey))) {
+                    return res.status(400).json({ success: false, error: 'One or more selected gambling leaderboard sections are invalid.' });
+                }
+
+                if (hasChannelField && channelId !== (config.channelId || null)) {
+                    await seasonLeaderboardManager.setLeaderboardChannel(guildId, channelId);
+                }
+
+                await seasonLeaderboardManager.setLeaderboardOptions(guildId, configUpdate);
+
+                const updatedConfig = seasonLeaderboardManager.getGuildConfig(guildId);
+                const preview = await buildSeasonLeaderboardPreviewPayload(guildId, this.client);
+                const syncResult = preview.currentSeasonName
+                    ? await syncDashboardSeasonLeaderboardMessage({
+                        guild,
+                        guildId,
+                        client: this.client,
+                        seasonName: preview.currentSeasonName
+                    })
+                    : { updated: false, reason: 'no-current-season' };
+
+                logDashboardAudit(req, 'UPDATE_SEASON_LEADERBOARD_CONFIG', {
+                    enabled: updatedConfig.enabled,
+                    channelId: updatedConfig.channelId || null,
+                    compactMode: updatedConfig.compactMode,
+                    updateIntervalMinutes: updatedConfig.updateIntervalMinutes,
+                    pruneDays: updatedConfig.pruneDays,
+                    syncResult
+                });
+
+                res.json({
+                    success: true,
+                    config: updatedConfig,
+                    preview,
+                    syncResult,
+                    currentSeasonName: preview.currentSeasonName,
+                    seasonInfo: preview.currentSeasonName
+                        ? seasonManager.getSeason(guildId, preview.currentSeasonName)
+                        : null
+                });
+            } catch (error) {
+                console.error('Error updating season leaderboard dashboard settings:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to update season leaderboard settings.' });
+            }
+        });
+
+        this.app.post('/api/economy/:guildId/season-leaderboard-preview', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const config = seasonLeaderboardManager.getGuildConfig(guildId);
+                const { hasChannelField, channelId, configUpdate } = buildSeasonLeaderboardDashboardOptions(req.body || {}, config);
+                const validGameKeys = new Set(seasonLeaderboardGames.map((game) => game.key));
+
+                if (!Number.isFinite(configUpdate.updateIntervalMinutes) || configUpdate.updateIntervalMinutes < 5 || configUpdate.updateIntervalMinutes > 1440) {
+                    return res.status(400).json({ success: false, error: 'Update interval must be between 5 and 1440 minutes.' });
+                }
+
+                if (!Number.isFinite(configUpdate.pruneDays) || configUpdate.pruneDays < 0 || configUpdate.pruneDays > 3650) {
+                    return res.status(400).json({ success: false, error: 'Prune days must be between 0 and 3650.' });
+                }
+
+                if (configUpdate.payouts.some((value) => !Number.isFinite(value) || value < 0)) {
+                    return res.status(400).json({ success: false, error: 'Payout values must be zero or greater.' });
+                }
+
+                if (hasChannelField && channelId) {
+                    const channel = guild.channels.cache.get(channelId)
+                        || await guild.channels.fetch(channelId).catch(() => null);
+                    if (!channel || !channel.isTextBased()) {
+                        return res.status(400).json({ success: false, error: 'Please choose a valid text channel for leaderboard updates.' });
+                    }
+                }
+
+                if (configUpdate.allowedRoleId && !guild.roles.cache.has(configUpdate.allowedRoleId)) {
+                    return res.status(400).json({ success: false, error: 'The selected force update role was not found in this server.' });
+                }
+
+                if (configUpdate.rewardRoles.some((roleId) => !guild.roles.cache.has(roleId))) {
+                    return res.status(400).json({ success: false, error: 'One or more reward roles were not found in this server.' });
+                }
+
+                if ((configUpdate.appearance.enabledGames || []).some((gameKey) => !validGameKeys.has(gameKey))) {
+                    return res.status(400).json({ success: false, error: 'One or more selected gambling leaderboard sections are invalid.' });
+                }
+
+                const previewConfig = {
+                    ...configUpdate,
+                    channelId: hasChannelField ? channelId : config.channelId || null
+                };
+                const preview = await buildSeasonLeaderboardPreviewPayload(guildId, this.client, previewConfig);
+
+                res.json({ success: true, preview });
+            } catch (error) {
+                console.error('Error previewing season leaderboard dashboard settings:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to preview season leaderboard settings.' });
             }
         });
 
@@ -1403,8 +2270,17 @@ class Dashboard {
                 return res.status(403).send('Unable to verify your current server permissions');
             }
 
-            if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
+            if (member.permissions.has(PermissionFlagsBits.Administrator)) {
+                return next();
+            }
+
+            const sectionKey = inferDashboardSectionKey(req.path);
+            if (!sectionKey) {
                 return res.status(403).send('You need Administrator permissions');
+            }
+
+            if (!dashboardPermissionsManager.memberCanAccessSection(member, sectionKey)) {
+                return res.status(403).send(`You need Administrator permissions or a delegated role for ${getDashboardSectionLabel(sectionKey)}`);
             }
 
             next();

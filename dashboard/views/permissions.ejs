@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Dashboard Delegation</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+  <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+  <div class="main-wrapper">
+    <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Dashboard Delegation' }) %>
+
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-user-lock" style="color:var(--brand);margin-right:8px"></i>Dashboard Delegation</h1>
+        <p>Choose which roles can access each dashboard section without full Administrator permission.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div><div class="card-title"><i class="fas fa-shield-halved"></i> Section Access</div><div class="card-subtitle">Administrators always keep full access. Empty sections remain admin-only.</div></div></div>
+        <form id="dashboardPermissionsForm">
+          <div class="permission-grid">
+            <% sectionLabels.forEach(section => { %>
+              <section class="permission-card">
+                <div class="permission-card-header">
+                  <h3><%= section.label %></h3>
+                  <span class="badge badge-brand"><%= (sectionConfig[section.key] || []).length %> roles</span>
+                </div>
+                <div class="permission-role-list">
+                  <% roles.forEach(role => { %>
+                    <label class="permission-role-option">
+                      <input type="checkbox" name="<%= section.key %>" value="<%= role.id %>" <%= (sectionConfig[section.key] || []).includes(role.id) ? 'checked' : '' %>>
+                      <span><%= role.name %></span>
+                    </label>
+                  <% }) %>
+                </div>
+              </section>
+            <% }) %>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Delegation Rules</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+document.getElementById('dashboardPermissionsForm').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Saving...';
+
+  try {
+    const payload = {};
+    document.querySelectorAll('.permission-card').forEach((card) => {
+      const checkbox = card.querySelector('input[type="checkbox"]');
+      if (!checkbox) return;
+      const sectionKey = checkbox.name;
+      payload[sectionKey] = Array.from(card.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+    });
+
+    const response = await fetch(`/api/${guildId}/dashboard-permissions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Failed to save dashboard delegation rules.');
+    }
+    dashboardUI.showToast('Dashboard delegation rules saved.', 'success');
+  } catch (error) {
+    dashboardUI.showToast(error.message || 'Failed to save dashboard delegation rules.', 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = original;
+  }
+});
+</script>
+</body>
+</html>

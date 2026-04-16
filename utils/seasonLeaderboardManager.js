@@ -4,6 +4,97 @@ const { EmbedBuilder } = require('discord.js');
 
 const CONFIG_FILE = path.join(__dirname, '..', 'data', 'seasonLeaderboardConfig.json');
 
+const GAMBLING_GAMES = [
+    {
+        key: 'blackjack',
+        name: '🃏 Blackjack',
+        color: 0xFF6B6B,
+        hasTies: true
+    },
+    {
+        key: 'roulette',
+        name: '🎰 Roulette',
+        color: 0xFF1744,
+        hasTies: false
+    },
+    {
+        key: 'slots',
+        name: '🎰 Slots',
+        color: 0xFFD700,
+        hasTies: false
+    },
+    {
+        key: 'dice',
+        name: '🎲 Dice',
+        color: 0x536DFE,
+        hasTies: false
+    },
+    {
+        key: 'coinflip',
+        name: '🪙 Coinflip',
+        color: 0xFFC107,
+        hasTies: false
+    },
+    {
+        key: 'rps',
+        name: '🎮 Rock Paper Scissors',
+        color: 0x4CAF50,
+        hasTies: true
+    },
+    {
+        key: 'ttt',
+        name: '⭕ Tic Tac Toe',
+        color: 0x2196F3,
+        hasTies: true
+    }
+];
+
+const DEFAULT_APPEARANCE = {
+    headerTitle: '📊 {season} - Live Leaderboards',
+    headerDescription: 'Updated every {interval} minutes • Total Players: {players}',
+    headerColor: '#5865F2',
+    balanceTitle: '💰 Season Balance Leaderboard',
+    balanceColor: '#57F287',
+    voiceTitle: '🎙️ Season Voice Channel Hours',
+    voiceColor: '#9C27B0',
+    layoutDensity: 'standard',
+    customBlockTitle: '📝 Server Note',
+    customBlockBody: '',
+    showBalance: true,
+    showVoice: true,
+    showGambling: true,
+    enabledGames: GAMBLING_GAMES.map((game) => game.key)
+};
+
+const normalizeHexColor = (value, fallback) => {
+    const fallbackColor = String(fallback || '#5865F2').trim().toUpperCase();
+    const normalized = String(value || '').trim();
+    if (!normalized) return fallbackColor;
+    const hex = normalized.startsWith('#') ? normalized.slice(1) : normalized;
+    if (!/^[0-9A-Fa-f]{6}$/.test(hex)) return fallbackColor;
+    return `#${hex.toUpperCase()}`;
+};
+
+const colorHexToNumber = (value, fallback) => {
+    const hex = normalizeHexColor(value, fallback).slice(1);
+    return parseInt(hex, 16);
+};
+
+const sanitizeText = (value, fallback, maxLength) => {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return String(fallback || '');
+    return trimmed.slice(0, maxLength);
+};
+
+const applyTemplate = (template, context = {}) => {
+    return String(template || '').replace(/\{(\w+)\}/g, (match, token) => {
+        if (!Object.prototype.hasOwnProperty.call(context, token)) {
+            return match;
+        }
+        return String(context[token] ?? '');
+    });
+};
+
 class SeasonLeaderboardManager {
     constructor() {
         this.config = {};
@@ -46,23 +137,120 @@ class SeasonLeaderboardManager {
         }
     }
 
-    getGuildConfig(guildId) {
-        if (!this.config[guildId]) {
-            this.config[guildId] = {};
+    getDefaultAppearance() {
+        return {
+            ...DEFAULT_APPEARANCE,
+            enabledGames: [...DEFAULT_APPEARANCE.enabledGames]
+        };
+    }
+
+    normalizeAppearance(appearance = {}) {
+        const merged = {
+            ...this.getDefaultAppearance(),
+            ...(appearance || {})
+        };
+
+        const validGameKeys = new Set(GAMBLING_GAMES.map((game) => game.key));
+
+        merged.headerTitle = sanitizeText(merged.headerTitle, DEFAULT_APPEARANCE.headerTitle, 256);
+        merged.headerDescription = sanitizeText(merged.headerDescription, DEFAULT_APPEARANCE.headerDescription, 4096);
+        merged.headerColor = normalizeHexColor(merged.headerColor, DEFAULT_APPEARANCE.headerColor);
+        merged.balanceTitle = sanitizeText(merged.balanceTitle, DEFAULT_APPEARANCE.balanceTitle, 256);
+        merged.balanceColor = normalizeHexColor(merged.balanceColor, DEFAULT_APPEARANCE.balanceColor);
+        merged.voiceTitle = sanitizeText(merged.voiceTitle, DEFAULT_APPEARANCE.voiceTitle, 256);
+        merged.voiceColor = normalizeHexColor(merged.voiceColor, DEFAULT_APPEARANCE.voiceColor);
+        merged.layoutDensity = ['standard', 'compact', 'minimal'].includes(String(merged.layoutDensity || '').trim())
+            ? String(merged.layoutDensity).trim()
+            : DEFAULT_APPEARANCE.layoutDensity;
+        merged.customBlockTitle = sanitizeText(merged.customBlockTitle, DEFAULT_APPEARANCE.customBlockTitle, 256);
+        merged.customBlockBody = sanitizeText(merged.customBlockBody, DEFAULT_APPEARANCE.customBlockBody, 1024);
+        merged.showBalance = merged.showBalance !== false;
+        merged.showVoice = merged.showVoice !== false;
+        merged.showGambling = merged.showGambling !== false;
+        merged.enabledGames = Array.isArray(merged.enabledGames)
+            ? Array.from(new Set(merged.enabledGames.map((key) => String(key || '').trim()).filter((key) => validGameKeys.has(key))))
+            : [...DEFAULT_APPEARANCE.enabledGames];
+
+        if (merged.enabledGames.length === 0) {
+            merged.enabledGames = [...DEFAULT_APPEARANCE.enabledGames];
         }
 
-        const cfg = this.config[guildId];
-        if (typeof cfg.enabled !== 'boolean') cfg.enabled = true;
-        if (!cfg.updateIntervalMinutes) cfg.updateIntervalMinutes = 15;
-        if (typeof cfg.compactMode !== 'boolean') cfg.compactMode = false;
-        if (!Array.isArray(cfg.messageIds)) cfg.messageIds = [];
-        if (!cfg.allowedRoleId) cfg.allowedRoleId = null;
-        if (!cfg.indexMessageId) cfg.indexMessageId = null;
-        if (!cfg.lastAutoUpdate) cfg.lastAutoUpdate = 0;
-        if (!cfg.pruneDays) cfg.pruneDays = 30;
-        if (!Array.isArray(cfg.payouts)) cfg.payouts = [10000, 5000, 2500];
-        if (!Array.isArray(cfg.rewardRoles)) cfg.rewardRoles = [];
-        return cfg;
+        return merged;
+    }
+
+    getDefaultConfig() {
+        return {
+            enabled: true,
+            updateIntervalMinutes: 15,
+            compactMode: false,
+            messageIds: [],
+            allowedRoleId: null,
+            indexMessageId: null,
+            lastAutoUpdate: 0,
+            pruneDays: 30,
+            payouts: [10000, 5000, 2500],
+            rewardRoles: [],
+            messageId: null,
+            channelId: null,
+            appearance: this.getDefaultAppearance()
+        };
+    }
+
+    normalizeConfig(config = {}) {
+        const defaults = this.getDefaultConfig();
+        const normalized = {
+            ...defaults,
+            ...(config || {})
+        };
+
+        normalized.enabled = normalized.enabled !== false;
+        normalized.updateIntervalMinutes = Number.isFinite(Number(normalized.updateIntervalMinutes))
+            ? Math.max(5, Math.floor(Number(normalized.updateIntervalMinutes)))
+            : defaults.updateIntervalMinutes;
+        normalized.compactMode = Boolean(normalized.compactMode);
+        normalized.messageIds = Array.isArray(normalized.messageIds) ? normalized.messageIds : [];
+        normalized.allowedRoleId = normalized.allowedRoleId || null;
+        normalized.indexMessageId = normalized.indexMessageId || null;
+        normalized.lastAutoUpdate = Number(normalized.lastAutoUpdate) || 0;
+        normalized.lastManualUpdate = Number(normalized.lastManualUpdate) || 0;
+        normalized.pruneDays = Number.isFinite(Number(normalized.pruneDays))
+            ? Math.max(0, Math.floor(Number(normalized.pruneDays)))
+            : defaults.pruneDays;
+        normalized.payouts = Array.isArray(normalized.payouts)
+            ? normalized.payouts.map((payout) => Math.max(0, Number(payout) || 0)).slice(0, 3)
+            : [...defaults.payouts];
+        while (normalized.payouts.length < 3) {
+            normalized.payouts.push(0);
+        }
+        normalized.rewardRoles = Array.isArray(normalized.rewardRoles)
+            ? normalized.rewardRoles.map((roleId) => String(roleId || '').trim()).filter(Boolean).slice(0, 3)
+            : [];
+        normalized.messageId = normalized.messageId || null;
+        normalized.channelId = normalized.channelId || null;
+        normalized.appearance = this.normalizeAppearance(normalized.appearance || {});
+
+        return normalized;
+    }
+
+    buildConfigPreview(guildId, overrides = {}) {
+        const current = this.getGuildConfig(guildId);
+        return this.normalizeConfig({
+            ...current,
+            ...(overrides || {}),
+            appearance: {
+                ...(current.appearance || {}),
+                ...((overrides && overrides.appearance) || {})
+            }
+        });
+    }
+
+    getGuildConfig(guildId) {
+        if (!this.config[guildId]) {
+            this.config[guildId] = this.getDefaultConfig();
+        }
+
+        this.config[guildId] = this.normalizeConfig(this.config[guildId]);
+        return this.config[guildId];
     }
 
     /**
@@ -103,6 +291,12 @@ class SeasonLeaderboardManager {
         }
         if (options.allowedRoleId !== undefined) {
             cfg.allowedRoleId = options.allowedRoleId || null;
+        }
+        if (options.appearance && typeof options.appearance === 'object') {
+            cfg.appearance = this.normalizeAppearance({
+                ...(cfg.appearance || {}),
+                ...options.appearance
+            });
         }
         await this.save();
     }
@@ -183,18 +377,35 @@ class SeasonLeaderboardManager {
      * @param {Client} client - Discord client for fetching usernames
      * @returns {Promise<Array>} Array of embeds
      */
-    async generateSeasonEmbeds(guildId, seasonManager, seasonName, client) {
+    async generateSeasonEmbeds(guildId, seasonManager, seasonName, client, configOverride = null) {
         const season = seasonManager.getSeason(guildId, seasonName);
         if (!season) {
             return [];
         }
 
-        const cfg = this.getGuildConfig(guildId);
+        const cfg = configOverride
+            ? this.buildConfigPreview(guildId, configOverride)
+            : this.getGuildConfig(guildId);
+        const appearance = cfg.appearance || this.getDefaultAppearance();
         const updateIntervalMinutes = cfg.updateIntervalMinutes || 15;
         const compactMode = !!cfg.compactMode;
-        const balanceLimit = compactMode ? 3 : 10;
-        const gamblingLimit = compactMode ? 3 : 5;
+        const layoutDensity = appearance.layoutDensity || 'standard';
+        const useCompactLimits = compactMode || layoutDensity === 'compact' || layoutDensity === 'minimal';
+        const balanceLimit = layoutDensity === 'minimal' ? 3 : (useCompactLimits ? 3 : 10);
+        const gamblingLimit = layoutDensity === 'minimal' ? 1 : (useCompactLimits ? 3 : 5);
         const nextUpdateAt = Math.floor((Date.now() + (updateIntervalMinutes * 60 * 1000)) / 1000);
+        const context = {
+            season: seasonName,
+            players: season.totalPlayers || 0,
+            interval: updateIntervalMinutes,
+            started: new Date(season.startDate).toLocaleDateString(),
+            status: season.isActive ? 'Active' : 'Ended'
+        };
+        const headerTitle = applyTemplate(appearance.headerTitle, context) || `📊 ${seasonName} - Live Leaderboards`;
+        const headerDescription = applyTemplate(appearance.headerDescription, context)
+            || `Updated every ${updateIntervalMinutes} minutes • Total Players: ${season.totalPlayers}`;
+        const customBlockTitle = applyTemplate(appearance.customBlockTitle, context) || DEFAULT_APPEARANCE.customBlockTitle;
+        const customBlockBody = applyTemplate(appearance.customBlockBody, context).trim();
 
         // Helper to get username with fallback
         const getUsername = async (userId, storedUsername) => {
@@ -221,14 +432,14 @@ class SeasonLeaderboardManager {
 
         const embeds = [];
         const combinedFields = [];
-        const combinedTitle = `📊 ${seasonName.toUpperCase()} - Live Leaderboards`;
-        const combinedDescription = `Updated every ${updateIntervalMinutes} minutes • Total Players: ${season.totalPlayers}`;
+        const combinedTitle = headerTitle;
+        const combinedDescription = headerDescription;
 
         // Header embed with season info
         const headerEmbed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle(`📊 ${seasonName.toUpperCase()} - Live Leaderboards`)
-            .setDescription(`Updated every ${updateIntervalMinutes} minutes • Total Players: ${season.totalPlayers}`)
+            .setColor(colorHexToNumber(appearance.headerColor, DEFAULT_APPEARANCE.headerColor))
+            .setTitle(headerTitle)
+            .setDescription(headerDescription)
             .addFields(
                 { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
                 { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true },
@@ -244,9 +455,24 @@ class SeasonLeaderboardManager {
             { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:R>`, inline: true }
         );
 
+        if (customBlockBody) {
+            const customEmbed = new EmbedBuilder()
+                .setColor(colorHexToNumber(appearance.headerColor, DEFAULT_APPEARANCE.headerColor))
+                .setTitle(customBlockTitle)
+                .setDescription(customBlockBody);
+
+            embeds.push(customEmbed);
+
+            combinedFields.push({
+                name: customBlockTitle,
+                value: customBlockBody,
+                inline: false
+            });
+        }
+
         // Balance leaderboard
         const balanceLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', balanceLimit);
-        if (balanceLeaderboard.length > 0) {
+        if (appearance.showBalance && balanceLeaderboard.length > 0) {
             let balanceDesc = '';
             for (let i = 0; i < balanceLeaderboard.length; i++) {
                 const player = balanceLeaderboard[i];
@@ -255,16 +481,18 @@ class SeasonLeaderboardManager {
                 balanceDesc += `${medal} **${username}** • **${player.balance.toLocaleString()}** coins\n`;
             }
 
+            const balanceTitle = applyTemplate(appearance.balanceTitle, context) || DEFAULT_APPEARANCE.balanceTitle;
+
             const balanceEmbed = new EmbedBuilder()
-                .setColor(0x57F287)
-                .setTitle('💰 Season Balance Leaderboard')
+                .setColor(colorHexToNumber(appearance.balanceColor, DEFAULT_APPEARANCE.balanceColor))
+                .setTitle(balanceTitle)
                 .setDescription(balanceDesc)
                 .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
 
             embeds.push(balanceEmbed);
 
             combinedFields.push({
-                name: '💰 Season Balance Leaderboard',
+                name: balanceTitle,
                 value: balanceDesc,
                 inline: false
             });
@@ -275,7 +503,7 @@ class SeasonLeaderboardManager {
         // Filter to only show players with voice hours > 0
         const filteredVoiceLeaderboard = voiceLeaderboard.filter(player => (player.voiceHours || 0) > 0);
         
-        if (filteredVoiceLeaderboard.length > 0) {
+        if (appearance.showVoice && filteredVoiceLeaderboard.length > 0) {
             let voiceDesc = '';
             for (let i = 0; i < filteredVoiceLeaderboard.length; i++) {
                 const player = filteredVoiceLeaderboard[i];
@@ -286,70 +514,67 @@ class SeasonLeaderboardManager {
                 voiceDesc += `${medal} **${username}** • **${hours}h ${minutes}m**\n`;
             }
 
+            const voiceTitle = applyTemplate(appearance.voiceTitle, context) || DEFAULT_APPEARANCE.voiceTitle;
+
             const voiceEmbed = new EmbedBuilder()
-                .setColor(0x9C27B0)
-                .setTitle('🎙️ Season Voice Channel Hours')
+                .setColor(colorHexToNumber(appearance.voiceColor, DEFAULT_APPEARANCE.voiceColor))
+                .setTitle(voiceTitle)
                 .setDescription(voiceDesc)
                 .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
 
             embeds.push(voiceEmbed);
 
             combinedFields.push({
-                name: '🎙️ Season Voice Channel Hours',
+                name: voiceTitle,
                 value: voiceDesc,
                 inline: false
             });
         }
 
         // Gambling leaderboards
-        const gamblingGames = [
-            { 
-                key: 'blackjack', 
-                name: '🃏 Blackjack',
-                color: 0xFF6B6B,
-                hasTies: true
-            },
-            { 
-                key: 'roulette', 
-                name: '🎰 Roulette',
-                color: 0xFF1744,
-                hasTies: false
-            },
-            { 
-                key: 'slots', 
-                name: '🎰 Slots',
-                color: 0xFFD700,
-                hasTies: false
-            },
-            { 
-                key: 'dice', 
-                name: '🎲 Dice',
-                color: 0x536DFE,
-                hasTies: false
-            },
-            { 
-                key: 'coinflip', 
-                name: '🪙 Coinflip',
-                color: 0xFFC107,
-                hasTies: false
-            },
-            { 
-                key: 'rps', 
-                name: '🎮 Rock Paper Scissors',
-                color: 0x4CAF50,
-                hasTies: true
-            },
-            { 
-                key: 'ttt', 
-                name: '⭕ Tic Tac Toe',
-                color: 0x2196F3,
-                hasTies: true
+        const enabledGames = new Set(appearance.enabledGames || DEFAULT_APPEARANCE.enabledGames);
+        for (const game of GAMBLING_GAMES) {
+            if (!appearance.showGambling || !enabledGames.has(game.key)) {
+                continue;
             }
-        ];
 
-        for (const game of gamblingGames) {
-            // Wins leaderboard
             const winsLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'wins', 5);
+            const winRateLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'winRate', 5);
+            const totalGamesLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'total', 5);
+
+            if (layoutDensity === 'compact' || layoutDensity === 'minimal') {
+                const compactLines = [];
+                const topWins = winsLeaderboard[0];
+                const topRate = winRateLeaderboard[0];
+                const topGames = totalGamesLeaderboard[0];
+
+                if (topWins) {
+                    const username = await getUsername(topWins.userId, topWins.username);
+                    compactLines.push(`Wins: **${username}** (${topWins.wins})`);
+                }
+
+                if (topRate) {
+                    const username = await getUsername(topRate.userId, topRate.username);
+                    compactLines.push(`Rate: **${username}** (${topRate.winRate}%)`);
+                }
+
+                if (layoutDensity === 'compact' && topGames) {
+                    const username = await getUsername(topGames.userId, topGames.username);
+                    compactLines.push(`Games: **${username}** (${topGames.total})`);
+                }
+
+                if (compactLines.length > 0) {
+                    combinedFields.push({
+                        name: game.name,
+                        value: compactLines.join('\n'),
+                        inline: layoutDensity !== 'minimal'
+                    });
+                }
+
+                continue;
+            }
+
+            // Wins leaderboard
             const winsLimit = gamblingLimit;
             const winRateLimit = gamblingLimit;
             const totalLimit = gamblingLimit;
@@ -380,7 +605,6 @@ class SeasonLeaderboardManager {
             }
 
             // Win Rate leaderboard
-            const winRateLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'winRate', 5);
             const winRateLeaderboardLimited = winRateLeaderboard.slice(0, winRateLimit);
             if (winRateLeaderboardLimited.length > 0) {
                 let winRateDesc = '';
@@ -407,7 +631,6 @@ class SeasonLeaderboardManager {
             }
 
             // Total Games leaderboard
-            const totalGamesLeaderboard = this.getGamblingLeaderboardByType(season.leaderboard, game.key, 'total', 5);
             const totalGamesLeaderboardLimited = totalGamesLeaderboard.slice(0, totalLimit);
             if (totalGamesLeaderboardLimited.length > 0) {
                 let totalDesc = '';
@@ -549,4 +772,10 @@ class SeasonLeaderboardManager {
     }
 }
 
-module.exports = new SeasonLeaderboardManager();
+const seasonLeaderboardManager = new SeasonLeaderboardManager();
+
+module.exports = seasonLeaderboardManager;
+module.exports.SEASON_LEADERBOARD_GAMES = GAMBLING_GAMES.map((game) => ({
+    key: game.key,
+    name: game.name
+}));
