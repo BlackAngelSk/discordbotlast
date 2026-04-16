@@ -542,7 +542,10 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
     let leaderboardMessage;
     if (existingMessageId) {
         try {
-            const message = await channel.messages.fetch(existingMessageId);
+            const message = await seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId);
+            if (!message) {
+                throw new Error('Existing leaderboard message not found');
+            }
             leaderboardMessage = await message.edit({ embeds: [embeds[0]], components });
         } catch (error) {
             leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });

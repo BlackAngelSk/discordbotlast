@@ -351,6 +351,54 @@ class SeasonLeaderboardManager {
         return this.config[guildId]?.indexMessageId || null;
     }
 
+    async findLeaderboardMessage(channel, guildId, messageId = null) {
+        if (!channel?.isTextBased?.()) {
+            return null;
+        }
+
+        const expectedPrefix = `lb_page:${guildId}:`;
+        const botUserId = channel.client?.user?.id || null;
+
+        if (messageId) {
+            const cachedMessage = channel.messages?.cache?.get?.(messageId);
+            if (cachedMessage) {
+                return cachedMessage;
+            }
+
+            try {
+                const fetchedMessage = await channel.messages.fetch(messageId);
+                if (fetchedMessage) {
+                    return fetchedMessage;
+                }
+            } catch {
+                // Fall back to recent history scan below.
+            }
+        }
+
+        try {
+            const recentMessages = await channel.messages.fetch({ limit: 25 });
+            const candidates = Array.from(recentMessages.values()).filter((message) => {
+                if (botUserId && message.author?.id !== botUserId) {
+                    return false;
+                }
+
+                const hasPager = message.components?.some((row) => row.components?.some((component) => String(component.customId || '').startsWith(expectedPrefix)));
+                if (hasPager) {
+                    return true;
+                }
+
+                const firstEmbed = Array.isArray(message.embeds) ? message.embeds[0] : null;
+                const fields = Array.isArray(firstEmbed?.fields) ? firstEmbed.fields : [];
+                const fieldNames = new Set(fields.map((field) => String(field?.name || '')));
+                return fieldNames.has('🕐 Started') && fieldNames.has('📝 Status') && fieldNames.has('⏭️ Next Update');
+            });
+
+            return candidates[0] || null;
+        } catch {
+            return null;
+        }
+    }
+
     setPageCache(guildId, data) {
         if (!data) return;
         this.pageCache.set(guildId, {

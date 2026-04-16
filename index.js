@@ -475,7 +475,7 @@ async function updateSeasonLeaderboards(client) {
                 // Try to edit existing message
                 if (existingMessageId) {
                     try {
-                        const msg = await withTimeout(channel.messages.fetch(existingMessageId), 5000);
+                        const msg = await withTimeout(seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId), 5000);
                         if (msg) {
                             await withTimeout(msg.edit({ embeds: [embeds[0]], components }), 5000);
                             leaderboardMessage = msg;
