@@ -187,6 +187,7 @@ class SeasonLeaderboardManager {
             allowedRoleId: null,
             indexMessageId: null,
             lastAutoUpdate: 0,
+            nextAutoUpdateAt: 0,
             pruneDays: 30,
             payouts: [10000, 5000, 2500],
             rewardRoles: [],
@@ -212,6 +213,7 @@ class SeasonLeaderboardManager {
         normalized.allowedRoleId = normalized.allowedRoleId || null;
         normalized.indexMessageId = normalized.indexMessageId || null;
         normalized.lastAutoUpdate = Number(normalized.lastAutoUpdate) || 0;
+        normalized.nextAutoUpdateAt = Number(normalized.nextAutoUpdateAt) || 0;
         normalized.lastManualUpdate = Number(normalized.lastManualUpdate) || 0;
         normalized.pruneDays = Number.isFinite(Number(normalized.pruneDays))
             ? Math.max(0, Math.floor(Number(normalized.pruneDays)))

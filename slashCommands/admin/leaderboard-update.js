@@ -150,6 +150,7 @@ module.exports = {
             await seasonLeaderboardManager.setLeaderboardMessages(interaction.guildId, []);
             await seasonLeaderboardManager.setIndexMessage(interaction.guildId, null);
             cfg.lastAutoUpdate = Date.now();
+            cfg.nextAutoUpdateAt = cfg.lastAutoUpdate + ((cfg.updateIntervalMinutes || 15) * 60 * 1000);
             await seasonLeaderboardManager.save();
             seasonLeaderboardManager.setPageCache(interaction.guildId, {
                 embeds,

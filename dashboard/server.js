@@ -2091,6 +2091,12 @@ class Dashboard {
                     })
                     : { updated: false, reason: 'no-current-season' };
 
+                if (syncResult.updated) {
+                    updatedConfig.lastAutoUpdate = Date.now();
+                    updatedConfig.nextAutoUpdateAt = updatedConfig.lastAutoUpdate + ((updatedConfig.updateIntervalMinutes || 15) * 60 * 1000);
+                    await seasonLeaderboardManager.save();
+                }
+
                 logDashboardAudit(req, 'UPDATE_SEASON_LEADERBOARD_CONFIG', {
                     enabled: updatedConfig.enabled,
                     channelId: updatedConfig.channelId || null,

@@ -401,13 +401,20 @@ async function updateSeasonLeaderboards(client) {
             if (!cfg.enabled) continue;
             const now = Date.now();
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
+            const nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
 
             // Handle bad host clock / future timestamps so updates don't get stuck forever
             if ((cfg.lastAutoUpdate || 0) > now + (5 * 60 * 1000)) {
                 cfg.lastAutoUpdate = 0;
+                cfg.nextAutoUpdateAt = 0;
+            }
+
+            if (nextAutoUpdateAt > now) {
+                continue;
             }
 
             if (now - (cfg.lastAutoUpdate || 0) < intervalMs) {
+                cfg.nextAutoUpdateAt = (cfg.lastAutoUpdate || 0) + intervalMs;
                 continue;
             }
 
@@ -499,6 +506,7 @@ async function updateSeasonLeaderboards(client) {
                 // Always save the messageId for next cycle
                 cfg.messageId = leaderboardMessage.id;
                 cfg.lastAutoUpdate = Date.now();
+                cfg.nextAutoUpdateAt = cfg.lastAutoUpdate + intervalMs;
                 await seasonLeaderboardManager.save();
                 seasonLeaderboardManager.setPageCache(guildId, {
                     embeds,
