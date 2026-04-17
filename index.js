@@ -253,6 +253,7 @@ let lastQuarterlySeasonCheck = 0;
 let seasonLeaderboardIntervalHandle = null;
 let quarterlySeasonIntervalHandle = null;
 let readyTasksStarted = false;
+const seasonLeaderboardLastRunByGuild = new Map();
 
 // Setup shutdown handlers
 shutdownManager.onShutdown(async () => {
@@ -417,6 +418,7 @@ async function updateSeasonLeaderboards(client) {
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
             let nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
             const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
+            const inMemoryLastAutoUpdate = Number(seasonLeaderboardLastRunByGuild.get(guildId)) || 0;
 
             // Handle bad host clock / future timestamps so updates don't get stuck forever
             if ((cfg.lastAutoUpdate || 0) > now + (5 * 60 * 1000)) {
@@ -431,6 +433,20 @@ async function updateSeasonLeaderboards(client) {
                 if (computedNextAutoUpdateAt > now) {
                     cfg.nextAutoUpdateAt = computedNextAutoUpdateAt;
                     nextAutoUpdateAt = computedNextAutoUpdateAt;
+                    schedulerStateChanged = true;
+                }
+            }
+
+            if (inMemoryLastAutoUpdate > 0) {
+                const effectiveLastAutoUpdate = Math.max(Number(cfg.lastAutoUpdate) || 0, inMemoryLastAutoUpdate);
+                if (effectiveLastAutoUpdate !== (Number(cfg.lastAutoUpdate) || 0)) {
+                    cfg.lastAutoUpdate = effectiveLastAutoUpdate;
+                    schedulerStateChanged = true;
+                }
+
+                if (!nextAutoUpdateAt || nextAutoUpdateAt < effectiveLastAutoUpdate + intervalMs) {
+                    cfg.nextAutoUpdateAt = effectiveLastAutoUpdate + intervalMs;
+                    nextAutoUpdateAt = cfg.nextAutoUpdateAt;
                     schedulerStateChanged = true;
                 }
             }
@@ -450,6 +466,7 @@ async function updateSeasonLeaderboards(client) {
                         cfg.lastAutoUpdate = lastMessageUpdateAt;
                         cfg.nextAutoUpdateAt = lastMessageUpdateAt + intervalMs;
                         nextAutoUpdateAt = cfg.nextAutoUpdateAt;
+                        seasonLeaderboardLastRunByGuild.set(guildId, lastMessageUpdateAt);
                         schedulerStateChanged = true;
                     }
                 } catch {
@@ -555,6 +572,7 @@ async function updateSeasonLeaderboards(client) {
                 cfg.messageId = leaderboardMessage.id;
                 cfg.lastAutoUpdate = Date.now();
                 cfg.nextAutoUpdateAt = cfg.lastAutoUpdate + intervalMs;
+                seasonLeaderboardLastRunByGuild.set(guildId, cfg.lastAutoUpdate);
                 schedulerStateChanged = true;
                 await seasonLeaderboardManager.save();
                 seasonLeaderboardManager.setPageCache(guildId, {
