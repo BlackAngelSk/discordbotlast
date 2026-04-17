@@ -250,6 +250,9 @@ async function loadHandlers() {
 let seasonLeaderboardTaskRunning = false;
 let quarterlySeasonCheckRunning = false;
 let lastQuarterlySeasonCheck = 0;
+let seasonLeaderboardIntervalHandle = null;
+let quarterlySeasonIntervalHandle = null;
+let readyTasksStarted = false;
 
 // Setup shutdown handlers
 shutdownManager.onShutdown(async () => {
@@ -287,6 +290,12 @@ loadHandlers().then(() => {
 
     // Login to Discord with your bot token
     client.startReadyTasks = () => {
+        if (readyTasksStarted) {
+            return;
+        }
+
+        readyTasksStarted = true;
+
         // Move non-critical ready work off the first ready tick
         setTimeout(async () => {
             console.log(`✅ Bot startup coordinator running as ${client.user.tag}`);
@@ -326,36 +335,40 @@ loadHandlers().then(() => {
 
             // Start season leaderboard update task (runs every minute, respects per-guild interval)
             if (!devModeEnabled) {
-                setInterval(async () => {
-                    if (seasonLeaderboardTaskRunning) return;
-                    seasonLeaderboardTaskRunning = true;
-                    try {
-                        await updateSeasonLeaderboards(client);
-                    } finally {
-                        seasonLeaderboardTaskRunning = false;
-                    }
-                }, 60 * 1000); // 1 minute
+                if (!seasonLeaderboardIntervalHandle) {
+                    seasonLeaderboardIntervalHandle = setInterval(async () => {
+                        if (seasonLeaderboardTaskRunning) return;
+                        seasonLeaderboardTaskRunning = true;
+                        try {
+                            await updateSeasonLeaderboards(client);
+                        } finally {
+                            seasonLeaderboardTaskRunning = false;
+                        }
+                    }, 60 * 1000); // 1 minute
+                }
             } else {
                 console.log('🧪 DEV_MODE: Skipping scheduled season leaderboard updates.');
             }
 
             // Start quarterly season auto-creation task (runs every 6 hours, checks once per day)
-            setInterval(async () => {
-                if (quarterlySeasonCheckRunning) return;
-                const now = Date.now();
-                // Only check once per day (86400000 ms = 24 hours)
-                if (now - lastQuarterlySeasonCheck < 24 * 60 * 60 * 1000) return;
-                
-                quarterlySeasonCheckRunning = true;
-                try {
-                    await seasonManager.autoCreateQuarterlySeasons(client, client.user.id);
-                    lastQuarterlySeasonCheck = now;
-                } catch (error) {
-                    console.error('Error in quarterly season check:', error);
-                } finally {
-                    quarterlySeasonCheckRunning = false;
-                }
-            }, 6 * 60 * 60 * 1000); // 6 hours
+            if (!quarterlySeasonIntervalHandle) {
+                quarterlySeasonIntervalHandle = setInterval(async () => {
+                    if (quarterlySeasonCheckRunning) return;
+                    const now = Date.now();
+                    // Only check once per day (86400000 ms = 24 hours)
+                    if (now - lastQuarterlySeasonCheck < 24 * 60 * 60 * 1000) return;
+                    
+                    quarterlySeasonCheckRunning = true;
+                    try {
+                        await seasonManager.autoCreateQuarterlySeasons(client, client.user.id);
+                        lastQuarterlySeasonCheck = now;
+                    } catch (error) {
+                        console.error('Error in quarterly season check:', error);
+                    } finally {
+                        quarterlySeasonCheckRunning = false;
+                    }
+                }, 6 * 60 * 60 * 1000); // 6 hours
+            }
 
             // Initial update
             if (!devModeEnabled && !seasonLeaderboardTaskRunning) {
@@ -383,6 +396,7 @@ async function updateSeasonLeaderboards(client) {
 
     try {
         const guildConfigs = seasonLeaderboardManager.config;
+        let schedulerStateChanged = false;
 
         for (const guildId in guildConfigs) {
             const config = guildConfigs[guildId];
@@ -401,12 +415,23 @@ async function updateSeasonLeaderboards(client) {
             if (!cfg.enabled) continue;
             const now = Date.now();
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
-            const nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
+            let nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
 
             // Handle bad host clock / future timestamps so updates don't get stuck forever
             if ((cfg.lastAutoUpdate || 0) > now + (5 * 60 * 1000)) {
                 cfg.lastAutoUpdate = 0;
                 cfg.nextAutoUpdateAt = 0;
+                nextAutoUpdateAt = 0;
+                schedulerStateChanged = true;
+            }
+
+            if (!nextAutoUpdateAt && (cfg.lastAutoUpdate || 0) > 0) {
+                const computedNextAutoUpdateAt = Number(cfg.lastAutoUpdate) + intervalMs;
+                if (computedNextAutoUpdateAt > now) {
+                    cfg.nextAutoUpdateAt = computedNextAutoUpdateAt;
+                    nextAutoUpdateAt = computedNextAutoUpdateAt;
+                    schedulerStateChanged = true;
+                }
             }
 
             if (nextAutoUpdateAt > now) {
@@ -415,6 +440,7 @@ async function updateSeasonLeaderboards(client) {
 
             if (now - (cfg.lastAutoUpdate || 0) < intervalMs) {
                 cfg.nextAutoUpdateAt = (cfg.lastAutoUpdate || 0) + intervalMs;
+                schedulerStateChanged = true;
                 continue;
             }
 
@@ -507,6 +533,7 @@ async function updateSeasonLeaderboards(client) {
                 cfg.messageId = leaderboardMessage.id;
                 cfg.lastAutoUpdate = Date.now();
                 cfg.nextAutoUpdateAt = cfg.lastAutoUpdate + intervalMs;
+                schedulerStateChanged = true;
                 await seasonLeaderboardManager.save();
                 seasonLeaderboardManager.setPageCache(guildId, {
                     embeds,
@@ -522,6 +549,10 @@ async function updateSeasonLeaderboards(client) {
             } catch (error) {
                 console.error(`Error updating leaderboards for guild ${guildId}:`, error);
             }
+        }
+
+        if (schedulerStateChanged) {
+            await seasonLeaderboardManager.save();
         }
     } catch (error) {
         console.error('Error in leaderboard update task:', error);
