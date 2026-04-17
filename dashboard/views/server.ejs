@@ -336,8 +336,6 @@ document.getElementById('settingsForm').addEventListener('submit', async e => {
   } catch (err) { toast('Failed to save: ' + err.message, 'error'); }
   finally { btn.innerHTML = orig; btn.disabled = false; }
 });
-</script>
-</body>
 document.querySelectorAll('.dashboard-test-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     const original = btn.innerHTML;
@@ -360,4 +358,6 @@ document.querySelectorAll('.dashboard-test-btn').forEach(btn => {
     }
   });
 });
+</script>
+</body>
 </html>
