@@ -416,6 +416,7 @@ async function updateSeasonLeaderboards(client) {
             const now = Date.now();
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
             let nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
+            const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
 
             // Handle bad host clock / future timestamps so updates don't get stuck forever
             if ((cfg.lastAutoUpdate || 0) > now + (5 * 60 * 1000)) {
@@ -431,6 +432,28 @@ async function updateSeasonLeaderboards(client) {
                     cfg.nextAutoUpdateAt = computedNextAutoUpdateAt;
                     nextAutoUpdateAt = computedNextAutoUpdateAt;
                     schedulerStateChanged = true;
+                }
+            }
+
+            // Use the Discord message timestamp as a fallback source of truth when
+            // persisted scheduler state is stale or missing.
+            if (!nextAutoUpdateAt && existingMessageId) {
+                try {
+                    const existingMessage = await withTimeout(
+                        seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId),
+                        5000
+                    );
+                    const lastMessageUpdateAt = Number(existingMessage?.editedTimestamp || existingMessage?.createdTimestamp) || 0;
+
+                    if (lastMessageUpdateAt > 0 && now - lastMessageUpdateAt < intervalMs) {
+                        cfg.messageId = existingMessage.id;
+                        cfg.lastAutoUpdate = lastMessageUpdateAt;
+                        cfg.nextAutoUpdateAt = lastMessageUpdateAt + intervalMs;
+                        nextAutoUpdateAt = cfg.nextAutoUpdateAt;
+                        schedulerStateChanged = true;
+                    }
+                } catch {
+                    // Ignore lookup failures and fall back to config timestamps.
                 }
             }
 
@@ -496,7 +519,6 @@ async function updateSeasonLeaderboards(client) {
                 
                 if (embeds.length === 0) continue;
 
-                const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
                 const totalPages = embeds.length;
                 const components = totalPages > 1
                     ? [buildLeaderboardPageComponents(guildId, 0, totalPages)]
