@@ -440,12 +440,18 @@ class SeasonLeaderboardManager {
             : this.getGuildConfig(guildId);
         const appearance = cfg.appearance || this.getDefaultAppearance();
         const updateIntervalMinutes = cfg.updateIntervalMinutes || 15;
+        const updateIntervalMs = updateIntervalMinutes * 60 * 1000;
         const compactMode = !!cfg.compactMode;
         const layoutDensity = appearance.layoutDensity || 'standard';
         const useCompactLimits = compactMode || layoutDensity === 'compact' || layoutDensity === 'minimal';
         const balanceLimit = layoutDensity === 'minimal' ? 3 : (useCompactLimits ? 3 : 10);
         const gamblingLimit = layoutDensity === 'minimal' ? 1 : (useCompactLimits ? 3 : 5);
-        const nextUpdateAt = Math.floor((Date.now() + (updateIntervalMinutes * 60 * 1000)) / 1000);
+        const now = Date.now();
+        const configuredNextUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
+        const computedNextUpdateAt = Number(cfg.lastAutoUpdate)
+            ? Number(cfg.lastAutoUpdate) + updateIntervalMs
+            : now + updateIntervalMs;
+        const nextUpdateAt = Math.floor(((configuredNextUpdateAt > now ? configuredNextUpdateAt : computedNextUpdateAt)) / 1000);
         const context = {
             season: seasonName,
             players: season.totalPlayers || 0,
@@ -495,7 +501,7 @@ class SeasonLeaderboardManager {
             .addFields(
                 { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
                 { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true },
-                { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:R>`, inline: true }
+                { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:f>`, inline: true }
             )
             .setTimestamp();
 
@@ -504,7 +510,7 @@ class SeasonLeaderboardManager {
         combinedFields.push(
             { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
             { name: '📝 Status', value: season.isActive ? '🟢 Active' : '🔴 Ended', inline: true },
-            { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:R>`, inline: true }
+            { name: '⏭️ Next Update', value: `<t:${nextUpdateAt}:f>`, inline: true }
         );
 
         if (customBlockBody) {
