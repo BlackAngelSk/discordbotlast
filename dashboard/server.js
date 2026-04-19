@@ -23,6 +23,7 @@ const statsManager = require('../utils/statsManager');
 const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
 const liveAlertsManager = require('../utils/liveAlertsManager');
+const epicGamesAlertsManager = require('../utils/epicGamesAlertsManager');
 const suggestionManager = require('../utils/suggestionManager');
 const reactionRoleManager = require('../utils/reactionRoleManager');
 const roleMenuManager = require('../utils/roleMenuManager');
@@ -113,6 +114,7 @@ const DASHBOARD_SECTION_LABELS = {
     shop: 'Shop',
     commands: 'Commands',
     liveAlerts: 'Live Alerts',
+    epicGamesAlerts: 'Epic Games Alerts',
     community: 'Community',
     voiceTools: 'Voice Tools',
     moderation: 'Moderation',
@@ -133,6 +135,7 @@ const inferDashboardSectionKey = (requestPath) => {
     if (/^\/dashboard\/[^/]+\/shop$/.test(pathValue)) return 'shop';
     if (/^\/dashboard\/[^/]+\/commands$/.test(pathValue) || /^\/api\/commands\/[^/]+/.test(pathValue) || /^\/api\/command-permissions\/[^/]+/.test(pathValue)) return 'commands';
     if (/^\/dashboard\/[^/]+\/live-alerts$/.test(pathValue) || /^\/api\/live-alerts\/[^/]+/.test(pathValue)) return 'liveAlerts';
+    if (/^\/dashboard\/[^/]+\/epic-games$/.test(pathValue) || /^\/api\/epic-games\/[^/]+/.test(pathValue)) return 'epicGamesAlerts';
     if (/^\/dashboard\/[^/]+\/community$/.test(pathValue) || /^\/api\/community\/[^/]+/.test(pathValue)) return 'community';
     if (/^\/dashboard\/[^/]+\/voice-tools$/.test(pathValue) || /^\/api\/voice-tools\/[^/]+/.test(pathValue)) return 'voiceTools';
     if (/^\/dashboard\/[^/]+\/moderation$/.test(pathValue) || /^\/api\/[^/]+\/moderation(?:\/|$)/.test(pathValue)) return 'moderation';
@@ -1331,6 +1334,108 @@ class Dashboard {
             }
         });
 
+        // API: Epic Games alerts
+        this.app.get('/api/epic-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = epicGamesAlertsManager.getGuildConfig(guildId);
+                const snapshot = await epicGamesAlertsManager.fetchSnapshot().catch(() => null);
+
+                res.json({
+                    success: true,
+                    config: config ? {
+                        ...config,
+                        channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
+                    } : null,
+                    currentOffers: snapshot?.currentOffers || []
+                });
+            } catch (error) {
+                console.error('Error fetching Epic Games alerts:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/epic-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { channelId } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!channelId) {
+                    return res.status(400).json({ success: false, error: 'Channel is required' });
+                }
+
+                const channel = guild.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const snapshot = await epicGamesAlertsManager.enableAlerts(guildId, channelId);
+                res.json({
+                    success: true,
+                    message: 'Epic Games alert channel saved successfully',
+                    config: epicGamesAlertsManager.getGuildConfig(guildId),
+                    currentOffers: snapshot?.currentOffers || []
+                });
+            } catch (error) {
+                console.error('Error saving Epic Games alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/epic-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                await epicGamesAlertsManager.disableAlerts(req.params.guildId);
+                res.json({ success: true, message: 'Epic Games alert removed successfully' });
+            } catch (error) {
+                console.error('Error removing Epic Games alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/epic-games/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const configured = epicGamesAlertsManager.getGuildConfig(guildId);
+                const requestedChannelId = String(req.body?.channelId || '').trim();
+                const targetChannelId = requestedChannelId || configured?.channelId;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!targetChannelId) {
+                    return res.status(400).json({ success: false, error: 'Choose a channel first' });
+                }
+
+                const channel = guild.channels.cache.get(targetChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const snapshot = await epicGamesAlertsManager.fetchSnapshot();
+                const payload = epicGamesAlertsManager.buildCurrentAlert(snapshot);
+                if (!payload) {
+                    return res.status(400).json({ success: false, error: 'Epic Games did not return any free game offers right now.' });
+                }
+
+                for (const messagePayload of payload.messages) {
+                    await channel.send(messagePayload);
+                }
+
+                res.json({ success: true, message: `Sent a test Epic Games alert to #${channel.name}` });
+            } catch (error) {
+                console.error('Error sending Epic Games test alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         // Community tools dashboard
         this.app.get('/dashboard/:guildId/community', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
@@ -1959,6 +2064,27 @@ class Dashboard {
             } catch (error) {
                 console.error('Live alerts page error:', error);
                 res.status(500).send('Error loading live alerts');
+            }
+        });
+
+        // Epic Games Alerts Dashboard
+        this.app.get('/dashboard/:guildId/epic-games', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = epicGamesAlertsManager.getGuildConfig(guildId);
+                const snapshot = await epicGamesAlertsManager.fetchSnapshot().catch(() => null);
+
+                res.render('epic-games', {
+                    guild,
+                    config,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    currentOffers: snapshot?.currentOffers || [],
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Epic Games alerts page error:', error);
+                res.status(500).send('Error loading Epic Games alerts');
             }
         });
 

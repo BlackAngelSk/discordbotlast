@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> — Epic Games Alerts</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+    <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+    <div class="main-wrapper">
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Epic Games Alerts' }) %>
+
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fas fa-gift" style="color:var(--brand);margin-right:8px"></i>Epic Games Free Game Alerts</h1>
+                <p>Choose where to post the games that are free right now on <strong>Epic Games Store</strong>.</p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
+                    <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
+                    <div class="stat-card-change"><i class="fas fa-gift"></i> Current free games only</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Alert Channel</span><div class="stat-card-icon blue"><i class="fas fa-hashtag"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.channelId ? `#${guild.channels.cache.get(config.channelId)?.name || config.channelId}` : 'Not set' %></div>
+                    <div class="stat-card-change"><i class="fas fa-message"></i> Destination channel</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Free Now</span><div class="stat-card-icon purple"><i class="fas fa-gamepad"></i></div></div>
+                    <div class="stat-card-value"><%= currentOffers.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-store"></i> Live Epic offers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Last Checked</span><div class="stat-card-icon orange"><i class="fas fa-clock"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.lastCheckedAt ? 'Saved' : 'Waiting' %></div>
+                    <div class="stat-card-change"><%= config?.lastCheckedAt ? new Date(config.lastCheckedAt).toLocaleString() : 'No checks yet' %></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
+                        <div class="card-subtitle">Pick a text channel, save it, and optionally send a test alert.</div>
+                    </div>
+                </div>
+
+                <form id="epicGamesForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Discord Channel</label>
+                            <select name="channelId" class="form-control" required>
+                                <option value="">Select channel</option>
+                                <% channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">The bot will post Epic Games free-game alerts here.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="justify-content:flex-start">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Channel</button>
+                        <button type="button" class="btn btn-secondary" id="testEpicGamesBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
+                        <button type="button" class="btn btn-danger" id="clearEpicGamesBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-list"></i> Free Right Now</div>
+                        <div class="card-subtitle">Preview of the games the Epic API currently reports as free.</div>
+                    </div>
+                </div>
+
+                <% if (currentOffers.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+                        <% currentOffers.forEach(offer => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2)">
+                                <% if (offer.imageUrl) { %>
+                                    <img src="<%= offer.imageUrl %>" alt="<%= offer.title %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px"><%= offer.title %></div>
+                                <div class="form-hint" style="margin-bottom:10px">Free until <%= new Date(offer.endDate).toLocaleString() %></div>
+                                <a href="<%= offer.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> Open Store Page</a>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fas fa-gift"></i>No Epic Games free offers are available right now.</div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+const form = document.getElementById('epicGamesForm');
+const channelSelect = form.querySelector('select[name="channelId"]');
+const saveButton = form.querySelector('button[type="submit"]');
+const testButton = document.getElementById('testEpicGamesBtn');
+const clearButton = document.getElementById('clearEpicGamesBtn');
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const original = saveButton.innerHTML;
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner"></span> Saving...';
+
+    try {
+        const response = await fetch(`/api/epic-games/${guildId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to save Epic Games alert channel');
+        }
+        dashboardUI.showToast('Epic Games alert channel saved.', 'success');
+        setTimeout(() => location.reload(), 600);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to save Epic Games alert channel.', 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = original;
+    }
+});
+
+testButton.addEventListener('click', async () => {
+    const original = testButton.innerHTML;
+    testButton.disabled = true;
+    testButton.innerHTML = '<span class="spinner"></span> Sending...';
+
+    try {
+        const response = await fetch(`/api/epic-games/${guildId}/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value || null })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to send Epic Games test alert');
+        }
+        dashboardUI.showToast(result.message || 'Epic Games test alert sent.', 'success');
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to send Epic Games test alert.', 'error');
+    } finally {
+        testButton.disabled = false;
+        testButton.innerHTML = original;
+    }
+});
+
+clearButton.addEventListener('click', async () => {
+    if (!confirm('Disable Epic Games alerts for this server?')) {
+        return;
+    }
+
+    const original = clearButton.innerHTML;
+    clearButton.disabled = true;
+    clearButton.innerHTML = '<span class="spinner"></span> Removing...';
+
+    try {
+        const response = await fetch(`/api/epic-games/${guildId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to disable Epic Games alerts');
+        }
+        dashboardUI.showToast('Epic Games alerts disabled.', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to disable Epic Games alerts.', 'error');
+    } finally {
+        clearButton.disabled = false;
+        clearButton.innerHTML = original;
+    }
+});
+</script>
+</body>
+</html>

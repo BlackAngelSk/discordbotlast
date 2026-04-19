@@ -7,6 +7,7 @@ const SECTION_KEYS = [
     'shop',
     'commands',
     'liveAlerts',
+    'epicGamesAlerts',
     'community',
     'voiceTools',
     'moderation',

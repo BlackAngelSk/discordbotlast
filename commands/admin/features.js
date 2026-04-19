@@ -22,6 +22,7 @@ const FEATURES = {
     birthdays: 'Birthday announcements',
     analytics: 'Analytics tracking',
     liveAlerts: 'Twitch/YouTube live alerts',
+    epicGamesAlerts: 'Epic Games Store free game alerts',
     bumpReminder: 'Disboard bump reminders',
 };
 
