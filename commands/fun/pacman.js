@@ -137,18 +137,25 @@ function countPellets(board) {
     return pellets;
 }
 
-function renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining) {
+function getPlayerSprite(direction) {
+    if (direction === 'left') return 'ᗤ';
+    if (direction === 'up') return 'ᗢ';
+    if (direction === 'down') return 'ᗣ';
+    return 'ᗧ';
+}
+
+function renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining, playerDirection) {
     let output = '';
     const symbols = {
-        crash: 'X',
-        player: 'P',
-        ghost: 'G',
-        frightenedGhost: 'F',
-        wall: '▓',
-        pellet: '•',
-        power: 'O',
+        crash: '✸',
+        ghost: '◉',
+        frightenedGhost: '◎',
+        wall: '█',
+        pellet: '·',
+        power: '◌',
         empty: ' '
     };
+    const playerSprite = getPlayerSprite(playerDirection);
 
     for (let y = 0; y < board.length; y++) {
         for (let x = 0; x < board[0].length; x++) {
@@ -163,15 +170,15 @@ function renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining) {
             if (playerHere && ghostHere) {
                 symbol = symbols.crash;
             } else if (playerHere) {
-                symbol = symbols.player;
+                symbol = playerSprite;
             } else if (ghostHere) {
                 const frightenedHere = ghosts.some((ghost, index) => (
                     ghost.x === x && ghost.y === y && ghostStates[index]?.frightened
                 ));
                 if (frightenedHere && powerTurnsRemaining > 0) {
-                    symbol = ghostCountHere > 1 ? 'f' : symbols.frightenedGhost;
+                    symbol = ghostCountHere > 1 ? '◍' : symbols.frightenedGhost;
                 } else {
-                    symbol = ghostCountHere > 1 ? 'W' : symbols.ghost;
+                    symbol = ghostCountHere > 1 ? '⬢' : symbols.ghost;
                 }
             } else if (board[y][x] === '#') {
                 symbol = symbols.wall;
@@ -430,11 +437,11 @@ async function playPacmanGame(message) {
             .setColor(result === 'win' ? 0x57f287 : result === 'lose' ? 0xed4245 : 0x5865f2)
             .setTitle('🕹️ Pacman-Style Arcade')
             .setDescription(
-                `${renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining)}\n` +
+                `${renderBoard(board, player, ghosts, ghostStates, powerTurnsRemaining, lastPlayerMove)}\n` +
                 `**Score:** ${score} | **Pellets Left:** ${pelletsLeft}${powerText}\n` +
                 `${stateText}`
             )
-            .setFooter({ text: 'P=you, G/W=ghost(s), F=fear ghost, ▓=wall, •=pellet, O=power orb' });
+            .setFooter({ text: 'ᗧ/ᗤ/ᗢ/ᗣ=you, ◉/⬢=ghost(s), ◎/◍=frightened, █=wall, ·=pellet, ◌=power orb' });
     };
 
     const gameMessage = await message.reply({
