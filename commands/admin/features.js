@@ -23,6 +23,7 @@ const FEATURES = {
     analytics: 'Analytics tracking',
     liveAlerts: 'Twitch/YouTube live alerts',
     epicGamesAlerts: 'Epic Games Store free game alerts',
+    steamGameUpdates: 'Steam game update and changelog alerts',
     bumpReminder: 'Disboard bump reminders',
 };
 

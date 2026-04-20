@@ -24,6 +24,7 @@ const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
 const liveAlertsManager = require('../utils/liveAlertsManager');
 const epicGamesAlertsManager = require('../utils/epicGamesAlertsManager');
+const steamGameUpdatesManager = require('../utils/steamGameUpdatesManager');
 const suggestionManager = require('../utils/suggestionManager');
 const reactionRoleManager = require('../utils/reactionRoleManager');
 const roleMenuManager = require('../utils/roleMenuManager');
@@ -115,6 +116,7 @@ const DASHBOARD_SECTION_LABELS = {
     commands: 'Commands',
     liveAlerts: 'Live Alerts',
     epicGamesAlerts: 'Epic Games Alerts',
+    steamGameUpdates: 'Steam Updates',
     community: 'Community',
     voiceTools: 'Voice Tools',
     moderation: 'Moderation',
@@ -136,6 +138,7 @@ const inferDashboardSectionKey = (requestPath) => {
     if (/^\/dashboard\/[^/]+\/commands$/.test(pathValue) || /^\/api\/commands\/[^/]+/.test(pathValue) || /^\/api\/command-permissions\/[^/]+/.test(pathValue)) return 'commands';
     if (/^\/dashboard\/[^/]+\/live-alerts$/.test(pathValue) || /^\/api\/live-alerts\/[^/]+/.test(pathValue)) return 'liveAlerts';
     if (/^\/dashboard\/[^/]+\/epic-games$/.test(pathValue) || /^\/api\/epic-games\/[^/]+/.test(pathValue)) return 'epicGamesAlerts';
+    if (/^\/dashboard\/[^/]+\/steam-updates$/.test(pathValue) || /^\/api\/steam-updates\/[^/]+/.test(pathValue)) return 'steamGameUpdates';
     if (/^\/dashboard\/[^/]+\/community$/.test(pathValue) || /^\/api\/community\/[^/]+/.test(pathValue)) return 'community';
     if (/^\/dashboard\/[^/]+\/voice-tools$/.test(pathValue) || /^\/api\/voice-tools\/[^/]+/.test(pathValue)) return 'voiceTools';
     if (/^\/dashboard\/[^/]+\/moderation$/.test(pathValue) || /^\/api\/[^/]+\/moderation(?:\/|$)/.test(pathValue)) return 'moderation';
@@ -1436,6 +1439,126 @@ class Dashboard {
             }
         });
 
+        this.app.get('/api/steam-updates/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { config, trackedGames, previews } = await steamGameUpdatesManager.getDashboardData(guildId);
+
+                res.json({
+                    success: true,
+                    config: config ? {
+                        ...config,
+                        channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
+                    } : null,
+                    trackedGames,
+                    previews
+                });
+            } catch (error) {
+                console.error('Error fetching Steam updates:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.get('/api/steam-updates/:guildId/search', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const query = String(req.query.query || '').trim();
+                if (query.length < 2) {
+                    return res.json({ success: true, results: [] });
+                }
+
+                const results = await steamGameUpdatesManager.searchStoreGames(query);
+                res.json({ success: true, results });
+            } catch (error) {
+                console.error('Error searching Steam games:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-updates/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { channelId, games } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!channelId) {
+                    return res.status(400).json({ success: false, error: 'Channel is required' });
+                }
+
+                const channel = guild.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const result = await steamGameUpdatesManager.updateGuildConfig(guildId, channelId, games);
+                res.json({
+                    success: true,
+                    message: result.wasTrimmed
+                        ? 'Steam updates saved. Only the first 20 games were kept.'
+                        : 'Steam updates saved successfully',
+                    config: result.config,
+                    trackedGames: result.trackedGames,
+                    previews: result.previews
+                });
+            } catch (error) {
+                console.error('Error saving Steam updates:', error);
+                const statusCode = /invalid steam app ids or urls|add at least one steam app id or steam store url/i.test(error.message) ? 400 : 500;
+                res.status(statusCode).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/steam-updates/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                await steamGameUpdatesManager.disableAlerts(req.params.guildId);
+                res.json({ success: true, message: 'Steam updates removed successfully' });
+            } catch (error) {
+                console.error('Error removing Steam updates:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-updates/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const configured = steamGameUpdatesManager.getGuildConfig(guildId);
+                const requestedChannelId = String(req.body?.channelId || '').trim();
+                const targetChannelId = requestedChannelId || configured?.channelId;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!targetChannelId) {
+                    return res.status(400).json({ success: false, error: 'Choose a channel first' });
+                }
+
+                const channel = guild.channels.cache.get(targetChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const payloads = await steamGameUpdatesManager.buildTestAlerts(guildId);
+                if (payloads.length === 0) {
+                    return res.status(400).json({ success: false, error: 'Steam did not return any recent update posts for the tracked games.' });
+                }
+
+                for (const payload of payloads) {
+                    await channel.send(payload);
+                }
+
+                res.json({ success: true, message: `Sent a test Steam update alert to #${channel.name}` });
+            } catch (error) {
+                console.error('Error sending Steam test alert:', error);
+                const statusCode = /no steam games are configured/i.test(error.message) ? 400 : 500;
+                res.status(statusCode).json({ success: false, error: error.message });
+            }
+        });
+
         // Community tools dashboard
         this.app.get('/dashboard/:guildId/community', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
@@ -2085,6 +2208,25 @@ class Dashboard {
             } catch (error) {
                 console.error('Epic Games alerts page error:', error);
                 res.status(500).send('Error loading Epic Games alerts');
+            }
+        });
+
+        this.app.get('/dashboard/:guildId/steam-updates', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { config, previews } = await steamGameUpdatesManager.getDashboardData(guildId);
+
+                res.render('steam-updates', {
+                    guild,
+                    config,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    previews,
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Steam updates page error:', error);
+                res.status(500).send('Error loading Steam updates');
             }
         });
 

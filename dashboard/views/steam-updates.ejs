@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> — Steam Updates</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+    <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+    <div class="main-wrapper">
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Updates' }) %>
+
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fab fa-steam" style="color:var(--brand);margin-right:8px"></i>Steam Game Update Alerts</h1>
+                <p>Pick a channel and choose which Steam games this server should watch for update posts and changelogs.</p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
+                    <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
+                    <div class="stat-card-change"><i class="fab fa-steam"></i> Steam News monitoring</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Alert Channel</span><div class="stat-card-icon blue"><i class="fas fa-hashtag"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.channelId ? `#${guild.channels.cache.get(config.channelId)?.name || config.channelId}` : 'Not set' %></div>
+                    <div class="stat-card-change"><i class="fas fa-message"></i> Destination channel</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Tracked Games</span><div class="stat-card-icon purple"><i class="fas fa-gamepad"></i></div></div>
+                    <div class="stat-card-value"><%= previews.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-list"></i> Up to 20 Steam apps</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Last Checked</span><div class="stat-card-icon orange"><i class="fas fa-clock"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.lastCheckedAt ? 'Saved' : 'Waiting' %></div>
+                    <div class="stat-card-change"><%= config?.lastCheckedAt ? new Date(config.lastCheckedAt).toLocaleString() : 'No checks yet' %></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
+                        <div class="card-subtitle">Save the channel and search Steam games by name, or paste Steam app IDs and URLs manually.</div>
+                    </div>
+                </div>
+
+                <form id="steamUpdatesForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Discord Channel</label>
+                            <select name="channelId" class="form-control" required>
+                                <option value="">Select channel</option>
+                                <% channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">The bot will post Steam update alerts here.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="width:100%">
+                            <label class="form-label">Find Steam Games</label>
+                            <input type="text" id="steamGameSearch" class="form-control" placeholder="Search for Counter-Strike, Rust, Dota 2...">
+                            <div class="form-hint">Search by game name and click a result to add it to the tracked list.</div>
+                            <div id="steamSearchResults" style="display:grid;gap:10px;margin-top:12px"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="width:100%">
+                            <label class="form-label">Selected Games</label>
+                            <div id="selectedSteamGames" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px"></div>
+                            <div class="form-hint">Remove any game you no longer want to monitor before saving.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="width:100%">
+                            <label class="form-label">Advanced Input</label>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;440&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <div class="form-hint">Optional manual input. Use Steam app IDs or Steam store URLs, one per line.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="justify-content:flex-start">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Steam Updates</button>
+                        <button type="button" class="btn btn-secondary" id="testSteamUpdatesBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
+                        <button type="button" class="btn btn-danger" id="clearSteamUpdatesBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-newspaper"></i> Latest Preview</div>
+                        <div class="card-subtitle">Most recent Steam News post found for each tracked game.</div>
+                    </div>
+                </div>
+
+                <% if (previews.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+                        <% previews.forEach(game => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2)">
+                                <% if (game.imageUrl) { %>
+                                    <img src="<%= game.imageUrl %>" alt="<%= game.name %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px"><%= game.name %></div>
+                                <div class="form-hint" style="margin-bottom:10px">App ID: <%= game.appId %></div>
+                                <% if (game.latestArticle) { %>
+                                    <div style="font-weight:600;margin-bottom:8px"><%= game.latestArticle.title %></div>
+                                    <div class="form-hint" style="margin-bottom:10px">Published <%= new Date(game.latestArticle.date * 1000).toLocaleString() %></div>
+                                    <div style="margin-bottom:12px;line-height:1.5"><%= game.latestArticle.contents %></div>
+                                    <div style="display:flex;gap:10px;flex-wrap:wrap">
+                                        <a href="<%= game.latestArticle.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-newspaper"></i> Open Changelog</a>
+                                        <a href="<%= game.storeUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> Store Page</a>
+                                    </div>
+                                <% } else { %>
+                                    <div class="table-empty" style="padding:16px 12px"><i class="fas fa-circle-info"></i>No recent Steam News post found for this app.</div>
+                                <% } %>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fab fa-steam"></i>No Steam games are configured yet.</div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+const initialTrackedGames = <%- JSON.stringify((config?.trackedGames || previews || []).map((game) => ({
+    appId: String(game.appId),
+    name: game.name,
+    imageUrl: game.imageUrl || null,
+    tinyImage: game.tinyImage || game.imageUrl || null,
+    storeUrl: game.storeUrl || `https://store.steampowered.com/app/${game.appId}/`
+}))) %>;
+const form = document.getElementById('steamUpdatesForm');
+const channelSelect = form.querySelector('select[name="channelId"]');
+const gamesInput = form.querySelector('textarea[name="games"]');
+const searchInput = document.getElementById('steamGameSearch');
+const searchResults = document.getElementById('steamSearchResults');
+const selectedGamesContainer = document.getElementById('selectedSteamGames');
+const saveButton = form.querySelector('button[type="submit"]');
+const testButton = document.getElementById('testSteamUpdatesBtn');
+const clearButton = document.getElementById('clearSteamUpdatesBtn');
+const selectedGames = new Map();
+let searchAbortController = null;
+let searchTimer = null;
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function syncGamesTextarea() {
+    gamesInput.value = Array.from(selectedGames.values()).map(game => game.appId).join('\n');
+}
+
+function buildGamesPayload() {
+    const manualEntries = gamesInput.value
+        .split(/[\n,]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
+    const mergedEntries = new Map();
+    for (const game of selectedGames.values()) {
+        mergedEntries.set(String(game.appId), String(game.appId));
+    }
+
+    for (const entry of manualEntries) {
+        const match = entry.match(/store\.steampowered\.com\/app\/(\d+)/i);
+        const key = match ? match[1] : entry;
+        if (!mergedEntries.has(key)) {
+            mergedEntries.set(key, entry);
+        }
+    }
+
+    return Array.from(mergedEntries.values()).join('\n');
+}
+
+function renderSelectedGames() {
+    if (selectedGames.size === 0) {
+        selectedGamesContainer.innerHTML = '<div class="table-empty" style="padding:16px 12px"><i class="fas fa-gamepad"></i>No Steam games selected yet.</div>';
+        syncGamesTextarea();
+        return;
+    }
+
+    selectedGamesContainer.innerHTML = Array.from(selectedGames.values()).map((game) => `
+        <article class="card" style="margin:0;background:var(--bg-card-2)">
+            <div style="display:flex;gap:12px;align-items:center">
+                ${game.tinyImage || game.imageUrl ? `<img src="${escapeHtml(game.tinyImage || game.imageUrl)}" alt="${escapeHtml(game.name)}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">` : ''}
+                <div style="flex:1;min-width:0">
+                    <div class="card-title" style="margin-bottom:6px">${escapeHtml(game.name)}</div>
+                    <div class="form-hint">App ID: ${escapeHtml(game.appId)}</div>
+                </div>
+                <button type="button" class="btn btn-danger btn-sm" data-remove-app-id="${escapeHtml(game.appId)}"><i class="fas fa-trash"></i></button>
+            </div>
+        </article>
+    `).join('');
+
+    syncGamesTextarea();
+}
+
+function addSelectedGame(game) {
+    if (!game || !game.appId) return;
+    if (selectedGames.has(game.appId)) return;
+    if (selectedGames.size >= 20) {
+        dashboardUI.showToast('You can track up to 20 Steam games per server.', 'error');
+        return;
+    }
+    selectedGames.set(String(game.appId), game);
+    renderSelectedGames();
+}
+
+function parseManualInput() {
+    const lines = gamesInput.value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean);
+    for (const entry of lines) {
+        const match = entry.match(/store\.steampowered\.com\/app\/(\d+)/i);
+        const appId = match ? match[1] : (/^\d+$/.test(entry) ? entry : null);
+        if (!appId || selectedGames.has(appId)) continue;
+        selectedGames.set(appId, {
+            appId,
+            name: `App ${appId}`,
+            tinyImage: null,
+            imageUrl: null,
+            storeUrl: `https://store.steampowered.com/app/${appId}/`
+        });
+    }
+    renderSelectedGames();
+}
+
+for (const game of initialTrackedGames) {
+    if (!game?.appId) continue;
+    selectedGames.set(String(game.appId), game);
+}
+
+function renderSearchResults(results) {
+    if (!Array.isArray(results) || results.length === 0) {
+        searchResults.innerHTML = '<div class="table-empty" style="padding:16px 12px"><i class="fas fa-search"></i>No Steam games found.</div>';
+        return;
+    }
+
+    searchResults.innerHTML = results.map((game) => `
+        <button type="button" class="btn btn-secondary" data-add-game='${escapeHtml(JSON.stringify(game))}' style="justify-content:flex-start;padding:12px 14px">
+            ${game.tinyImage || game.imageUrl ? `<img src="${escapeHtml(game.tinyImage || game.imageUrl)}" alt="${escapeHtml(game.name)}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;margin-right:12px">` : ''}
+            <span style="display:flex;flex-direction:column;align-items:flex-start;text-align:left">
+                <strong>${escapeHtml(game.name)}</strong>
+                <span class="form-hint">App ID: ${escapeHtml(game.appId)}</span>
+            </span>
+        </button>
+    `).join('');
+}
+
+async function runSteamSearch() {
+    const query = searchInput.value.trim();
+    if (query.length < 2) {
+        searchResults.innerHTML = '';
+        return;
+    }
+
+    if (searchAbortController) {
+        searchAbortController.abort();
+    }
+
+    searchAbortController = new AbortController();
+    searchResults.innerHTML = '<div class="table-empty" style="padding:16px 12px"><span class="spinner"></span> Searching Steam...</div>';
+
+    try {
+        const response = await fetch(`/api/steam-updates/${guildId}/search?query=${encodeURIComponent(query)}`, {
+            signal: searchAbortController.signal
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Steam search failed');
+        }
+        renderSearchResults(result.results || []);
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        searchResults.innerHTML = '<div class="table-empty" style="padding:16px 12px"><i class="fas fa-circle-exclamation"></i>Search failed.</div>';
+    }
+}
+
+searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSteamSearch, 250);
+});
+
+searchResults.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-add-game]');
+    if (!button) return;
+    try {
+        addSelectedGame(JSON.parse(button.dataset.addGame));
+    } catch {
+        dashboardUI.showToast('Failed to add Steam game from search result.', 'error');
+    }
+});
+
+selectedGamesContainer.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-remove-app-id]');
+    if (!button) return;
+    selectedGames.delete(button.dataset.removeAppId);
+    renderSelectedGames();
+});
+
+if (selectedGames.size === 0) {
+    parseManualInput();
+} else {
+    renderSelectedGames();
+}
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const original = saveButton.innerHTML;
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner"></span> Saving...';
+
+    try {
+        const response = await fetch(`/api/steam-updates/${guildId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value, games: buildGamesPayload() })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to save Steam update settings');
+        }
+        dashboardUI.showToast(result.message || 'Steam update settings saved.', 'success');
+        setTimeout(() => location.reload(), 600);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to save Steam update settings.', 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = original;
+    }
+});
+
+testButton.addEventListener('click', async () => {
+    const original = testButton.innerHTML;
+    testButton.disabled = true;
+    testButton.innerHTML = '<span class="spinner"></span> Sending...';
+
+    try {
+        const response = await fetch(`/api/steam-updates/${guildId}/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value || null })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to send Steam test alert');
+        }
+        dashboardUI.showToast(result.message || 'Steam test alert sent.', 'success');
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to send Steam test alert.', 'error');
+    } finally {
+        testButton.disabled = false;
+        testButton.innerHTML = original;
+    }
+});
+
+clearButton.addEventListener('click', async () => {
+    if (!confirm('Disable Steam update alerts for this server?')) {
+        return;
+    }
+
+    const original = clearButton.innerHTML;
+    clearButton.disabled = true;
+    clearButton.innerHTML = '<span class="spinner"></span> Removing...';
+
+    try {
+        const response = await fetch(`/api/steam-updates/${guildId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to disable Steam updates');
+        }
+        dashboardUI.showToast('Steam updates disabled.', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to disable Steam updates.', 'error');
+    } finally {
+        clearButton.disabled = false;
+        clearButton.innerHTML = original;
+    }
+});
+</script>
+</body>
+</html>

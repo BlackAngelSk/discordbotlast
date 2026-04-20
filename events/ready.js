@@ -110,6 +110,26 @@ module.exports = {
             }
         }, 15000);
 
+        setTimeout(async () => {
+            try {
+                const epicGamesAlertsManager = require('../utils/epicGamesAlertsManager');
+                await epicGamesAlertsManager.init(readyClient);
+                console.log('✅ Epic Games alerts polling started');
+            } catch (error) {
+                console.error('Error starting Epic Games alerts:', error);
+            }
+        }, 17000);
+
+        setTimeout(async () => {
+            try {
+                const steamGameUpdatesManager = require('../utils/steamGameUpdatesManager');
+                await steamGameUpdatesManager.init(readyClient);
+                console.log('✅ Steam game update polling started');
+            } catch (error) {
+                console.error('Error starting Steam game updates:', error);
+            }
+        }, 19000);
+
         // Start stat channel updater
         setTimeout(async () => {
             try {

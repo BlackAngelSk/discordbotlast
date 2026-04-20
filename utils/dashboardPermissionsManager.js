@@ -8,6 +8,7 @@ const SECTION_KEYS = [
     'commands',
     'liveAlerts',
     'epicGamesAlerts',
+    'steamGameUpdates',
     'community',
     'voiceTools',
     'moderation',
