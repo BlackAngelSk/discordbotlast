@@ -282,6 +282,18 @@ function parseTrackedSources(input) {
     };
 }
 
+function buildRawGamesValue(input, trackedGames) {
+    if (typeof input === 'string') {
+        const trimmed = input.trim();
+        if (trimmed) return trimmed;
+    }
+
+    return (Array.isArray(trackedGames) ? trackedGames : [])
+        .map(game => game.provider === 'steam' ? game.appId : game.sourceId)
+        .filter(Boolean)
+        .join('\n');
+}
+
 function extractMetaContent(html, key) {
     const patterns = [
         new RegExp(`<meta[^>]+property=["']${key}["'][^>]+content=["']([^"']+)["']`, 'i'),
@@ -700,7 +712,7 @@ class SteamGameUpdatesManager {
             channelId,
             appIds,
             trackedGames,
-            rawGames: String(rawGames || '').trim() || trackedGames.map(game => game.provider === 'steam' ? game.appId : game.sourceId).join('\n'),
+            rawGames: buildRawGamesValue(rawGames, trackedGames),
             lastSeenArticles,
             lastCheckedAt: new Date().toISOString()
         };
