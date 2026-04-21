@@ -142,6 +142,30 @@ function normalizeSpecialSource(value) {
     return null;
 }
 
+function extractTrackedEntryValue(entry) {
+    if (typeof entry === 'string' || typeof entry === 'number') {
+        return String(entry).trim();
+    }
+
+    if (!entry || typeof entry !== 'object') {
+        return '';
+    }
+
+    const specialSource = normalizeSpecialSource(
+        entry.sourceId || entry.provider || entry.slug || entry.id || entry.name
+    );
+    if (specialSource) {
+        return specialSource.sourceId;
+    }
+
+    const steamCandidate = entry.appId || entry.id || entry.storeUrl || entry.url;
+    if (steamCandidate) {
+        return String(steamCandidate).trim();
+    }
+
+    return String(entry.name || '').trim();
+}
+
 function buildStoreUrl(appId) {
     return `https://store.steampowered.com/app/${appId}/`;
 }
@@ -208,8 +232,15 @@ function normalizeTrackedGame(game) {
 }
 
 function parseTrackedSources(input) {
-    const parts = String(input || '')
-        .split(/[\n,]+/)
+    const rawEntries = Array.isArray(input)
+        ? input
+        : (input && typeof input === 'object')
+            ? [input]
+            : String(input || '').split(/[\n,]+/);
+
+    const parts = rawEntries
+        .map(extractTrackedEntryValue)
+        .flatMap(entry => String(entry || '').split(/[\n,]+/))
         .map(part => part.trim())
         .filter(Boolean);
 

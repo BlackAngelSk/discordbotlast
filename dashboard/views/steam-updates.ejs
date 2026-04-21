@@ -170,7 +170,15 @@ function escapeHtml(value) {
 }
 
 function syncGamesTextarea() {
-    gamesInput.value = Array.from(selectedGames.values()).map(game => game.appId).join('\n');
+    const values = Array.from(selectedGames.values())
+        .map((game) => {
+            if (game.provider === 'minecraft' || game.sourceId === 'minecraft') return 'minecraft';
+            if (game.provider === 'osu' || game.sourceId === 'osu') return 'osu';
+            return game.appId;
+        })
+        .filter(Boolean);
+
+    gamesInput.value = values.join('\n');
 }
 
 function buildGamesPayload() {
@@ -181,7 +189,14 @@ function buildGamesPayload() {
 
     const mergedEntries = new Map();
     for (const game of selectedGames.values()) {
-        mergedEntries.set(String(game.appId), String(game.appId));
+        const entryValue = game.provider === 'minecraft' || game.sourceId === 'minecraft'
+            ? 'minecraft'
+            : game.provider === 'osu' || game.sourceId === 'osu'
+                ? 'osu'
+                : String(game.appId || '').trim();
+
+        if (!entryValue) continue;
+        mergedEntries.set(entryValue, entryValue);
     }
 
     for (const entry of manualEntries) {
@@ -197,7 +212,7 @@ function buildGamesPayload() {
 
 function renderSelectedGames() {
     if (selectedGames.size === 0) {
-        selectedGamesContainer.innerHTML = '<div class="table-empty" style="padding:16px 12px"><i class="fas fa-gamepad"></i>No Steam games selected yet.</div>';
+        selectedGamesContainer.innerHTML = '<div class="table-empty" style="padding:16px 12px"><i class="fas fa-gamepad"></i>No game sources selected yet.</div>';
         syncGamesTextarea();
         return;
     }
@@ -208,9 +223,9 @@ function renderSelectedGames() {
                 ${game.tinyImage || game.imageUrl ? `<img src="${escapeHtml(game.tinyImage || game.imageUrl)}" alt="${escapeHtml(game.name)}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">` : ''}
                 <div style="flex:1;min-width:0">
                     <div class="card-title" style="margin-bottom:6px">${escapeHtml(game.name)}</div>
-                    <div class="form-hint">App ID: ${escapeHtml(game.appId)}</div>
+                    <div class="form-hint">${escapeHtml(game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : `App ID: ${game.appId}`)}</div>
                 </div>
-                <button type="button" class="btn btn-danger btn-sm" data-remove-app-id="${escapeHtml(game.appId)}"><i class="fas fa-trash"></i></button>
+                <button type="button" class="btn btn-danger btn-sm" data-remove-game-key="${escapeHtml(game.sourceId || game.appId)}"><i class="fas fa-trash"></i></button>
             </div>
         </article>
     `).join('');
@@ -219,19 +234,51 @@ function renderSelectedGames() {
 }
 
 function addSelectedGame(game) {
-    if (!game || !game.appId) return;
-    if (selectedGames.has(game.appId)) return;
+    if (!game) return;
+
+    const gameKey = String(game.sourceId || game.appId || '').trim();
+    if (!gameKey) return;
+    if (selectedGames.has(gameKey)) return;
     if (selectedGames.size >= 20) {
         dashboardUI.showToast('You can track up to 20 Steam games per server.', 'error');
         return;
     }
-    selectedGames.set(String(game.appId), game);
+    selectedGames.set(gameKey, game);
     renderSelectedGames();
 }
 
 function parseManualInput() {
     const lines = gamesInput.value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean);
     for (const entry of lines) {
+        const normalizedEntry = entry.toLowerCase();
+        if (normalizedEntry === 'minecraft' || normalizedEntry === 'mc') {
+            if (!selectedGames.has('minecraft')) {
+                selectedGames.set('minecraft', {
+                    sourceId: 'minecraft',
+                    provider: 'minecraft',
+                    name: 'Minecraft',
+                    tinyImage: null,
+                    imageUrl: null,
+                    storeUrl: 'https://www.minecraft.net/en-us/updates/'
+                });
+            }
+            continue;
+        }
+
+        if (normalizedEntry === 'osu' || normalizedEntry === 'osu!') {
+            if (!selectedGames.has('osu')) {
+                selectedGames.set('osu', {
+                    sourceId: 'osu',
+                    provider: 'osu',
+                    name: 'osu!',
+                    tinyImage: null,
+                    imageUrl: null,
+                    storeUrl: 'https://osu.ppy.sh/home/changelog/lazer'
+                });
+            }
+            continue;
+        }
+
         const match = entry.match(/store\.steampowered\.com\/app\/(\d+)/i);
         const appId = match ? match[1] : (/^\d+$/.test(entry) ? entry : null);
         if (!appId || selectedGames.has(appId)) continue;
@@ -247,8 +294,9 @@ function parseManualInput() {
 }
 
 for (const game of initialTrackedGames) {
-    if (!game?.appId) continue;
-    selectedGames.set(String(game.appId), game);
+    const gameKey = String(game?.sourceId || game?.appId || '').trim();
+    if (!gameKey) continue;
+    selectedGames.set(gameKey, game);
 }
 
 function renderSearchResults(results) {
@@ -313,9 +361,9 @@ searchResults.addEventListener('click', (event) => {
 });
 
 selectedGamesContainer.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-remove-app-id]');
+    const button = event.target.closest('[data-remove-game-key]');
     if (!button) return;
-    selectedGames.delete(button.dataset.removeAppId);
+    selectedGames.delete(button.dataset.removeGameKey);
     renderSelectedGames();
 });
 
