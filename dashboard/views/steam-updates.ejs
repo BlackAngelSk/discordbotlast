@@ -12,19 +12,19 @@
     <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
     <div class="main-wrapper">
-        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Updates' }) %>
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Game Updates' }) %>
 
         <main class="content">
             <div class="page-header">
-                <h1><i class="fab fa-steam" style="color:var(--brand);margin-right:8px"></i>Steam Game Update Alerts</h1>
-                <p>Pick a channel and choose which Steam games this server should watch for update posts and changelogs.</p>
+                <h1><i class="fas fa-gamepad" style="color:var(--brand);margin-right:8px"></i>Game Update Alerts</h1>
+                <p>Pick a channel and choose which Steam games or supported live-service games this server should watch for updates.</p>
             </div>
 
             <div class="stats-row">
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
                     <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
-                    <div class="stat-card-change"><i class="fab fa-steam"></i> Steam News monitoring</div>
+                    <div class="stat-card-change"><i class="fas fa-satellite-dish"></i> Multi-source update monitoring</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Alert Channel</span><div class="stat-card-icon blue"><i class="fas fa-hashtag"></i></div></div>
@@ -34,7 +34,7 @@
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Tracked Games</span><div class="stat-card-icon purple"><i class="fas fa-gamepad"></i></div></div>
                     <div class="stat-card-value"><%= previews.length %></div>
-                    <div class="stat-card-change"><i class="fas fa-list"></i> Up to 20 Steam apps</div>
+                    <div class="stat-card-change"><i class="fas fa-list"></i> Up to 20 tracked sources</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Last Checked</span><div class="stat-card-icon orange"><i class="fas fa-clock"></i></div></div>
@@ -47,7 +47,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
-                        <div class="card-subtitle">Save the channel and search Steam games by name, or paste Steam app IDs and URLs manually.</div>
+                        <div class="card-subtitle">Save the channel, search Steam games by name, or add special sources like Minecraft, osu, and League of Legends manually.</div>
                     </div>
                 </div>
 
@@ -61,7 +61,7 @@
                                     <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
                                 <% }) %>
                             </select>
-                            <div class="form-hint">The bot will post Steam update alerts here.</div>
+                            <div class="form-hint">The bot will post game update alerts here.</div>
                         </div>
                     </div>
 
@@ -85,13 +85,13 @@
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
                             <label class="form-label">Advanced Input</label>
-                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;440&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
-                            <div class="form-hint">Optional manual input. Use Steam app IDs or Steam store URLs, one per line.</div>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <div class="form-hint">Optional manual input. Use Steam app IDs, Steam store URLs, or one of: minecraft, osu, lol.</div>
                         </div>
                     </div>
 
                     <div class="form-actions" style="justify-content:flex-start">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Steam Updates</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Game Updates</button>
                         <button type="button" class="btn btn-secondary" id="testSteamUpdatesBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
                         <button type="button" class="btn btn-danger" id="clearSteamUpdatesBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
                     </div>
@@ -102,7 +102,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-newspaper"></i> Latest Preview</div>
-                        <div class="card-subtitle">Most recent Steam News post found for each tracked game.</div>
+                        <div class="card-subtitle">Most recent update preview found for each tracked source.</div>
                     </div>
                 </div>
 
@@ -114,7 +114,7 @@
                                     <img src="<%= game.imageUrl %>" alt="<%= game.name %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
                                 <% } %>
                                 <div class="card-title" style="margin-bottom:8px"><%= game.name %></div>
-                                <div class="form-hint" style="margin-bottom:10px"><%= game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : `App ID: ${game.appId}` %></div>
+                                <div class="form-hint" style="margin-bottom:10px"><%= game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : game.provider === 'league' || game.sourceId === 'league' ? 'Source: lol' : `App ID: ${game.appId}` %></div>
                                 <% if (game.latestArticle) { %>
                                     <div style="font-weight:600;margin-bottom:8px"><%= game.latestArticle.title %></div>
                                     <div class="form-hint" style="margin-bottom:10px">Published <%= new Date(game.latestArticle.date || Date.now()).toLocaleString() %></div>
@@ -150,6 +150,32 @@
 <script>
 const guildId = '<%= guild.id %>';
 const initialTrackedGames = JSON.parse(document.getElementById('initialTrackedGamesData')?.textContent || '[]');
+const specialSourceDefaults = {
+    minecraft: {
+        sourceId: 'minecraft',
+        provider: 'minecraft',
+        name: 'Minecraft',
+        tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/key-art/Homepage_Gameplay-Trailer_MC-OV-logo-300x300.png',
+        imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg',
+        storeUrl: 'https://www.minecraft.net/en-us/updates/'
+    },
+    osu: {
+        sourceId: 'osu',
+        provider: 'osu',
+        name: 'osu!',
+        tinyImage: 'https://osu.ppy.sh/images/layout/logo@2x.png',
+        imageUrl: 'https://osu.ppy.sh/images/layout/header.jpg',
+        storeUrl: 'https://osu.ppy.sh/home/changelog/lazer'
+    },
+    league: {
+        sourceId: 'league',
+        provider: 'league',
+        name: 'League of Legends',
+        tinyImage: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
+        imageUrl: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
+        storeUrl: 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/'
+    }
+};
 const form = document.getElementById('steamUpdatesForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
 const gamesInput = form.querySelector('textarea[name="games"]');
@@ -177,6 +203,7 @@ function syncGamesTextarea() {
         .map((game) => {
             if (game.provider === 'minecraft' || game.sourceId === 'minecraft') return 'minecraft';
             if (game.provider === 'osu' || game.sourceId === 'osu') return 'osu';
+            if (game.provider === 'league' || game.sourceId === 'league') return 'lol';
             return game.appId;
         })
         .filter(Boolean);
@@ -196,6 +223,8 @@ function buildGamesPayload() {
             ? 'minecraft'
             : game.provider === 'osu' || game.sourceId === 'osu'
                 ? 'osu'
+                : game.provider === 'league' || game.sourceId === 'league'
+                    ? 'lol'
                 : String(game.appId || '').trim();
 
         if (!entryValue) continue;
@@ -226,7 +255,7 @@ function renderSelectedGames() {
                 ${game.tinyImage || game.imageUrl ? `<img src="${escapeHtml(game.tinyImage || game.imageUrl)}" alt="${escapeHtml(game.name)}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">` : ''}
                 <div style="flex:1;min-width:0">
                     <div class="card-title" style="margin-bottom:6px">${escapeHtml(game.name)}</div>
-                    <div class="form-hint">${escapeHtml(game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : `App ID: ${game.appId}`)}</div>
+                    <div class="form-hint">${escapeHtml(game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : game.provider === 'league' || game.sourceId === 'league' ? 'Source: lol' : `App ID: ${game.appId}`)}</div>
                 </div>
                 <button type="button" class="btn btn-danger btn-sm" data-remove-game-key="${escapeHtml(game.sourceId || game.appId)}"><i class="fas fa-trash"></i></button>
             </div>
@@ -243,7 +272,7 @@ function addSelectedGame(game) {
     if (!gameKey) return;
     if (selectedGames.has(gameKey)) return;
     if (selectedGames.size >= 20) {
-        dashboardUI.showToast('You can track up to 20 Steam games per server.', 'error');
+        dashboardUI.showToast('You can track up to 20 game sources per server.', 'error');
         return;
     }
     selectedGames.set(gameKey, game);
@@ -256,28 +285,21 @@ function parseManualInput() {
         const normalizedEntry = entry.toLowerCase();
         if (normalizedEntry === 'minecraft' || normalizedEntry === 'mc') {
             if (!selectedGames.has('minecraft')) {
-                selectedGames.set('minecraft', {
-                    sourceId: 'minecraft',
-                    provider: 'minecraft',
-                    name: 'Minecraft',
-                    tinyImage: null,
-                    imageUrl: null,
-                    storeUrl: 'https://www.minecraft.net/en-us/updates/'
-                });
+                selectedGames.set('minecraft', { ...specialSourceDefaults.minecraft });
             }
             continue;
         }
 
         if (normalizedEntry === 'osu' || normalizedEntry === 'osu!') {
             if (!selectedGames.has('osu')) {
-                selectedGames.set('osu', {
-                    sourceId: 'osu',
-                    provider: 'osu',
-                    name: 'osu!',
-                    tinyImage: null,
-                    imageUrl: null,
-                    storeUrl: 'https://osu.ppy.sh/home/changelog/lazer'
-                });
+                selectedGames.set('osu', { ...specialSourceDefaults.osu });
+            }
+            continue;
+        }
+
+        if (normalizedEntry === 'league' || normalizedEntry === 'leagueoflegends' || normalizedEntry === 'lol') {
+            if (!selectedGames.has('league')) {
+                selectedGames.set('league', { ...specialSourceDefaults.league });
             }
             continue;
         }
@@ -299,7 +321,7 @@ function parseManualInput() {
 for (const game of initialTrackedGames) {
     const gameKey = String(game?.sourceId || game?.appId || '').trim();
     if (!gameKey) continue;
-    selectedGames.set(gameKey, game);
+    selectedGames.set(gameKey, specialSourceDefaults[gameKey] ? { ...specialSourceDefaults[gameKey], ...game } : game);
 }
 
 function renderSearchResults(results) {

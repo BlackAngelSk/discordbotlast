@@ -1498,15 +1498,15 @@ class Dashboard {
                 res.json({
                     success: true,
                     message: result.wasTrimmed
-                        ? 'Steam updates saved. Only the first 20 games were kept.'
-                        : 'Steam updates saved successfully',
+                        ? 'Game updates saved. Only the first 20 tracked sources were kept.'
+                        : 'Game updates saved successfully',
                     config: result.config,
                     trackedGames: result.trackedGames,
                     previews: result.previews
                 });
             } catch (error) {
                 console.error('Error saving Steam updates:', error);
-                const statusCode = /invalid steam app ids or urls|add at least one steam app id or steam store url/i.test(error.message) ? 400 : 500;
+                const statusCode = /invalid game identifiers|invalid steam app ids or urls|add at least one steam app id|minecraft|osu|lol/i.test(error.message) ? 400 : 500;
                 res.status(statusCode).json({ success: false, error: error.message });
             }
         });

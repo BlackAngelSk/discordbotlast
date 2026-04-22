@@ -11,6 +11,7 @@ const APP_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v000
 const APP_SEARCH_URL = 'https://store.steampowered.com/api/storesearch/?l=en&cc=US&term=';
 const MINECRAFT_UPDATES_URL = 'https://www.minecraft.net/en-us/updates/';
 const MINECRAFT_VERSION_MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
+const LEAGUE_PATCH_NOTES_URL = 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/';
 const OSU_CHANGELOG_URL = 'https://osu.ppy.sh/home/changelog/lazer';
 const OSU_CHANGELOG_API_URL = 'https://osu.ppy.sh/api/v2/changelog/lazer';
 const POLL_INTERVAL = 15 * 60 * 1000;
@@ -25,23 +26,35 @@ const SPECIAL_TRACKED_SOURCES = {
         aliases: ['minecraft', 'mc'],
         sourceId: 'minecraft',
         name: 'Minecraft',
-        imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/key-art/Homepage_Gameplay-Trailer_MC-OV-logo-300x300.png',
+        imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg',
+        tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/key-art/Homepage_Gameplay-Trailer_MC-OV-logo-300x300.png',
         storeUrl: MINECRAFT_UPDATES_URL,
         color: 0xf59e0b,
         providerLabel: 'Minecraft'
+    },
+    league: {
+        aliases: ['league', 'lol', 'leagueoflegends', 'leagueoflegend', 'league legends'],
+        sourceId: 'league',
+        name: 'League of Legends',
+        imageUrl: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
+        tinyImage: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
+        storeUrl: LEAGUE_PATCH_NOTES_URL,
+        color: 0xc89b3c,
+        providerLabel: 'League of Legends'
     },
     osu: {
         aliases: ['osu', 'osu!'],
         sourceId: 'osu',
         name: 'osu!',
-        imageUrl: 'https://osu.ppy.sh/images/layout/logo@2x.png',
+        imageUrl: 'https://osu.ppy.sh/images/layout/header.jpg',
+        tinyImage: 'https://osu.ppy.sh/images/layout/logo@2x.png',
         storeUrl: OSU_CHANGELOG_URL,
         color: 0xff66aa,
         providerLabel: 'osu!'
     }
 };
 
-function httpsGet(url, { responseType = 'json', headers = {} } = {}) {
+function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0 } = {}) {
     return new Promise((resolve, reject) => {
         const req = https.get(url, {
             timeout: REQUEST_TIMEOUT,
@@ -52,6 +65,15 @@ function httpsGet(url, { responseType = 'json', headers = {} } = {}) {
                 data += chunk;
             });
             res.on('end', () => {
+                if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+                    if (redirectCount >= 5) {
+                        return reject(new Error('Too many redirects'));
+                    }
+
+                    const nextUrl = new URL(res.headers.location, url).toString();
+                    return resolve(httpsGet(nextUrl, { responseType, headers, redirectCount: redirectCount + 1 }));
+                }
+
                 if (res.statusCode < 200 || res.statusCode >= 300) {
                     return reject(new Error(`HTTP ${res.statusCode}`));
                 }
@@ -195,7 +217,21 @@ function normalizeTrackedGame(game) {
             sourceId: source.sourceId,
             name: game.name || source.name,
             imageUrl: game.imageUrl || source.imageUrl,
-            tinyImage: game.tinyImage || game.imageUrl || source.imageUrl,
+            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
+            storeUrl: game.storeUrl || source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'league' || game.sourceId === 'league') {
+        const source = SPECIAL_TRACKED_SOURCES.league;
+        return {
+            provider: 'league',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: game.imageUrl || source.imageUrl,
+            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
             storeUrl: game.storeUrl || source.storeUrl,
             color: source.color,
             providerLabel: source.providerLabel
@@ -209,7 +245,7 @@ function normalizeTrackedGame(game) {
             sourceId: source.sourceId,
             name: game.name || source.name,
             imageUrl: game.imageUrl || source.imageUrl,
-            tinyImage: game.tinyImage || game.imageUrl || source.imageUrl,
+            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
             storeUrl: game.storeUrl || source.storeUrl,
             color: source.color,
             providerLabel: source.providerLabel
@@ -459,8 +495,78 @@ async function fetchMinecraftUpdates() {
         url: MINECRAFT_UPDATES_URL,
         date: releaseEntry?.releaseTime || snapshotEntry?.releaseTime || Date.now(),
         imageUrl: SPECIAL_TRACKED_SOURCES.minecraft.imageUrl,
+        tinyImage: SPECIAL_TRACKED_SOURCES.minecraft.tinyImage,
         color: SPECIAL_TRACKED_SOURCES.minecraft.color,
         storeUrl: MINECRAFT_UPDATES_URL
+    }];
+}
+
+function parseLeaguePatchVersion(url) {
+    const match = String(url || '').match(/patch-(\d+)-(\d+)-notes/i);
+    if (!match) return null;
+
+    return {
+        major: Number(match[1]) || 0,
+        minor: Number(match[2]) || 0
+    };
+}
+
+function extractLeaguePatchUrl(html) {
+    const matches = Array.from(new Set([
+        ...String(html || '').match(/\/en-us\/news\/game-updates\/[a-z0-9-]*patch-\d+-\d+-notes\/?/gi) || [],
+        ...String(html || '').match(/\/en-us\/news\/game-updates\/patch-\d+-\d+-notes\/?/gi) || []
+    ]));
+
+    const ranked = matches
+        .map(url => ({ url, version: parseLeaguePatchVersion(url) }))
+        .filter(entry => entry.version)
+        .sort((left, right) => (right.version.major - left.version.major) || (right.version.minor - left.version.minor));
+
+    return ranked[0]?.url ? `https://www.leagueoflegends.com${ranked[0].url}` : LEAGUE_PATCH_NOTES_URL;
+}
+
+function extractLeaguePublishedAt(html) {
+    const metaPublished = extractMetaContent(html, 'article:published_time');
+    if (metaPublished) return metaPublished;
+
+    const textMatch = String(html || '').match(/Game Updates\s*\|[^|]*\|(\d{1,2}\/\d{1,2}\/\d{4})/i);
+    return textMatch?.[1] ? new Date(textMatch[1]).toISOString() : null;
+}
+
+function extractLeagueSections(html) {
+    const headings = Array.from(String(html || '').matchAll(/<h2[^>]*>(.*?)<\/h2>/gis))
+        .map(match => sanitizeText(match[1]))
+        .filter(Boolean)
+        .filter(title => !/related articles|about league of legends/i.test(title));
+
+    return headings.slice(0, 5).map(title => ({ title, items: [`See the official ${title.toLowerCase()} section in the latest patch notes.`] }));
+}
+
+async function fetchLeagueUpdates() {
+    const listingHtml = await httpsGetText(LEAGUE_PATCH_NOTES_URL);
+    const patchUrl = extractLeaguePatchUrl(listingHtml);
+    const patchHtml = patchUrl === LEAGUE_PATCH_NOTES_URL ? listingHtml : await httpsGetText(patchUrl);
+    const title = extractMetaContent(patchHtml, 'og:title') || 'League of Legends Patch Notes';
+    const summary = truncate(
+        extractMetaContent(patchHtml, 'og:description') || 'A new League of Legends patch is live.',
+        280
+    );
+    const imageUrl = extractMetaContent(patchHtml, 'og:image') || SPECIAL_TRACKED_SOURCES.league.imageUrl;
+
+    return [{
+        key: patchUrl,
+        provider: 'league',
+        providerLabel: 'League of Legends',
+        gameName: 'League of Legends',
+        title,
+        summary,
+        sections: extractLeagueSections(patchHtml),
+        url: patchUrl,
+        date: extractLeaguePublishedAt(patchHtml) || Date.now(),
+        imageUrl,
+        tinyImage: SPECIAL_TRACKED_SOURCES.league.tinyImage,
+        color: SPECIAL_TRACKED_SOURCES.league.color,
+        storeUrl: LEAGUE_PATCH_NOTES_URL
     }];
 }
 
@@ -514,6 +620,7 @@ async function fetchOsuUpdates() {
         url: `${OSU_CHANGELOG_URL}/${encodeURIComponent(build.version || build.display_version || '')}`,
         date: build.created_at || Date.now(),
         imageUrl,
+        tinyImage: SPECIAL_TRACKED_SOURCES.osu.tinyImage,
         color: SPECIAL_TRACKED_SOURCES.osu.color,
         storeUrl: OSU_CHANGELOG_URL
     }];
@@ -650,6 +757,10 @@ class SteamGameUpdatesManager {
             return fetchMinecraftUpdates();
         }
 
+        if (game.provider === 'league') {
+            return fetchLeagueUpdates();
+        }
+
         if (game.provider === 'osu') {
             return fetchOsuUpdates();
         }
@@ -665,7 +776,7 @@ class SteamGameUpdatesManager {
         }
 
         if (trackedGames.length === 0) {
-            throw new Error('Add at least one Steam app ID, `minecraft`, or `osu`');
+            throw new Error('Add at least one Steam app ID, `minecraft`, `osu`, or `lol`');
         }
 
         const resolvedGames = [];

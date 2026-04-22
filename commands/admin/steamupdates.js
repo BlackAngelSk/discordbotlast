@@ -3,8 +3,8 @@ const steamGameUpdatesManager = require('../../utils/steamGameUpdatesManager');
 
 module.exports = {
     name: 'steamupdates',
-    description: 'Configure game update and changelog alerts for Steam, Minecraft, and osu.',
-    usage: '!steamupdates list\n!steamupdates search <steam game name>\n!steamupdates set #channel <appId|storeUrl|minecraft|osu, ...>\n!steamupdates remove\n!steamupdates test [#channel]',
+    description: 'Configure game update and changelog alerts for Steam, Minecraft, osu, and League of Legends.',
+    usage: '!steamupdates list\n!steamupdates search <steam game name>\n!steamupdates set #channel <appId|storeUrl|minecraft|osu|lol, ...>\n!steamupdates remove\n!steamupdates test [#channel]',
     aliases: ['steamupdate', 'steamalerts', 'steamgames'],
     category: 'admin',
     async execute(message, args) {
@@ -22,7 +22,7 @@ module.exports = {
                 .setTimestamp();
 
             if (!config?.channelId) {
-                embed.setDescription('No game update alert channel is configured. Use `!steamupdates set #channel 730, minecraft, osu` to enable alerts.');
+                embed.setDescription('No game update alert channel is configured. Use `!steamupdates set #channel 730, minecraft, osu, lol` to enable alerts.');
             } else {
                 const trackedGames = Array.isArray(config.trackedGames) ? config.trackedGames : [];
                 embed.setDescription(`Alerts are enabled in <#${config.channelId}>.`)
@@ -71,7 +71,7 @@ module.exports = {
                 .setColor(0x1b2838)
                 .setTitle(`🔎 Steam Search: ${query}`)
                 .setDescription(results.map(game => `• **${game.name}** - App ID: \`${game.appId}\``).join('\n'))
-                .setFooter({ text: 'Use the app ID with !steamupdates set #channel <appId, minecraft, osu>' })
+                .setFooter({ text: 'Use the app ID with !steamupdates set #channel <appId, minecraft, osu, lol>' })
                 .setTimestamp();
 
             return message.reply({ embeds: [embed] });
@@ -80,7 +80,7 @@ module.exports = {
         if (subcommand === 'set') {
             const channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
             if (!channel) {
-                return message.reply('❌ Mention a valid text channel, for example `!steamupdates set #game-updates 730, minecraft, osu`.');
+                return message.reply('❌ Mention a valid text channel, for example `!steamupdates set #game-updates 730, minecraft, osu, lol`.');
             }
 
             if (!channel.isTextBased()) {
@@ -94,7 +94,7 @@ module.exports = {
 
             const rawGames = args.slice(2).join(' ').trim();
             if (!rawGames) {
-                return message.reply('❌ Add at least one Steam app ID, store URL, `minecraft`, or `osu` after the channel.');
+                return message.reply('❌ Add at least one Steam app ID, store URL, `minecraft`, `osu`, or `lol` after the channel.');
             }
 
             const result = await steamGameUpdatesManager.updateGuildConfig(message.guild.id, channel.id, rawGames);
