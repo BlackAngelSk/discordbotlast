@@ -25,3 +25,4 @@ data/
 
 # Generator scripts
 generate_commands_list.js
+data/economy.json

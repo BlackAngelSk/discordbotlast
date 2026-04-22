@@ -36,8 +36,8 @@ const SPECIAL_TRACKED_SOURCES = {
         aliases: ['league', 'lol', 'leagueoflegends', 'leagueoflegend', 'league legends'],
         sourceId: 'league',
         name: 'League of Legends',
-        imageUrl: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
-        tinyImage: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d3b7bd9decb1e1672dcb80be4f8bc1aa05490dc1-110x70.svg?accountingTag=LoL',
+        imageUrl: 'https://www.leagueoflegends.com/static/open-graph/lol.jpg',
+        tinyImage: 'https://www.leagueoflegends.com/static/favicon/10f498b01d7f8c6.ico',
         storeUrl: LEAGUE_PATCH_NOTES_URL,
         color: 0xc89b3c,
         providerLabel: 'League of Legends'
@@ -46,8 +46,8 @@ const SPECIAL_TRACKED_SOURCES = {
         aliases: ['osu', 'osu!'],
         sourceId: 'osu',
         name: 'osu!',
-        imageUrl: 'https://osu.ppy.sh/images/layout/header.jpg',
-        tinyImage: 'https://osu.ppy.sh/images/layout/logo@2x.png',
+        imageUrl: 'https://osu.ppy.sh/favicon-32x32.png',
+        tinyImage: 'https://osu.ppy.sh/favicon-32x32.png',
         storeUrl: OSU_CHANGELOG_URL,
         color: 0xff66aa,
         providerLabel: 'osu!'
@@ -216,9 +216,9 @@ function normalizeTrackedGame(game) {
             provider: 'minecraft',
             sourceId: source.sourceId,
             name: game.name || source.name,
-            imageUrl: game.imageUrl || source.imageUrl,
-            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
-            storeUrl: game.storeUrl || source.storeUrl,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
             color: source.color,
             providerLabel: source.providerLabel
         };
@@ -230,9 +230,9 @@ function normalizeTrackedGame(game) {
             provider: 'league',
             sourceId: source.sourceId,
             name: game.name || source.name,
-            imageUrl: game.imageUrl || source.imageUrl,
-            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
-            storeUrl: game.storeUrl || source.storeUrl,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
             color: source.color,
             providerLabel: source.providerLabel
         };
@@ -244,9 +244,9 @@ function normalizeTrackedGame(game) {
             provider: 'osu',
             sourceId: source.sourceId,
             name: game.name || source.name,
-            imageUrl: game.imageUrl || source.imageUrl,
-            tinyImage: game.tinyImage || game.imageUrl || source.tinyImage || source.imageUrl,
-            storeUrl: game.storeUrl || source.storeUrl,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
             color: source.color,
             providerLabel: source.providerLabel
         };
@@ -369,40 +369,57 @@ function splitIntoHighlights(text, maxItems = 6) {
     return items;
 }
 
-function formatSectionsForEmbed(sections) {
-    return (Array.isArray(sections) ? sections : [])
-        .slice(0, 4)
-        .map(section => {
-            const items = (section.items || []).slice(0, 5).map(item => `• ${truncate(item, 220)}`);
-            if (!section.title || items.length === 0) return null;
-            return `**${truncate(section.title, 80)}**\n${items.join('\n')}`;
-        })
-        .filter(Boolean)
-        .join('\n\n');
-}
-
 function createUpdateEmbed(update) {
-    const descriptionParts = [];
-    if (update.summary) {
-        descriptionParts.push(truncate(update.summary, 320));
-    }
-
-    const sectionText = formatSectionsForEmbed(update.sections);
-    if (sectionText) {
-        descriptionParts.push(sectionText);
-    }
-
-    descriptionParts.push(`[Read full update notes](${update.url})`);
-
+    const isValidUrl = (url) => {
+        if (!url || typeof url !== 'string') return false;
+        try {
+            new URL(url);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+    
     const embed = new EmbedBuilder()
         .setColor(update.color || 0xf59e0b)
         .setAuthor({ name: truncate(update.gameName || update.providerLabel || 'Game Update', 256) })
         .setTitle(truncate(update.title || 'Game update', 256))
-        .setURL(update.url)
-        .setDescription(descriptionParts.filter(Boolean).join('\n\n'))
         .setFooter({ text: `${update.providerLabel || 'Game'} updates` })
         .setTimestamp(new Date(update.date || Date.now()));
 
+    // Add summary as main description if available
+    if (update.summary) {
+        embed.setDescription(truncate(update.summary, 1024));
+    }
+
+    // Add sections as individual fields for better visual structure
+    if (Array.isArray(update.sections) && update.sections.length > 0) {
+        update.sections.slice(0, 5).forEach(section => {
+            if (section.title && Array.isArray(section.items) && section.items.length > 0) {
+                const items = section.items
+                    .slice(0, 8)
+                    .map(item => `• ${truncate(item, 200)}`)
+                    .join('\n');
+                
+                embed.addFields({
+                    name: truncate(section.title, 240),
+                    value: items || 'No details',
+                    inline: false
+                });
+            }
+        });
+    }
+
+    // Add read more link as a field if URL is valid
+    if (isValidUrl(update.url)) {
+        embed.addFields({
+            name: 'Full Update Notes',
+            value: `[View complete patch notes](${update.url})`,
+            inline: false
+        });
+    }
+
+    // Use thumbnail for game icon
     if (update.imageUrl) {
         embed.setThumbnail(update.imageUrl);
     }
@@ -677,6 +694,10 @@ class SteamGameUpdatesManager {
 
         config.trackedGames = config.trackedGames.map(normalizeTrackedGame).filter(Boolean);
         config.appIds = config.trackedGames.filter(game => game.provider === 'steam').map(game => game.appId);
+
+        // Always recompute rawGames so it includes all sources (including special ones like osu, minecraft, lol)
+        config.rawGames = buildRawGamesValue(config.rawGames, config.trackedGames);
+
         return config;
     }
 
@@ -864,8 +885,40 @@ class SteamGameUpdatesManager {
 
     async buildTestAlerts(guildId) {
         const config = this.getGuildConfig(guildId);
+        
+        // If no games configured, return a sample update to preview the embed design
         if (!config?.trackedGames?.length) {
-            throw new Error('No games are configured for this server yet');
+            const sampleUpdate = {
+                provider: 'steam',
+                providerLabel: 'Steam',
+                gameName: 'Portal 2',
+                title: 'Test Update - Portal 2 Patch Notes',
+                summary: 'This is a sample update to preview how game update notifications will look in your server. Configure tracked games in the dashboard to enable real updates.',
+                sections: [
+                    {
+                        title: 'New Features',
+                        items: [
+                            'Added new test chamber puzzles',
+                            'Improved performance for large levels',
+                            'Enhanced graphics quality'
+                        ]
+                    },
+                    {
+                        title: 'Bug Fixes',
+                        items: [
+                            'Fixed audio sync issues',
+                            'Resolved minor UI glitches',
+                            'Improved stability'
+                        ]
+                    }
+                ],
+                url: 'https://store.steampowered.com/app/620/',
+                date: new Date().toISOString(),
+                imageUrl: null,
+                color: 0xf59e0b
+            };
+            
+            return [this.buildArticleAlert(sampleUpdate)];
         }
 
         const articles = [];
