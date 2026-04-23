@@ -16,6 +16,7 @@ class SeasonManager {
             currentSeason: null
         };
         this.loaded = false;
+        this.mongoWriteCooldownUntil = 0;
     }
 
     async init() {
@@ -101,18 +102,37 @@ class SeasonManager {
     async save() {
         try {
             await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
-
-            // Also save to MongoDB if available
-            if (databaseManager.useDB === 'mongodb') {
-                const seasonsCollection = databaseManager.db.collection('seasons');
-                await seasonsCollection.updateOne(
-                    { _id: 'config' },
-                    { $set: this.data },
-                    { upsert: true }
-                );
-            }
         } catch (error) {
             console.error('Error saving seasons:', error);
+            return;
+        }
+
+        // Also save to MongoDB when available, but avoid repeated spam on transient connection failures.
+        if (databaseManager.useDB !== 'mongodb') {
+            return;
+        }
+
+        const now = Date.now();
+        if (this.mongoWriteCooldownUntil > now) {
+            return;
+        }
+
+        if (!databaseManager.db) {
+            this.mongoWriteCooldownUntil = now + (60 * 1000);
+            return;
+        }
+
+        try {
+            await databaseManager.upsertOne('seasons', { _id: 'config' }, this.data);
+            this.mongoWriteCooldownUntil = 0;
+        } catch (error) {
+            const hint = typeof databaseManager.getMongoConnectionHint === 'function'
+                ? databaseManager.getMongoConnectionHint(error?.message)
+                : 'Verify MONGODB_URI, Atlas IP access list, and TLS/CA settings.';
+
+            // Back off Mongo writes for 5 minutes to prevent log flooding during outages.
+            this.mongoWriteCooldownUntil = Date.now() + (5 * 60 * 1000);
+            console.warn(`⚠️ Season Mongo save failed; JSON save succeeded. Pausing season Mongo writes for 5 minutes. ${hint}`);
         }
     }
 
