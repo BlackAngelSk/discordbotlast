@@ -1,19 +1,10 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
-const { MONGODB_STORAGE_LIMIT } = require('../../check-mongodb-space');
-const { MongoClient } = require('mongodb');
-
-function validateMongoUri(uri) {
-    if (!uri || typeof uri !== 'string') return 'MONGODB_URI not found.';
-    const trimmed = uri.trim();
-    if (!trimmed) return 'MONGODB_URI is empty.';
-    if (!/^mongodb(\+srv)?:\/\//.test(trimmed)) {
-        return 'MONGODB_URI must start with mongodb:// or mongodb+srv://';
-    }
-    if (trimmed.includes('<db_password>') || trimmed.includes('<username>')) {
-        return 'MONGODB_URI still contains placeholders (e.g. <db_password>).';
-    }
-    return null;
-}
+const {
+    MONGODB_STORAGE_LIMIT,
+    validateMongoUri,
+    connectMongoWithRetry
+} = require('../../check-mongodb-space');
+const databaseManager = require('../../utils/databaseManager');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -53,8 +44,7 @@ module.exports = {
                 });
             }
 
-            mongoClient = new MongoClient(mongoUri);
-            await mongoClient.connect();
+            mongoClient = await connectMongoWithRetry(mongoUri);
             const db = mongoClient.db(dbName);
 
             // Get database stats
@@ -170,9 +160,13 @@ module.exports = {
                 });
             }
 
+            const hint = typeof databaseManager.getMongoConnectionHint === 'function'
+                ? databaseManager.getMongoConnectionHint(error?.message)
+                : 'Verify MONGODB_URI and Atlas network access.';
+
             console.error('Error checking MongoDB space:', error);
             return interaction.editReply({
-                content: `❌ Error checking MongoDB: ${error.message}`
+                content: `❌ Error checking MongoDB: ${error.message}\n💡 ${hint}`
             });
         } finally {
             if (mongoClient) {

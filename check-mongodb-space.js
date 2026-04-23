@@ -5,6 +5,7 @@
 
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
+const databaseManager = require('./utils/databaseManager');
 
 // MongoDB storage limits (in MB) - Update based on your plan
 // Common limits: 512 MB (free), 2.5 GB, 10 GB, etc.
@@ -31,6 +32,34 @@ function validateMongoUri(uri) {
     return null;
 }
 
+async function connectMongoWithRetry(mongoUri) {
+    const baseOptions = typeof databaseManager.buildMongoClientOptions === 'function'
+        ? databaseManager.buildMongoClientOptions()
+        : {};
+
+    let mongoClient = new MongoClient(mongoUri, baseOptions);
+
+    try {
+        await mongoClient.connect();
+        return mongoClient;
+    } catch (error) {
+        const canRetryIpv4 =
+            typeof databaseManager.isTlsHandshakeError === 'function' &&
+            databaseManager.isTlsHandshakeError(error?.message) &&
+            !databaseManager.getEnvBoolean('MONGODB_FORCE_IPV4', false);
+
+        if (!canRetryIpv4) {
+            await mongoClient.close().catch(() => null);
+            throw error;
+        }
+
+        await mongoClient.close().catch(() => null);
+        mongoClient = new MongoClient(mongoUri, { ...baseOptions, family: 4 });
+        await mongoClient.connect();
+        return mongoClient;
+    }
+}
+
 async function checkMongoDBSpace() {
     const mongoUri = process.env.MONGODB_URI;
     const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
@@ -41,11 +70,11 @@ async function checkMongoDBSpace() {
         process.exit(1);
     }
 
-    const mongoClient = new MongoClient(mongoUri);
+    let mongoClient = null;
 
     try {
         console.log('📊 Connecting to MongoDB...\n');
-        await mongoClient.connect();
+        mongoClient = await connectMongoWithRetry(mongoUri);
         const db = mongoClient.db(dbName);
 
         // Get database stats
@@ -138,16 +167,22 @@ async function checkMongoDBSpace() {
             console.error('   2) URL-encode special password chars (@, :, /, ?, #, %).');
             console.error('   3) Verify DB user has access to this cluster/database.');
         } else {
+            const hint = typeof databaseManager.getMongoConnectionHint === 'function'
+                ? databaseManager.getMongoConnectionHint(error?.message)
+                : 'Verify MONGODB_URI and Atlas network access.';
             console.error('❌ Error checking MongoDB:', error.message);
+            console.error(`💡 ${hint}`);
         }
         process.exit(1);
     } finally {
-        await mongoClient.close();
+        if (mongoClient) {
+            await mongoClient.close().catch(() => null);
+        }
     }
 }
 
 // Export for use as a function
-module.exports = { checkMongoDBSpace, MONGODB_STORAGE_LIMIT };
+module.exports = { checkMongoDBSpace, MONGODB_STORAGE_LIMIT, validateMongoUri, connectMongoWithRetry };
 
 // Run if executed directly
 if (require.main === module) {
