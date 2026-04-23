@@ -7,7 +7,7 @@ const settingsManager = require('./settingsManager');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'steamGameUpdates.json');
 const APP_DETAILS_URL = 'https://store.steampowered.com/api/appdetails?l=en&appids=';
-const APP_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?maxlength=1200&format=json&count=10&appid=';
+const APP_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?maxlength=0&format=json&count=10&appid=';
 const APP_SEARCH_URL = 'https://store.steampowered.com/api/storesearch/?l=en&cc=US&term=';
 const MINECRAFT_UPDATES_URL = 'https://www.minecraft.net/en-us/updates/';
 const MINECRAFT_VERSION_MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
@@ -369,6 +369,73 @@ function splitIntoHighlights(text, maxItems = 6) {
     return items;
 }
 
+function parseSteamSections(contents) {
+    const raw = String(contents || '').trim();
+    if (!raw) return [];
+
+    const sections = [];
+    const sectionRegex = /\[p\]\\?\[\s*([^\]]+?)\s*\\?\]\[\/p\]\s*\[list\]([\s\S]*?)\[\/list\]/gi;
+    let sectionMatch;
+
+    while ((sectionMatch = sectionRegex.exec(raw)) !== null) {
+        const title = truncate(sanitizeText(sectionMatch[1]), 80);
+        const listBody = sectionMatch[2] || '';
+        const items = [];
+        const itemRegex = /\[\*\]\s*([\s\S]*?)\[\/\*\]/gi;
+        let itemMatch;
+
+        while ((itemMatch = itemRegex.exec(listBody)) !== null) {
+            const clean = truncate(sanitizeText(itemMatch[1]), 220);
+            if (clean) items.push(clean);
+        }
+
+        if (title && items.length > 0) {
+            sections.push({ title, items });
+        }
+    }
+
+    if (sections.length > 0) {
+        return sections;
+    }
+
+    const fallbackItems = String(raw)
+        .replace(/\\+/g, '\n')
+        .split(/\n+/)
+        .map(line => truncate(sanitizeText(line), 220))
+        .filter(Boolean)
+        .slice(0, 8);
+
+    return fallbackItems.length > 0
+        ? [{ title: 'Updates', items: fallbackItems }]
+        : [];
+}
+
+function formatSectionsAsEmbedText(sections, maxLength = 3000) {
+    if (!Array.isArray(sections) || sections.length === 0) {
+        return '';
+    }
+
+    const blocks = [];
+
+    for (const section of sections.slice(0, 5)) {
+        const rawTitle = String(section?.title || '').trim();
+        const title = truncate(rawTitle || 'Updates', 60).toUpperCase();
+        const items = Array.isArray(section?.items)
+            ? section.items
+                .map(item => truncate(sanitizeText(item), 220))
+                .filter(Boolean)
+                .slice(0, 8)
+            : [];
+
+        if (!items.length) continue;
+
+        const lines = [`[ ${title} ]`, '', ...items.map(item => `•  ${item}`)];
+        blocks.push(lines.join('\n'));
+    }
+
+    return truncate(blocks.join('\n\n'), maxLength);
+}
+
 function createUpdateEmbed(update) {
     const isValidUrl = (url) => {
         if (!url || typeof url !== 'string') return false;
@@ -387,36 +454,24 @@ function createUpdateEmbed(update) {
         .setFooter({ text: `${update.providerLabel || 'Game'} updates` })
         .setTimestamp(new Date(update.date || Date.now()));
 
-    // Add summary as main description if available
-    if (update.summary) {
-        embed.setDescription(truncate(update.summary, 1024));
+    const sectionText = formatSectionsAsEmbedText(update.sections);
+    const summary = truncate(sanitizeText(update.summary || ''), 700);
+    const descriptionParts = [];
+
+    if (summary && !sectionText) {
+        descriptionParts.push(summary);
     }
 
-    // Add sections as individual fields for better visual structure
-    if (Array.isArray(update.sections) && update.sections.length > 0) {
-        update.sections.slice(0, 5).forEach(section => {
-            if (section.title && Array.isArray(section.items) && section.items.length > 0) {
-                const items = section.items
-                    .slice(0, 8)
-                    .map(item => `• ${truncate(item, 200)}`)
-                    .join('\n');
-                
-                embed.addFields({
-                    name: truncate(section.title, 240),
-                    value: items || 'No details',
-                    inline: false
-                });
-            }
-        });
+    if (sectionText) {
+        descriptionParts.push(sectionText);
     }
 
-    // Add read more link as a field if URL is valid
     if (isValidUrl(update.url)) {
-        embed.addFields({
-            name: 'Full Update Notes',
-            value: `[View complete patch notes](${update.url})`,
-            inline: false
-        });
+        descriptionParts.push(`[View complete patch notes](${update.url})`);
+    }
+
+    if (descriptionParts.length > 0) {
+        embed.setDescription(truncate(descriptionParts.join('\n\n'), 4096));
     }
 
     // Use thumbnail for game icon
@@ -429,9 +484,11 @@ function createUpdateEmbed(update) {
 
 function buildSteamUpdate(appId, article, game) {
     const title = sanitizeText(article.title) || `Update posted for ${game?.name || `App ${appId}`}`;
-    const contents = sanitizeText(article.contents).replace(/^\\+/, '').trim();
-    const highlights = splitIntoHighlights(contents, 5).filter(item => item.toLowerCase() !== title.toLowerCase());
-    const summary = truncate(highlights[0] || contents || 'A new Steam changelog is now live.', 280);
+    const rawContents = String(article.contents || '');
+    const sections = parseSteamSections(rawContents);
+    const firstSectionItem = sections[0]?.items?.[0] || '';
+    const fallbackSummary = sanitizeText(rawContents.replace(/\\+/g, ' ')).trim();
+    const summary = truncate(firstSectionItem || fallbackSummary || 'A new Steam changelog is now live.', 280);
 
     return {
         key: buildArticleKey(article),
@@ -440,7 +497,7 @@ function buildSteamUpdate(appId, article, game) {
         gameName: game?.name || `App ${appId}`,
         title,
         summary,
-        sections: highlights.length > 1 ? [{ title: 'Highlights', items: highlights.slice(1) }] : [],
+        sections,
         url: article.url || buildNewsHubUrl(appId),
         date: Number(article.date) || 0,
         imageUrl: game?.imageUrl || null,
