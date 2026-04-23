@@ -21,9 +21,10 @@
             </div>
 
             <div class="stats-row">
+                <% const steamStatus = !config ? 'Off' : (config.enabled === false ? 'Paused' : (config.channelId ? 'On' : 'Off')); %>
                 <div class="stat-card">
-                    <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
-                    <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
+                    <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= steamStatus === 'On' ? 'green' : steamStatus === 'Paused' ? 'orange' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
+                    <div class="stat-card-value"><%= steamStatus %></div>
                     <div class="stat-card-change"><i class="fas fa-satellite-dish"></i> Multi-source update monitoring</div>
                 </div>
                 <div class="stat-card">
@@ -53,9 +54,19 @@
 
                 <form id="steamUpdatesForm">
                     <div class="form-row">
+                        <div class="form-group" style="width:100%">
+                            <label class="checkbox-wrap" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0">
+                                <input type="checkbox" id="steamUpdatesEnabled" name="enabled" <%= config?.enabled === false ? '' : 'checked' %>>
+                                <span>Enable Steam update alerts for this server</span>
+                            </label>
+                            <div class="form-hint">When disabled, your tracked games stay saved but the bot will not post alerts.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
                         <div class="form-group">
                             <label class="form-label">Discord Channel</label>
-                            <select name="channelId" class="form-control" required>
+                            <select name="channelId" class="form-control">
                                 <option value="">Select channel</option>
                                 <% channels.forEach(channel => { %>
                                     <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
@@ -185,6 +196,7 @@ const selectedGamesContainer = document.getElementById('selectedSteamGames');
 const saveButton = form.querySelector('button[type="submit"]');
 const testButton = document.getElementById('testSteamUpdatesBtn');
 const clearButton = document.getElementById('clearSteamUpdatesBtn');
+const enabledToggle = document.getElementById('steamUpdatesEnabled');
 const selectedGames = new Map();
 let searchAbortController = null;
 let searchTimer = null;
@@ -408,7 +420,7 @@ form.addEventListener('submit', async (event) => {
         const response = await fetch(`/api/steam-updates/${guildId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId: channelSelect.value, games: buildGamesPayload() })
+            body: JSON.stringify({ channelId: channelSelect.value || null, games: buildGamesPayload(), enabled: enabledToggle.checked })
         });
         const result = await response.json();
         if (!response.ok || !result.success) {

@@ -525,6 +525,11 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
         return { updated: false, reason: 'missing-season-or-guild' };
     }
 
+    const cfg = seasonLeaderboardManager.getGuildConfig(guildId);
+    if (cfg.enabled === false) {
+        return { updated: false, reason: 'leaderboard-disabled' };
+    }
+
     const channelId = seasonLeaderboardManager.getLeaderboardChannel(guildId);
     if (!channelId) {
         return { updated: false, reason: 'no-channel-configured' };
@@ -533,6 +538,12 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
     const channel = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
     if (!channel || !channel.isTextBased()) {
         return { updated: false, reason: 'invalid-channel' };
+    }
+
+    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+    const botPermissions = botMember ? channel.permissionsFor(botMember) : null;
+    if (!botPermissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
+        return { updated: false, reason: 'missing-channel-permissions', channelId: channel.id };
     }
 
     const embeds = await seasonLeaderboardManager.generateSeasonEmbeds(guildId, seasonManager, seasonName, client);
@@ -1480,21 +1491,24 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const { channelId, games } = req.body;
+                const enabled = req.body?.enabled === true || req.body?.enabled === 'true' || req.body?.enabled === 'on' || req.body?.enabled === 1 || req.body?.enabled === '1';
 
                 if (!guild) {
                     return res.status(404).json({ success: false, error: 'Guild not found' });
                 }
 
-                if (!channelId) {
-                    return res.status(400).json({ success: false, error: 'Channel is required' });
+                if (enabled && !channelId) {
+                    return res.status(400).json({ success: false, error: 'Channel is required when alerts are enabled' });
                 }
 
-                const channel = guild.channels.cache.get(channelId);
-                if (!channel || channel.type !== 0) {
-                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                if (channelId) {
+                    const channel = guild.channels.cache.get(channelId);
+                    if (!channel || channel.type !== 0) {
+                        return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                    }
                 }
 
-                const result = await steamGameUpdatesManager.updateGuildConfig(guildId, channelId, games);
+                const result = await steamGameUpdatesManager.updateGuildConfig(guildId, channelId || null, games, { enabled });
                 res.json({
                     success: true,
                     message: result.wasTrimmed
@@ -2154,10 +2168,24 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const analytics = await analyticsManager.getDashboardData(guildId);
+                const topMessageUsers = statsManager.getTopUsers(guildId, 10);
+                const topMessageChannels = statsManager.getTopChannels(guildId, 8);
+
+                const topMessageUsersResolved = await Promise.all(topMessageUsers.map(async (entry) => ({
+                    ...entry,
+                    username: await resolveGuildUsername(guild, entry.userId)
+                })));
+
+                const topMessageChannelsResolved = topMessageChannels.map((entry) => ({
+                    ...entry,
+                    channelName: guild?.channels?.cache?.get(entry.channelId)?.name || `Unknown (${entry.channelId})`
+                }));
 
                 res.render('analytics', {
                     guild,
                     analytics,
+                    topMessageUsers: topMessageUsersResolved,
+                    topMessageChannels: topMessageChannelsResolved,
                     user: req.user
                 });
             } catch (error) {
@@ -2327,6 +2355,15 @@ class Dashboard {
                         || await guild.channels.fetch(channelId).catch(() => null);
                     if (!channel || !channel.isTextBased()) {
                         return res.status(400).json({ success: false, error: 'Please choose a valid text channel for leaderboard updates.' });
+                    }
+
+                    const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                    const botPermissions = botMember ? channel.permissionsFor(botMember) : null;
+                    if (!botPermissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
+                        return res.status(400).json({
+                            success: false,
+                            error: 'The bot needs View Channel, Send Messages, and Embed Links in the selected leaderboard channel.'
+                        });
                     }
                 }
 

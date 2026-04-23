@@ -729,6 +729,9 @@ class SteamGameUpdatesManager {
                 ? config.trackedGames.map(normalizeTrackedGame).filter(Boolean)
                 : [];
             config.appIds = config.trackedGames.filter(game => game.provider === 'steam').map(game => game.appId);
+            if (typeof config.enabled !== 'boolean') {
+                config.enabled = Boolean(config.channelId);
+            }
             if (!config.lastSeenArticles || typeof config.lastSeenArticles !== 'object') {
                 config.lastSeenArticles = {};
             }
@@ -751,6 +754,7 @@ class SteamGameUpdatesManager {
 
         config.trackedGames = config.trackedGames.map(normalizeTrackedGame).filter(Boolean);
         config.appIds = config.trackedGames.filter(game => game.provider === 'steam').map(game => game.appId);
+        config.enabled = typeof config.enabled === 'boolean' ? config.enabled : Boolean(config.channelId);
 
         // Always recompute rawGames so it includes all sources (including special ones like osu, minecraft, lol)
         config.rawGames = buildRawGamesValue(config.rawGames, config.trackedGames);
@@ -886,9 +890,10 @@ class SteamGameUpdatesManager {
         return previews.sort((left, right) => left.name.localeCompare(right.name));
     }
 
-    async updateGuildConfig(guildId, channelId, rawGames) {
+    async updateGuildConfig(guildId, channelId, rawGames, options = {}) {
         const { trackedGames, wasTrimmed } = await this.resolveTrackedGames(rawGames);
         const lastSeenArticles = {};
+        const enabled = options.enabled !== undefined ? Boolean(options.enabled) : true;
 
         for (const game of trackedGames) {
             const articles = await this.fetchUpdatesForGame(game).catch(() => []);
@@ -898,6 +903,7 @@ class SteamGameUpdatesManager {
         const appIds = trackedGames.filter(game => game.provider === 'steam').map(game => game.appId);
 
         this.data.guilds[guildId] = {
+            enabled,
             channelId,
             appIds,
             trackedGames,
@@ -1027,7 +1033,7 @@ class SteamGameUpdatesManager {
 
             for (const [guildId, config] of Object.entries(this.data.guilds)) {
                 const trackedGames = Array.isArray(config?.trackedGames) ? config.trackedGames.map(normalizeTrackedGame).filter(Boolean) : [];
-                if (!config?.channelId || trackedGames.length === 0 || !this.isFeatureEnabled(guildId)) {
+                if (!config?.channelId || config?.enabled === false || trackedGames.length === 0 || !this.isFeatureEnabled(guildId)) {
                     continue;
                 }
 

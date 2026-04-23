@@ -25,7 +25,9 @@ module.exports = {
                 embed.setDescription('No game update alert channel is configured. Use `!steamupdates set #channel 730, minecraft, osu, lol` to enable alerts.');
             } else {
                 const trackedGames = Array.isArray(config.trackedGames) ? config.trackedGames : [];
-                embed.setDescription(`Alerts are enabled in <#${config.channelId}>.`)
+                embed.setDescription(config.enabled === false
+                    ? `Alerts are currently paused in <#${config.channelId}>. Re-save from the dashboard to enable them again.`
+                    : `Alerts are enabled in <#${config.channelId}>.`)
                     .addFields(
                         {
                             name: 'Tracked games',

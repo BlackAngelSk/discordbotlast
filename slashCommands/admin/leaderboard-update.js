@@ -60,6 +60,14 @@ module.exports = {
                 });
             }
 
+            const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+            const botPermissions = botMember ? channel.permissionsFor(botMember) : null;
+            if (!botPermissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
+                return interaction.editReply({
+                    content: `❌ I need View Channel, Send Messages, and Embed Links in ${channel} before I can post the leaderboard there.`
+                });
+            }
+
             await seasonManager.refreshSeasonStats(
                 interaction.guildId,
                 seasonName,
