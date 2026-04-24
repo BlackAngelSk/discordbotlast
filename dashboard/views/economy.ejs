@@ -189,6 +189,39 @@
                                 <input class="form-control" id="seasonVoiceColor" name="voiceColor" type="color" value="<%= seasonLeaderboardConfig.appearance.voiceColor %>">
                             </div>
                         </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonMessagesTitle">Messages Section Title</label>
+                                <input class="form-control" id="seasonMessagesTitle" name="messagesTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.messagesTitle || '💬 Most Messages Sent' %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonMessagesColor">Messages Section Color</label>
+                                <input class="form-control" id="seasonMessagesColor" name="messagesColor" type="color" value="<%= seasonLeaderboardConfig.appearance.messagesColor || '#4ECDC4' %>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonMediaTitle">Images/GIFs Section Title</label>
+                                <input class="form-control" id="seasonMediaTitle" name="mediaTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.mediaTitle || '🖼️ Most Images/GIFs Posted' %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonMediaColor">Images/GIFs Section Color</label>
+                                <input class="form-control" id="seasonMediaColor" name="mediaColor" type="color" value="<%= seasonLeaderboardConfig.appearance.mediaColor || '#FF9F43' %>">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="seasonChannelsTitle">Active Channels Section Title</label>
+                                <input class="form-control" id="seasonChannelsTitle" name="channelsTitle" type="text" maxlength="256" value="<%= seasonLeaderboardConfig.appearance.channelsTitle || '🧭 Most Active Channels (Variety)' %>">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="seasonChannelsColor">Active Channels Section Color</label>
+                                <input class="form-control" id="seasonChannelsColor" name="channelsColor" type="color" value="<%= seasonLeaderboardConfig.appearance.channelsColor || '#8E7CFD' %>">
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-section" style="margin-top:16px">
@@ -200,6 +233,18 @@
                         <div class="toggle-group">
                             <div class="toggle-info"><h4>Show voice leaderboard</h4><p>Include tracked voice hours when the season has any voice data.</p></div>
                             <label class="toggle-switch"><input type="checkbox" id="seasonShowVoice" name="showVoice" <%= seasonLeaderboardConfig.appearance.showVoice ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show messages leaderboard</h4><p>Include most messages sent rankings.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowMessages" name="showMessages" <%= seasonLeaderboardConfig.appearance.showMessages !== false ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show images/GIFs leaderboard</h4><p>Include most images and GIFs posted rankings.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowMedia" name="showMedia" <%= seasonLeaderboardConfig.appearance.showMedia !== false ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-info"><h4>Show active channels leaderboard</h4><p>Include most varied channel activity rankings.</p></div>
+                            <label class="toggle-switch"><input type="checkbox" id="seasonShowChannels" name="showChannels" <%= seasonLeaderboardConfig.appearance.showChannels !== false ? 'checked' : '' %>><span class="toggle-slider"></span></label>
                         </div>
                         <div class="toggle-group">
                             <div class="toggle-info"><h4>Show gambling leaderboards</h4><p>Include per-game win, win-rate, and total-games leaderboards.</p></div>
@@ -504,8 +549,17 @@ function collectSeasonFormPayload() {
         balanceColor: document.getElementById('seasonBalanceColor').value,
         voiceTitle: document.getElementById('seasonVoiceTitle').value,
         voiceColor: document.getElementById('seasonVoiceColor').value,
+        messagesTitle: document.getElementById('seasonMessagesTitle').value,
+        messagesColor: document.getElementById('seasonMessagesColor').value,
+        mediaTitle: document.getElementById('seasonMediaTitle').value,
+        mediaColor: document.getElementById('seasonMediaColor').value,
+        channelsTitle: document.getElementById('seasonChannelsTitle').value,
+        channelsColor: document.getElementById('seasonChannelsColor').value,
         showBalance: document.getElementById('seasonShowBalance').checked,
         showVoice: document.getElementById('seasonShowVoice').checked,
+        showMessages: document.getElementById('seasonShowMessages').checked,
+        showMedia: document.getElementById('seasonShowMedia').checked,
+        showChannels: document.getElementById('seasonShowChannels').checked,
         showGambling: document.getElementById('seasonShowGambling').checked,
         enabledGames: Array.from(document.querySelectorAll('input[name="enabledGames"]:checked')).map((input) => input.value),
         payout1: Number(document.getElementById('seasonPayout1').value),

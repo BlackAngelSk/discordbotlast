@@ -11,6 +11,7 @@ const levelRewardsManager = require('../utils/levelRewardsManager');
 const achievementManager = require('../utils/achievementManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
 const stickyMessages = require('../utils/stickyMessages');
+const seasonManager = require('../utils/seasonManager');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
@@ -21,6 +22,40 @@ const URL_REGEX = /https?:\/\/[^\s]+/gi;
 
 // Simple in-memory cache so we don't re-check the same domain
 const phishCache = new Map();
+
+function messageHasMediaContent(message) {
+    const attachments = Array.from(message.attachments?.values?.() || []);
+    const hasMediaAttachment = attachments.some((attachment) => {
+        const contentType = String(attachment.contentType || '').toLowerCase();
+        if (contentType.startsWith('image/') || contentType.startsWith('video/')) {
+            return true;
+        }
+
+        const url = String(attachment.url || attachment.proxyURL || '').toLowerCase();
+        return /\.(gif|png|jpe?g|webp|bmp|tiff?|mp4|mov|webm)(\?|$)/i.test(url);
+    });
+
+    if (hasMediaAttachment) {
+        return true;
+    }
+
+    const embeds = Array.from(message.embeds || []);
+    const hasGifEmbed = embeds.some((embed) => {
+        const type = String(embed?.type || '').toLowerCase();
+        if (type === 'gifv') {
+            return true;
+        }
+
+        const imageUrl = String(embed?.image?.url || embed?.thumbnail?.url || '').toLowerCase();
+        return /\.gif(\?|$)/i.test(imageUrl);
+    });
+
+    if (hasGifEmbed) {
+        return true;
+    }
+
+    return /(https?:\/\/\S+\.gif(\?|\s|$))/i.test(String(message.content || ''));
+}
 
 async function isPhishingDomain(domain) {
     if (phishCache.has(domain)) return phishCache.get(domain);
@@ -274,8 +309,14 @@ module.exports = {
 
         // Track message statistics
         try {
+            const isMediaMessage = messageHasMediaContent(message);
             await activityTracker.recordActivity(message.guildId, message.author.id, 'message');
             await statsManager.recordMessage(message.guildId, message.author.id, message.channelId);
+            await seasonManager.addMessageActivity(message.guildId, message.author.id, {
+                username: message.author.username,
+                channelId: message.channelId,
+                isMedia: isMediaMessage
+            });
         } catch (error) {
             console.error('Stats tracking error:', error);
         }

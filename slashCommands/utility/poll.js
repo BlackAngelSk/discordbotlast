@@ -115,29 +115,30 @@ module.exports = {
         }
 
         // Send poll
-        const message = await interaction.reply({ 
+        const response = await interaction.reply({ 
             embeds: [embed], 
             components: [buttons],
             withResponse: true
         });
+        const messageId = response.resource.message.id;
 
         // Store poll data
         if (!interaction.client.polls) {
             interaction.client.polls = new Map();
         }
-        interaction.client.polls.set(message.id, {
+        interaction.client.polls.set(messageId, {
             ...pollData,
             options,
-            messageId: message.id,
+            messageId,
             channelId: interaction.channelId,
             guildId: interaction.guildId
         });
 
         // Auto-close poll after duration
         setTimeout(() => {
-            if (interaction.client.polls.has(message.id)) {
+            if (interaction.client.polls.has(messageId)) {
                 // Could send final results here
-                interaction.client.polls.delete(message.id);
+                interaction.client.polls.delete(messageId);
             }
         }, durationValidation.value);
     }

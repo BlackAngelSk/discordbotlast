@@ -57,11 +57,20 @@ const DEFAULT_APPEARANCE = {
     balanceColor: '#57F287',
     voiceTitle: '🎙️ Season Voice Channel Hours',
     voiceColor: '#9C27B0',
+    messagesTitle: '💬 Most Messages Sent',
+    messagesColor: '#4ECDC4',
+    mediaTitle: '🖼️ Most Images/GIFs Posted',
+    mediaColor: '#FF9F43',
+    channelsTitle: '🧭 Most Active Channels (Variety)',
+    channelsColor: '#8E7CFD',
     layoutDensity: 'standard',
     customBlockTitle: '📝 Server Note',
     customBlockBody: '',
     showBalance: true,
     showVoice: true,
+    showMessages: true,
+    showMedia: true,
+    showChannels: true,
     showGambling: true,
     enabledGames: GAMBLING_GAMES.map((game) => game.key)
 };
@@ -159,6 +168,12 @@ class SeasonLeaderboardManager {
         merged.balanceColor = normalizeHexColor(merged.balanceColor, DEFAULT_APPEARANCE.balanceColor);
         merged.voiceTitle = sanitizeText(merged.voiceTitle, DEFAULT_APPEARANCE.voiceTitle, 256);
         merged.voiceColor = normalizeHexColor(merged.voiceColor, DEFAULT_APPEARANCE.voiceColor);
+        merged.messagesTitle = sanitizeText(merged.messagesTitle, DEFAULT_APPEARANCE.messagesTitle, 256);
+        merged.messagesColor = normalizeHexColor(merged.messagesColor, DEFAULT_APPEARANCE.messagesColor);
+        merged.mediaTitle = sanitizeText(merged.mediaTitle, DEFAULT_APPEARANCE.mediaTitle, 256);
+        merged.mediaColor = normalizeHexColor(merged.mediaColor, DEFAULT_APPEARANCE.mediaColor);
+        merged.channelsTitle = sanitizeText(merged.channelsTitle, DEFAULT_APPEARANCE.channelsTitle, 256);
+        merged.channelsColor = normalizeHexColor(merged.channelsColor, DEFAULT_APPEARANCE.channelsColor);
         merged.layoutDensity = ['standard', 'compact', 'minimal'].includes(String(merged.layoutDensity || '').trim())
             ? String(merged.layoutDensity).trim()
             : DEFAULT_APPEARANCE.layoutDensity;
@@ -166,6 +181,9 @@ class SeasonLeaderboardManager {
         merged.customBlockBody = sanitizeText(merged.customBlockBody, DEFAULT_APPEARANCE.customBlockBody, 1024);
         merged.showBalance = merged.showBalance !== false;
         merged.showVoice = merged.showVoice !== false;
+        merged.showMessages = merged.showMessages !== false;
+        merged.showMedia = merged.showMedia !== false;
+        merged.showChannels = merged.showChannels !== false;
         merged.showGambling = merged.showGambling !== false;
         merged.enabledGames = Array.isArray(merged.enabledGames)
             ? Array.from(new Set(merged.enabledGames.map((key) => String(key || '').trim()).filter((key) => validGameKeys.has(key))))
@@ -589,6 +607,87 @@ class SeasonLeaderboardManager {
             });
         }
 
+        // Most Messages leaderboard
+        const messageLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'messageCount', balanceLimit)
+            .filter((player) => (player.messageCount || 0) > 0);
+        if (appearance.showMessages !== false && messageLeaderboard.length > 0) {
+            let messageDesc = '';
+            for (let i = 0; i < messageLeaderboard.length; i++) {
+                const player = messageLeaderboard[i];
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                const username = await getUsername(player.userId, player.username);
+                messageDesc += `${medal} **${username}** • **${Number(player.messageCount || 0).toLocaleString()}** messages\n`;
+            }
+
+            const messagesTitle = applyTemplate(appearance.messagesTitle, context) || DEFAULT_APPEARANCE.messagesTitle;
+            const messagesEmbed = new EmbedBuilder()
+                .setColor(colorHexToNumber(appearance.messagesColor, DEFAULT_APPEARANCE.messagesColor))
+                .setTitle(messagesTitle)
+                .setDescription(messageDesc)
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
+
+            embeds.push(messagesEmbed);
+            combinedFields.push({
+                name: messagesTitle,
+                value: messageDesc,
+                inline: false
+            });
+        }
+
+        // Most Images/GIFs leaderboard
+        const mediaLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'mediaCount', balanceLimit)
+            .filter((player) => (player.mediaCount || 0) > 0);
+        if (appearance.showMedia !== false && mediaLeaderboard.length > 0) {
+            let mediaDesc = '';
+            for (let i = 0; i < mediaLeaderboard.length; i++) {
+                const player = mediaLeaderboard[i];
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                const username = await getUsername(player.userId, player.username);
+                mediaDesc += `${medal} **${username}** • **${Number(player.mediaCount || 0).toLocaleString()}** posts\n`;
+            }
+
+            const mediaTitle = applyTemplate(appearance.mediaTitle, context) || DEFAULT_APPEARANCE.mediaTitle;
+            const mediaEmbed = new EmbedBuilder()
+                .setColor(colorHexToNumber(appearance.mediaColor, DEFAULT_APPEARANCE.mediaColor))
+                .setTitle(mediaTitle)
+                .setDescription(mediaDesc)
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
+
+            embeds.push(mediaEmbed);
+            combinedFields.push({
+                name: mediaTitle,
+                value: mediaDesc,
+                inline: false
+            });
+        }
+
+        // Most Active Channels leaderboard
+        const channelsLeaderboard = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'activeChannels', balanceLimit)
+            .filter((player) => (player.activeChannels || 0) > 0);
+        if (appearance.showChannels !== false && channelsLeaderboard.length > 0) {
+            let channelsDesc = '';
+            for (let i = 0; i < channelsLeaderboard.length; i++) {
+                const player = channelsLeaderboard[i];
+                const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
+                const username = await getUsername(player.userId, player.username);
+                channelsDesc += `${medal} **${username}** • **${Number(player.activeChannels || 0)}** channels\n`;
+            }
+
+            const channelsTitle = applyTemplate(appearance.channelsTitle, context) || DEFAULT_APPEARANCE.channelsTitle;
+            const channelsEmbed = new EmbedBuilder()
+                .setColor(colorHexToNumber(appearance.channelsColor, DEFAULT_APPEARANCE.channelsColor))
+                .setTitle(channelsTitle)
+                .setDescription(channelsDesc)
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' });
+
+            embeds.push(channelsEmbed);
+            combinedFields.push({
+                name: channelsTitle,
+                value: channelsDesc,
+                inline: false
+            });
+        }
+
         // Gambling leaderboards
         const enabledGames = new Set(appearance.enabledGames || DEFAULT_APPEARANCE.enabledGames);
         for (const game of GAMBLING_GAMES) {
@@ -759,6 +858,9 @@ class SeasonLeaderboardManager {
             winnersDesc = 'No winners available.';
         }
 
+        const topMessages = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'messageCount', 1)[0];
+        const topMedia = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'mediaCount', 1)[0];
+
         const totalPlayers = season.totalPlayers || 0;
         const summaryEmbed = new EmbedBuilder()
             .setColor(0xF1C40F)
@@ -768,7 +870,21 @@ class SeasonLeaderboardManager {
                 { name: '👥 Total Players', value: `${totalPlayers}`, inline: true },
                 { name: '🕐 Started', value: new Date(season.startDate).toLocaleDateString(), inline: true },
                 { name: '🧾 Ended', value: season.endDate ? new Date(season.endDate).toLocaleDateString() : 'N/A', inline: true },
-                { name: '🏆 Winners (Balance)', value: winnersDesc, inline: false }
+                { name: '🏆 Winners (Balance)', value: winnersDesc, inline: false },
+                {
+                    name: '💬 Most Messages',
+                    value: topMessages && (topMessages.messageCount || 0) > 0
+                        ? `<@${topMessages.userId}> • **${Number(topMessages.messageCount || 0).toLocaleString()}** messages`
+                        : 'No data',
+                    inline: false
+                },
+                {
+                    name: '🖼️ Most Images/GIFs',
+                    value: topMedia && (topMedia.mediaCount || 0) > 0
+                        ? `<@${topMedia.userId}> • **${Number(topMedia.mediaCount || 0).toLocaleString()}** posts`
+                        : 'No data',
+                    inline: false
+                }
             )
             .setTimestamp();
 

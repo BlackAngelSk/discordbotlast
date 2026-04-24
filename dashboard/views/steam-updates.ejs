@@ -129,7 +129,7 @@
                                 <% if (game.latestArticle) { %>
                                     <div style="font-weight:600;margin-bottom:8px"><%= game.latestArticle.title %></div>
                                     <div class="form-hint" style="margin-bottom:10px">Published <%= new Date(game.latestArticle.date || Date.now()).toLocaleString() %></div>
-                                    <div style="margin-bottom:12px;line-height:1.5"><%= game.latestArticle.summary || game.latestArticle.contents || 'Latest update preview available.' %></div>
+                                    <div style="margin-bottom:12px;line-height:1.6;white-space:pre-wrap;font-size:0.95em;color:var(--text-secondary);font-family:'Courier New', monospace;padding:10px;background:var(--bg-card-hover);border-radius:8px;border-left:3px solid var(--brand)"><%= game.formattedSummary || 'Latest update preview available.' %></div>
                                     <div style="display:flex;gap:10px;flex-wrap:wrap">
                                         <a href="<%= game.latestArticle.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-newspaper"></i> Open Changelog</a>
                                         <a href="<%= game.storeUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> Open Source</a>

@@ -216,7 +216,7 @@ class SeasonManager {
      * @param {string} guildId - Discord Guild ID
      * @param {string} seasonName - Season name
      * @param {string} userId - Discord User ID
-     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling, voiceHours}
+     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling, voiceHours, messageCount, mediaCount, activeChannels}
      */
     async recordPlayerStats(guildId, seasonName, userId, stats) {
         const season = this.getSeason(guildId, seasonName);
@@ -232,6 +232,12 @@ class SeasonManager {
             level: stats.level || 1,
             coins: stats.seasonalCoins || 0,
             voiceHours: stats.voiceHours || 0,
+            messageCount: Number(stats.messageCount) || 0,
+            mediaCount: Number(stats.mediaCount) || 0,
+            activeChannels: Number(stats.activeChannels) || 0,
+            channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
+                ? { ...stats.channelsActivity }
+                : {},
             gambling: stats.gambling || {
                 blackjack: { wins: 0, losses: 0, ties: 0 },
                 roulette: { wins: 0, losses: 0 },
@@ -277,6 +283,10 @@ class SeasonManager {
                 level: 1,
                 coins: 0,
                 voiceHours: 0,
+                messageCount: 0,
+                mediaCount: 0,
+                activeChannels: 0,
+                channelsActivity: {},
                 gambling: {
                     blackjack: { wins: 0, losses: 0, ties: 0 },
                     roulette: { wins: 0, losses: 0 },
@@ -438,6 +448,13 @@ class SeasonManager {
                     xp: stats.xp || 0,
                     level: stats.level || 1,
                     coins: stats.seasonalCoins || 0,
+                    voiceHours: Number(stats.voiceHours) || 0,
+                    messageCount: Number(stats.messageCount) || 0,
+                    mediaCount: Number(stats.mediaCount) || 0,
+                    activeChannels: Number(stats.activeChannels) || 0,
+                    channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
+                        ? { ...stats.channelsActivity }
+                        : {},
                     gambling: stats.gambling || {
                         blackjack: { wins: 0, losses: 0, ties: 0 },
                         roulette: { wins: 0, losses: 0 },
@@ -487,6 +504,13 @@ class SeasonManager {
                     xp: stats.xp || 0,
                     level: stats.level || 1,
                     coins: stats.seasonalCoins || 0,
+                    voiceHours: Number(stats.voiceHours) || 0,
+                    messageCount: Number(stats.messageCount) || 0,
+                    mediaCount: Number(stats.mediaCount) || 0,
+                    activeChannels: Number(stats.activeChannels) || 0,
+                    channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
+                        ? { ...stats.channelsActivity }
+                        : {},
                     gambling: stats.gambling || {
                         blackjack: { wins: 0, losses: 0, ties: 0 },
                         roulette: { wins: 0, losses: 0 },
@@ -567,15 +591,27 @@ class SeasonManager {
         for (const userId in season.leaderboard) {
             const stats = getStats(userId);
             if (stats) {
-                // Preserve existing voice hours during refresh
-                const existingVoiceHours = season.leaderboard[userId].voiceHours || 0;
-                
+                // Preserve cumulative season activity counters during refresh unless explicit values are provided.
+                const existingVoiceHours = Number(season.leaderboard[userId].voiceHours) || 0;
+                const existingMessageCount = Number(season.leaderboard[userId].messageCount) || 0;
+                const existingMediaCount = Number(season.leaderboard[userId].mediaCount) || 0;
+                const existingActiveChannels = Number(season.leaderboard[userId].activeChannels) || 0;
+                const existingChannelsActivity = season.leaderboard[userId].channelsActivity && typeof season.leaderboard[userId].channelsActivity === 'object'
+                    ? { ...season.leaderboard[userId].channelsActivity }
+                    : {};
+
                 season.leaderboard[userId].balance = stats.balance || 0;
                 season.leaderboard[userId].xp = stats.xp || 0;
                 season.leaderboard[userId].level = stats.level || 1;
                 season.leaderboard[userId].coins = stats.seasonalCoins || 0;
                 season.leaderboard[userId].gambling = stats.gambling || season.leaderboard[userId].gambling;
-                season.leaderboard[userId].voiceHours = existingVoiceHours;
+                season.leaderboard[userId].voiceHours = Number.isFinite(Number(stats.voiceHours)) ? Number(stats.voiceHours) : existingVoiceHours;
+                season.leaderboard[userId].messageCount = Number.isFinite(Number(stats.messageCount)) ? Number(stats.messageCount) : existingMessageCount;
+                season.leaderboard[userId].mediaCount = Number.isFinite(Number(stats.mediaCount)) ? Number(stats.mediaCount) : existingMediaCount;
+                season.leaderboard[userId].activeChannels = Number.isFinite(Number(stats.activeChannels)) ? Number(stats.activeChannels) : existingActiveChannels;
+                season.leaderboard[userId].channelsActivity = stats.channelsActivity && typeof stats.channelsActivity === 'object'
+                    ? { ...stats.channelsActivity }
+                    : existingChannelsActivity;
                 if (stats.username) {
                     season.leaderboard[userId].username = stats.username;
                 }
@@ -589,6 +625,79 @@ class SeasonManager {
         }
 
         return { success: true, updated: updatedCount };
+    }
+
+    async addMessageActivity(guildId, userId, payload = {}) {
+        const seasonName = this.getCurrentSeason(guildId);
+        if (!seasonName) {
+            return { success: false, error: 'No active season' };
+        }
+
+        const season = this.getSeason(guildId, seasonName);
+        if (!season || !season.isActive) {
+            return { success: false, error: 'Season not found or inactive' };
+        }
+
+        const username = payload.username || 'Unknown User';
+        const channelId = payload.channelId ? String(payload.channelId) : null;
+        const isMedia = Boolean(payload.isMedia);
+
+        if (!season.leaderboard[userId]) {
+            season.leaderboard[userId] = {
+                userId,
+                username,
+                balance: 0,
+                xp: 0,
+                level: 1,
+                coins: 0,
+                voiceHours: 0,
+                messageCount: 0,
+                mediaCount: 0,
+                activeChannels: 0,
+                channelsActivity: {},
+                gambling: {
+                    blackjack: { wins: 0, losses: 0, ties: 0 },
+                    roulette: { wins: 0, losses: 0 },
+                    slots: { wins: 0, losses: 0 },
+                    dice: { wins: 0, losses: 0 },
+                    coinflip: { wins: 0, losses: 0 },
+                    rps: { wins: 0, losses: 0, ties: 0 },
+                    ttt: { wins: 0, losses: 0, ties: 0 }
+                },
+                joinedAt: Date.now(),
+                lastUpdated: Date.now()
+            };
+            season.totalPlayers = Object.keys(season.leaderboard).length;
+        }
+
+        const entry = season.leaderboard[userId];
+        entry.username = entry.username || username;
+        entry.messageCount = (Number(entry.messageCount) || 0) + 1;
+        if (isMedia) {
+            entry.mediaCount = (Number(entry.mediaCount) || 0) + 1;
+        }
+
+        if (!entry.channelsActivity || typeof entry.channelsActivity !== 'object') {
+            entry.channelsActivity = {};
+        }
+
+        if (channelId) {
+            entry.channelsActivity[channelId] = (Number(entry.channelsActivity[channelId]) || 0) + 1;
+            entry.activeChannels = Object.keys(entry.channelsActivity).length;
+        } else {
+            entry.activeChannels = Number(entry.activeChannels) || 0;
+        }
+
+        entry.lastUpdated = Date.now();
+        await this.save();
+
+        return {
+            success: true,
+            seasonName,
+            messageCount: entry.messageCount,
+            mediaCount: entry.mediaCount,
+            activeChannels: entry.activeChannels
+        };
     }
 
     async pruneInactivePlayers(guildId, seasonName, inactiveDays = 30) {

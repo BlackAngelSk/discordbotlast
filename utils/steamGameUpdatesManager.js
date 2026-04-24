@@ -134,6 +134,40 @@ function truncate(value, maxLength) {
     return `${safeValue.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 }
 
+function formatChangelogSummary(article) {
+    if (!article) return '';
+    
+    // Format sections if available (Steam format)
+    if (Array.isArray(article.sections) && article.sections.length > 0) {
+        const sectionLines = [];
+        for (const section of article.sections.slice(0, 3)) {
+            const title = String(section.title || 'Updates').trim().toUpperCase();
+            sectionLines.push(`[ ${title} ]`);
+            
+            const items = Array.isArray(section.items) ? section.items : [];
+            for (const item of items.slice(0, 4)) {
+                const cleanItem = truncate(sanitizeText(item), 180);
+                if (cleanItem) sectionLines.push(`• ${cleanItem}`);
+            }
+            sectionLines.push('');
+        }
+        return truncate(sectionLines.join('\n'), 400);
+    }
+    
+    // Use summary if available (Minecraft, League, osu format)
+    if (article.summary) {
+        return truncate(sanitizeText(article.summary), 400);
+    }
+    
+    // Fallback to contents (raw Steam format)
+    if (article.contents) {
+        const cleaned = sanitizeText(article.contents);
+        return truncate(cleaned, 400);
+    }
+    
+    return '';
+}
+
 function toUnixTimestamp(value) {
     const timestamp = typeof value === 'number' ? value : Math.floor(new Date(value).getTime() / 1000);
     return Number.isFinite(timestamp) ? timestamp : null;
@@ -881,9 +915,11 @@ class SteamGameUpdatesManager {
 
         for (const game of trackedGames) {
             const articles = await this.fetchUpdatesForGame(game).catch(() => []);
+            const latestArticle = articles[0] || null;
             previews.push({
                 ...game,
-                latestArticle: articles[0] || null
+                latestArticle,
+                formattedSummary: latestArticle ? formatChangelogSummary(latestArticle) : ''
             });
         }
 

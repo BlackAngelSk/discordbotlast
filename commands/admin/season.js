@@ -108,7 +108,7 @@ async function handleCreate(message, args, guildId) {
                 { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
                 { name: '👤 Created By', value: `<@${message.author.id}>`, inline: true },
                 { name: '👥 Members Enrolled', value: `**${enrollResult.enrolled}** member(s)`, inline: true },
-                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, & All Gambling Stats', inline: true },
+                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, Voice, Messages, Media Posts, Active Channels, & Gambling Stats', inline: true },
                 { name: '🕐 Started', value: `<t:${Math.floor(Date.now() / 1000)}:f>`, inline: false },
                 { name: '📝 Status', value: '🟢 Active', inline: true }
             )
@@ -171,7 +171,7 @@ async function handleEnroll(message, args, guildId) {
                 { name: '📛 Season Name', value: `\`${seasonName}\``, inline: true },
                 { name: '👥 Members Enrolled', value: `**${enrollResult.enrolled}** member(s)`, inline: true },
                 { name: '👥 Total in Season', value: season.totalPlayers.toString(), inline: true },
-                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, & All Gambling Stats', inline: false }
+                { name: '🎰 Tracking', value: 'Balance, XP, Level, Coins, Voice, Messages, Media Posts, Active Channels, & Gambling Stats', inline: false }
             )
             .setTimestamp();
 

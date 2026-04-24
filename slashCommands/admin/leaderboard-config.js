@@ -141,7 +141,7 @@ module.exports = {
                 }
 
                 const rows = Object.values(season.leaderboard || {});
-                const header = ['userId', 'username', 'balance', 'xp', 'level', 'coins', 'lastUpdated'];
+                const header = ['userId', 'username', 'balance', 'xp', 'level', 'coins', 'voiceHours', 'messageCount', 'mediaCount', 'activeChannels', 'lastUpdated'];
                 const lines = [header.join(',')];
 
                 for (const row of rows) {
@@ -152,6 +152,10 @@ module.exports = {
                         row.xp || 0,
                         row.level || 1,
                         row.coins || 0,
+                        row.voiceHours || 0,
+                        row.messageCount || 0,
+                        row.mediaCount || 0,
+                        row.activeChannels || 0,
                         row.lastUpdated ? new Date(row.lastUpdated).toISOString() : ''
                     ];
                     lines.push(values.map(v => `"${v}"`).join(','));

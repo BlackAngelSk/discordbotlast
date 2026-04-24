@@ -468,6 +468,53 @@ module.exports = {
             }
         }
 
+        // Poll vote buttons
+        if (interaction.customId.startsWith('poll_vote_')) {
+            try {
+                const optionIndex = parseInt(interaction.customId.replace('poll_vote_', ''), 10);
+                if (!interaction.client.polls) interaction.client.polls = new Map();
+                const pollData = interaction.client.polls.get(interaction.message.id);
+
+                if (!pollData) {
+                    return interaction.reply({ content: '❌ This poll has ended or is no longer active.', flags: 64 });
+                }
+                if (Date.now() > pollData.endsAt) {
+                    return interaction.reply({ content: '❌ This poll has already ended.', flags: 64 });
+                }
+
+                const userId = interaction.user.id;
+
+                // Remove previous vote from any option
+                for (const [idx, voters] of Object.entries(pollData.votes)) {
+                    voters.delete(userId);
+                }
+
+                // Cast new vote
+                if (!pollData.votes[optionIndex]) pollData.votes[optionIndex] = new Set();
+                pollData.votes[optionIndex].add(userId);
+
+                // Rebuild vote counts display
+                const totalVotes = Object.values(pollData.votes).reduce((sum, s) => sum + s.size, 0);
+                const voteField = pollData.options.map((opt, idx) => {
+                    const count = (pollData.votes[idx] || new Set()).size;
+                    const bar = totalVotes > 0 ? '█'.repeat(Math.round((count / totalVotes) * 10)) + '░'.repeat(10 - Math.round((count / totalVotes) * 10)) : '░░░░░░░░░░';
+                    return `**${String.fromCharCode(65 + idx)}**: ${bar} ${count} vote${count !== 1 ? 's' : ''}`;
+                }).join('\n');
+
+                const originalEmbed = interaction.message.embeds[0];
+                const updatedEmbed = EmbedBuilder.from(originalEmbed)
+                    .spliceFields(0, originalEmbed.fields.length, { name: `Votes (${totalVotes} total)`, value: voteField, inline: false });
+
+                await interaction.update({ embeds: [updatedEmbed], components: interaction.message.components });
+            } catch (err) {
+                console.error('Poll vote error:', err);
+                if (!interaction.replied && !interaction.deferred) {
+                    interaction.reply({ content: '❌ Failed to record your vote.', flags: 64 }).catch(() => {});
+                }
+            }
+            return;
+        }
+
         // Music controls
         if (!interaction.customId.startsWith('music_')) return;
 

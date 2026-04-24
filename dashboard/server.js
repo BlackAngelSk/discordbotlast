@@ -265,6 +265,12 @@ const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) 
                 balanceColor: normalizeHexColorInput(body.balanceColor, currentAppearance.balanceColor),
                 voiceTitle: normalizeTextInput(body.voiceTitle, currentAppearance.voiceTitle, 256),
                 voiceColor: normalizeHexColorInput(body.voiceColor, currentAppearance.voiceColor),
+                messagesTitle: normalizeTextInput(body.messagesTitle, currentAppearance.messagesTitle, 256),
+                messagesColor: normalizeHexColorInput(body.messagesColor, currentAppearance.messagesColor),
+                mediaTitle: normalizeTextInput(body.mediaTitle, currentAppearance.mediaTitle, 256),
+                mediaColor: normalizeHexColorInput(body.mediaColor, currentAppearance.mediaColor),
+                channelsTitle: normalizeTextInput(body.channelsTitle, currentAppearance.channelsTitle, 256),
+                channelsColor: normalizeHexColorInput(body.channelsColor, currentAppearance.channelsColor),
                 layoutDensity: ['standard', 'compact', 'minimal'].includes(String(body.layoutDensity || '').trim())
                     ? String(body.layoutDensity).trim()
                     : currentAppearance.layoutDensity,
@@ -272,6 +278,9 @@ const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) 
                 customBlockBody: normalizeTextInput(body.customBlockBody, currentAppearance.customBlockBody, 1024),
                 showBalance: parseDashboardBoolean(body.showBalance),
                 showVoice: parseDashboardBoolean(body.showVoice),
+                showMessages: parseDashboardBoolean(body.showMessages),
+                showMedia: parseDashboardBoolean(body.showMedia),
+                showChannels: parseDashboardBoolean(body.showChannels),
                 showGambling: parseDashboardBoolean(body.showGambling),
                 enabledGames
             }
@@ -371,6 +380,52 @@ const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-seaso
                 .setColor(parseInt(String(appearance.voiceColor || '#9C27B0').replace('#', ''), 16))
                 .setTitle(applyPreviewTemplate(appearance.voiceTitle || '🎙️ Season Voice Channel Hours', previewContext))
                 .setDescription(leaderboardToDescription(voicePlayers))
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
+        );
+    }
+
+    const messagesSamplePlayers = [
+        { medal: '🥇', username: 'Rune', value: '1,204 messages' },
+        { medal: '🥈', username: 'Nova', value: '987 messages' },
+        { medal: '🥉', username: 'Atlas', value: '832 messages' }
+    ].slice(0, playerCount);
+    const mediaSamplePlayers = [
+        { medal: '🥇', username: 'Echo', value: '312 posts' },
+        { medal: '🥈', username: 'Pixel', value: '245 posts' },
+        { medal: '🥉', username: 'Astra', value: '178 posts' }
+    ].slice(0, playerCount);
+    const channelsSamplePlayers = [
+        { medal: '🥇', username: 'Atlas', value: '14 channels' },
+        { medal: '🥈', username: 'Nova', value: '11 channels' },
+        { medal: '🥉', username: 'Rune', value: '9 channels' }
+    ].slice(0, playerCount);
+
+    if (appearance.showMessages !== false) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.messagesColor || '#4ECDC4').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.messagesTitle || '💬 Most Messages Sent', previewContext))
+                .setDescription(leaderboardToDescription(messagesSamplePlayers))
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
+        );
+    }
+
+    if (appearance.showMedia !== false) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.mediaColor || '#FF9F43').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.mediaTitle || '🖼️ Most Images/GIFs Posted', previewContext))
+                .setDescription(leaderboardToDescription(mediaSamplePlayers))
+                .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
+        );
+    }
+
+    if (appearance.showChannels !== false) {
+        embeds.push(
+            new EmbedBuilder()
+                .setColor(parseInt(String(appearance.channelsColor || '#8E7CFD').replace('#', ''), 16))
+                .setTitle(applyPreviewTemplate(appearance.channelsTitle || '🧭 Most Active Channels (Variety)', previewContext))
+                .setDescription(leaderboardToDescription(channelsSamplePlayers))
                 .setFooter({ text: compactMode ? 'Top 3 Players' : 'Top 10 Players' })
         );
     }
