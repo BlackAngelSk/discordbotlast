@@ -7,8 +7,8 @@ const { pokerCommunityAttachment, pokerHandAttachment} = require('../../utils/ca
 
 module.exports = {
     name: 'poker',
-    description: 'Play multiplayer Texas Hold\'em Poker!',
-    usage: '!poker host <blind> [buyin] | !poker join <blind> | !poker start | !poker status | !poker leave',
+    description: 'Play multiplayer Texas Hold\'em Poker! Create flexible tables where each player chooses their buy-in amount.',
+    usage: '!poker create <maxPot> - Create flexible table\n!poker host <blind> [buyin] - Traditional table\n!poker join <blind> [buyin] - Join traditional table\n!poker list - View available tables\n!poker start|status|leave - Game commands',
     aliases: ['holdem', 'txpoker'],
     category: 'fun',
     beta: false, // Set to true to restrict to beta testers
@@ -22,22 +22,125 @@ module.exports = {
 
             const subcommand = args[0]?.toLowerCase();
             if (!subcommand) {
-                return message.reply('❌ Usage: `!poker host <bet>` | `!poker join <bet>` | `!poker start` | `!poker status` | `!poker leave`');
+                return message.reply(`📋 **Poker Command Help**
+
+**Flexible Table (Recommended):**
+\`!poker create <maxPot>\` - Players can choose any buy-in up to maxPot
+Example: \`!poker create 10000\`
+
+**Traditional Table:**
+\`!poker host <blind> [buyin]\` - Fixed blind with optional custom buy-in
+\`!poker join <blind> [buyin]\` - Join a traditional table
+
+**Other Commands:**
+\`!poker list\` - See available tables
+\`!poker start\` - Start game (host only)
+\`!poker status\` - View current game
+\`!poker leave\` - Leave table`);
             }
 
+            if (subcommand === 'create') return createFlexiblePoker(message, args);
             if (subcommand === 'host') return hostPoker(message, args);
             if (subcommand === 'join') return joinPoker(message, args);
+            if (subcommand === 'list') return listPokerTables(message);
             if (subcommand === 'start') return startHostedPoker(message);
             if (subcommand === 'status') return pokerStatus(message);
             if (subcommand === 'leave') return leavePoker(message);
 
-            return message.reply('❌ Unknown subcommand. Use: host, join, start, status, leave');
+            return message.reply('❌ Unknown subcommand. Use `!poker` to see help.');
         } catch (error) {
             console.error('Error in poker command:', error);
             return message.reply('❌ An error occurred in poker.');
         }
     }
 };
+
+async function createFlexiblePoker(message, args) {
+    const maxPot = parseInt(args[1], 10);
+    if (!maxPot || maxPot < 100) {
+        return message.reply('❌ Please specify a valid max pot (minimum 100 coins)!\nUsage: `!poker create <maxPot>`\nExample: `!poker create 10000`');
+    }
+
+    if (PokerTableManager.getUserTable(message.author.id)) {
+        return message.reply('❌ You are already in a poker game! Use `!poker leave` if stuck.');
+    }
+
+    const userData = economyManager.getUserData(message.guild.id, message.author.id);
+    const betaInfinite = isBetaInfinite(message);
+
+    // Calculate blind from pot (pot = blind * 20, so blind = pot / 20)
+    const suggestedBlind = Math.max(5, Math.floor(maxPot / 50));
+    
+    if (!betaInfinite && userData.balance < maxPot) {
+        return message.reply(`❌ You don't have enough coins! Your balance: ${userData.balance}, max pot: ${maxPot}`);
+    }
+
+    const table = PokerTableManager.createTable(message.guild.id, message.channel.id, suggestedBlind, 6);
+    table.hostId = message.author.id;
+    table.betaInfinite = betaInfinite;
+    table.isFlexible = true;
+    table.maxPot = maxPot;
+    table.minBet = suggestedBlind;
+
+    const added = PokerTableManager.addPlayerToTable(table.tableId, message.author.id, message.author.username, maxPot);
+    if (!added) return message.reply('❌ Failed to create poker table.');
+
+    if (!betaInfinite) {
+        await economyManager.removeMoney(message.guild.id, message.author.id, maxPot);
+    }
+
+    // Store original buy-in for this player
+    const hostPlayer = table.players?.get(message.author.id);
+    if (hostPlayer) hostPlayer.originalBuyIn = maxPot;
+
+    const embed = new EmbedBuilder()
+        .setColor(0x228b22)
+        .setTitle('🎴 Flexible Poker Table Created')
+        .setDescription(`${message.author} is hosting a poker table!`)
+        .addFields(
+            { name: 'Host Max Buy-in', value: `${maxPot} coins`, inline: true },
+            { name: 'Blind (Suggested)', value: `${suggestedBlind} coins`, inline: true },
+            { name: 'Players', value: '1/6', inline: true },
+            { name: 'How to Join', value: `Click **Join Table** then specify your buy-in amount (1 - ${maxPot} coins)`, inline: false },
+            { name: 'How to Start', value: 'Host can click **Start Game** when ready (need 2+ players).', inline: false }
+        )
+        .setFooter({ text: 'Players can buy in for any amount up to the max pot.' });
+
+    const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`poker_flexjoin_${table.tableId}`).setLabel('Join Table').setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setCustomId(`poker_start_${table.tableId}`).setLabel('Start Game').setStyle(ButtonStyle.Primary)
+    );
+
+    const tableMsg = await message.reply({ embeds: [embed], components: [row] });
+    setupFlexibleTableLobby(message, table, tableMsg);
+}
+
+async function listPokerTables(message) {
+    const tables = [];
+    for (const [, t] of PokerTableManager.tables) {
+        if (t.guildId === message.guild.id && t.channelId === message.channel.id && !t.gameStarted) {
+            tables.push(t);
+        }
+    }
+
+    if (tables.length === 0) {
+        return message.reply('❌ No available poker tables in this channel. Start one with `!poker create <maxPot>` or `!poker host <blind>`');
+    }
+
+    const tableList = tables.map(t => {
+        const players = t.getTotalPlayers();
+        const mode = t.isFlexible ? `Flexible (Max: ${t.maxPot})` : `Blind: ${t.minBet}`;
+        return `• **${t.hostId === message.author.id ? '(Your Table)' : ''}** ${mode} - ${players}/6 players`;
+    }).join('\n');
+
+    const embed = new EmbedBuilder()
+        .setColor(0x228b22)
+        .setTitle('🎴 Available Poker Tables')
+        .setDescription(tableList)
+        .setFooter({ text: `Total: ${tables.length} table(s)` });
+
+    return message.reply({ embeds: [embed] });
+}
 
 async function hostPoker(message, args) {
     const bet = parseInt(args[1], 10);
@@ -98,13 +201,14 @@ async function hostPoker(message, args) {
 async function joinPoker(message, args) {
     const bet = parseInt(args[1], 10);
     if (!bet || bet < 10) {
-        return message.reply('❌ Please specify a valid bet amount (minimum 10 coins)!\nUsage: `!poker join <bet>`');
+        return message.reply('❌ Please specify a valid bet amount (minimum 10 coins)!\nUsage: `!poker join <bet> [buyin]`\nExample: `!poker join 50 5000`');
     }
 
     if (PokerTableManager.getUserTable(message.author.id)) {
         return message.reply('❌ You are already in a poker game! Use `!poker leave` if stuck.');
     }
 
+    const customBuyIn = parseInt(args[2], 10);
     const userData = economyManager.getUserData(message.guild.id, message.author.id);
     const betaInfinite = isBetaInfinite(message);
 
@@ -117,21 +221,27 @@ async function joinPoker(message, args) {
     }
 
     if (!table) {
-        return message.reply(`❌ No waiting table with ${bet} coin bet in this channel. Use \`!poker host ${bet}\`.`);
+        return message.reply(`❌ No waiting table with ${bet} coin blind in this channel. Use \`!poker host ${bet}\` or \`!poker list\`.`);
     }
 
-    const tableBuyIn = getTableBuyIn(table);
-    if (!betaInfinite && userData.balance < tableBuyIn) {
-        return message.reply(`❌ You don't have enough coins! Need ${tableBuyIn}, balance: ${userData.balance}`);
+    let buyIn = customBuyIn && customBuyIn > 0 ? customBuyIn : getTableBuyIn(table);
+    
+    // Validate buy-in
+    if (buyIn < table.minBet * 2) {
+        return message.reply(`❌ Buy-in must be at least ${table.minBet * 2} coins (2x blind).`);
     }
 
-    const added = PokerTableManager.addPlayerToTable(table.tableId, message.author.id, message.author.username, tableBuyIn);
+    if (!betaInfinite && userData.balance < buyIn) {
+        return message.reply(`❌ You don't have enough coins! Need ${buyIn}, your balance: ${userData.balance}`);
+    }
+
+    const added = PokerTableManager.addPlayerToTable(table.tableId, message.author.id, message.author.username, buyIn);
     if (!added) return message.reply('❌ Could not join this table.');
 
     if (!table.betaInfinite) {
-        await economyManager.removeMoney(message.guild.id, message.author.id, tableBuyIn);
+        await economyManager.removeMoney(message.guild.id, message.author.id, buyIn);
     }
-    return message.reply('✅ Joined poker table! Waiting for host to start...');
+    return message.reply(`✅ Joined poker table with ${buyIn} coin buy-in! Waiting for host to start...`);
 }
 
 async function startHostedPoker(message) {
@@ -139,7 +249,7 @@ async function startHostedPoker(message) {
     if (!table) return message.reply('❌ You are not in a poker table.');
     if (table.gameStarted) return message.reply('❌ This game already started.');
     if (table.hostId !== message.author.id) return message.reply('❌ Only the host can start the game.');
-    if (!table.canStartGame()) return message.reply('❌ Need 2-6 players to start.');
+    if (table.getTotalPlayers() < 1) return message.reply('❌ At least 1 player needed to start.');
 
     return runGameLoop(message.channel, table);
 }
@@ -150,7 +260,8 @@ async function leavePoker(message) {
     if (table.gameStarted) return message.reply('❌ You cannot leave while a hand is running.');
 
     const wasHost = table.hostId === message.author.id;
-    const buyIn = getTableBuyIn(table);
+    const player = table.players?.get(message.author.id);
+    const buyIn = player?.originalBuyIn || getTableBuyIn(table);
 
     PokerTableManager.removePlayerFromTable(message.author.id);
     if (!table.betaInfinite) {
@@ -251,7 +362,7 @@ function setupTableLobby(message, table, tableMsg) {
                 return interaction.reply({ content: `❌ Beta only. You need the \`${getBetaRoleName()}\` role.`, flags: MessageFlags.Ephemeral });
             }
             if (interaction.user.id !== t.hostId) return interaction.reply({ content: '❌ Only host can start.', flags: MessageFlags.Ephemeral });
-            if (!t.canStartGame()) return interaction.reply({ content: '❌ Need 2-6 players.', flags: MessageFlags.Ephemeral });
+            if (t.getTotalPlayers() < 1) return interaction.reply({ content: '❌ At least 1 player needed to start.', flags: MessageFlags.Ephemeral });
 
             await interaction.reply({ content: '🎴 Game starting...', flags: MessageFlags.Ephemeral });
             startingGame = true;
@@ -269,7 +380,8 @@ function setupTableLobby(message, table, tableMsg) {
         if (!t.betaInfinite) {
             const tableBuyIn = getTableBuyIn(t);
             for (const p of t.getAllPlayers()) {
-                await economyManager.addMoney(t.guildId, p.userId, tableBuyIn);
+                const playerBuyIn = p.originalBuyIn || tableBuyIn;
+                await economyManager.addMoney(t.guildId, p.userId, playerBuyIn);
             }
         }
         PokerTableManager.closeTable(t.tableId);
@@ -277,23 +389,133 @@ function setupTableLobby(message, table, tableMsg) {
     });
 }
 
+function setupFlexibleTableLobby(message, table, tableMsg) {
+    const collector = tableMsg.createMessageComponentCollector({ time: 8 * 60 * 1000 });
+    let startingGame = false;
+
+    collector.on('collect', async (interaction) => {
+        if (interaction.customId === `poker_flexjoin_${table.tableId}`) {
+            const t = PokerTableManager.getTable(table.tableId);
+            if (!t || t.gameStarted) return interaction.reply({ content: '❌ Table not available.', flags: MessageFlags.Ephemeral });
+
+            if (!memberHasBetaAccess(interaction.member)) {
+                return interaction.reply({ content: `❌ Beta only. You need the \`${getBetaRoleName()}\` role.`, flags: MessageFlags.Ephemeral });
+            }
+
+            if (PokerTableManager.getUserTable(interaction.user.id)) {
+                return interaction.reply({ content: '❌ You are already in a poker table.', flags: MessageFlags.Ephemeral });
+            }
+
+            const userData = economyManager.getUserData(message.guild.id, interaction.user.id);
+            const maxBuyIn = t.maxPot;
+
+            if (!t.betaInfinite && userData.balance < 100) {
+                return interaction.reply({ content: `❌ You need at least 100 coins to join this table. Your balance: ${userData.balance}`, flags: MessageFlags.Ephemeral });
+            }
+
+            // Show modal for buy-in selection
+            const maxAllowed = Math.min(maxBuyIn, !t.betaInfinite ? userData.balance : maxBuyIn);
+            await showBuyInModal(interaction, t, message.guild.id, maxAllowed);
+            return;
+        }
+
+        if (interaction.customId === `poker_start_${table.tableId}`) {
+            const t = PokerTableManager.getTable(table.tableId);
+            if (!t) return interaction.reply({ content: '❌ Table not found.', flags: MessageFlags.Ephemeral });
+            if (!memberHasBetaAccess(interaction.member)) {
+                return interaction.reply({ content: `❌ Beta only. You need the \`${getBetaRoleName()}\` role.`, flags: MessageFlags.Ephemeral });
+            }
+            if (interaction.user.id !== t.hostId) return interaction.reply({ content: '❌ Only host can start.', flags: MessageFlags.Ephemeral });
+            if (t.getTotalPlayers() < 1) return interaction.reply({ content: '❌ At least 1 player needed to start.', flags: MessageFlags.Ephemeral });
+
+            await interaction.reply({ content: '🎴 Game starting...', flags: MessageFlags.Ephemeral });
+            startingGame = true;
+            collector.stop('game_start');
+            return runGameLoop(message.channel, t, tableMsg);
+        }
+    });
+
+    collector.on('end', async (_collected, reason) => {
+        if (startingGame || reason === 'game_start') return;
+
+        const t = PokerTableManager.getTable(table.tableId);
+        if (!t || t.gameStarted) return;
+
+        if (!t.betaInfinite) {
+            for (const p of t.getAllPlayers()) {
+                const playerBuyIn = p.originalBuyIn || getTableBuyIn(t);
+                await economyManager.addMoney(t.guildId, p.userId, playerBuyIn);
+            }
+        }
+        PokerTableManager.closeTable(t.tableId);
+        tableMsg.edit({ components: [] }).catch(() => {});
+    });
+}
+
+async function showBuyInModal(interaction, table, guildId, maxAllowed) {
+    const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+
+    const modal = new ModalBuilder()
+        .setCustomId(`poker_buyin_${table.tableId}`)
+        .setTitle('Enter Your Buy-in Amount');
+
+    const buyInInput = new TextInputBuilder()
+        .setCustomId('buyin_amount')
+        .setLabel(`Buy-in (1 - ${maxAllowed} coins)`)
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder(`Max: ${maxAllowed}`)
+        .setRequired(true);
+
+    modal.addComponents(new ActionRowBuilder().addComponents(buyInInput));
+    
+    await interaction.showModal(modal);
+}
+
 async function updateTableLobby(tableMsg, table) {
-    const players = table.getAllPlayers().map(p => `• ${p.username}`).join('\n') || 'Waiting...';
+    const players = table.getAllPlayers().map(p => `• ${p.username} (${p.buyIn || 0} coins)`).join('\n') || 'Waiting...';
+    const modeText = table.isFlexible ? `Max Buy-in: ${table.maxPot}` : `Blind: ${table.minBet}`;
     const embed = new EmbedBuilder()
         .setColor(0x228b22)
         .setTitle('🎴 Poker Table')
         .addFields(
-            { name: 'Blind', value: `${table.minBet} coins`, inline: true },
-            { name: 'Buy-in', value: `${getTableBuyIn(table)} coins`, inline: true },
+            { name: 'Mode', value: modeText, inline: true },
+            { name: 'Buy-in Settings', value: table.isFlexible ? 'Flexible (per player)' : `Default: ${getTableBuyIn(table)}`, inline: true },
             { name: 'Players', value: `${table.getTotalPlayers()}/${table.maxPlayers}`, inline: true },
-            { name: 'List', value: players, inline: false }
+            { name: 'Player List', value: players, inline: false }
         );
 
     await tableMsg.edit({ embeds: [embed] }).catch(() => {});
 }
 
+async function sendPokerRules(member, table) {
+    const minBet = table.minBet || 1;
+    const maxBet = table.maxPot || table.buyIn || 'unlimited';
+    
+    const rulesEmbed = new EmbedBuilder()
+        .setColor(0x228b22)
+        .setTitle('🎴 Texas Hold\'em Poker Rules')
+        .setDescription('Welcome to Poker! Here\'s how the game works:')
+        .addFields(
+            { name: '📋 Hand Rankings (Highest to Lowest)', value: '🏆 Royal Flush\n🎴 Straight Flush\n4️⃣ Four of a Kind\n🏠 Full House\n🌊 Flush\n➡️ Straight\n3️⃣ Three of a Kind\n👥 Two Pair\n👤 One Pair\n🎯 High Card', inline: false },
+            { name: '💵 Betting', value: `**Small Blind:** ${minBet}\n**Big Blind:** ${minBet * 2}\n**Your Stack:** ${maxBet} coins max\n\nBet/Raise strategically to win the pot!`, inline: false },
+            { name: '🎰 Game Flow', value: '**Preflop** → 2 hidden cards (hole cards)\n**Flop** → 3 community cards revealed\n**Turn** → 4th community card\n**River** → 5th community card\n**Showdown** → Best 5-card hand wins!', inline: false },
+            { name: '⚙️ Actions', value: '**Check** - Pass without betting (if no open bet)\n**Bet** - Place chips in the pot\n**Call** - Match current bet\n**Raise** - Increase the bet\n**Fold** - Give up your hand\n**All-in** - Push all remaining chips', inline: false },
+            { name: '✅ Tips', value: '• Keep your hole cards secret\n• Use the "View My Cards" button anytime\n• Can\'t leave once the hand starts\n• Best hand after River wins the pot', inline: false }
+        )
+        .setFooter({ text: 'Good luck! 🍀' });
+
+    await member.send({ embeds: [rulesEmbed] }).catch(() => {});
+}
+
 async function runGameLoop(channel, table, tableMsg = null) {
     if (!table.startGame()) return channel.send('❌ Could not start poker game.');
+
+    // Send rules to all players via DM
+    for (const p of table.getAllPlayers()) {
+        const member = await channel.guild.members.fetch(p.userId).catch(() => null);
+        if (!member) continue;
+        await sendPokerRules(member, table);
+    }
 
     for (const p of table.getAllPlayers()) {
         const member = await channel.guild.members.fetch(p.userId).catch(() => null);

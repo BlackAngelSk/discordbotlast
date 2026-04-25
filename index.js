@@ -207,11 +207,7 @@ async function loadHandlers() {
             runInitStep('Voice rewards manager', () => voiceRewardsManager.init()),
             runInitStep('Raid protection manager', () => raidProtectionManager.init()),
             runInitStep('Birthday manager', () => birthdayManager.init()),
-            runInitStep('Achievement manager', () => achievementManager.init())
-        ]);
-
-        // Feature managers (parallel)
-        await Promise.all([
+            runInitStep('Achievement manager', () => achievementManager.init()),
             runInitStep('Scheduled messages manager', () => scheduledMessagesManager.init(client)),
             runInitStep('Custom role shop', () => customRoleShop.init()),
             runInitStep('Activity tracker', () => activityTracker.init()),

@@ -131,6 +131,62 @@ module.exports = {
             return;
         }
 
+        // ── Modal submissions ─────────────────────────────────────────────────
+        if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith('poker_buyin_')) {
+                try {
+                    const { PokerTableManager } = require('../utils/pokerTableManager');
+                    const tableId = interaction.customId.replace('poker_buyin_', '');
+                    const table = PokerTableManager.getTable(tableId);
+                    
+                    if (!table || table.gameStarted) {
+                        return interaction.reply({ content: '❌ This table is no longer available.', flags: 64 });
+                    }
+
+                    if (PokerTableManager.getUserTable(interaction.user.id)) {
+                        return interaction.reply({ content: '❌ You are already in a poker table.', flags: 64 });
+                    }
+
+                    const buyInInput = interaction.fields.getTextInputValue('buyin_amount');
+                    const buyInAmount = parseInt(buyInInput, 10);
+
+                    if (!buyInAmount || buyInAmount < table.minBet * 2) {
+                        return interaction.reply({ content: `❌ Buy-in must be at least ${table.minBet * 2} coins (2x blind).`, flags: 64 });
+                    }
+
+                    const userData = economyManager.getUserData(interaction.guildId, interaction.user.id);
+                    const betaInfinite = !!interaction?.member?.betaInfiniteBalance;
+
+                    if (buyInAmount > table.maxPot) {
+                        return interaction.reply({ content: `❌ Buy-in cannot exceed ${table.maxPot} coins.`, flags: 64 });
+                    }
+
+                    if (!betaInfinite && userData.balance < buyInAmount) {
+                        return interaction.reply({ content: `❌ You don't have enough coins! Need ${buyInAmount}, your balance: ${userData.balance}`, flags: 64 });
+                    }
+
+                    const added = PokerTableManager.addPlayerToTable(table.tableId, interaction.user.id, interaction.user.username, buyInAmount);
+                    if (!added) {
+                        return interaction.reply({ content: '❌ Could not join this table (full or other error).', flags: 64 });
+                    }
+
+                    if (!table.betaInfinite) {
+                        await economyManager.removeMoney(interaction.guildId, interaction.user.id, buyInAmount);
+                    }
+
+                    // Store original buy-in for this player
+                    const player = table.players?.get(interaction.user.id);
+                    if (player) player.originalBuyIn = buyInAmount;
+
+                    await interaction.reply({ content: `✅ Joined poker table with ${buyInAmount} coin buy-in! Waiting for host to start...`, flags: 64 });
+                } catch (error) {
+                    console.error('Error handling poker buy-in modal:', error);
+                    await interaction.reply({ content: '❌ An error occurred processing your buy-in.', flags: 64 }).catch(() => {});
+                }
+            }
+            return;
+        }
+
         if (!interaction.isButton()) return;
 
         // ── Verification gate ─────────────────────────────────────────────────

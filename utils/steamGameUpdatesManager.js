@@ -14,6 +14,13 @@ const MINECRAFT_VERSION_MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/v
 const LEAGUE_PATCH_NOTES_URL = 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/';
 const OSU_CHANGELOG_URL = 'https://osu.ppy.sh/home/changelog/lazer';
 const OSU_CHANGELOG_API_URL = 'https://osu.ppy.sh/api/v2/changelog/lazer';
+const VALORANT_PATCH_NOTES_URL = 'https://playvalorant.com/en-us/news/';
+const FFXIV_PATCH_NOTES_URL = 'https://na.finalfantasyxiv.com/lodestone/news/';
+const WOW_PATCH_NOTES_URL = 'https://us.battle.net/news/en-us/wow/';
+const POE_NEWS_URL = 'https://www.pathofexile.com/en/news';
+const FORTNITE_NEWS_URL = 'https://www.fortnite.com/?lang=en-US';
+const HELLDIVERS2_NEWS_URL = 'https://www.helldivers.com/';
+const DIABLO_NEWS_URL = 'https://diablo4.blizzard.com/en-us/news/';
 const POLL_INTERVAL = 15 * 60 * 1000;
 const MAX_TRACKED_GAMES = 20;
 const REQUEST_TIMEOUT = 20000;
@@ -51,6 +58,76 @@ const SPECIAL_TRACKED_SOURCES = {
         storeUrl: OSU_CHANGELOG_URL,
         color: 0xff66aa,
         providerLabel: 'osu!'
+    },
+    valorant: {
+        aliases: ['valorant', 'val', 'valorant patch'],
+        sourceId: 'valorant',
+        name: 'Valorant',
+        imageUrl: 'https://images.contentstack.io/v3/assets/bltfe521ce715202d33/blt28c73a46e28bd2e1/62f88e90e6d4dd0c88b70e84/VALORANT_2022_E4A_TeaserKeyArt_16x9_02.jpg',
+        tinyImage: 'https://www.valorantpc.com/favicon.ico',
+        storeUrl: VALORANT_PATCH_NOTES_URL,
+        color: 0xff4655,
+        providerLabel: 'Valorant'
+    },
+    ffxiv: {
+        aliases: ['ffxiv', 'ff14', 'finalfantasy14', 'final fantasy xiv', 'final fantasy 14'],
+        sourceId: 'ffxiv',
+        name: 'Final Fantasy XIV',
+        imageUrl: 'https://na.finalfantasyxiv.com/pr/dl/news/m_header_lodestone.jpg',
+        tinyImage: 'https://na.finalfantasyxiv.com/favicon.ico',
+        storeUrl: FFXIV_PATCH_NOTES_URL,
+        color: 0x0099ff,
+        providerLabel: 'Final Fantasy XIV'
+    },
+    wow: {
+        aliases: ['wow', 'wow', 'worldofwarcraft', 'world of warcraft'],
+        sourceId: 'wow',
+        name: 'World of Warcraft',
+        imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p3/P3DV54SA3XCK1522711097119.jpg',
+        tinyImage: 'https://us.battle.net/favicon.ico',
+        storeUrl: WOW_PATCH_NOTES_URL,
+        color: 0x0070dd,
+        providerLabel: 'World of Warcraft'
+    },
+    poe: {
+        aliases: ['poe', 'pathofexile', 'path of exile'],
+        sourceId: 'poe',
+        name: 'Path of Exile',
+        imageUrl: 'https://www.pathofexile.com/image/news/PathOfExile2Launch.jpg',
+        tinyImage: 'https://www.pathofexile.com/favicon.ico',
+        storeUrl: POE_NEWS_URL,
+        color: 0xff6b35,
+        providerLabel: 'Path of Exile'
+    },
+    fortnite: {
+        aliases: ['fortnite', 'fn', 'battle royale'],
+        sourceId: 'fortnite',
+        name: 'Fortnite',
+        imageUrl: 'https://www.fortnite.com/etc.clientlibs/fortnite/clientlibs/main/resources/images/default-social.jpg',
+        tinyImage: 'https://www.fortnite.com/favicon.ico',
+        storeUrl: FORTNITE_NEWS_URL,
+        color: 0x7c5cff,
+        providerLabel: 'Fortnite'
+    },
+    helldivers2: {
+        aliases: ['helldivers2', 'helldivers 2', 'hd2'],
+        sourceId: 'helldivers2',
+        name: 'Helldivers 2',
+        imageUrl: 'https://www.helldivers.com/site-assets/images/social-share.jpg',
+        tinyImage: 'https://www.helldivers.com/favicon.ico',
+        storeUrl: HELLDIVERS2_NEWS_URL,
+        color: 0xffaa00,
+        providerLabel: 'Helldivers 2'
+    },
+    diablo: {
+        aliases: ['diablo', 'diablo4', 'diablo iv'],
+        sourceId: 'diablo',
+        name: 'Diablo IV',
+        imageUrl: 'https://diablo4.blizzard.com/en-us/media/diablo4-com-social-share.jpg',
+        tinyImage: 'https://diablo4.blizzard.com/favicon.ico',
+        storeUrl: DIABLO_NEWS_URL,
+        color: 0xaa0000,
+        providerLabel: 'Diablo IV'
     }
 };
 
@@ -276,6 +353,104 @@ function normalizeTrackedGame(game) {
         const source = SPECIAL_TRACKED_SOURCES.osu;
         return {
             provider: 'osu',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'valorant' || game.sourceId === 'valorant') {
+        const source = SPECIAL_TRACKED_SOURCES.valorant;
+        return {
+            provider: 'valorant',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'ffxiv' || game.sourceId === 'ffxiv') {
+        const source = SPECIAL_TRACKED_SOURCES.ffxiv;
+        return {
+            provider: 'ffxiv',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'wow' || game.sourceId === 'wow') {
+        const source = SPECIAL_TRACKED_SOURCES.wow;
+        return {
+            provider: 'wow',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'poe' || game.sourceId === 'poe') {
+        const source = SPECIAL_TRACKED_SOURCES.poe;
+        return {
+            provider: 'poe',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'fortnite' || game.sourceId === 'fortnite') {
+        const source = SPECIAL_TRACKED_SOURCES.fortnite;
+        return {
+            provider: 'fortnite',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'helldivers2' || game.sourceId === 'helldivers2') {
+        const source = SPECIAL_TRACKED_SOURCES.helldivers2;
+        return {
+            provider: 'helldivers2',
+            sourceId: source.sourceId,
+            name: game.name || source.name,
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage || source.imageUrl,
+            storeUrl: source.storeUrl,
+            color: source.color,
+            providerLabel: source.providerLabel
+        };
+    }
+
+    if (game.provider === 'diablo' || game.sourceId === 'diablo') {
+        const source = SPECIAL_TRACKED_SOURCES.diablo;
+        return {
+            provider: 'diablo',
             sourceId: source.sourceId,
             name: game.name || source.name,
             imageUrl: source.imageUrl,
@@ -734,6 +909,230 @@ async function fetchOsuUpdates() {
     }];
 }
 
+async function fetchValorantUpdates() {
+    try {
+        const html = await httpsGetText(VALORANT_PATCH_NOTES_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Valorant Patch Notes';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Valorant patch update is live.',
+            280
+        );
+        
+        return [{
+            key: `valorant:${Date.now()}`,
+            provider: 'valorant',
+            providerLabel: 'Valorant',
+            gameName: 'Valorant',
+            title,
+            summary,
+            sections: [],
+            url: VALORANT_PATCH_NOTES_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.valorant.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.valorant.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.valorant.color,
+            storeUrl: VALORANT_PATCH_NOTES_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Valorant updates:', error);
+        return [];
+    }
+}
+
+async function fetchFFXIVUpdates() {
+    try {
+        const html = await httpsGetText(FFXIV_PATCH_NOTES_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Final Fantasy XIV Patch Notes';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Final Fantasy XIV patch is available.',
+            280
+        );
+        
+        return [{
+            key: `ffxiv:${Date.now()}`,
+            provider: 'ffxiv',
+            providerLabel: 'Final Fantasy XIV',
+            gameName: 'Final Fantasy XIV',
+            title,
+            summary,
+            sections: [],
+            url: FFXIV_PATCH_NOTES_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.ffxiv.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.ffxiv.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.ffxiv.color,
+            storeUrl: FFXIV_PATCH_NOTES_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching FFXIV updates:', error);
+        return [];
+    }
+}
+
+async function fetchWoWUpdates() {
+    try {
+        const html = await httpsGetText(WOW_PATCH_NOTES_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'World of Warcraft Patch Notes';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New World of Warcraft patch is live.',
+            280
+        );
+        
+        return [{
+            key: `wow:${Date.now()}`,
+            provider: 'wow',
+            providerLabel: 'World of Warcraft',
+            gameName: 'World of Warcraft',
+            title,
+            summary,
+            sections: [],
+            url: WOW_PATCH_NOTES_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.wow.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.wow.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.wow.color,
+            storeUrl: WOW_PATCH_NOTES_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching WoW updates:', error);
+        return [];
+    }
+}
+
+async function fetchPoEUpdates() {
+    try {
+        const html = await httpsGetText(POE_NEWS_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Path of Exile News';
+        const descMatch = html.match(/<p[^>]*>(.*?)<\/p>/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Path of Exile updates and news.',
+            280
+        );
+        
+        return [{
+            key: `poe:${Date.now()}`,
+            provider: 'poe',
+            providerLabel: 'Path of Exile',
+            gameName: 'Path of Exile',
+            title,
+            summary,
+            sections: [],
+            url: POE_NEWS_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.poe.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.poe.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.poe.color,
+            storeUrl: POE_NEWS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Path of Exile updates:', error);
+        return [];
+    }
+}
+
+async function fetchFortniteUpdates() {
+    try {
+        const html = await httpsGetText(FORTNITE_NEWS_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Fortnite Game Updates';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Fortnite updates and events available.',
+            280
+        );
+        
+        return [{
+            key: `fortnite:${Date.now()}`,
+            provider: 'fortnite',
+            providerLabel: 'Fortnite',
+            gameName: 'Fortnite',
+            title,
+            summary,
+            sections: [],
+            url: FORTNITE_NEWS_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.fortnite.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.fortnite.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.fortnite.color,
+            storeUrl: FORTNITE_NEWS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Fortnite updates:', error);
+        return [];
+    }
+}
+
+async function fetchHelldivers2Updates() {
+    try {
+        const html = await httpsGetText(HELLDIVERS2_NEWS_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Helldivers 2 Updates';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Helldivers 2 updates and missions.',
+            280
+        );
+        
+        return [{
+            key: `helldivers2:${Date.now()}`,
+            provider: 'helldivers2',
+            providerLabel: 'Helldivers 2',
+            gameName: 'Helldivers 2',
+            title,
+            summary,
+            sections: [],
+            url: HELLDIVERS2_NEWS_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.helldivers2.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.helldivers2.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.helldivers2.color,
+            storeUrl: HELLDIVERS2_NEWS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Helldivers 2 updates:', error);
+        return [];
+    }
+}
+
+async function fetchDiabloUpdates() {
+    try {
+        const html = await httpsGetText(DIABLO_NEWS_URL);
+        const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
+        const title = titleMatch ? sanitizeText(titleMatch[1]) : 'Diablo IV News';
+        const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+        const summary = truncate(
+            descMatch ? sanitizeText(descMatch[1]) : 'New Diablo IV patches and news.',
+            280
+        );
+        
+        return [{
+            key: `diablo:${Date.now()}`,
+            provider: 'diablo',
+            providerLabel: 'Diablo IV',
+            gameName: 'Diablo IV',
+            title,
+            summary,
+            sections: [],
+            url: DIABLO_NEWS_URL,
+            date: Date.now(),
+            imageUrl: SPECIAL_TRACKED_SOURCES.diablo.imageUrl,
+            tinyImage: SPECIAL_TRACKED_SOURCES.diablo.tinyImage,
+            color: SPECIAL_TRACKED_SOURCES.diablo.color,
+            storeUrl: DIABLO_NEWS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Diablo updates:', error);
+        return [];
+    }
+}
+
 class SteamGameUpdatesManager {
     constructor() {
         this.client = null;
@@ -879,6 +1278,34 @@ class SteamGameUpdatesManager {
 
         if (game.provider === 'osu') {
             return fetchOsuUpdates();
+        }
+
+        if (game.provider === 'valorant') {
+            return fetchValorantUpdates();
+        }
+
+        if (game.provider === 'ffxiv') {
+            return fetchFFXIVUpdates();
+        }
+
+        if (game.provider === 'wow') {
+            return fetchWoWUpdates();
+        }
+
+        if (game.provider === 'poe') {
+            return fetchPoEUpdates();
+        }
+
+        if (game.provider === 'fortnite') {
+            return fetchFortniteUpdates();
+        }
+
+        if (game.provider === 'helldivers2') {
+            return fetchHelldivers2Updates();
+        }
+
+        if (game.provider === 'diablo') {
+            return fetchDiabloUpdates();
         }
 
         return this.fetchNewsForApp(game.appId, game);

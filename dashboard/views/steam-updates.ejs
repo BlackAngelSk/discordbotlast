@@ -17,7 +17,7 @@
         <main class="content">
             <div class="page-header">
                 <h1><i class="fas fa-gamepad" style="color:var(--brand);margin-right:8px"></i>Game Update Alerts</h1>
-                <p>Pick a channel and choose which Steam games or supported live-service games this server should watch for updates.</p>
+                <p>Pick a channel and choose which games this server should watch for updates. Supports Steam games, Minecraft, League of Legends, osu!, Valorant, Final Fantasy XIV, World of Warcraft, Path of Exile, Fortnite, Helldivers 2, and Diablo IV.</p>
             </div>
 
             <div class="stats-row">
@@ -48,7 +48,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
-                        <div class="card-subtitle">Save the channel, search Steam games by name, or add special sources like Minecraft, osu, and League of Legends manually.</div>
+                        <div class="card-subtitle">Save the channel, search Steam games by name, or add built-in games: Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, Path of Exile, Fortnite, Helldivers 2, or Diablo IV.</div>
                     </div>
                 </div>
 
@@ -96,8 +96,8 @@
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
                             <label class="form-label">Advanced Input</label>
-                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
-                            <div class="form-hint">Optional manual input. Use Steam app IDs, Steam store URLs, or one of: minecraft, osu, lol.</div>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <div class="form-hint">Use Steam app IDs, Steam store URLs, or game names: minecraft, osu, lol, valorant, ffxiv, wow, poe, fortnite, helldivers2, diablo.</div>
                         </div>
                     </div>
 
@@ -185,6 +185,62 @@ const specialSourceDefaults = {
         tinyImage: 'https://www.leagueoflegends.com/static/favicon/10f498b01d7f8c6.ico',
         imageUrl: 'https://www.leagueoflegends.com/static/open-graph/lol.jpg',
         storeUrl: 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/'
+    },
+    valorant: {
+        sourceId: 'valorant',
+        provider: 'valorant',
+        name: 'Valorant',
+        tinyImage: 'https://www.valorantpc.com/favicon.ico',
+        imageUrl: 'https://images.contentstack.io/v3/assets/bltfe521ce715202d33/blt28c73a46e28bd2e1/62f88e90e6d4dd0c88b70e84/VALORANT_2022_E4A_TeaserKeyArt_16x9_02.jpg',
+        storeUrl: 'https://playvalorant.com/en-us/news/'
+    },
+    ffxiv: {
+        sourceId: 'ffxiv',
+        provider: 'ffxiv',
+        name: 'Final Fantasy XIV',
+        tinyImage: 'https://na.finalfantasyxiv.com/favicon.ico',
+        imageUrl: 'https://na.finalfantasyxiv.com/pr/dl/news/m_header_lodestone.jpg',
+        storeUrl: 'https://na.finalfantasyxiv.com/lodestone/news/'
+    },
+    wow: {
+        sourceId: 'wow',
+        provider: 'wow',
+        name: 'World of Warcraft',
+        tinyImage: 'https://us.battle.net/favicon.ico',
+        imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p3/P3DV54SA3XCK1522711097119.jpg',
+        storeUrl: 'https://us.battle.net/news/en-us/wow/'
+    },
+    poe: {
+        sourceId: 'poe',
+        provider: 'poe',
+        name: 'Path of Exile',
+        tinyImage: 'https://www.pathofexile.com/favicon.ico',
+        imageUrl: 'https://www.pathofexile.com/image/news/PathOfExile2Launch.jpg',
+        storeUrl: 'https://www.pathofexile.com/en/news'
+    },
+    fortnite: {
+        sourceId: 'fortnite',
+        provider: 'fortnite',
+        name: 'Fortnite',
+        tinyImage: 'https://www.fortnite.com/favicon.ico',
+        imageUrl: 'https://www.fortnite.com/etc.clientlibs/fortnite/clientlibs/main/resources/images/default-social.jpg',
+        storeUrl: 'https://www.fortnite.com/?lang=en-US'
+    },
+    helldivers2: {
+        sourceId: 'helldivers2',
+        provider: 'helldivers2',
+        name: 'Helldivers 2',
+        tinyImage: 'https://www.helldivers.com/favicon.ico',
+        imageUrl: 'https://www.helldivers.com/site-assets/images/social-share.jpg',
+        storeUrl: 'https://www.helldivers.com/'
+    },
+    diablo: {
+        sourceId: 'diablo',
+        provider: 'diablo',
+        name: 'Diablo IV',
+        tinyImage: 'https://diablo4.blizzard.com/favicon.ico',
+        imageUrl: 'https://diablo4.blizzard.com/en-us/media/diablo4-com-social-share.jpg',
+        storeUrl: 'https://diablo4.blizzard.com/en-us/news/'
     }
 };
 const form = document.getElementById('steamUpdatesForm');
