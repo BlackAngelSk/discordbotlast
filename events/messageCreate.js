@@ -12,6 +12,7 @@ const achievementManager = require('../utils/achievementManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
 const stickyMessages = require('../utils/stickyMessages');
 const seasonManager = require('../utils/seasonManager');
+const telegramSyncManager = require('../utils/telegramSyncManager');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
@@ -395,6 +396,12 @@ module.exports = {
             }
         } catch (error) {
             console.error('XP tracking error:', error);
+        }
+
+        try {
+            await telegramSyncManager.relayDiscordMessage(message);
+        } catch (error) {
+            console.error('Telegram sync relay error:', error.message);
         }
 
         // Check for custom commands (uses server prefixes)

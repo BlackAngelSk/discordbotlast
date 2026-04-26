@@ -9,6 +9,7 @@ const SECTION_KEYS = [
     'liveAlerts',
     'epicGamesAlerts',
     'steamGameUpdates',
+    'telegramSync',
     'community',
     'voiceTools',
     'moderation',

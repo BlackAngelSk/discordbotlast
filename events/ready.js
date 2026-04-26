@@ -130,6 +130,16 @@ module.exports = {
             }
         }, 19000);
 
+        setTimeout(async () => {
+            try {
+                const telegramSyncManager = require('../utils/telegramSyncManager');
+                await telegramSyncManager.init(readyClient);
+                console.log('✅ Telegram sync bridge started');
+            } catch (error) {
+                console.error('Error starting Telegram sync bridge:', error);
+            }
+        }, 21000);
+
         // Start stat channel updater
         setTimeout(async () => {
             try {

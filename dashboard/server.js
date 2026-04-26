@@ -25,6 +25,7 @@ const analyticsManager = require('../utils/analyticsManager');
 const liveAlertsManager = require('../utils/liveAlertsManager');
 const epicGamesAlertsManager = require('../utils/epicGamesAlertsManager');
 const steamGameUpdatesManager = require('../utils/steamGameUpdatesManager');
+const telegramSyncManager = require('../utils/telegramSyncManager');
 const suggestionManager = require('../utils/suggestionManager');
 const reactionRoleManager = require('../utils/reactionRoleManager');
 const roleMenuManager = require('../utils/roleMenuManager');
@@ -117,6 +118,7 @@ const DASHBOARD_SECTION_LABELS = {
     liveAlerts: 'Live Alerts',
     epicGamesAlerts: 'Epic Games Alerts',
     steamGameUpdates: 'Steam Updates',
+    telegramSync: 'Telegram Sync',
     community: 'Community',
     voiceTools: 'Voice Tools',
     moderation: 'Moderation',
@@ -139,6 +141,7 @@ const inferDashboardSectionKey = (requestPath) => {
     if (/^\/dashboard\/[^/]+\/live-alerts$/.test(pathValue) || /^\/api\/live-alerts\/[^/]+/.test(pathValue)) return 'liveAlerts';
     if (/^\/dashboard\/[^/]+\/epic-games$/.test(pathValue) || /^\/api\/epic-games\/[^/]+/.test(pathValue)) return 'epicGamesAlerts';
     if (/^\/dashboard\/[^/]+\/steam-updates$/.test(pathValue) || /^\/api\/steam-updates\/[^/]+/.test(pathValue)) return 'steamGameUpdates';
+    if (/^\/dashboard\/[^/]+\/telegram-sync$/.test(pathValue) || /^\/api\/telegram-sync\/[^/]+/.test(pathValue)) return 'telegramSync';
     if (/^\/dashboard\/[^/]+\/community$/.test(pathValue) || /^\/api\/community\/[^/]+/.test(pathValue)) return 'community';
     if (/^\/dashboard\/[^/]+\/voice-tools$/.test(pathValue) || /^\/api\/voice-tools\/[^/]+/.test(pathValue)) return 'voiceTools';
     if (/^\/dashboard\/[^/]+\/moderation$/.test(pathValue) || /^\/api\/[^/]+\/moderation(?:\/|$)/.test(pathValue)) return 'moderation';
@@ -1628,6 +1631,113 @@ class Dashboard {
             }
         });
 
+        this.app.get('/api/telegram-sync/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = telegramSyncManager.getGuildConfig(guildId);
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                res.json({
+                    success: true,
+                    config: {
+                        ...config,
+                        channelName: config.discordChannelId
+                            ? (guild.channels.cache.get(config.discordChannelId)?.name || `Unknown (${config.discordChannelId})`)
+                            : null
+                    },
+                    envStatus: {
+                        hasToken: telegramSyncManager.hasBotToken()
+                    }
+                });
+            } catch (error) {
+                console.error('Error fetching Telegram sync config:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/telegram-sync/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const discordChannelId = String(req.body?.discordChannelId || '').trim();
+                if (discordChannelId) {
+                    const channel = guild.channels.cache.get(discordChannelId);
+                    if (!channel || channel.type !== 0) {
+                        return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                    }
+                }
+
+                const config = await telegramSyncManager.updateGuildConfig(guildId, {
+                    enabled: req.body?.enabled,
+                    discordChannelId,
+                    telegramChatId: req.body?.telegramChatId,
+                    syncDiscordToTelegram: req.body?.syncDiscordToTelegram,
+                    syncTelegramToDiscord: req.body?.syncTelegramToDiscord,
+                    includeAttachments: req.body?.includeAttachments
+                });
+
+                res.json({ success: true, message: 'Telegram sync settings saved successfully', config });
+            } catch (error) {
+                console.error('Error saving Telegram sync config:', error);
+                const statusCode = /required|numeric|chat id|channel/i.test(error.message) ? 400 : 500;
+                res.status(statusCode).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/telegram-sync/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                await telegramSyncManager.disableGuild(req.params.guildId);
+                res.json({ success: true, message: 'Telegram sync disabled successfully' });
+            } catch (error) {
+                console.error('Error disabling Telegram sync:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/telegram-sync/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = telegramSyncManager.getGuildConfig(guildId);
+                const requestedBy = req.user?.username || req.user?.global_name || req.user?.id || 'Dashboard User';
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!config.discordChannelId) {
+                    return res.status(400).json({ success: false, error: 'Set a Discord channel first' });
+                }
+
+                const channel = guild.channels.cache.get(config.discordChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const direction = String(req.body?.direction || 'discordToTelegram');
+                if (direction === 'telegramToDiscord') {
+                    await channel.send({ content: `📨 **Telegram -> Discord sync test**\nRequested by: ${requestedBy}` });
+                    return res.json({ success: true, message: `Sent a test Telegram-style message to #${channel.name}` });
+                }
+
+                await telegramSyncManager.sendTestToTelegram(guildId, requestedBy);
+                res.json({ success: true, message: 'Sent a test Discord -> Telegram message' });
+            } catch (error) {
+                console.error('Error sending Telegram sync test:', error);
+                const statusCode = /missing|required|chat id|token/i.test(error.message) ? 400 : 500;
+                res.status(statusCode).json({ success: false, error: error.message });
+            }
+        });
+
         // Community tools dashboard
         this.app.get('/dashboard/:guildId/community', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
@@ -2310,6 +2420,27 @@ class Dashboard {
             } catch (error) {
                 console.error('Steam updates page error:', error);
                 res.status(500).send('Error loading Steam updates');
+            }
+        });
+
+        this.app.get('/dashboard/:guildId/telegram-sync', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = telegramSyncManager.getGuildConfig(guildId);
+
+                res.render('telegram-sync', {
+                    guild,
+                    config,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    envStatus: {
+                        hasToken: telegramSyncManager.hasBotToken()
+                    },
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Telegram sync page error:', error);
+                res.status(500).send('Error loading Telegram sync settings');
             }
         });
 
