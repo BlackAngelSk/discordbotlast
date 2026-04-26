@@ -121,80 +121,104 @@ module.exports = {
 
             if (isUrl && isPlaylist) {
                 // Handle playlist with play-dl
-                const playlistInfo = await play.playlist_info(query, { incomplete: true });
-                
-                if (!playlistInfo) {
-                    return message.reply('❌ Could not fetch playlist information!');
-                }
-
-                const videos = await playlistInfo.all_videos();
-                
-                if (videos.length === 0) {
-                    return message.reply('❌ No videos found in playlist!');
-                }
-                
-                let queue = queues.get(message.guild.id);
-                if (!queue) {
-                    queue = new MusicQueue(message.guild.id);
-                    queues.set(message.guild.id, queue);
-
-                    const connection = joinVoiceChannel({
-                        channelId: voiceChannel.id,
-                        guildId: message.guild.id,
-                        adapterCreator: message.guild.voiceAdapterCreator,
-                    });
-
-                    await queue.setupConnection(connection);
-                }
-                
-                // Add all songs from playlist
-                const songs = [];
-                for (const video of videos.slice(0, 50)) { // Limit to 50 songs
-                    const song = {
-                        title: video.title,
-                        url: video.url,
-                        duration: video.durationInSec || 0,
-                        thumbnail: video.thumbnails?.[0]?.url,
-                        requester: message.author.tag
-                    };
-                    queue.addSong(song);
-                    songs.push(song);
-                }
-
-                await achievementManager.syncUser(message.guild.id, message.author.id, { songPlayed: true });
-                
-                const playlistEmbed = new EmbedBuilder()
-                    .setColor(0x00ff00)
-                    .setTitle('📋 Playlist Added')
-                    .setDescription(`Added ${songs.length} songs from playlist`)
-                    .addFields(
-                        { name: '🎧 Requested by', value: message.author.tag, inline: true }
-                    );
-                
-                await message.channel.send({ embeds: [playlistEmbed] });
-                
-                const isFirstSong = !queue.isPlaying;
-                if (isFirstSong) {
-                    queue.playNext();
+                try {
+                    const playlistInfo = await play.playlist_info(query, { incomplete: true });
                     
-                    const nowPlayingEmbed = new EmbedBuilder()
-                        .setColor(0x0099ff)
-                        .setTitle('🎵 Now Playing')
-                        .setDescription(`[${songs[0].title}](${songs[0].url})`)
-                        .addFields(
-                            { name: '⏱️ Duration', value: formatDuration(songs[0].duration), inline: true },
-                            { name: '🎧 Requested by', value: songs[0].requester, inline: true }
-                        )
-                        .setThumbnail(songs[0].thumbnail);
+                    if (!playlistInfo) {
+                        return message.reply('❌ Could not fetch playlist information!');
+                    }
 
-                    const msg = await message.channel.send({
-                        embeds: [nowPlayingEmbed],
-                        components: createMusicControls()
-                    });
-                    queue.nowPlayingMessage = msg;
+                    const videos = await playlistInfo.all_videos();
+                    
+                    if (videos.length === 0) {
+                        return message.reply('❌ No videos found in playlist!');
+                    }
+                    
+                    let queue = queues.get(message.guild.id);
+                    if (!queue) {
+                        queue = new MusicQueue(message.guild.id);
+                        queues.set(message.guild.id, queue);
+
+                        const connection = joinVoiceChannel({
+                            channelId: voiceChannel.id,
+                            guildId: message.guild.id,
+                            adapterCreator: message.guild.voiceAdapterCreator,
+                        });
+
+                        await queue.setupConnection(connection);
+                    }
+                    
+                    // Add all songs from playlist
+                    const songs = [];
+                    for (const video of videos.slice(0, 50)) { // Limit to 50 songs
+                        const song = {
+                            title: video.title,
+                            url: video.url,
+                            duration: video.durationInSec || 0,
+                            thumbnail: video.thumbnails?.[0]?.url,
+                            requester: message.author.tag
+                        };
+                        queue.addSong(song);
+                        songs.push(song);
+                    }
+
+                    await achievementManager.syncUser(message.guild.id, message.author.id, { songPlayed: true });
+                    
+                    const playlistEmbed = new EmbedBuilder()
+                        .setColor(0x00ff00)
+                        .setTitle('📋 Playlist Added')
+                        .setDescription(`Added ${songs.length} songs from playlist`)
+                        .addFields(
+                            { name: '🎧 Requested by', value: message.author.tag, inline: true }
+                        );
+                    
+                    await message.channel.send({ embeds: [playlistEmbed] });
+                    
+                    const isFirstSong = !queue.isPlaying;
+                    if (isFirstSong) {
+                        queue.playNext();
+                        
+                        const nowPlayingEmbed = new EmbedBuilder()
+                            .setColor(0x0099ff)
+                            .setTitle('🎵 Now Playing')
+                            .setDescription(`[${songs[0].title}](${songs[0].url})`)
+                            .addFields(
+                                { name: '⏱️ Duration', value: formatDuration(songs[0].duration), inline: true },
+                                { name: '🎧 Requested by', value: songs[0].requester, inline: true }
+                            )
+                            .setThumbnail(songs[0].thumbnail);
+
+                        const msg = await message.channel.send({
+                            embeds: [nowPlayingEmbed],
+                            components: createMusicControls()
+                        });
+                        queue.nowPlayingMessage = msg;
+                    }
+                    
+                    return;
+                } catch (playlistError) {
+                    console.error('Playlist error:', playlistError);
+                    
+                    // Handle the YouTube layout change error
+                    if (playlistError.message && playlistError.message.includes('Watch playlist unavailable')) {
+                        return message.reply(
+                            '❌ **Playlist Loading Failed**\n\n' +
+                            'YouTube playlists are currently unavailable due to layout changes. This is a known issue.\n\n' +
+                            '**Alternatives:**\n' +
+                            '• Try playing individual videos from the playlist\n' +
+                            '• Use a direct YouTube video link instead\n' +
+                            '• Search for the song by name using the bot'
+                        );
+                    }
+                    
+                    // Handle other playlist errors
+                    return message.reply(
+                        '❌ Could not load playlist. Please ensure:\n' +
+                        '• The playlist URL is valid\n' +
+                        '• The playlist exists and is public\n' +
+                        '• Try a different video or playlist'
+                    );
                 }
-                
-                return;
             }
             
             if (isUrl) {

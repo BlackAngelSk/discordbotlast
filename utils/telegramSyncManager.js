@@ -337,12 +337,17 @@ class TelegramSyncManager {
             }
 
             const updates = await this._fetchUpdates({ timeout: 20, offset: this.updateOffset });
+            if (updates.length > 0) {
+                console.log(`[Telegram Sync] Received ${updates.length} update(s)`);
+            }
             for (const update of updates) {
                 this.updateOffset = update.update_id + 1;
                 await this._processUpdate(update);
             }
         } catch (error) {
-            console.error('Telegram sync polling error:', error.message);
+            if (!/timeout/i.test(error.message)) {
+                console.error('[Telegram Sync] Polling error:', error.message);
+            }
         } finally {
             this.pollInFlight = false;
             this.pollTimer = setTimeout(() => this._pollLoop(), 1200);
@@ -374,11 +379,19 @@ class TelegramSyncManager {
     async _processUpdate(update) {
         const message = update?.message || update?.edited_message;
         if (!message || !message.chat) return;
-        if (message.from?.is_bot) return;
+        if (message.from?.is_bot) {
+            console.debug(`[Telegram Sync] Skipping bot message from chat ${message.chat.id}`);
+            return;
+        }
 
         const telegramChatId = String(message.chat.id);
+        console.log(`[Telegram Sync] Processing message from Telegram chat ${telegramChatId}`);
+        
         const payload = buildTelegramToDiscordMessage(message);
-        if (!payload) return;
+        if (!payload) {
+            console.log(`[Telegram Sync] Message had no text/media content, skipping`);
+            return;
+        }
 
         const matchingGuildIds = Object.keys(this.data).filter((guildId) => {
             const config = this.getGuildConfig(guildId);
@@ -389,16 +402,34 @@ class TelegramSyncManager {
                 && String(config.telegramChatId) === telegramChatId;
         });
 
+        if (matchingGuildIds.length === 0) {
+            console.warn(`[Telegram Sync] Chat ${telegramChatId} not configured in any guild. Configured chats: ${Object.keys(this.data).map(gid => this.getGuildConfig(gid).telegramChatId).filter(Boolean).join(', ') || 'none'}`);
+            return;
+        }
+
+        console.log(`[Telegram Sync] Found ${matchingGuildIds.length} guild(s) to relay message to`);
+
         for (const guildId of matchingGuildIds) {
             const config = this.getGuildConfig(guildId);
             const channel = this.client?.channels?.cache?.get(config.discordChannelId)
                 || await this.client?.channels?.fetch?.(config.discordChannelId).catch(() => null);
 
-            if (!channel || channel.type !== 0) {
+            if (!channel) {
+                console.error(`[Telegram Sync] Discord channel ${config.discordChannelId} not found`);
                 continue;
             }
 
-            await channel.send({ content: payload }).catch(() => null);
+            if (channel.type !== 0) {
+                console.error(`[Telegram Sync] Discord channel ${config.discordChannelId} is not a text channel (type: ${channel.type})`);
+                continue;
+            }
+
+            try {
+                await channel.send({ content: payload });
+                console.log(`[Telegram Sync] Message relayed to Discord channel ${config.discordChannelId} in guild ${guildId}`);
+            } catch (error) {
+                console.error(`[Telegram Sync] Failed to send to Discord channel ${config.discordChannelId}:`, error.message);
+            }
         }
     }
 }
