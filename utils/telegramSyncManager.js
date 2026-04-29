@@ -120,7 +120,9 @@ function buildTelegramToDiscordMessage(msg) {
 
     const sender = msg.from?.username
         ? `@${msg.from.username}`
-        : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') || 'Telegram User';
+        : [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ')
+            || (msg.sender_chat?.username ? `@${msg.sender_chat.username}` : msg.sender_chat?.title)
+            || 'Telegram User';
 
     const chatLabel = msg.chat?.title || msg.chat?.username || msg.chat?.type || 'Telegram Chat';
     const contentParts = [text, attachmentHint].filter(Boolean);
@@ -324,6 +326,47 @@ class TelegramSyncManager {
         this.pollTimer = setTimeout(() => this._pollLoop(), 1200);
     }
 
+    _hasTelegramToDiscordTargets() {
+        return Object.keys(this.data).some((guildId) => {
+            const config = this.getGuildConfig(guildId);
+            return config.enabled
+                && config.syncTelegramToDiscord
+                && config.telegramChatId
+                && config.discordChannelId;
+        });
+    }
+
+    _findMatchingGuildIds(message) {
+        const telegramChatId = String(message?.chat?.id || '').trim();
+        const usernameCandidates = [
+            message?.chat?.username,
+            message?.from?.username,
+            message?.sender_chat?.username
+        ]
+            .map((entry) => String(entry || '').trim().toLowerCase())
+            .filter(Boolean)
+            .map((entry) => (entry.startsWith('@') ? entry : `@${entry}`));
+
+        const usernameSet = new Set(usernameCandidates);
+
+        return Object.keys(this.data).filter((guildId) => {
+            const config = this.getGuildConfig(guildId);
+            const configuredChat = String(config.telegramChatId || '').trim();
+            const configuredUsername = configuredChat.startsWith('@')
+                ? configuredChat.toLowerCase()
+                : '';
+
+            return config.enabled
+                && config.syncTelegramToDiscord
+                && configuredChat
+                && config.discordChannelId
+                && (
+                    configuredChat === telegramChatId
+                    || (configuredUsername && usernameSet.has(configuredUsername))
+                );
+        });
+    }
+
     async _pollLoop() {
         if (this.pollInFlight) {
             this.pollTimer = setTimeout(() => this._pollLoop(), 1500);
@@ -333,6 +376,10 @@ class TelegramSyncManager {
         this.pollInFlight = true;
         try {
             if (!this.hasBotToken()) {
+                return;
+            }
+
+            if (!this._hasTelegramToDiscordTargets()) {
                 return;
             }
 
@@ -377,7 +424,10 @@ class TelegramSyncManager {
     }
 
     async _processUpdate(update) {
-        const message = update?.message || update?.edited_message;
+        const message = update?.message
+            || update?.edited_message
+            || update?.channel_post
+            || update?.edited_channel_post;
         if (!message || !message.chat) return;
         if (message.from?.is_bot) {
             console.debug(`[Telegram Sync] Skipping bot message from chat ${message.chat.id}`);
@@ -385,25 +435,36 @@ class TelegramSyncManager {
         }
 
         const telegramChatId = String(message.chat.id);
+        const matchingGuildIds = this._findMatchingGuildIds(message);
+        if (matchingGuildIds.length === 0) {
+            const observedUsernames = [
+                message?.chat?.username,
+                message?.from?.username,
+                message?.sender_chat?.username
+            ]
+                .map((value) => String(value || '').trim())
+                .filter(Boolean)
+                .map((value) => (value.startsWith('@') ? value : `@${value}`));
+
+            const configuredTargets = Object.keys(this.data)
+                .map((guildId) => this.getGuildConfig(guildId))
+                .filter((config) => config.enabled && config.syncTelegramToDiscord && config.discordChannelId)
+                .map((config) => config.telegramChatId)
+                .filter(Boolean);
+
+            console.warn(
+                `[Telegram Sync] Ignoring update: no Telegram->Discord route matched. `
+                + `chat.id=${telegramChatId}, observed usernames=${observedUsernames.join(', ') || 'none'}, `
+                + `configured targets=${configuredTargets.join(', ') || 'none'}`
+            );
+            return;
+        }
+
         console.log(`[Telegram Sync] Processing message from Telegram chat ${telegramChatId}`);
         
         const payload = buildTelegramToDiscordMessage(message);
         if (!payload) {
             console.log(`[Telegram Sync] Message had no text/media content, skipping`);
-            return;
-        }
-
-        const matchingGuildIds = Object.keys(this.data).filter((guildId) => {
-            const config = this.getGuildConfig(guildId);
-            return config.enabled
-                && config.syncTelegramToDiscord
-                && config.telegramChatId
-                && config.discordChannelId
-                && String(config.telegramChatId) === telegramChatId;
-        });
-
-        if (matchingGuildIds.length === 0) {
-            console.warn(`[Telegram Sync] Chat ${telegramChatId} not configured in any guild. Configured chats: ${Object.keys(this.data).map(gid => this.getGuildConfig(gid).telegramChatId).filter(Boolean).join(', ') || 'none'}`);
             return;
         }
 
