@@ -45,8 +45,55 @@ function formatNumber(num) {
     return num.toString();
 }
 
+function parseFlexibleDate(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value;
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        const normalized = value > 0 && value < 1e12 ? value * 1000 : value;
+        const parsed = new Date(normalized);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+
+        if (/^\d+$/.test(trimmed)) {
+            return parseFlexibleDate(Number(trimmed));
+        }
+
+        const parsed = new Date(trimmed);
+        return Number.isNaN(parsed.getTime()) ? null : parsed;
+    }
+
+    return null;
+}
+
+function toDateObject(value, fallback = Date.now()) {
+    const parsed = parseFlexibleDate(value);
+    if (parsed) return parsed;
+
+    const fallbackDate = parseFlexibleDate(fallback);
+    return fallbackDate || new Date();
+}
+
+function toEpochMs(value, fallback = 0) {
+    return toDateObject(value, fallback).getTime();
+}
+
+function formatDateLabel(value, { fallbackLabel = 'Not available', locale, formatOptions } = {}) {
+    const parsed = parseFlexibleDate(value);
+    return parsed ? parsed.toLocaleString(locale, formatOptions) : fallbackLabel;
+}
+
 module.exports = {
     parseDuration,
     formatDuration,
-    formatNumber
+    formatNumber,
+    parseFlexibleDate,
+    toDateObject,
+    toEpochMs,
+    formatDateLabel
 };

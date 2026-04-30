@@ -1,7 +1,7 @@
 {
   "name": "discord-bot",
-  "version": "1.5.5",
-  "description": "A Discord bot built with discord.js",
+  "version": "1.6.1",
+  "description": "A Discord bot built with discord.js. and a variety of features, including music playback, games, and more.",
   "main": "index.js",
   "scripts": {
     "start": "node --no-deprecation index.js",
@@ -11,13 +11,14 @@
     "pm2:logs": "pm2 logs discord-bot",
     "pm2:save": "pm2 save",
     "slots:sim": "node scripts/simulate-slots-rtp.js",
-    "test:slots": "node scripts/test-slots-logic.js"
+    "test:slots": "node scripts/test-slots-logic.js",
+    "test:steam-dates": "node scripts/test-steam-update-dates.js"
   },
   "keywords": [
     "discord",
     "bot"
   ],
-  "author": "",
+  "author": "BlackAngelSK",
   "license": "ISC",
   "dependencies": {
     "@discordjs/opus": "^0.10.0",

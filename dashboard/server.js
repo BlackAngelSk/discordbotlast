@@ -33,7 +33,7 @@ const tempVoiceManager = require('../utils/tempVoiceManager');
 const voiceRewardsManager = require('../utils/voiceRewardsManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
 const starboardManager = require('../utils/starboardManager');
-const { formatNumber } = require('../utils/helpers');
+const { formatNumber, formatDateLabel } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 const seasonLeaderboardGames = Array.isArray(seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES)
     ? seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES
@@ -2415,6 +2415,7 @@ class Dashboard {
                     config,
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
                     previews,
+                    formatDateLabel,
                     user: req.user
                 });
             } catch (error) {

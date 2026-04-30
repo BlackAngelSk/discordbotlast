@@ -3,6 +3,7 @@ const path = require('path');
 const https = require('https');
 const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('./discordFetch');
+const { toDateObject, toEpochMs } = require('./helpers');
 const settingsManager = require('./settingsManager');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'steamGameUpdates.json');
@@ -80,7 +81,7 @@ const SPECIAL_TRACKED_SOURCES = {
         providerLabel: 'Final Fantasy XIV'
     },
     wow: {
-        aliases: ['wow', 'wow', 'worldofwarcraft', 'world of warcraft'],
+        aliases: ['wow', 'worldofwarcraft', 'world of warcraft'],
         sourceId: 'wow',
         name: 'World of Warcraft',
         imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p3/P3DV54SA3XCK1522711097119.jpg',
@@ -160,7 +161,9 @@ function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0 
                 }
 
                 try {
-                    resolve(JSON.parse(data));
+                    // Preserve large integer fields (e.g. Steam gid) that exceed JS safe integer range
+                    const safeData = data.replace(/"gid"\s*:\s*(\d{10,})/g, '"gid":"$1"');
+                    resolve(JSON.parse(safeData));
                 } catch {
                     reject(new Error('Invalid JSON response from remote API'));
                 }
@@ -250,6 +253,37 @@ function toUnixTimestamp(value) {
     return Number.isFinite(timestamp) ? timestamp : null;
 }
 
+function buildProviderUpdateKey(provider, { id, url, title, date } = {}) {
+    const normalizedProvider = String(provider || 'provider').trim().toLowerCase();
+    const normalizedId = String(id || '').trim().toLowerCase();
+    const normalizedUrl = String(url || '').trim().toLowerCase();
+    const normalizedTitle = truncate(sanitizeText(title || 'update').toLowerCase(), 120);
+    const dateMs = toEpochMs(date, 0);
+
+    const parts = [normalizedProvider, normalizedId, normalizedUrl, normalizedTitle];
+    if (dateMs > 0) parts.push(String(dateMs));
+
+    return parts.filter(Boolean).join(':');
+}
+
+function parseUsDateToIso(value) {
+    const match = String(value || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!match) return null;
+
+    const month = Number(match[1]);
+    const day = Number(match[2]);
+    const year = Number(match[3]);
+    if (!Number.isInteger(month) || !Number.isInteger(day) || !Number.isInteger(year)) return null;
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+        return null;
+    }
+
+    return parsed.toISOString();
+}
+
 function normalizeSteamAppId(value) {
     const raw = String(value || '').trim();
     if (!raw) return null;
@@ -305,6 +339,47 @@ function buildStoreUrl(appId) {
 
 function buildNewsHubUrl(appId) {
     return `https://store.steampowered.com/news/app/${appId}`;
+}
+
+function isBlockedSourceUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return /(?:^|\/\/)(?:www\.)?gamingonlinux\.com(?:\/|$)/i.test(url);
+}
+
+function isSteamHostedUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+
+    try {
+        const host = normalizeComparableHost(new URL(url).hostname);
+        return host === 'steampowered.com' || host.endsWith('.steampowered.com');
+    } catch {
+        return false;
+    }
+}
+
+function buildSteamArticleUrl(appId, article) {
+    // Prefer extracting gid from article.url string — avoids JSON large-integer precision loss
+    const rawUrl = String(article?.url || '').trim();
+    if (rawUrl && isSteamHostedUrl(rawUrl)) {
+        const gidFromUrl = rawUrl.match(/\/view\/(\d+)/)?.[1];
+        if (gidFromUrl) return `https://store.steampowered.com/news/app/${appId}/view/${gidFromUrl}`;
+    }
+
+    const gid = String(article?.gid || '').trim();
+    if (!gid) return null;
+    return `https://store.steampowered.com/news/app/${appId}/view/${gid}`;
+}
+
+function buildSteamChangelogUrl(appId, article) {
+    const articleUrl = String(article?.url || '').trim();
+
+    // Use the article URL directly unless it's an explicitly blocked source (e.g. GamingOnLinux).
+    // Steam CDN URLs (steamstore-a.akamaihd.net) redirect correctly to the real article page.
+    if (articleUrl && !isBlockedSourceUrl(articleUrl)) {
+        return articleUrl;
+    }
+
+    return buildSteamArticleUrl(appId, article) || buildNewsHubUrl(appId);
 }
 
 function buildSourceKey(game) {
@@ -553,6 +628,80 @@ function extractMetaContent(html, key) {
     return '';
 }
 
+function normalizeComparableHost(value) {
+    return String(value || '').toLowerCase().replace(/^www\./, '');
+}
+
+function resolveAbsoluteUrl(baseUrl, candidate) {
+    try {
+        const raw = decodeEntities(String(candidate || '').trim());
+        if (!raw || /^#/.test(raw) || /^(javascript|mailto|tel):/i.test(raw)) return null;
+        return new URL(raw, baseUrl).toString();
+    } catch {
+        return null;
+    }
+}
+
+function extractPreferredArticleUrl(html, baseUrl, {
+    hrefPatterns = [],
+    textPatterns = [],
+    excludePatterns = []
+} = {}) {
+    const source = String(html || '');
+    if (!source) return baseUrl;
+
+    const baseHost = normalizeComparableHost(new URL(baseUrl).hostname);
+    const candidates = [];
+
+    const pushCandidate = (url, text = '') => {
+        if (!url) return;
+
+        const normalizedText = sanitizeText(text);
+        const normalizedUrl = String(url).trim();
+        if (!normalizedUrl) return;
+        if (isBlockedSourceUrl(normalizedUrl)) return;
+        if (excludePatterns.some(pattern => pattern.test(normalizedUrl) || pattern.test(normalizedText))) return;
+
+        let candidateHost = '';
+        try {
+            candidateHost = normalizeComparableHost(new URL(normalizedUrl).hostname);
+        } catch {
+            return;
+        }
+
+        const isSameHost = candidateHost === baseHost || candidateHost.endsWith(`.${baseHost}`) || baseHost.endsWith(`.${candidateHost}`);
+        if (!isSameHost) return;
+
+        const key = `${normalizedUrl}::${normalizedText.toLowerCase()}`;
+        if (candidates.some(candidate => candidate.key === key)) return;
+
+        let score = 0;
+        if (hrefPatterns.some(pattern => pattern.test(normalizedUrl))) score += 5;
+        if (textPatterns.some(pattern => pattern.test(normalizedText))) score += 3;
+        if (/(patch|notes|update|changelog|release|hotfix)/i.test(`${normalizedUrl} ${normalizedText}`)) score += 1;
+
+        if (score > 0) {
+            candidates.push({ key, url: normalizedUrl, score });
+        }
+    };
+
+    const canonical = extractMetaContent(source, 'og:url') || extractMetaContent(source, 'twitter:url') || '';
+    const canonicalUrl = resolveAbsoluteUrl(baseUrl, canonical);
+    if (canonicalUrl && canonicalUrl !== baseUrl) {
+        pushCandidate(canonicalUrl);
+    }
+
+    const anchorRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis;
+    let match;
+    while ((match = anchorRegex.exec(source)) !== null) {
+        const resolved = resolveAbsoluteUrl(baseUrl, match[1]);
+        pushCandidate(resolved, match[2]);
+    }
+
+    candidates.sort((left, right) => right.score - left.score || left.url.length - right.url.length);
+    return candidates[0]?.url || baseUrl;
+}
+
 function splitIntoHighlights(text, maxItems = 6) {
     const rawSegments = String(text || '')
         .replace(/\r/g, '\n')
@@ -661,7 +810,7 @@ function createUpdateEmbed(update) {
         .setAuthor({ name: truncate(update.gameName || update.providerLabel || 'Game Update', 256) })
         .setTitle(truncate(update.title || 'Game update', 256))
         .setFooter({ text: `${update.providerLabel || 'Game'} updates` })
-        .setTimestamp(new Date(update.date || Date.now()));
+        .setTimestamp(toDateObject(update.date, Date.now()));
 
     const sectionText = formatSectionsAsEmbedText(update.sections);
     const summary = truncate(sanitizeText(update.summary || ''), 700);
@@ -707,7 +856,7 @@ function buildSteamUpdate(appId, article, game) {
         title,
         summary,
         sections,
-        url: article.url || buildNewsHubUrl(appId),
+        url: buildSteamChangelogUrl(appId, article),
         date: Number(article.date) || 0,
         imageUrl: game?.imageUrl || null,
         color: game?.color || 0xf59e0b,
@@ -813,7 +962,7 @@ function extractLeaguePublishedAt(html) {
     if (metaPublished) return metaPublished;
 
     const textMatch = String(html || '').match(/Game Updates\s*\|[^|]*\|(\d{1,2}\/\d{1,2}\/\d{4})/i);
-    return textMatch?.[1] ? new Date(textMatch[1]).toISOString() : null;
+    return textMatch?.[1] ? parseUsDateToIso(textMatch[1]) : null;
 }
 
 function extractLeagueSections(html) {
@@ -919,17 +1068,24 @@ async function fetchValorantUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Valorant patch update is live.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, VALORANT_PATCH_NOTES_URL, {
+            hrefPatterns: [/\/news\/game-updates\//i, /patch/i, /notes/i],
+            textPatterns: [/patch/i, /notes/i, /update/i, /changelog/i],
+            excludePatterns: [/\/esports\//i, /\/dev\//i, /privacy|terms|support/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `valorant:${Date.now()}`,
+            key: buildProviderUpdateKey('valorant', { url: changelogUrl, title, date: publishedAt }),
             provider: 'valorant',
             providerLabel: 'Valorant',
             gameName: 'Valorant',
             title,
             summary,
             sections: [],
-            url: VALORANT_PATCH_NOTES_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.valorant.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.valorant.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.valorant.color,
@@ -951,17 +1107,24 @@ async function fetchFFXIVUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Final Fantasy XIV patch is available.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, FFXIV_PATCH_NOTES_URL, {
+            hrefPatterns: [/\/lodestone\/topics\/detail\//i, /patch/i, /notes/i],
+            textPatterns: [/patch/i, /notes/i, /maintenance/i, /update/i],
+            excludePatterns: [/privacy|terms|support|account/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `ffxiv:${Date.now()}`,
+            key: buildProviderUpdateKey('ffxiv', { url: changelogUrl, title, date: publishedAt }),
             provider: 'ffxiv',
             providerLabel: 'Final Fantasy XIV',
             gameName: 'Final Fantasy XIV',
             title,
             summary,
             sections: [],
-            url: FFXIV_PATCH_NOTES_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.ffxiv.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.ffxiv.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.ffxiv.color,
@@ -983,17 +1146,24 @@ async function fetchWoWUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New World of Warcraft patch is live.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, WOW_PATCH_NOTES_URL, {
+            hrefPatterns: [/\/news\//i, /patch/i, /notes/i, /hotfix/i],
+            textPatterns: [/patch/i, /notes/i, /hotfix/i, /update/i],
+            excludePatterns: [/shop|account|support|privacy|terms/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `wow:${Date.now()}`,
+            key: buildProviderUpdateKey('wow', { url: changelogUrl, title, date: publishedAt }),
             provider: 'wow',
             providerLabel: 'World of Warcraft',
             gameName: 'World of Warcraft',
             title,
             summary,
             sections: [],
-            url: WOW_PATCH_NOTES_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.wow.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.wow.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.wow.color,
@@ -1015,17 +1185,24 @@ async function fetchPoEUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Path of Exile updates and news.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, POE_NEWS_URL, {
+            hrefPatterns: [/\/news\//i, /patch/i, /notes/i, /changelog/i],
+            textPatterns: [/patch/i, /notes/i, /changelog/i, /update/i],
+            excludePatterns: [/forum|account|support|privacy|terms/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `poe:${Date.now()}`,
+            key: buildProviderUpdateKey('poe', { url: changelogUrl, title, date: publishedAt }),
             provider: 'poe',
             providerLabel: 'Path of Exile',
             gameName: 'Path of Exile',
             title,
             summary,
             sections: [],
-            url: POE_NEWS_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.poe.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.poe.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.poe.color,
@@ -1047,17 +1224,24 @@ async function fetchFortniteUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Fortnite updates and events available.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, FORTNITE_NEWS_URL, {
+            hrefPatterns: [/\/news\//i, /patch/i, /notes/i, /changelog/i],
+            textPatterns: [/patch/i, /notes/i, /changelog/i, /update/i],
+            excludePatterns: [/creative|festival|shop|support|privacy|terms/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `fortnite:${Date.now()}`,
+            key: buildProviderUpdateKey('fortnite', { url: changelogUrl, title, date: publishedAt }),
             provider: 'fortnite',
             providerLabel: 'Fortnite',
             gameName: 'Fortnite',
             title,
             summary,
             sections: [],
-            url: FORTNITE_NEWS_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.fortnite.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.fortnite.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.fortnite.color,
@@ -1079,17 +1263,24 @@ async function fetchHelldivers2Updates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Helldivers 2 updates and missions.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, HELLDIVERS2_NEWS_URL, {
+            hrefPatterns: [/\/news\//i, /patch/i, /notes/i, /update/i],
+            textPatterns: [/patch/i, /notes/i, /changelog/i, /update/i],
+            excludePatterns: [/store|buy|support|privacy|terms/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `helldivers2:${Date.now()}`,
+            key: buildProviderUpdateKey('helldivers2', { url: changelogUrl, title, date: publishedAt }),
             provider: 'helldivers2',
             providerLabel: 'Helldivers 2',
             gameName: 'Helldivers 2',
             title,
             summary,
             sections: [],
-            url: HELLDIVERS2_NEWS_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.helldivers2.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.helldivers2.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.helldivers2.color,
@@ -1111,17 +1302,24 @@ async function fetchDiabloUpdates() {
             descMatch ? sanitizeText(descMatch[1]) : 'New Diablo IV patches and news.',
             280
         );
+        const changelogUrl = extractPreferredArticleUrl(html, DIABLO_NEWS_URL, {
+            hrefPatterns: [/\/news\//i, /patch/i, /notes/i, /update/i],
+            textPatterns: [/patch/i, /notes/i, /hotfix/i, /update/i],
+            excludePatterns: [/shop|account|support|privacy|terms/i]
+        });
         
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
         return [{
-            key: `diablo:${Date.now()}`,
+            key: buildProviderUpdateKey('diablo', { url: changelogUrl, title, date: publishedAt }),
             provider: 'diablo',
             providerLabel: 'Diablo IV',
             gameName: 'Diablo IV',
             title,
             summary,
             sections: [],
-            url: DIABLO_NEWS_URL,
-            date: Date.now(),
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
             imageUrl: SPECIAL_TRACKED_SOURCES.diablo.imageUrl,
             tinyImage: SPECIAL_TRACKED_SOURCES.diablo.tinyImage,
             color: SPECIAL_TRACKED_SOURCES.diablo.color,
@@ -1454,7 +1652,7 @@ class SteamGameUpdatesManager {
         }
 
         return articles
-            .sort((left, right) => Number(new Date(right.date || 0)) - Number(new Date(left.date || 0)))
+            .sort((left, right) => toEpochMs(right.date, 0) - toEpochMs(left.date, 0))
             .slice(0, 3)
             .map(article => this.buildArticleAlert(article));
     }
