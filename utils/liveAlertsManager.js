@@ -42,6 +42,15 @@ function httpsGet(url, headers = {}) {
     return httpsRequest(url, { method: 'GET', headers });
 }
 
+function normalizeYouTubeChannelIdentifier(input) {
+    const value = String(input || '').trim();
+    if (!value) return value;
+
+    // Accept direct UC channel IDs anywhere in the string (raw value or URL).
+    const match = value.match(/(UC[\w-]{22})/);
+    return match ? match[1] : value;
+}
+
 class LiveAlertsManager {
     constructor() {
         // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, discordChannelId, roleId?, lastVideoId }] } }
@@ -86,16 +95,18 @@ class LiveAlertsManager {
 
     async addYouTubeAlert(guildId, ytChannelId, discordChannelId, roleId = null) {
         if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
-        const existing = this.data[guildId].youtube.find(e => e.channelId === ytChannelId);
+        const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
+        const existing = this.data[guildId].youtube.find(e => e.channelId === normalizedChannelId);
         if (existing) { existing.discordChannelId = discordChannelId; existing.roleId = roleId; }
-        else this.data[guildId].youtube.push({ channelId: ytChannelId, discordChannelId, roleId, lastVideoId: null });
+        else this.data[guildId].youtube.push({ channelId: normalizedChannelId, discordChannelId, roleId, lastVideoId: null });
         await this.save();
         setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
     }
 
     async removeYouTubeAlert(guildId, ytChannelId) {
         if (!this.data[guildId]) return;
-        this.data[guildId].youtube = this.data[guildId].youtube.filter(e => e.channelId !== ytChannelId);
+        const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
+        this.data[guildId].youtube = this.data[guildId].youtube.filter(e => e.channelId !== normalizedChannelId);
         await this.save();
     }
 
@@ -201,8 +212,13 @@ class LiveAlertsManager {
         if (!apiKey) return;
         try {
             // Read the latest uploaded video from this channel.
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${entry.channelId}&part=snippet,id&order=date&maxResults=1&type=video`;
+            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${encodeURIComponent(entry.channelId)}&part=snippet,id&order=date&maxResults=1&type=video`;
             const res = await httpsGet(url);
+            if (res.status >= 400 || res.body?.error) {
+                const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
+                console.error(`YouTube check error (${entry.channelId}):`, errMessage);
+                return;
+            }
             const item = res.body?.items?.[0];
             if (!item) return;
             const videoId = item.id?.videoId;

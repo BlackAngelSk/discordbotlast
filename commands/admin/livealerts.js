@@ -1,10 +1,30 @@
 const { EmbedBuilder } = require('discord.js');
 const liveAlertsManager = require('../../utils/liveAlertsManager');
 
+function findTargetChannel(message, args, fromIndex = 3) {
+    const mentioned = message.mentions.channels.first();
+    if (mentioned) return mentioned;
+
+    const idArg = args.slice(fromIndex).find(arg => /^\d{17,19}$/.test(arg));
+    return idArg ? message.guild.channels.cache.get(idArg) || null : null;
+}
+
+function findTargetRoleId(message, args, fromIndex = 3, skipId = null) {
+    const mentioned = message.mentions.roles.first();
+    if (mentioned) return mentioned.id;
+
+    const idArg = args.slice(fromIndex).find(arg => {
+        if (!/^\d{17,19}$/.test(arg)) return false;
+        if (skipId && arg === skipId) return false;
+        return message.guild.roles.cache.has(arg);
+    });
+    return idArg || null;
+}
+
 module.exports = {
     name: 'livealerts',
     description: 'Manage Twitch live and YouTube new video notifications.',
-    usage: '!livealerts add twitch <username> #channel [@role]\n!livealerts add youtube <channelId> #channel [@role]\n!livealerts remove twitch <username>\n!livealerts remove youtube <channelId>\n!livealerts list',
+    usage: '!livealerts add twitch <username> #channel [@role]\n!livealerts add youtube <channelId|channelUrl> #channel [@role]\n!livealerts remove twitch <username>\n!livealerts remove youtube <channelId|channelUrl>\n!livealerts list',
     aliases: ['streamalert', 'streamalerts'],
     category: 'admin',
     async execute(message, args, client) {
@@ -18,7 +38,7 @@ module.exports = {
         if (!sub || sub === 'list') {
             const cfg = liveAlertsManager.getAlerts(message.guild.id);
             const embed = new EmbedBuilder()
-                .setTitle('📡 Live Stream Alerts')
+                .setTitle('📡 Stream & Video Alerts')
                 .setColor(0x5865f2)
                 .setTimestamp();
 
@@ -54,17 +74,18 @@ module.exports = {
 
             const identifier = args[2];
             if (!identifier) {
-                return message.reply(`❌ Provide the ${platform === 'twitch' ? 'Twitch username' : 'YouTube channel ID'}.`);
+                return message.reply(`❌ Provide the ${platform === 'twitch' ? 'Twitch username' : 'YouTube channel ID or channel URL'}.`);
             }
 
-            const discordChannel = message.mentions.channels.first()
-                || (args[3]?.match(/^\d{17,19}$/) && message.guild.channels.cache.get(args[3]));
+            const discordChannel = findTargetChannel(message, args, 3);
             if (!discordChannel) {
                 return message.reply('❌ Mention the Discord channel to post alerts in (e.g. `#stream-alerts`).');
             }
+            if (typeof discordChannel.isTextBased !== 'function' || !discordChannel.isTextBased()) {
+                return message.reply('❌ Please choose a text channel for alerts.');
+            }
 
-            const roleMention = message.mentions.roles.first() || null;
-            const roleId = roleMention?.id || null;
+            const roleId = findTargetRoleId(message, args, 3, discordChannel.id);
 
             if (platform === 'twitch') {
                 await liveAlertsManager.addTwitchAlert(message.guild.id, identifier, discordChannel.id, roleId);
@@ -79,10 +100,11 @@ module.exports = {
 
             if (platform === 'youtube') {
                 await liveAlertsManager.addYouTubeAlert(message.guild.id, identifier, discordChannel.id, roleId);
+                const missingYouTubeConfig = !process.env.YOUTUBE_API_KEY;
                 const embed = new EmbedBuilder()
                     .setColor(0xff0000)
                     .setTitle('✅ YouTube Alert Added')
-                    .setDescription(`Now watching channel ID \`${identifier}\` on YouTube for new uploads.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.`)
+                    .setDescription(`Now watching \`${identifier}\` on YouTube for new uploads.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.${missingYouTubeConfig ? '\n\n⚠️ YOUTUBE_API_KEY is not configured yet, so messages will not send until it is added to the env file.' : ''}`)
                     .setFooter({ text: 'Checked every 5 minutes' });
                 return message.reply({ embeds: [embed] });
             }
