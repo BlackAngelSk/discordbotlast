@@ -2,7 +2,7 @@
  * Live Alerts Manager
  * Polls Twitch & YouTube Data API periodically and posts to configured channels.
  * Twitch: Uses Helix API (requires CLIENT_ID + APP_ACCESS_TOKEN)
- * YouTube: Uses Data API v3 (requires YOUTUBE_API_KEY)
+ * YouTube: Uses Data API v3 (requires YOUTUBE_API_KEY) for new video uploads
  */
 const fs = require('fs').promises;
 const path = require('path');
@@ -200,12 +200,22 @@ class LiveAlertsManager {
         const apiKey = process.env.YOUTUBE_API_KEY;
         if (!apiKey) return;
         try {
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${entry.channelId}&part=snippet,id&order=date&maxResults=1&type=video&eventType=live`;
+            // Read the latest uploaded video from this channel.
+            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${entry.channelId}&part=snippet,id&order=date&maxResults=1&type=video`;
             const res = await httpsGet(url);
             const item = res.body?.items?.[0];
             if (!item) return;
             const videoId = item.id?.videoId;
-            if (!videoId || videoId === entry.lastVideoId) return;
+            if (!videoId) return;
+
+            // First successful fetch seeds state so old uploads do not trigger alerts.
+            if (!entry.lastVideoId) {
+                entry.lastVideoId = videoId;
+                await this.save();
+                return;
+            }
+
+            if (videoId === entry.lastVideoId) return;
             entry.lastVideoId = videoId;
             await this.save();
             await this._postYouTubeAlert(guildId, entry, item);
@@ -219,18 +229,18 @@ class LiveAlertsManager {
         const channel = this._client.channels.cache.get(entry.discordChannelId);
         if (!channel) return;
         const { EmbedBuilder } = require('discord.js');
-        const title = item.snippet?.title || 'New Live Stream';
+        const title = item.snippet?.title || 'New Video';
         const channelTitle = item.snippet?.channelTitle || 'YouTube Channel';
         const videoId = item.id?.videoId;
         const embed = new EmbedBuilder()
             .setColor(0xff0000)
-            .setTitle(`▶️ ${channelTitle} is live on YouTube!`)
+            .setTitle(`▶️ ${channelTitle} uploaded a new video!`)
             .setURL(`https://youtube.com/watch?v=${videoId}`)
             .setDescription(title)
             .setThumbnail(item.snippet?.thumbnails?.medium?.url || null)
             .setTimestamp();
         const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
-        await channel.send({ content: `${mention}▶️ **${channelTitle}** is now live!`, embeds: [embed] }).catch(() => {});
+        await channel.send({ content: `${mention}▶️ **${channelTitle}** uploaded a new video!`, embeds: [embed] }).catch(() => {});
     }
 
     // ── Polling ───────────────────────────────────────────────────────────────

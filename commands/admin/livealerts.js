@@ -3,7 +3,7 @@ const liveAlertsManager = require('../../utils/liveAlertsManager');
 
 module.exports = {
     name: 'livealerts',
-    description: 'Manage Twitch and YouTube live stream notifications.',
+    description: 'Manage Twitch live and YouTube new video notifications.',
     usage: '!livealerts add twitch <username> #channel [@role]\n!livealerts add youtube <channelId> #channel [@role]\n!livealerts remove twitch <username>\n!livealerts remove youtube <channelId>\n!livealerts list',
     aliases: ['streamalert', 'streamalerts'],
     category: 'admin',
@@ -82,7 +82,7 @@ module.exports = {
                 const embed = new EmbedBuilder()
                     .setColor(0xff0000)
                     .setTitle('✅ YouTube Alert Added')
-                    .setDescription(`Now watching channel ID \`${identifier}\` on YouTube.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.`)
+                    .setDescription(`Now watching channel ID \`${identifier}\` on YouTube for new uploads.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.`)
                     .setFooter({ text: 'Checked every 5 minutes' });
                 return message.reply({ embeds: [embed] });
             }
