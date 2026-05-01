@@ -11,6 +11,7 @@ const https = require('https');
 const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const YOUTUBE_QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
 
 function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
     return new Promise((resolve, reject) => {
@@ -60,6 +61,8 @@ class LiveAlertsManager {
         this._interval = null;
         this._warnedMissingTwitchCredentials = false;
         this._warnedTwitchAuthFailure = false;
+        this._youtubeQuotaBlockedUntil = 0;
+        this._warnedYouTubeQuota = false;
     }
 
     async init(client) {
@@ -207,6 +210,39 @@ class LiveAlertsManager {
     }
 
     // ── YouTube ───────────────────────────────────────────────────────────────
+    _isYouTubeQuotaError(errorBody, status, fallbackMessage = '') {
+        const message = String(
+            errorBody?.error?.message ||
+            fallbackMessage ||
+            ''
+        ).toLowerCase();
+
+        const reasons = Array.isArray(errorBody?.error?.errors)
+            ? errorBody.error.errors.map(e => String(e?.reason || '').toLowerCase())
+            : [];
+
+        if (message.includes('quota') || reasons.some(r => r.includes('quota') || r.includes('dailylimitexceeded'))) {
+            return true;
+        }
+
+        // Some APIs surface daily limit as forbidden without a detailed reason.
+        return status === 403 && message.includes('exceeded');
+    }
+
+    _setYouTubeQuotaBackoff(context = '') {
+        const now = Date.now();
+        const blockedUntil = now + YOUTUBE_QUOTA_BACKOFF_MS;
+        if (blockedUntil > this._youtubeQuotaBlockedUntil) {
+            this._youtubeQuotaBlockedUntil = blockedUntil;
+        }
+
+        if (!this._warnedYouTubeQuota) {
+            const resumeTime = new Date(this._youtubeQuotaBlockedUntil).toISOString();
+            console.warn(`YouTube live alerts paused until ${resumeTime} due to API quota limits.${context ? ` Source: ${context}` : ''}`);
+            this._warnedYouTubeQuota = true;
+        }
+    }
+
     async _getYouTubeChannelMeta(identifier, apiKey) {
         const raw = String(identifier || '').trim();
         if (!raw) return null;
@@ -217,6 +253,9 @@ class LiveAlertsManager {
         const tryRequest = async (url) => {
             const res = await httpsGet(url);
             if (res.status >= 400 || res.body?.error) {
+                if (this._isYouTubeQuotaError(res.body, res.status)) {
+                    this._setYouTubeQuotaBackoff(`channel meta for ${identifier}`);
+                }
                 const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
                 throw new Error(errMessage);
             }
@@ -246,9 +285,21 @@ class LiveAlertsManager {
     async _checkYouTube(entry, guildId) {
         const apiKey = process.env.YOUTUBE_API_KEY;
         if (!apiKey) return;
+        if (Date.now() < this._youtubeQuotaBlockedUntil) return;
+
+        // Quota cooldown ended, allow one warning again if it happens later.
+        if (this._warnedYouTubeQuota) {
+            this._warnedYouTubeQuota = false;
+        }
+
         try {
-            // Resolve and persist channel title independently of uploads.
-            const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
+            // Resolve/persist channel metadata only when missing or identifier isn't a UC id.
+            let resolvedMeta = null;
+            const hasUcId = /^UC[\w-]{22}$/.test(String(entry.channelId || ''));
+            if (!entry.channelName || !hasUcId) {
+                resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
+            }
+
             if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
                 entry.channelId = resolvedMeta.channelId;
                 await this.save();
@@ -264,6 +315,10 @@ class LiveAlertsManager {
             const res = await httpsGet(url);
             if (res.status >= 400 || res.body?.error) {
                 const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
+                if (this._isYouTubeQuotaError(res.body, res.status, errMessage)) {
+                    this._setYouTubeQuotaBackoff(`video search for ${entry.channelId}`);
+                    return;
+                }
                 console.error(`YouTube check error (${entry.channelId}):`, errMessage);
                 return;
             }
@@ -290,6 +345,10 @@ class LiveAlertsManager {
             await this.save();
             await this._postYouTubeAlert(guildId, entry, item);
         } catch (err) {
+            if (this._isYouTubeQuotaError(null, 0, err.message)) {
+                this._setYouTubeQuotaBackoff(`exception for ${entry.channelId}`);
+                return;
+            }
             console.error(`YouTube check error (${entry.channelId}):`, err.message);
         }
     }
