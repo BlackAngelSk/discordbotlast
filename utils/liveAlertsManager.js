@@ -1,8 +1,9 @@
 /**
  * Live Alerts Manager
- * Polls Twitch & YouTube Data API periodically and posts to configured channels.
+ * Polls Twitch & YouTube periodically and posts to configured channels.
  * Twitch: Uses Helix API (requires CLIENT_ID + APP_ACCESS_TOKEN)
- * YouTube: Uses Data API v3 (requires YOUTUBE_API_KEY) for new video uploads
+ * YouTube: Uses public RSS feed (zero quota) for new video detection;
+ *          Data API v3 (YOUTUBE_API_KEY) only for channel name/ID resolution.
  */
 const fs = require('fs').promises;
 const path = require('path');
@@ -12,6 +13,25 @@ const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const YOUTUBE_QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
+
+function parseXmlText(xml, tag) {
+    const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i'));
+    return m ? m[1].trim() : null;
+}
+
+function parseYouTubeRssFeed(xml) {
+    // Find first <entry> block.
+    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
+    if (!entryMatch) return null;
+    const entry = entryMatch[1];
+
+    const videoIdRaw = parseXmlText(entry, 'yt:videoId');
+    const title = parseXmlText(entry, 'title');
+    const channelName = parseXmlText(xml, 'title'); // channel title is before entries
+    const thumb = (entry.match(/medium_url="([^"]+)"/) || entry.match(/url="([^"]+)"/))?.[1] || null;
+
+    return videoIdRaw ? { videoId: videoIdRaw, title: title || 'New Video', channelName: channelName || null, thumb } : null;
+}
 
 function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
     return new Promise((resolve, reject) => {
@@ -283,8 +303,6 @@ class LiveAlertsManager {
     }
 
     async _checkYouTube(entry, guildId) {
-        const apiKey = process.env.YOUTUBE_API_KEY;
-        if (!apiKey) return;
         if (Date.now() < this._youtubeQuotaBlockedUntil) return;
 
         // Quota cooldown ended, allow one warning again if it happens later.
@@ -293,43 +311,38 @@ class LiveAlertsManager {
         }
 
         try {
-            // Resolve/persist channel metadata only when missing or identifier isn't a UC id.
-            let resolvedMeta = null;
+            // Resolve/persist channel name + ensure UC id — uses API only when data is missing.
             const hasUcId = /^UC[\w-]{22}$/.test(String(entry.channelId || ''));
             if (!entry.channelName || !hasUcId) {
-                resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
-            }
-
-            if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
-                entry.channelId = resolvedMeta.channelId;
-                await this.save();
-            }
-            const resolvedChannelName = resolvedMeta?.channelName || null;
-            if (resolvedChannelName && entry.channelName !== resolvedChannelName) {
-                entry.channelName = resolvedChannelName;
-                await this.save();
-            }
-
-            // Read the latest uploaded video from this channel.
-            const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${encodeURIComponent(entry.channelId)}&part=snippet,id&order=date&maxResults=1&type=video`;
-            const res = await httpsGet(url);
-            if (res.status >= 400 || res.body?.error) {
-                const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
-                if (this._isYouTubeQuotaError(res.body, res.status, errMessage)) {
-                    this._setYouTubeQuotaBackoff(`video search for ${entry.channelId}`);
-                    return;
+                const apiKey = process.env.YOUTUBE_API_KEY;
+                if (apiKey) {
+                    const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
+                    if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
+                        entry.channelId = resolvedMeta.channelId;
+                        await this.save();
+                    }
+                    if (resolvedMeta?.channelName && entry.channelName !== resolvedMeta.channelName) {
+                        entry.channelName = resolvedMeta.channelName;
+                        await this.save();
+                    }
                 }
-                console.error(`YouTube check error (${entry.channelId}):`, errMessage);
+            }
+
+            // Use the free public RSS feed — costs zero API quota.
+            const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(entry.channelId)}`;
+            const rssRes = await httpsGet(rssUrl, { 'Accept': 'application/rss+xml, application/xml, text/xml' });
+            if (rssRes.status >= 400) {
+                console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
                 return;
             }
-            const item = res.body?.items?.[0];
-            if (!item) return;
-            const videoId = item.id?.videoId;
-            if (!videoId) return;
-            const latestChannelName = item.snippet?.channelTitle || resolvedChannelName || null;
+            const xml = typeof rssRes.body === 'string' ? rssRes.body : JSON.stringify(rssRes.body);
+            const parsed = parseYouTubeRssFeed(xml);
+            if (!parsed) return;
 
-            if (latestChannelName && entry.channelName !== latestChannelName) {
-                entry.channelName = latestChannelName;
+            const { videoId, title, channelName: rssChannelName, thumb } = parsed;
+
+            if (rssChannelName && entry.channelName !== rssChannelName) {
+                entry.channelName = rssChannelName;
                 await this.save();
             }
 
@@ -343,12 +356,8 @@ class LiveAlertsManager {
             if (videoId === entry.lastVideoId) return;
             entry.lastVideoId = videoId;
             await this.save();
-            await this._postYouTubeAlert(guildId, entry, item);
+            await this._postYouTubeAlert(guildId, entry, { videoId, title, thumb });
         } catch (err) {
-            if (this._isYouTubeQuotaError(null, 0, err.message)) {
-                this._setYouTubeQuotaBackoff(`exception for ${entry.channelId}`);
-                return;
-            }
             console.error(`YouTube check error (${entry.channelId}):`, err.message);
         }
     }
@@ -358,15 +367,16 @@ class LiveAlertsManager {
         const channel = this._client.channels.cache.get(entry.discordChannelId);
         if (!channel) return;
         const { EmbedBuilder } = require('discord.js');
-        const title = item.snippet?.title || 'New Video';
+        const title = item.title || item.snippet?.title || 'New Video';
         const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
-        const videoId = item.id?.videoId;
+        const videoId = item.videoId || item.id?.videoId;
+        const thumbUrl = item.thumb || item.snippet?.thumbnails?.medium?.url || null;
         const embed = new EmbedBuilder()
             .setColor(0xff0000)
             .setTitle(`▶️ ${channelTitle} uploaded a new video!`)
             .setURL(`https://youtube.com/watch?v=${videoId}`)
             .setDescription(title)
-            .setThumbnail(item.snippet?.thumbnails?.medium?.url || null)
+            .setThumbnail(thumbUrl)
             .setTimestamp();
         const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
         await channel.send({ content: `${mention}▶️ **${channelTitle}** uploaded a new video!`, embeds: [embed] }).catch(() => {});
