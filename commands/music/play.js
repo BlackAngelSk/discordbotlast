@@ -122,13 +122,36 @@ module.exports = {
             if (isUrl && isPlaylist) {
                 // Handle playlist with play-dl
                 try {
-                    const playlistInfo = await play.playlist_info(query, { incomplete: true });
+                    let playlistInfo;
+                    try {
+                        playlistInfo = await play.playlist_info(query, { incomplete: true });
+                    } catch (playlistErr) {
+                        const isLayoutChange = playlistErr.message && (
+                            playlistErr.message.includes('browseId') ||
+                            playlistErr.message.includes('Cannot read properties') ||
+                            playlistErr.message.includes('undefined')
+                        );
+                        if (isLayoutChange) {
+                            return message.reply(
+                                '❌ YouTube playlists are currently unavailable due to layout changes.\n\n' +
+                                '• Use a direct YouTube video link instead\n' +
+                                '• Search by song name\n' +
+                                '• Try again later'
+                            );
+                        }
+                        throw playlistErr;
+                    }
                     
                     if (!playlistInfo) {
                         return message.reply('❌ Could not fetch playlist information!');
                     }
 
-                    const videos = await playlistInfo.all_videos();
+                    let videos;
+                    try {
+                        videos = await playlistInfo.all_videos();
+                    } catch (videosErr) {
+                        return message.reply('❌ Failed to load playlist videos. Try a direct video link instead.');
+                    }
                     
                     if (videos.length === 0) {
                         return message.reply('❌ No videos found in playlist!');

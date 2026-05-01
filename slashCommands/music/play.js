@@ -215,14 +215,35 @@ async function handleYouTubeVideo(url, queue, interaction) {
 async function handleYouTubePlaylist(url, queue, interaction) {
     await interaction.editReply('🔍 Fetching playlist...');
 
-    const playlistInfo = await play.playlist_info(url, { incomplete: true });
-    
+    let playlistInfo;
+    try {
+        playlistInfo = await play.playlist_info(url, { incomplete: true });
+    } catch (err) {
+        console.error('play-dl playlist_info error:', err.message);
+        await interaction.editReply(
+            '❌ YouTube playlists are currently unavailable due to layout changes on YouTube\'s side.\n\n' +
+            'Try one of these instead:\n' +
+            '• Use a direct YouTube video link\n' +
+            '• Search by song name\n' +
+            '• Try again in a few minutes'
+        );
+        return;
+    }
+
     if (!playlistInfo) {
         await interaction.editReply('❌ Could not fetch playlist information!');
         return;
     }
 
-    const videos = await playlistInfo.all_videos();
+    let videos;
+    try {
+        videos = await playlistInfo.all_videos();
+    } catch (err) {
+        console.error('play-dl all_videos error:', err.message);
+        await interaction.editReply('❌ Failed to load playlist videos. YouTube may have changed its layout. Try a direct video link instead.');
+        return;
+    }
+
     const maxSongs = Math.min(videos.length, 50);
 
     for (let i = 0; i < maxSongs; i++) {
