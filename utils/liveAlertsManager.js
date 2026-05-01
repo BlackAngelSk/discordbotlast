@@ -53,7 +53,7 @@ function normalizeYouTubeChannelIdentifier(input) {
 
 class LiveAlertsManager {
     constructor() {
-        // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, discordChannelId, roleId?, lastVideoId }] } }
+        // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, channelName?, discordChannelId, roleId?, lastVideoId }] } }
         this.data = {};
         this._twitchToken = null;
         this._twitchTokenExpiry = 0;
@@ -98,7 +98,7 @@ class LiveAlertsManager {
         const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
         const existing = this.data[guildId].youtube.find(e => e.channelId === normalizedChannelId);
         if (existing) { existing.discordChannelId = discordChannelId; existing.roleId = roleId; }
-        else this.data[guildId].youtube.push({ channelId: normalizedChannelId, discordChannelId, roleId, lastVideoId: null });
+        else this.data[guildId].youtube.push({ channelId: normalizedChannelId, channelName: null, discordChannelId, roleId, lastVideoId: null });
         await this.save();
         setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
     }
@@ -207,10 +207,58 @@ class LiveAlertsManager {
     }
 
     // ── YouTube ───────────────────────────────────────────────────────────────
+    async _getYouTubeChannelMeta(identifier, apiKey) {
+        const raw = String(identifier || '').trim();
+        if (!raw) return null;
+
+        const ucMatch = raw.match(/(UC[\w-]{22})/);
+        const channelId = ucMatch ? ucMatch[1] : raw;
+
+        const tryRequest = async (url) => {
+            const res = await httpsGet(url);
+            if (res.status >= 400 || res.body?.error) {
+                const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
+                throw new Error(errMessage);
+            }
+            const item = res.body?.items?.[0];
+            if (!item) return null;
+            return {
+                channelId: item.id || channelId,
+                channelName: item.snippet?.title || null
+            };
+        };
+
+        // Preferred lookup when already a UC id.
+        if (/^UC[\w-]{22}$/.test(channelId)) {
+            return tryRequest(`https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&id=${encodeURIComponent(channelId)}&part=snippet&maxResults=1`);
+        }
+
+        // Support handle URLs or bare handles (e.g. @mychannel).
+        const handleMatch = raw.match(/@([A-Za-z0-9._-]+)/);
+        if (handleMatch?.[1]) {
+            const handle = handleMatch[1];
+            return tryRequest(`https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&forHandle=${encodeURIComponent(handle)}&part=snippet&maxResults=1`);
+        }
+
+        return null;
+    }
+
     async _checkYouTube(entry, guildId) {
         const apiKey = process.env.YOUTUBE_API_KEY;
         if (!apiKey) return;
         try {
+            // Resolve and persist channel title independently of uploads.
+            const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
+            if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
+                entry.channelId = resolvedMeta.channelId;
+                await this.save();
+            }
+            const resolvedChannelName = resolvedMeta?.channelName || null;
+            if (resolvedChannelName && entry.channelName !== resolvedChannelName) {
+                entry.channelName = resolvedChannelName;
+                await this.save();
+            }
+
             // Read the latest uploaded video from this channel.
             const url = `https://www.googleapis.com/youtube/v3/search?key=${apiKey}&channelId=${encodeURIComponent(entry.channelId)}&part=snippet,id&order=date&maxResults=1&type=video`;
             const res = await httpsGet(url);
@@ -223,6 +271,12 @@ class LiveAlertsManager {
             if (!item) return;
             const videoId = item.id?.videoId;
             if (!videoId) return;
+            const latestChannelName = item.snippet?.channelTitle || resolvedChannelName || null;
+
+            if (latestChannelName && entry.channelName !== latestChannelName) {
+                entry.channelName = latestChannelName;
+                await this.save();
+            }
 
             // First successful fetch seeds state so old uploads do not trigger alerts.
             if (!entry.lastVideoId) {
@@ -246,7 +300,7 @@ class LiveAlertsManager {
         if (!channel) return;
         const { EmbedBuilder } = require('discord.js');
         const title = item.snippet?.title || 'New Video';
-        const channelTitle = item.snippet?.channelTitle || 'YouTube Channel';
+        const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
         const videoId = item.id?.videoId;
         const embed = new EmbedBuilder()
             .setColor(0xff0000)

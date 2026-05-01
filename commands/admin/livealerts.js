@@ -57,7 +57,7 @@ module.exports = {
                     embed.addFields({
                         name: '🔴 YouTube',
                         value: cfg.youtube.map(e =>
-                            `• \`${e.channelId}\` → <#${e.discordChannelId}>${e.roleId ? ` <@&${e.roleId}>` : ''}`
+                            `• **${e.channelName || e.channelId}** (\`${e.channelId}\`) → <#${e.discordChannelId}>${e.roleId ? ` <@&${e.roleId}>` : ''}`
                         ).join('\n')
                     });
                 }

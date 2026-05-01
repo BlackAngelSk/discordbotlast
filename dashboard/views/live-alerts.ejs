@@ -160,12 +160,13 @@
                     <table>
                         <thead>
                             <tr><th colspan="5">YouTube</th></tr>
-                            <tr><th>Channel ID</th><th>Discord Channel</th><th>Role</th><th>Last Video</th><th>Action</th></tr>
+                            <tr><th>Channel</th><th>Channel ID</th><th>Discord Channel</th><th>Role</th><th>Last Video</th><th>Action</th></tr>
                         </thead>
                         <tbody>
                             <% if (alerts.youtube && alerts.youtube.length > 0) { %>
                                 <% alerts.youtube.forEach(entry => { %>
                                     <tr>
+                                        <td><strong><%= entry.channelName || 'Loading...' %></strong></td>
                                         <td><strong><%= entry.channelId %></strong></td>
                                         <td><%= guild.channels.cache.get(entry.discordChannelId) ? '#' + guild.channels.cache.get(entry.discordChannelId).name : entry.discordChannelId %></td>
                                         <td><%= entry.roleId && guild.roles.cache.get(entry.roleId) ? guild.roles.cache.get(entry.roleId).name : 'None' %></td>
@@ -174,7 +175,7 @@
                                     </tr>
                                 <% }) %>
                             <% } else { %>
-                                <tr><td colspan="5" class="table-empty"><i class="fab fa-youtube"></i> No YouTube alerts configured</td></tr>
+                                <tr><td colspan="6" class="table-empty"><i class="fab fa-youtube"></i> No YouTube alerts configured</td></tr>
                             <% } %>
                         </tbody>
                     </table>
