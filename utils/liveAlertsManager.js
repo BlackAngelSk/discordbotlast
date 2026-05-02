@@ -83,6 +83,8 @@ class LiveAlertsManager {
         this._warnedTwitchAuthFailure = false;
         this._youtubeQuotaBlockedUntil = 0;
         this._warnedYouTubeQuota = false;
+        this._youtubeFailureCount = {}; // Track consecutive 404 failures per channel
+        this._youtubeFailureThreshold = 3; // Remove channel after N consecutive 404s
     }
 
     async init(client) {
@@ -332,9 +334,33 @@ class LiveAlertsManager {
             const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(entry.channelId)}`;
             const rssRes = await httpsGet(rssUrl, { 'Accept': 'application/rss+xml, application/xml, text/xml' });
             if (rssRes.status >= 400) {
-                console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
+                // Track 404 errors for this channel
+                if (rssRes.status === 404) {
+                    const failKey = `${guildId}_${entry.channelId}`;
+                    this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
+                    
+                    if (this._youtubeFailureCount[failKey] === 1) {
+                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP 404 - Channel not found. Will be removed after ${this._youtubeFailureThreshold} consecutive failures.`);
+                    }
+                    
+                    // Remove alert after N consecutive 404s
+                    if (this._youtubeFailureCount[failKey] >= this._youtubeFailureThreshold) {
+                        console.warn(`Removing YouTube alert for channel ${entry.channelId} (Guild: ${guildId}) - persistent 404 errors.`);
+                        this.removeYouTubeAlert(guildId, entry.channelId).catch(() => {});
+                        delete this._youtubeFailureCount[failKey];
+                    }
+                } else {
+                    console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
+                }
                 return;
             }
+
+            // Successful response - reset failure counter
+            const failKey = `${guildId}_${entry.channelId}`;
+            if (this._youtubeFailureCount[failKey] > 0) {
+                delete this._youtubeFailureCount[failKey];
+            }
+
             const xml = typeof rssRes.body === 'string' ? rssRes.body : JSON.stringify(rssRes.body);
             const parsed = parseYouTubeRssFeed(xml);
             if (!parsed) return;
