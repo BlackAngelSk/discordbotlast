@@ -1342,7 +1342,7 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
-                const { platform, identifier, discordChannelId, roleId } = req.body;
+                const { platform, identifier, discordChannelId, roleId, channelUrl } = req.body;
 
                 if (!guild) {
                     return res.status(404).json({ success: false, error: 'Guild not found' });
@@ -1369,7 +1369,8 @@ class Dashboard {
                 if (normalizedPlatform === 'twitch') {
                     await liveAlertsManager.addTwitchAlert(guildId, normalizedIdentifier, discordChannelId, safeRoleId);
                 } else {
-                    await liveAlertsManager.addYouTubeAlert(guildId, normalizedIdentifier, discordChannelId, safeRoleId);
+                    const normalizedChannelUrl = channelUrl ? String(channelUrl).trim() : null;
+                    await liveAlertsManager.addYouTubeAlert(guildId, normalizedIdentifier, discordChannelId, safeRoleId, normalizedChannelUrl);
                 }
 
                 res.json({ success: true, message: 'Live alert saved successfully' });

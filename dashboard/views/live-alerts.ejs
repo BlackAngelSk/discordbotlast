@@ -93,13 +93,14 @@
                     <div class="card-header">
                         <div>
                             <div class="card-title"><i class="fab fa-youtube"></i> Add YouTube Alert</div>
-                            <div class="card-subtitle">Watch a YouTube channel ID and post when they go live</div>
+                            <div class="card-subtitle">Watch a YouTube channel and post when they upload new videos</div>
                         </div>
                     </div>
                     <form class="live-alert-form" data-platform="youtube">
                         <div class="form-group">
-                            <label class="form-label">YouTube Channel ID</label>
-                            <input type="text" name="identifier" class="form-control" placeholder="UCxxxxxxxxxxxxxxxx" required>
+                            <label class="form-label">YouTube Channel ID or URL</label>
+                            <input type="text" name="identifier" class="form-control" placeholder="UCxxxxxxxxxxxxxxxx or https://youtube.com/channel/UCxxxxxxxxxxxxxxxx" required>
+                            <small style="color:var(--text-secondary);margin-top:6px;display:block">Accepts: Channel ID (UC...), full channel URL, or @handle URL</small>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Discord Channel</label>
@@ -159,18 +160,18 @@
                 <div class="table-wrapper">
                     <table>
                         <thead>
-                            <tr><th colspan="5">YouTube</th></tr>
-                            <tr><th>Channel</th><th>Channel ID</th><th>Discord Channel</th><th>Role</th><th>Last Video</th><th>Action</th></tr>
+                            <tr><th colspan="6">YouTube</th></tr>
+                            <tr><th>Channel</th><th>Channel Link</th><th>Discord Channel</th><th>Role</th><th>Status</th><th>Action</th></tr>
                         </thead>
                         <tbody>
                             <% if (alerts.youtube && alerts.youtube.length > 0) { %>
                                 <% alerts.youtube.forEach(entry => { %>
                                     <tr>
-                                        <td><strong><%= entry.channelName || 'Loading...' %></strong></td>
-                                        <td><strong><%= entry.channelId %></strong></td>
+                                        <td><strong><%= entry.channelName || 'Loading...' %></strong><br><small style="color:var(--text-secondary)"><%= entry.channelId %></small></td>
+                                        <td><a href="<%= entry.channelUrl || 'https://www.youtube.com/channel/' + entry.channelId %>" target="_blank" rel="noopener noreferrer" style="color:var(--brand);text-decoration:none;display:flex;align-items:center;gap:6px"><i class="fas fa-external-link-alt" style="font-size:0.85em"></i> Visit Channel</a></td>
                                         <td><%= guild.channels.cache.get(entry.discordChannelId) ? '#' + guild.channels.cache.get(entry.discordChannelId).name : entry.discordChannelId %></td>
                                         <td><%= entry.roleId && guild.roles.cache.get(entry.roleId) ? guild.roles.cache.get(entry.roleId).name : 'None' %></td>
-                                        <td><%= entry.lastVideoId || 'Waiting' %></td>
+                                        <td><span class="badge <%= entry.lastVideoId ? 'badge-green' : 'badge-blue' %>"><%= entry.lastVideoId ? 'Last: ' + entry.lastVideoId.substring(0, 8) : 'Watching' %></span></td>
                                         <td><button class="btn btn-danger btn-sm remove-alert-btn" data-platform="youtube" data-identifier="<%= entry.channelId %>"><i class="fas fa-trash"></i> Remove</button></td>
                                     </tr>
                                 <% }) %>
@@ -211,12 +212,19 @@ document.querySelectorAll('.live-alert-form').forEach(form => {
 
         try {
             const fd = new FormData(form);
+            const identifier = String(fd.get('identifier') || '').trim();
+            
             const payload = {
                 platform,
-                identifier: String(fd.get('identifier') || '').trim(),
+                identifier: identifier,
                 discordChannelId: fd.get('discordChannelId'),
                 roleId: fd.get('roleId') || null
             };
+
+            // For YouTube, if a URL is provided, send it as channelUrl
+            if (platform === 'youtube' && identifier.includes('youtube.com')) {
+                payload.channelUrl = identifier;
+            }
 
             const response = await fetch(`/api/live-alerts/${guildId}`, {
                 method: 'POST',
