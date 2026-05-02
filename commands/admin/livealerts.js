@@ -99,12 +99,25 @@ module.exports = {
             }
 
             if (platform === 'youtube') {
-                await liveAlertsManager.addYouTubeAlert(message.guild.id, identifier, discordChannel.id, roleId);
+                // Validate YouTube channel ID format
+                const ucMatch = identifier.match(/(UC[\w-]{22})/);
+                const extractedChannelId = ucMatch ? ucMatch[1] : identifier;
+                
+                if (!/^UC[\w-]{22}$/.test(extractedChannelId)) {
+                    const embed = new EmbedBuilder()
+                        .setColor(0xff6b6b)
+                        .setTitle('❌ Invalid YouTube Channel ID')
+                        .setDescription(`\`${extractedChannelId}\` does not match the required format.\n\n**Valid formats:**\n• **Channel ID**: \`UCF6hAvpKZ-uqMStf_8OUhhg\` (starts with UC, 24 chars total)\n• **Channel URL**: \`https://www.youtube.com/channel/UCF6hAvpKZ-uqMStf_8OUhhg\`\n\n**How to find your Channel ID:**\n1. Go to your YouTube channel\n2. Click "About"\n3. Copy the channel ID from the URL`)
+                        .setFooter({ text: 'Channel IDs always start with "UC" and are exactly 24 characters' });
+                    return message.reply({ embeds: [embed] });
+                }
+
+                await liveAlertsManager.addYouTubeAlert(message.guild.id, extractedChannelId, discordChannel.id, roleId);
                 const missingYouTubeConfig = !process.env.YOUTUBE_API_KEY;
                 const embed = new EmbedBuilder()
                     .setColor(0xff0000)
                     .setTitle('✅ YouTube Alert Added')
-                    .setDescription(`Now watching \`${identifier}\` on YouTube for new uploads.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.${missingYouTubeConfig ? '\n\n⚠️ YOUTUBE_API_KEY is not configured yet, so messages will not send until it is added to the env file.' : ''}`)
+                    .setDescription(`Now watching \`${extractedChannelId}\` on YouTube for new uploads.\nAlerts will post to ${discordChannel}${roleId ? ` with ping <@&${roleId}>` : ''}.${missingYouTubeConfig ? '\n\n⚠️ YOUTUBE_API_KEY is not configured yet, so messages will not send until it is added to the env file.' : ''}`)
                     .setFooter({ text: 'Checked every 5 minutes' });
                 return message.reply({ embeds: [embed] });
             }
