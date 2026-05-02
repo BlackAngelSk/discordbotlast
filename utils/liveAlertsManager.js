@@ -216,20 +216,39 @@ class LiveAlertsManager {
         if (!this._client) return;
         const channel = this._client.channels.cache.get(entry.channelId);
         if (!channel) return;
-        const { EmbedBuilder } = require('discord.js');
+        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        
+        const viewerCount = stream.viewer_count?.toString() || '0';
+        const gameEmoji = '🎮';
+        const viewerEmoji = '👥';
+        const liveEmoji = '🔴';
+        
         const embed = new EmbedBuilder()
             .setColor(0x9146ff)
-            .setTitle(`🔴 ${stream.user_name} is now live on Twitch!`)
+            .setAuthor({ name: `${stream.user_name}`, iconURL: `https://static-cdn.jtvnw.net/jtv_user_pictures/${entry.username.toLowerCase()}-profile_image-70x70.png` })
+            .setTitle(`${liveEmoji} NOW LIVE on Twitch!`)
             .setURL(`https://twitch.tv/${entry.username}`)
-            .setDescription(stream.title || 'No title')
+            .setDescription(`**${stream.title || 'No title provided'}**`)
             .addFields(
-                { name: '🎮 Game', value: stream.game_name || 'Unknown', inline: true },
-                { name: '👥 Viewers', value: stream.viewer_count?.toString() || '0', inline: true },
+                { name: `${gameEmoji} Game`, value: stream.game_name || 'Unknown', inline: true },
+                { name: `${viewerEmoji} Viewers`, value: viewerCount, inline: true },
+                { name: '⏱️ Stream Started', value: `<t:${Math.floor(new Date(stream.started_at).getTime() / 1000)}:R>`, inline: false },
             )
-            .setThumbnail(`https://static-cdn.jtvnw.net/previews-ttv/live_user_${entry.username}-320x180.jpg`)
+            .setImage(`https://static-cdn.jtvnw.net/previews-ttv/live_user_${entry.username.toLowerCase()}-1280x720.jpg`)
+            .setFooter({ text: 'Twitch • Live Alert', iconURL: 'https://www.twitch.tv/favicon.ico' })
             .setTimestamp();
+        
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('Watch Stream')
+                    .setURL(`https://twitch.tv/${entry.username}`)
+                    .setStyle(ButtonStyle.Link)
+                    .setEmoji('🔴'),
+            );
+        
         const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
-        await channel.send({ content: `${mention}🔴 **${stream.user_name}** is live!`, embeds: [embed] }).catch(() => {});
+        await channel.send({ content: `${mention}${liveEmoji} **${stream.user_name}** is now live!`, embeds: [embed], components: [buttons] }).catch(() => {});
     }
 
     // ── YouTube ───────────────────────────────────────────────────────────────
@@ -413,20 +432,41 @@ class LiveAlertsManager {
         if (!this._client) return;
         const channel = this._client.channels.cache.get(entry.discordChannelId);
         if (!channel) return;
-        const { EmbedBuilder } = require('discord.js');
+        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+        
         const title = item.title || item.snippet?.title || 'New Video';
         const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
         const videoId = item.videoId || item.id?.videoId;
-        const thumbUrl = item.thumb || item.snippet?.thumbnails?.medium?.url || null;
+        const thumbUrl = item.thumb || item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || null;
+        const description = item.snippet?.description ? item.snippet.description.substring(0, 200) + (item.snippet.description.length > 200 ? '...' : '') : 'New video uploaded';
+        const publishedAt = item.snippet?.publishedAt || new Date().toISOString();
+        
         const embed = new EmbedBuilder()
             .setColor(0xff0000)
-            .setTitle(`▶️ ${channelTitle} uploaded a new video!`)
+            .setAuthor({ name: channelTitle, iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
+            .setTitle(`▶️ New Video Published`)
             .setURL(`https://youtube.com/watch?v=${videoId}`)
-            .setDescription(title)
-            .setThumbnail(thumbUrl)
+            .setDescription(`**${title}**`)
+            .addFields(
+                { name: '📝 Description', value: description || 'No description', inline: false },
+                { name: '⏰ Published', value: `<t:${Math.floor(new Date(publishedAt).getTime() / 1000)}:R>`, inline: true },
+                { name: '🔗 Channel', value: `[Visit Channel](https://youtube.com/@${entry.channelName || 'channel'})`, inline: true },
+            )
+            .setImage(thumbUrl)
+            .setFooter({ text: 'YouTube • Video Alert', iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
             .setTimestamp();
+        
+        const buttons = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('Watch Video')
+                    .setURL(`https://youtube.com/watch?v=${videoId}`)
+                    .setStyle(ButtonStyle.Link)
+                    .setEmoji('▶️'),
+            );
+        
         const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
-        await channel.send({ content: `${mention}▶️ **${channelTitle}** uploaded a new video!`, embeds: [embed] }).catch(() => {});
+        await channel.send({ content: `${mention}▶️ **${channelTitle}** uploaded a new video!`, embeds: [embed], components: [buttons] }).catch(() => {});
     }
 
     // ── Polling ───────────────────────────────────────────────────────────────
