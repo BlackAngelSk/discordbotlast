@@ -33,6 +33,8 @@ const tempVoiceManager = require('../utils/tempVoiceManager');
 const voiceRewardsManager = require('../utils/voiceRewardsManager');
 const raidProtectionManager = require('../utils/raidProtectionManager');
 const starboardManager = require('../utils/starboardManager');
+const { minecraftStatusManager, DEFAULT_INTERVAL_MINUTES, MIN_INTERVAL_MINUTES, MAX_INTERVAL_MINUTES, normalizeIntervalMinutes } = require('../utils/minecraftStatusManager');
+const { normalizeMinecraftStatusInput, fetchMinecraftServerStatus } = require('../utils/minecraftStatus');
 const { formatNumber, formatDateLabel } = require('../utils/helpers');
 const dashboardRoutes = require('./routes');
 const seasonLeaderboardGames = Array.isArray(seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES)
@@ -944,6 +946,7 @@ class Dashboard {
                 const activeTickets = Object.values(allTickets).filter(t => t.status === 'open').length;
                 const liveAlerts = liveAlertsManager.getAlerts(req.params.guildId);
                 const liveAlertsCount = (liveAlerts.twitch?.length || 0) + (liveAlerts.youtube?.length || 0);
+                const minecraftStatusConfig = minecraftStatusManager.getGuildConfig(req.params.guildId);
                 
                 res.render('server', {
                     user: req.user,
@@ -959,6 +962,12 @@ class Dashboard {
                     customCommands: customCommands,
                     activeTickets: activeTickets,
                     liveAlertsCount: liveAlertsCount,
+                    minecraftStatusConfig,
+                    minecraftDefaults: {
+                        intervalMinutes: minecraftStatusConfig?.intervalMinutes || DEFAULT_INTERVAL_MINUTES,
+                        minIntervalMinutes: MIN_INTERVAL_MINUTES,
+                        maxIntervalMinutes: MAX_INTERVAL_MINUTES
+                    },
                     roles: Array.from(guild.roles.cache.values()).filter(r => r.name !== '@everyone'),
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0)
                 });
@@ -1045,6 +1054,87 @@ class Dashboard {
             } catch (error) {
                 console.error('Error updating settings:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        // API: Check Minecraft server status
+        this.app.post('/api/settings/:guildId/minecraft-status', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const { host, port, error } = normalizeMinecraftStatusInput(req.body?.host, req.body?.port);
+                if (error) {
+                    return res.status(400).json({ success: false, error });
+                }
+
+                const status = await fetchMinecraftServerStatus(host, port);
+                res.json({ success: true, status });
+            } catch (error) {
+                console.error('Error checking Minecraft server status:', error);
+                res.status(502).json({ success: false, error: error.message || 'Minecraft status lookup failed.' });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/minecraft-status/live', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { host, port, error } = normalizeMinecraftStatusInput(req.body?.host, req.body?.port);
+                const channelId = String(req.body?.channelId || '').trim();
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (error) {
+                    return res.status(400).json({ success: false, error });
+                }
+
+                if (!channelId) {
+                    return res.status(400).json({ success: false, error: 'Choose a Discord channel for the live embed.' });
+                }
+
+                const channel = guild.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel.' });
+                }
+
+                const configured = await minecraftStatusManager.configureMonitor(guildId, {
+                    channelId,
+                    host,
+                    port,
+                    intervalMinutes: normalizeIntervalMinutes(req.body?.intervalMinutes)
+                });
+
+                logDashboardAudit(req, 'CONFIGURE_MINECRAFT_STATUS_MONITOR', {
+                    host,
+                    port,
+                    channelId,
+                    intervalMinutes: configured?.intervalMinutes || normalizeIntervalMinutes(req.body?.intervalMinutes),
+                    messageId: configured?.messageId || null
+                });
+
+                res.json({
+                    success: true,
+                    message: 'Minecraft status embed sent and auto-updates enabled.',
+                    config: configured ? {
+                        ...configured,
+                        channelName: channel.name,
+                        messageUrl: configured.messageId ? `https://discord.com/channels/${guildId}/${channelId}/${configured.messageId}` : null
+                    } : null
+                });
+            } catch (error) {
+                console.error('Error configuring Minecraft status monitor:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to configure Minecraft status monitor.' });
+            }
+        });
+
+        this.app.delete('/api/settings/:guildId/minecraft-status/live', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                await minecraftStatusManager.disableMonitor(req.params.guildId);
+                logDashboardAudit(req, 'DISABLE_MINECRAFT_STATUS_MONITOR', {});
+                res.json({ success: true, message: 'Minecraft auto-updates disabled. Existing channel message was left as-is.' });
+            } catch (error) {
+                console.error('Error disabling Minecraft status monitor:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to disable Minecraft status monitor.' });
             }
         });
 

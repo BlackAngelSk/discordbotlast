@@ -8,6 +8,11 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
+<%
+  const manageableGuildCount = Array.isArray(guilds) ? guilds.length : 0;
+  const ownerToolCount = isBotOwner ? 1 : 0;
+  const totalCardCount = manageableGuildCount + ownerToolCount;
+%>
 <div class="server-picker">
 
   <!-- Navbar -->
@@ -31,8 +36,38 @@
   <!-- Content -->
   <div class="server-picker-content">
     <div class="server-picker-header">
-      <h1><i class="fas fa-th-large" style="color:var(--brand);margin-right:10px"></i>Your Servers</h1>
-      <p>Choose a server to manage its settings and configuration</p>
+      <div>
+        <h1><i class="fas fa-th-large" style="color:var(--brand);margin-right:10px"></i>Your Servers</h1>
+        <p>Choose a server to manage its settings and configuration</p>
+      </div>
+      <div class="server-picker-summary-text">
+        <i class="fas fa-bolt"></i>
+        <span><%= totalCardCount %> dashboard destinations ready</span>
+      </div>
+    </div>
+
+    <div class="server-picker-overview">
+      <div class="server-picker-stat">
+        <div class="server-picker-stat-icon"><i class="fas fa-server"></i></div>
+        <div>
+          <div class="server-picker-stat-value"><%= manageableGuildCount %></div>
+          <div class="server-picker-stat-label">Manageable servers</div>
+        </div>
+      </div>
+      <div class="server-picker-stat">
+        <div class="server-picker-stat-icon"><i class="fas fa-shield-halved"></i></div>
+        <div>
+          <div class="server-picker-stat-value"><%= ownerToolCount %></div>
+          <div class="server-picker-stat-label">Owner-only pages</div>
+        </div>
+      </div>
+      <div class="server-picker-stat server-picker-stat-wide">
+        <div class="server-picker-stat-icon"><i class="fas fa-compass"></i></div>
+        <div>
+          <div class="server-picker-stat-value">Fast jump</div>
+          <div class="server-picker-stat-label">Use search or the quick filters below to narrow large server lists.</div>
+        </div>
+      </div>
     </div>
 
     <div class="card" style="margin-bottom:22px">
@@ -68,17 +103,38 @@
     </div>
 
     <!-- Search -->
-    <div style="margin-bottom:22px">
-      <div class="search-input" style="max-width:340px">
+    <div class="server-picker-toolbar">
+      <div class="search-input server-search-input">
         <i class="fas fa-search"></i>
-        <input type="text" id="serverSearch" placeholder="Search servers...">
+        <input type="text" id="serverSearch" placeholder="Search servers or owner tools...">
+      </div>
+      <div class="server-picker-filters" role="tablist" aria-label="Server filters">
+        <button type="button" class="server-filter-btn is-active" data-filter="all">All</button>
+        <button type="button" class="server-filter-btn" data-filter="server">Servers</button>
+        <% if (isBotOwner) { %>
+          <button type="button" class="server-filter-btn" data-filter="owner">Owner Tools</button>
+        <% } %>
+      </div>
+      <div class="server-picker-results" id="serverResultsLabel"><%= totalCardCount %> results</div>
+    </div>
+
+    <div class="server-picker-shortcuts">
+      <div class="server-picker-shortcut"><i class="fas fa-keyboard"></i> Press <strong>/</strong> to focus search</div>
+      <div class="server-picker-shortcut"><i class="fas fa-filter"></i> Filter between server dashboards and owner tools</div>
+      <div class="server-picker-shortcut"><i class="fas fa-arrow-pointer"></i> Click any card to jump straight into configuration</div>
+    </div>
+
+    <div class="server-picker-section-header">
+      <div>
+        <h2>Available Dashboards</h2>
+        <p>Pick where you want to work next.</p>
       </div>
     </div>
 
     <!-- Grid -->
     <div class="server-grid" id="serverGrid">
       <% if (isBotOwner) { %>
-        <a href="/dashboard/owner" class="server-card" data-name="bot owner settings global owner">
+        <a href="/dashboard/owner" class="server-card" data-name="bot owner settings global owner" data-type="owner">
           <div class="server-card-icon-default" style="background:linear-gradient(135deg,var(--yellow),var(--orange));color:#111827">
             <i class="fas fa-crown"></i>
           </div>
@@ -97,7 +153,7 @@
         </div>
       <% } else { %>
         <% guilds.forEach(guild => { %>
-          <a href="/dashboard/<%= guild.id %>" class="server-card" data-name="<%= guild.name.toLowerCase() %>">
+          <a href="/dashboard/<%= guild.id %>" class="server-card" data-name="<%= guild.name.toLowerCase() %>" data-type="server">
             <% if (guild.icon) { %>
               <img class="server-card-icon" src="https://cdn.discordapp.com/icons/<%= guild.id %>/<%= guild.icon %>.png" alt="<%= guild.name %>" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
               <div class="server-card-icon-default" style="display:none"><%= guild.name.charAt(0).toUpperCase() %></div>
@@ -110,6 +166,14 @@
         <% }); %>
       <% } %>
     </div>
+
+    <% if (totalCardCount > 0) { %>
+      <div class="server-picker-empty" id="serverEmptyState" hidden>
+        <i class="fas fa-magnifying-glass"></i>
+        <h2>No dashboard matches</h2>
+        <p>Try a different search term or switch filter tabs.</p>
+      </div>
+    <% } %>
   </div>
 
 </div>
@@ -127,12 +191,50 @@
     btn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
   });
 
-  document.getElementById('serverSearch').addEventListener('input', e => {
-    const q = e.target.value.toLowerCase();
-    document.querySelectorAll('.server-card').forEach(c => {
-      c.style.display = (c.dataset.name || '').includes(q) ? '' : 'none';
+  const searchInput = document.getElementById('serverSearch');
+  const cards = Array.from(document.querySelectorAll('.server-card'));
+  const filterButtons = Array.from(document.querySelectorAll('.server-filter-btn'));
+  const resultLabel = document.getElementById('serverResultsLabel');
+  const emptyState = document.getElementById('serverEmptyState');
+  let activeFilter = 'all';
+
+  const applyServerFilters = () => {
+    const query = (searchInput.value || '').trim().toLowerCase();
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+      const matchesSearch = (card.dataset.name || '').includes(query);
+      const matchesType = activeFilter === 'all' || card.dataset.type === activeFilter;
+      const visible = matchesSearch && matchesType;
+      card.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+
+    resultLabel.textContent = `${visibleCount} result${visibleCount === 1 ? '' : 's'}`;
+    if (emptyState) {
+      emptyState.hidden = visibleCount !== 0;
+    }
+  };
+
+  searchInput.addEventListener('input', applyServerFilters);
+
+  filterButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      activeFilter = button.dataset.filter || 'all';
+      filterButtons.forEach(item => item.classList.toggle('is-active', item === button));
+      applyServerFilters();
     });
   });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === '/' && document.activeElement !== searchInput) {
+      event.preventDefault();
+      searchInput.focus();
+      searchInput.select();
+    }
+  });
+
+  applyServerFilters();
 </script>
 </body>
 </html>

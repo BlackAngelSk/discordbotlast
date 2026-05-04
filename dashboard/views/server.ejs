@@ -53,6 +53,7 @@
           <div><div class="card-title"><i class="fas fa-sparkles"></i> New Dashboard Tools</div><div class="card-subtitle">Quick access to the features you asked to add</div></div>
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+          <a href="#minecraftStatusCard" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-cube"></i> Minecraft Status</a>
           <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-users-gear"></i> Community Center</a>
           <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
           <a href="/dashboard/<%= guild.id %>/epic-games" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-gift"></i> Epic Games Alerts</a>
@@ -66,6 +67,76 @@
             <a href="/dashboard/owner" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-crown"></i> Bot Owner Settings</a>
           <% } %>
         </div>
+      </div>
+
+      <div class="card" id="minecraftStatusCard" style="margin-bottom:20px">
+        <div class="card-header">
+          <div><div class="card-title"><i class="fas fa-cube"></i> Minecraft Server Status</div><div class="card-subtitle">Check a server now, or post one live embed in Discord and keep it updated automatically</div></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="minecraftHostInput">Server Address</label>
+            <input type="text" class="form-control" id="minecraftHostInput" placeholder="play.example.net" value="<%= minecraftStatusConfig?.host || '' %>">
+            <div class="form-hint">Enter a host or paste <code>host:port</code>.</div>
+          </div>
+          <div class="form-group" style="max-width:180px">
+            <label class="form-label" for="minecraftPortInput">Port</label>
+            <input type="number" class="form-control" id="minecraftPortInput" min="1" max="65535" placeholder="25565" value="<%= minecraftStatusConfig?.port || '' %>">
+            <div class="form-hint">Optional. Defaults to the server's standard port.</div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="minecraftLiveChannel">Discord Channel</label>
+            <select class="form-control" id="minecraftLiveChannel">
+              <option value="">Select channel</option>
+              <% channels.forEach(channel => { %>
+                <option value="<%= channel.id %>" <%= minecraftStatusConfig?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+              <% }) %>
+            </select>
+            <div class="form-hint">The bot will send one status embed here and edit that same message on each refresh.</div>
+          </div>
+          <div class="form-group" style="max-width:220px">
+            <label class="form-label" for="minecraftIntervalInput">Update Interval</label>
+            <input type="number" class="form-control" id="minecraftIntervalInput" min="<%= minecraftDefaults.minIntervalMinutes %>" max="<%= minecraftDefaults.maxIntervalMinutes %>" value="<%= minecraftDefaults.intervalMinutes %>">
+            <div class="form-hint">Allowed range: <%= minecraftDefaults.minIntervalMinutes %>-<%= minecraftDefaults.maxIntervalMinutes %> minutes.</div>
+          </div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Live Embed</div>
+              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.enabled ? 'Enabled' : 'Disabled' %></div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Channel</div>
+              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.channelId ? `#${guild.channels.cache.get(minecraftStatusConfig.channelId)?.name || minecraftStatusConfig.channelId}` : 'Not set' %></div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Last Check</div>
+              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.lastCheckedAt ? new Date(minecraftStatusConfig.lastCheckedAt).toLocaleString() : 'Not yet' %></div>
+            </div>
+            <div>
+              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Message</div>
+              <div style="font-weight:700;color:var(--text-1)">
+                <% if (minecraftStatusConfig?.messageId && minecraftStatusConfig?.channelId) { %>
+                  <a href="https://discord.com/channels/<%= guild.id %>/<%= minecraftStatusConfig.channelId %>/<%= minecraftStatusConfig.messageId %>" target="_blank" rel="noopener noreferrer">Open live message</a>
+                <% } else { %>
+                  Not sent yet
+                <% } %>
+              </div>
+            </div>
+          </div>
+          <% if (minecraftStatusConfig?.lastError) { %>
+            <div class="form-hint" style="margin-top:10px;color:var(--yellow)"><i class="fas fa-triangle-exclamation"></i> Last update issue: <%= minecraftStatusConfig.lastError %></div>
+          <% } %>
+        </div>
+        <div class="quick-action-row" style="margin-bottom:0">
+          <button type="button" class="btn btn-secondary" id="checkMinecraftStatusBtn"><i class="fas fa-signal"></i> Check Server</button>
+          <button type="button" class="btn btn-primary" id="saveMinecraftLiveBtn"><i class="fas fa-paper-plane"></i> Send Live Embed</button>
+          <button type="button" class="btn btn-danger" id="disableMinecraftLiveBtn"><i class="fas fa-stop"></i> Disable Auto Updates</button>
+        </div>
+        <div id="minecraftStatusResult" hidden style="margin-top:16px"></div>
       </div>
 
       <form id="settingsForm">
@@ -274,6 +345,7 @@
 <%- include('partials/dashboard-common-scripts') %>
 <script>
 const guildId = '<%= guild.id %>';
+const minecraftStorageKey = `dashboard.minecraftStatus.${guildId}`;
 function toast(msg, type = 'success') {
   const c = document.getElementById('toasts');
   const t = document.createElement('div');
@@ -282,6 +354,52 @@ function toast(msg, type = 'success') {
   t.innerHTML = `<i class="fas ${icons[type] || 'fa-check-circle'}"></i> ${msg}`;
   c.appendChild(t);
   setTimeout(() => t.remove(), 3200);
+}
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+function renderMinecraftStatus(status) {
+  const result = document.getElementById('minecraftStatusResult');
+  const online = status?.online === true;
+  const badgeColor = online ? 'var(--green)' : 'var(--red)';
+  const badgeLabel = online ? 'Online' : 'Offline';
+  const resolvedAddress = [status?.hostname || status?.requestedHost, status?.port].filter(Boolean).join(':');
+  const playerSummary = online
+    ? `${status?.playersOnline ?? 0} / ${status?.playersMax ?? 0}`
+    : 'Unavailable';
+
+  result.hidden = false;
+  result.innerHTML = `
+    <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2)">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text-1);margin-bottom:6px">${escapeHtml(resolvedAddress || status?.requestedHost || 'Minecraft Server')}</div>
+          <div style="font-size:13px;color:var(--text-2)">${escapeHtml(status?.ip || 'IP hidden or unresolved')}</div>
+        </div>
+        <div style="padding:6px 12px;border-radius:999px;background:${badgeColor};color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.06em">${badgeLabel}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:${status?.motd ? '14px' : '0'}">
+        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Players</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(playerSummary)}</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Version</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.version || 'Unknown')}</div>
+        </div>
+        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
+          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Software</div>
+          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.software || 'Unknown')}</div>
+        </div>
+      </div>
+      ${status?.motd ? `<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)"><div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Message of the day</div><div style="color:var(--text-1);line-height:1.5">${escapeHtml(status.motd)}</div></div>` : ''}
+    </div>
+  `;
 }
 function addPrefix() {
   const c = document.getElementById('prefixContainer');
@@ -297,6 +415,34 @@ function removePrefix(btn) {
   btn.closest('.prefix-item').remove();
 }
 function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
+const minecraftHostInput = document.getElementById('minecraftHostInput');
+const minecraftPortInput = document.getElementById('minecraftPortInput');
+const minecraftLiveChannel = document.getElementById('minecraftLiveChannel');
+const minecraftIntervalInput = document.getElementById('minecraftIntervalInput');
+const minecraftDefaultInterval = Number(minecraftIntervalInput.defaultValue || minecraftIntervalInput.value || 5);
+const minecraftCheckButton = document.getElementById('checkMinecraftStatusBtn');
+const saveMinecraftLiveButton = document.getElementById('saveMinecraftLiveBtn');
+const disableMinecraftLiveButton = document.getElementById('disableMinecraftLiveBtn');
+const savedMinecraftTarget = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(minecraftStorageKey) || '{}');
+  } catch {
+    return {};
+  }
+})();
+if (!minecraftHostInput.value && savedMinecraftTarget.host) minecraftHostInput.value = savedMinecraftTarget.host;
+if (!minecraftPortInput.value && savedMinecraftTarget.port) minecraftPortInput.value = savedMinecraftTarget.port;
+if (!minecraftLiveChannel.value && savedMinecraftTarget.channelId) minecraftLiveChannel.value = savedMinecraftTarget.channelId;
+if (!minecraftIntervalInput.value && savedMinecraftTarget.intervalMinutes) minecraftIntervalInput.value = savedMinecraftTarget.intervalMinutes;
+if (!minecraftIntervalInput.value) minecraftIntervalInput.value = minecraftDefaultInterval;
+function persistMinecraftSettings() {
+  localStorage.setItem(minecraftStorageKey, JSON.stringify({
+    host: minecraftHostInput.value.trim(),
+    port: minecraftPortInput.value.trim(),
+    channelId: minecraftLiveChannel.value,
+    intervalMinutes: minecraftIntervalInput.value.trim()
+  }));
+}
 document.getElementById('addPrefixBtn').addEventListener('click', addPrefix);
 document.getElementById('closeResetModalBtn').addEventListener('click', closeModal);
 document.getElementById('cancelResetModalBtn').addEventListener('click', closeModal);
@@ -314,6 +460,111 @@ document.getElementById('confirmReset').addEventListener('click', async () => {
     if (j.success) { toast('Settings reset! Reloading...', 'success'); setTimeout(() => location.reload(), 1600); }
     else toast('Error: ' + j.error, 'error');
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
+});
+minecraftCheckButton.addEventListener('click', async () => {
+  const host = minecraftHostInput.value.trim();
+  const port = minecraftPortInput.value.trim();
+  if (!host) {
+    toast('Enter a Minecraft server address first.', 'error');
+    minecraftHostInput.focus();
+    return;
+  }
+
+  const original = minecraftCheckButton.innerHTML;
+  minecraftCheckButton.disabled = true;
+  minecraftCheckButton.innerHTML = '<span class="spinner"></span> Checking...';
+
+  try {
+    persistMinecraftSettings();
+    const response = await fetch(`/api/settings/${guildId}/minecraft-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, port })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Minecraft status lookup failed.');
+    }
+
+    renderMinecraftStatus(payload.status || {});
+    toast(payload.status?.online ? 'Minecraft server is online.' : 'Minecraft server appears to be offline.', payload.status?.online ? 'success' : 'warning');
+  } catch (error) {
+    toast(error.message || 'Minecraft status lookup failed.', 'error');
+  } finally {
+    minecraftCheckButton.disabled = false;
+    minecraftCheckButton.innerHTML = original;
+  }
+});
+saveMinecraftLiveButton.addEventListener('click', async () => {
+  const host = minecraftHostInput.value.trim();
+  const port = minecraftPortInput.value.trim();
+  const channelId = minecraftLiveChannel.value;
+  const intervalMinutes = minecraftIntervalInput.value.trim() || String(minecraftDefaultInterval);
+
+  if (!host) {
+    toast('Enter a Minecraft server address first.', 'error');
+    minecraftHostInput.focus();
+    return;
+  }
+
+  if (!channelId) {
+    toast('Choose a Discord channel for the live embed.', 'error');
+    minecraftLiveChannel.focus();
+    return;
+  }
+
+  const original = saveMinecraftLiveButton.innerHTML;
+  saveMinecraftLiveButton.disabled = true;
+  saveMinecraftLiveButton.innerHTML = '<span class="spinner"></span> Sending...';
+
+  try {
+    persistMinecraftSettings();
+    const response = await fetch(`/api/settings/${guildId}/minecraft-status/live`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ host, port, channelId, intervalMinutes })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to send live Minecraft embed.');
+    }
+
+    toast(payload.message || 'Live Minecraft embed configured.', 'success');
+    setTimeout(() => location.reload(), 700);
+  } catch (error) {
+    toast(error.message || 'Failed to send live Minecraft embed.', 'error');
+  } finally {
+    saveMinecraftLiveButton.disabled = false;
+    saveMinecraftLiveButton.innerHTML = original;
+  }
+});
+disableMinecraftLiveButton.addEventListener('click', async () => {
+  if (!confirm('Disable Minecraft auto-updates for this server?')) {
+    return;
+  }
+
+  const original = disableMinecraftLiveButton.innerHTML;
+  disableMinecraftLiveButton.disabled = true;
+  disableMinecraftLiveButton.innerHTML = '<span class="spinner"></span> Disabling...';
+
+  try {
+    const response = await fetch(`/api/settings/${guildId}/minecraft-status/live`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to disable Minecraft auto-updates.');
+    }
+
+    toast(payload.message || 'Minecraft auto-updates disabled.', 'success');
+    setTimeout(() => location.reload(), 700);
+  } catch (error) {
+    toast(error.message || 'Failed to disable Minecraft auto-updates.', 'error');
+  } finally {
+    disableMinecraftLiveButton.disabled = false;
+    disableMinecraftLiveButton.innerHTML = original;
+  }
 });
 document.getElementById('settingsForm').addEventListener('submit', async e => {
   e.preventDefault();

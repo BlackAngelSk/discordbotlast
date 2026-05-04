@@ -73,6 +73,7 @@ const voiceRewardsManager = require('./utils/voiceRewardsManager');
 const raidProtectionManager = require('./utils/raidProtectionManager');
 const scheduledMessagesManager = require('./utils/scheduledMessagesManager');
 const birthdayManager = require('./utils/birthdayManager');
+const { minecraftStatusManager } = require('./utils/minecraftStatusManager');
 const customRoleShop = require('./utils/customRoleShop');
 const activityTracker = require('./utils/activityTracker');
 const serverMilestones = require('./utils/serverMilestones');
@@ -207,6 +208,7 @@ async function loadHandlers() {
             runInitStep('Voice rewards manager', () => voiceRewardsManager.init()),
             runInitStep('Raid protection manager', () => raidProtectionManager.init()),
             runInitStep('Birthday manager', () => birthdayManager.init()),
+            runInitStep('Minecraft status manager', () => minecraftStatusManager.init(client)),
             runInitStep('Achievement manager', () => achievementManager.init()),
             runInitStep('Scheduled messages manager', () => scheduledMessagesManager.init(client)),
             runInitStep('Custom role shop', () => customRoleShop.init()),
