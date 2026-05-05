@@ -96,6 +96,45 @@ const fetchMinecraftServerStatus = async (host, port) => {
         return null;
     };
 
+    const toPlayerNameList = (...sources) => {
+        const names = [];
+
+        for (const source of sources) {
+            if (!Array.isArray(source)) continue;
+
+            for (const entry of source) {
+                if (typeof entry === 'string') {
+                    const cleaned = entry.trim();
+                    if (cleaned) {
+                        names.push(cleaned);
+                    }
+                    continue;
+                }
+
+                if (!entry || typeof entry !== 'object') {
+                    continue;
+                }
+
+                const rawName = entry.name_clean || entry.name_raw || entry.name || entry.username || '';
+                const cleaned = String(rawName).trim();
+                if (cleaned) {
+                    names.push(cleaned);
+                }
+            }
+        }
+
+        const unique = [];
+        const seen = new Set();
+        for (const name of names) {
+            const key = name.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique.push(name);
+        }
+
+        return unique;
+    };
+
     const fromMcsrvStatus = (payload) => ({
         requestedHost: normalizedHost,
         requestedPort: normalizedPort,
@@ -107,7 +146,8 @@ const fetchMinecraftServerStatus = async (host, port) => {
         software: payload?.software || null,
         motd: toMotdText(payload?.motd?.clean),
         playersOnline: Number.isFinite(payload?.players?.online) ? payload.players.online : 0,
-        playersMax: Number.isFinite(payload?.players?.max) ? payload.players.max : 0
+        playersMax: Number.isFinite(payload?.players?.max) ? payload.players.max : 0,
+        playerNames: toPlayerNameList(payload?.players?.list, payload?.players?.sample)
     });
 
     const fromMcstatus = (payload, edition, requestedAddress) => ({
@@ -122,6 +162,7 @@ const fetchMinecraftServerStatus = async (host, port) => {
         motd: toMotdText(payload?.motd?.clean),
         playersOnline: Number.isFinite(payload?.players?.online) ? payload.players.online : 0,
         playersMax: Number.isFinite(payload?.players?.max) ? payload.players.max : 0,
+        playerNames: toPlayerNameList(payload?.players?.list, payload?.players?.sample),
         resolvedAddress: requestedAddress
     });
 

@@ -42,6 +42,29 @@ const toCodeBlock = (value, maxLength = 900) => {
     return `\`\`\`\n${body}\n\`\`\``;
 };
 
+const formatOnlinePlayerNames = (status) => {
+    if (status?.online !== true) {
+        return 'Unavailable';
+    }
+
+    const names = Array.isArray(status?.playerNames)
+        ? status.playerNames.map((name) => truncateText(name, 32)).filter(Boolean)
+        : [];
+
+    if (!names.length) {
+        const playersOnline = Number(status?.playersOnline || 0);
+        return playersOnline > 0
+            ? 'Online users are not exposed by this server.'
+            : 'No users online';
+    }
+
+    const visibleNames = names.slice(0, 30);
+    const remaining = names.length - visibleNames.length;
+    const joined = visibleNames.join(', ');
+    const suffix = remaining > 0 ? ` (+${remaining} more)` : '';
+    return truncateText(`${joined}${suffix}`, 1000);
+};
+
 const buildPlayerProgressBar = (onlineCount, maxCount, size = 10) => {
     const online = Number(onlineCount);
     const max = Number(maxCount);
@@ -296,6 +319,7 @@ class MinecraftStatusManager {
         const playersText = online
             ? `${status.playersOnline} / ${status.playersMax}`
             : 'Unavailable';
+        const playerNamesText = formatOnlinePlayerNames(status);
         const playerBar = online
             ? buildPlayerProgressBar(status.playersOnline, status.playersMax)
             : '□□□□□□□□□□ 0%';
@@ -320,6 +344,7 @@ class MinecraftStatusManager {
                 { name: '🌐 Resolved IP', value: toEmbedFieldValue(toInlineCode(status.ip || 'Unknown')), inline: true },
                 { name: '👥 Players', value: toEmbedFieldValue(playersText), inline: true },
                 { name: '📈 Capacity', value: toEmbedFieldValue(playerBar), inline: true },
+                { name: '🧍 Online Users', value: toEmbedFieldValue(playerNamesText), inline: false },
                 { name: '🧩 Version', value: toEmbedFieldValue(status.version || 'Unknown'), inline: true },
                 { name: '🛠️ Software', value: toEmbedFieldValue(status.software || 'Unknown'), inline: true },
                 { name: '🔁 Interval', value: toEmbedFieldValue(`Every ${refreshMinutes} minute${refreshMinutes === 1 ? '' : 's'}`), inline: true },
