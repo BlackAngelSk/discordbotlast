@@ -35,7 +35,7 @@ const SPECIAL_TRACKED_SOURCES = {
         sourceId: 'minecraft',
         name: 'Minecraft',
         imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg',
-        tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/key-art/Homepage_Gameplay-Trailer_MC-OV-logo-300x300.png',
+        tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg',
         storeUrl: MINECRAFT_UPDATES_URL,
         color: 0xf59e0b,
         providerLabel: 'Minecraft'
@@ -212,6 +212,43 @@ function truncate(value, maxLength) {
     const safeValue = String(value || '').trim();
     if (!safeValue || safeValue.length <= maxLength) return safeValue;
     return `${safeValue.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
+}
+
+function buildSteamClanImageUrl(clanId, imagePath) {
+    const safeClanId = String(clanId || '').trim();
+    const safeImagePath = String(imagePath || '').trim().replace(/^\/+/, '');
+    if (!safeClanId || !safeImagePath) return null;
+
+    return `https://clan.akamai.steamstatic.com/images/${safeClanId}/${safeImagePath}`;
+}
+
+function extractSteamClanImageUrl(contents) {
+    const raw = String(contents || '');
+    if (!raw) return null;
+
+    const placeholderMatch = raw.match(/\{STEAM_CLAN_IMAGE\}\/([0-9]+)\/([^\s\]"']+\.(?:jpg|jpeg|png|gif|webp))/i);
+    if (placeholderMatch?.[1] && placeholderMatch?.[2]) {
+        return buildSteamClanImageUrl(placeholderMatch[1], placeholderMatch[2]);
+    }
+
+    const absoluteMatch = raw.match(/https?:\/\/clan\.akamai\.steamstatic\.com\/images\/([0-9]+)\/([^\s\]"']+\.(?:jpg|jpeg|png|gif|webp))/i);
+    if (absoluteMatch?.[1] && absoluteMatch?.[2]) {
+        return buildSteamClanImageUrl(absoluteMatch[1], absoluteMatch[2]);
+    }
+
+    return null;
+}
+
+function removeSteamImageMarkup(contents) {
+    const raw = String(contents || '');
+    if (!raw) return '';
+
+    return raw
+        .replace(/\[img\][\s\S]*?\[\/img\]/gi, ' ')
+        .replace(/\{STEAM_CLAN_IMAGE\}\/[0-9]+\/[^\s\]"']+\.(?:jpg|jpeg|png|gif|webp)/gi, ' ')
+        .replace(/https?:\/\/clan\.akamai\.steamstatic\.com\/images\/[0-9]+\/[^\s\]"']+\.(?:jpg|jpeg|png|gif|webp)/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
 function formatChangelogSummary(article) {
@@ -832,9 +869,16 @@ function createUpdateEmbed(update) {
         embed.setDescription(truncate(descriptionParts.join('\n\n'), 4096));
     }
 
-    // Use thumbnail for game icon
-    if (update.imageUrl) {
-        embed.setThumbnail(update.imageUrl);
+    const thumbnailUrl = update.tinyImage || update.imageUrl || null;
+    const bannerUrl = update.bannerUrl || update.imageUrl || null;
+
+    // Show both a compact logo and a large banner when available.
+    if (isValidUrl(thumbnailUrl)) {
+        embed.setThumbnail(thumbnailUrl);
+    }
+
+    if (isValidUrl(bannerUrl)) {
+        embed.setImage(bannerUrl);
     }
 
     return embed;
@@ -843,10 +887,12 @@ function createUpdateEmbed(update) {
 function buildSteamUpdate(appId, article, game) {
     const title = sanitizeText(article.title) || `Update posted for ${game?.name || `App ${appId}`}`;
     const rawContents = String(article.contents || '');
-    const sections = parseSteamSections(rawContents);
+    const cleanedContents = removeSteamImageMarkup(rawContents);
+    const sections = parseSteamSections(cleanedContents);
     const firstSectionItem = sections[0]?.items?.[0] || '';
-    const fallbackSummary = sanitizeText(rawContents.replace(/\\+/g, ' ')).trim();
+    const fallbackSummary = sanitizeText(cleanedContents.replace(/\\+/g, ' ')).trim();
     const summary = truncate(firstSectionItem || fallbackSummary || 'A new Steam changelog is now live.', 280);
+    const articleImage = extractSteamClanImageUrl(rawContents);
 
     return {
         key: buildArticleKey(article),
@@ -858,7 +904,9 @@ function buildSteamUpdate(appId, article, game) {
         sections,
         url: buildSteamChangelogUrl(appId, article),
         date: Number(article.date) || 0,
-        imageUrl: game?.imageUrl || null,
+        imageUrl: game?.imageUrl || articleImage || null,
+        tinyImage: game?.tinyImage || null,
+        bannerUrl: articleImage || game?.imageUrl || null,
         color: game?.color || 0xf59e0b,
         storeUrl: game?.storeUrl || buildStoreUrl(appId)
     };
