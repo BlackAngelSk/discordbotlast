@@ -10,6 +10,7 @@ const MAX_INTERVAL_MINUTES = 120;
 const UPDATE_TICK_MS = 60 * 1000;
 const OFFLINE_CONFIRMATION_CHECKS = 3;
 const MINECRAFT_ICON_URL = 'https://cdn.discordapp.com/emojis/1218277823286202398.webp?size=128&quality=lossless';
+const MAX_TRACKED_PLAYERS = 200;
 
 const normalizeIntervalMinutes = (value) => {
     const parsed = Number(value);
@@ -79,6 +80,178 @@ const buildPlayerProgressBar = (onlineCount, maxCount, size = 10) => {
     return `${'■'.repeat(filled)}${'□'.repeat(empty)} ${percent}%`;
 };
 
+const normalizePlayerNameKey = (value) => String(value || '').trim().toLowerCase();
+
+const formatDuration = (ms) => {
+    const safeMs = Number(ms);
+    if (!Number.isFinite(safeMs) || safeMs <= 0) {
+        return '0m';
+    }
+
+    const totalMinutes = Math.floor(safeMs / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+
+    if (days > 0) {
+        return `${days}d ${hours}h`;
+    }
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+    }
+
+    return `${minutes}m`;
+};
+
+const normalizePlayerSessionTracker = (value) => {
+    const source = value && typeof value === 'object' ? value : {};
+    const players = source.players && typeof source.players === 'object' ? source.players : {};
+
+    const normalizedPlayers = {};
+    for (const [key, entry] of Object.entries(players)) {
+        if (!entry || typeof entry !== 'object') continue;
+
+        const normalizedKey = normalizePlayerNameKey(key || entry.name);
+        if (!normalizedKey) continue;
+
+        normalizedPlayers[normalizedKey] = {
+            name: String(entry.name || '').trim() || normalizedKey,
+            totalOnlineMs: Math.max(0, Number(entry.totalOnlineMs || 0)),
+            currentSessionStartedAt: entry.currentSessionStartedAt || null,
+            lastSeenAt: entry.lastSeenAt || null,
+            lastSessionMs: Math.max(0, Number(entry.lastSessionMs || 0)),
+            updatedAt: entry.updatedAt || null
+        };
+    }
+
+    return { players: normalizedPlayers };
+};
+
+const updatePlayerSessionTracker = (trackerInput, status, { confirmedOnline, nowMs }) => {
+    const tracker = normalizePlayerSessionTracker(trackerInput);
+    const players = tracker.players;
+    const nowIso = new Date(nowMs).toISOString();
+
+    const closeSession = (entry) => {
+        const startedMs = entry.currentSessionStartedAt ? new Date(entry.currentSessionStartedAt).getTime() : 0;
+        if (startedMs > 0 && startedMs <= nowMs) {
+            const elapsed = Math.max(0, nowMs - startedMs);
+            entry.totalOnlineMs = Math.max(0, Number(entry.totalOnlineMs || 0)) + elapsed;
+            entry.lastSessionMs = elapsed;
+        }
+        entry.currentSessionStartedAt = null;
+        entry.updatedAt = nowIso;
+    };
+
+    if (confirmedOnline && status?.online === true) {
+        const names = Array.isArray(status.playerNames)
+            ? status.playerNames.map(name => String(name || '').trim()).filter(Boolean)
+            : [];
+
+        // Without exposed names there is no safe way to attribute time to specific players.
+        if (names.length > 0) {
+            const seen = new Set();
+            for (const name of names) {
+                const key = normalizePlayerNameKey(name);
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+
+                if (!players[key]) {
+                    players[key] = {
+                        name,
+                        totalOnlineMs: 0,
+                        currentSessionStartedAt: nowIso,
+                        lastSeenAt: nowIso,
+                        lastSessionMs: 0,
+                        updatedAt: nowIso
+                    };
+                }
+
+                const entry = players[key];
+                entry.name = name;
+                if (!entry.currentSessionStartedAt) {
+                    entry.currentSessionStartedAt = nowIso;
+                }
+                entry.lastSeenAt = nowIso;
+                entry.updatedAt = nowIso;
+            }
+
+            for (const [key, entry] of Object.entries(players)) {
+                if (!seen.has(key) && entry.currentSessionStartedAt) {
+                    closeSession(entry);
+                }
+            }
+        }
+    } else {
+        for (const entry of Object.values(players)) {
+            if (entry.currentSessionStartedAt) {
+                closeSession(entry);
+            }
+        }
+    }
+
+    const allEntries = Object.entries(players);
+    if (allEntries.length > MAX_TRACKED_PLAYERS) {
+        allEntries
+            .sort((left, right) => {
+                const leftStamp = new Date(left[1].updatedAt || left[1].lastSeenAt || 0).getTime() || 0;
+                const rightStamp = new Date(right[1].updatedAt || right[1].lastSeenAt || 0).getTime() || 0;
+                return rightStamp - leftStamp;
+            })
+            .slice(MAX_TRACKED_PLAYERS)
+            .forEach(([key]) => {
+                delete players[key];
+            });
+    }
+
+    return tracker;
+};
+
+const formatPlayerSessionTimes = (status, trackerInput, nowMs = Date.now()) => {
+    if (status?.online !== true) {
+        return 'Unavailable';
+    }
+
+    const names = Array.isArray(status?.playerNames)
+        ? status.playerNames.map(name => String(name || '').trim()).filter(Boolean)
+        : [];
+
+    if (!names.length) {
+        const playersOnline = Number(status?.playersOnline || 0);
+        return playersOnline > 0 ? 'Names hidden by server; tracking unavailable.' : 'No active sessions';
+    }
+
+    const tracker = normalizePlayerSessionTracker(trackerInput);
+    const lines = [];
+    const seen = new Set();
+
+    for (const name of names) {
+        const key = normalizePlayerNameKey(name);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        const tracked = tracker.players[key];
+        if (!tracked) {
+            lines.push(`${truncateText(name, 24)}: <1m`);
+            continue;
+        }
+
+        const startedMs = tracked.currentSessionStartedAt ? new Date(tracked.currentSessionStartedAt).getTime() : 0;
+        const sessionMs = startedMs > 0 ? Math.max(0, nowMs - startedMs) : 0;
+        lines.push(`${truncateText(name, 24)}: ${formatDuration(sessionMs)}`);
+    }
+
+    if (!lines.length) {
+        return 'No active sessions';
+    }
+
+    const visible = lines.slice(0, 15);
+    const remaining = lines.length - visible.length;
+    const suffix = remaining > 0 ? `\n+${remaining} more player session(s)` : '';
+    return truncateText(`${visible.join('\n')}${suffix}`, 1000);
+};
+
 class MinecraftStatusManager {
     constructor() {
         this.client = null;
@@ -89,6 +262,7 @@ class MinecraftStatusManager {
 
     async init(client) {
         this.client = client;
+        let needsSave = false;
 
         try {
             await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
@@ -102,6 +276,28 @@ class MinecraftStatusManager {
             }
         }
 
+        for (const [guildId, config] of Object.entries(this.data.guilds || {})) {
+            if (!config || typeof config !== 'object') {
+                this.data.guilds[guildId] = {
+                    guildId,
+                    enabled: false,
+                    playerSessionTracker: { players: {} }
+                };
+                needsSave = true;
+                continue;
+            }
+
+            const normalizedTracker = normalizePlayerSessionTracker(config.playerSessionTracker);
+            if (JSON.stringify(normalizedTracker) !== JSON.stringify(config.playerSessionTracker || {})) {
+                config.playerSessionTracker = normalizedTracker;
+                needsSave = true;
+            }
+        }
+
+        if (needsSave) {
+            await this.save();
+        }
+
         this.startUpdater();
     }
 
@@ -110,7 +306,16 @@ class MinecraftStatusManager {
     }
 
     getGuildConfig(guildId) {
-        return this.data.guilds[guildId] || null;
+        const config = this.data.guilds[guildId] || null;
+        if (!config) return null;
+
+        config.playerSessionTracker = normalizePlayerSessionTracker(config.playerSessionTracker);
+        return config;
+    }
+
+    getPlayerSessionSummary(guildId, status) {
+        const config = this.getGuildConfig(guildId);
+        return formatPlayerSessionTimes(status, config?.playerSessionTracker || null, Date.now());
     }
 
     async configureMonitor(guildId, { channelId, host, port, intervalMinutes }) {
@@ -128,6 +333,7 @@ class MinecraftStatusManager {
             enabled: true,
             messageId: channelChanged ? null : (previous?.messageId || null),
             lastGoodStatus: previous?.lastGoodStatus || null,
+            playerSessionTracker: normalizePlayerSessionTracker(previous?.playerSessionTracker),
             consecutiveOfflineChecks: 0,
             lastError: null,
             nextUpdateAt: null
@@ -212,6 +418,7 @@ class MinecraftStatusManager {
 
             const status = await fetchMinecraftServerStatus(normalizedConfig.host, normalizedConfig.port);
             const previous = this.data.guilds[guildId] || {};
+            const nowMs = Date.now();
 
             let statusForEmbed = status;
             let nextOfflineChecks = 0;
@@ -252,7 +459,12 @@ class MinecraftStatusManager {
                 }
             }
 
-            const message = await this.sendOrEditMessage(channel, config.messageId, this.buildStatusEmbed(guild, normalizedConfig, statusForEmbed));
+            const playerSessionTracker = updatePlayerSessionTracker(previous.playerSessionTracker, statusForEmbed, {
+                confirmedOnline,
+                nowMs
+            });
+
+            const message = await this.sendOrEditMessage(channel, config.messageId, this.buildStatusEmbed(guild, normalizedConfig, statusForEmbed, playerSessionTracker));
 
             this.data.guilds[guildId] = {
                 ...this.data.guilds[guildId],
@@ -262,6 +474,7 @@ class MinecraftStatusManager {
                 lastCheckedAt: new Date().toISOString(),
                 lastOnline: confirmedOnline,
                 lastGoodStatus,
+                playerSessionTracker,
                 consecutiveOfflineChecks: nextOfflineChecks,
                 lastError: null,
                 nextUpdateAt: new Date(Date.now() + normalizeIntervalMinutes(config.intervalMinutes) * 60 * 1000).toISOString()
@@ -307,7 +520,7 @@ class MinecraftStatusManager {
         return channel.send({ embeds: [embed] });
     }
 
-    buildStatusEmbed(guild, config, status) {
+    buildStatusEmbed(guild, config, status, playerSessionTracker = null) {
         const online = status.online === true;
         const color = online ? 0x57F287 : 0xED4245;
         const address = formatAddress(status.hostname || config.host, status.port || config.port);
@@ -320,6 +533,7 @@ class MinecraftStatusManager {
             ? `${status.playersOnline} / ${status.playersMax}`
             : 'Unavailable';
         const playerNamesText = formatOnlinePlayerNames(status);
+        const playerSessionText = formatPlayerSessionTimes(status, playerSessionTracker, Date.now());
         const playerBar = online
             ? buildPlayerProgressBar(status.playersOnline, status.playersMax)
             : '□□□□□□□□□□ 0%';
@@ -345,6 +559,7 @@ class MinecraftStatusManager {
                 { name: '👥 Players', value: toEmbedFieldValue(playersText), inline: true },
                 { name: '📈 Capacity', value: toEmbedFieldValue(playerBar), inline: true },
                 { name: '🧍 Online Users', value: toEmbedFieldValue(playerNamesText), inline: false },
+                { name: '⏱️ Session Time', value: toEmbedFieldValue(playerSessionText), inline: false },
                 { name: '🧩 Version', value: toEmbedFieldValue(status.version || 'Unknown'), inline: true },
                 { name: '🛠️ Software', value: toEmbedFieldValue(status.software || 'Unknown'), inline: true },
                 { name: '🔁 Interval', value: toEmbedFieldValue(`Every ${refreshMinutes} minute${refreshMinutes === 1 ? '' : 's'}`), inline: true },

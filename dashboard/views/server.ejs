@@ -372,6 +372,9 @@ function renderMinecraftStatus(status) {
   const playerSummary = online
     ? `${status?.playersOnline ?? 0} / ${status?.playersMax ?? 0}`
     : 'Unavailable';
+  const sessionSummary = online
+    ? (status?.playerSessionText || 'No active sessions')
+    : 'Unavailable';
 
   result.hidden = false;
   result.innerHTML = `
@@ -396,6 +399,10 @@ function renderMinecraftStatus(status) {
           <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Software</div>
           <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.software || 'Unknown')}</div>
         </div>
+      </div>
+      <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);margin-bottom:${status?.motd ? '14px' : '0'}">
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Player session time</div>
+        <div style="color:var(--text-1);line-height:1.5;white-space:pre-line">${escapeHtml(sessionSummary)}</div>
       </div>
       ${status?.motd ? `<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)"><div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Message of the day</div><div style="color:var(--text-1);line-height:1.5">${escapeHtml(status.motd)}</div></div>` : ''}
     </div>

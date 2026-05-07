@@ -1066,6 +1066,7 @@ class Dashboard {
                 }
 
                 const status = await fetchMinecraftServerStatus(host, port);
+                status.playerSessionText = minecraftStatusManager.getPlayerSessionSummary(req.params.guildId, status);
                 res.json({ success: true, status });
             } catch (error) {
                 console.error('Error checking Minecraft server status:', error);
