@@ -132,6 +132,7 @@ const updatePlayerSessionTracker = (trackerInput, status, { confirmedOnline, now
     const tracker = normalizePlayerSessionTracker(trackerInput);
     const players = tracker.players;
     const nowIso = new Date(nowMs).toISOString();
+    const playersOnline = Math.max(0, Number(status?.playersOnline || 0));
 
     const closeSession = (entry) => {
         const startedMs = entry.currentSessionStartedAt ? new Date(entry.currentSessionStartedAt).getTime() : 0;
@@ -148,6 +149,17 @@ const updatePlayerSessionTracker = (trackerInput, status, { confirmedOnline, now
         const names = Array.isArray(status.playerNames)
             ? status.playerNames.map(name => String(name || '').trim()).filter(Boolean)
             : [];
+
+        // When the server is online but reports zero players, any open tracked sessions are stale.
+        if (playersOnline === 0) {
+            for (const entry of Object.values(players)) {
+                if (entry.currentSessionStartedAt) {
+                    closeSession(entry);
+                }
+            }
+
+            return tracker;
+        }
 
         // Without exposed names there is no safe way to attribute time to specific players.
         if (names.length > 0) {

@@ -2,6 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const MAX_LEVEL = 10000000000;
+const ALLOWED_LEADERBOARD_TYPES = new Set(['balance', 'xp', 'seasonalCoins', 'dailyStreak', 'level', 'highestLevelReached']);
 
 function calculateLevelFromXP(xp) {
     const safeXP = Number.isFinite(xp) ? Math.max(0, xp) : 0;
@@ -192,6 +193,8 @@ class EconomyManager {
     }
 
     getLeaderboard(guildId, type = 'balance', limit = 10) {
+        // Security: Validate type parameter against whitelist to prevent prototype pollution
+        const sanitizedType = ALLOWED_LEADERBOARD_TYPES.has(type) ? type : 'balance';
         const normalizedGuildId = guildId ? String(guildId) : null;
 
         return Object.entries(this.data.users)
@@ -203,11 +206,13 @@ class EconomyManager {
                 if (!normalizedGuildId) return true;
                 return !user.guilds.length || user.guilds.includes(normalizedGuildId);
             })
-            .sort((a, b) => (b[type] || 0) - (a[type] || 0))
+            .sort((a, b) => (b[sanitizedType] || 0) - (a[sanitizedType] || 0))
             .slice(0, limit);
     }
 
     getGlobalLeaderboard(type = 'balance', limit = 100) {
+        // Security: Validate type parameter against whitelist to prevent prototype pollution
+        const sanitizedType = ALLOWED_LEADERBOARD_TYPES.has(type) ? type : 'balance';
         return Object.entries(this.data.users)
             .map(([userId, data]) => {
                 const user = this.normalizeUserData(data);
@@ -217,7 +222,7 @@ class EconomyManager {
                     totalCoins: user.seasonalCoins || 0
                 };
             })
-            .sort((a, b) => (b[type] || 0) - (a[type] || 0))
+            .sort((a, b) => (b[sanitizedType] || 0) - (a[sanitizedType] || 0))
             .slice(0, limit);
     }
 

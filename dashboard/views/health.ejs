@@ -3,21 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= guild.name %> — Bot Health</title>
+  <title>Bot Health — Owner Dashboard</title>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
-<div class="app-layout">
+<div <% if (isOwnerView) { %>class="server-picker owner-dashboard-shell"<% } else { %>class="app-layout"<% } %>>
+  <% if (isOwnerView) { %>
+  <nav class="landing-nav">
+    <div class="container">
+      <a href="/dashboard" class="landing-nav-brand">
+        <div class="landing-nav-brand-icon"><i class="fas fa-crown" style="color:white;font-size:16px"></i></div>
+        Bot Owner
+      </a>
+      <div class="landing-nav-links">
+        <a href="/dashboard/owner" class="btn btn-secondary btn-sm"><i class="fas fa-cog"></i> Settings</a>
+        <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+        <div class="topbar-user">
+          <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
+          <span class="topbar-user-name"><%= user.username %></span>
+        </div>
+        <a href="/logout" class="btn btn-secondary btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</a>
+      </div>
+    </div>
+  </nav>
+  <main class="server-picker-content">
+  <% } else { %>
   <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
   <div class="main-wrapper">
     <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Bot Health' }) %>
 
     <main class="content">
+  <% } %>
       <div class="page-header">
         <h1><i class="fas fa-heart-pulse" style="color:var(--brand);margin-right:8px"></i>Bot Health</h1>
-        <p>Live status and recent admin activity for <strong><%= guild.name %></strong></p>
+        <p><% if (isOwnerView) { %>Live status and recent dashboard activity for the bot<% } else { %>Live status and recent admin activity for <strong><%= guild.name %></strong><% } %></p>
       </div>
 
       <div class="stats-row">
@@ -65,7 +86,12 @@
         </div>
       </div>
     </main>
+  <% if (isOwnerView) { %>
+  </main>
+  <% } else { %>
   </div>
+</div>
+  <% } %>
 </div>
 
 <%- include('partials/dashboard-common-scripts') %>

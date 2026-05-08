@@ -127,8 +127,7 @@ const DASHBOARD_SECTION_LABELS = {
     automod: 'Auto-Mod',
     safety: 'Safety Center',
     analytics: 'Analytics',
-    activity: 'Activity Center',
-    health: 'Bot Health'
+    activity: 'Activity Center'
 };
 
 const getDashboardSectionLabel = (sectionKey) => DASHBOARD_SECTION_LABELS[sectionKey] || sectionKey;
@@ -151,7 +150,6 @@ const inferDashboardSectionKey = (requestPath) => {
     if (/^\/dashboard\/[^/]+\/safety$/.test(pathValue) || /^\/api\/safety\/[^/]+/.test(pathValue)) return 'safety';
     if (/^\/dashboard\/[^/]+\/analytics$/.test(pathValue) || /^\/api\/[^/]+\/analytics$/.test(pathValue)) return 'analytics';
     if (/^\/dashboard\/[^/]+\/activity$/.test(pathValue) || /^\/api\/[^/]+\/activity(?:\/|$)/.test(pathValue) || /^\/api\/[^/]+\/audit-log$/.test(pathValue)) return 'activity';
-    if (/^\/dashboard\/[^/]+\/health$/.test(pathValue)) return 'health';
 
     return null;
 };
@@ -1252,7 +1250,7 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const type = req.query.type || 'balance';
-                const limit = parseInt(req.query.limit) || 10;
+                const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 10));
                 let leaderboard = economyManager.getLeaderboard(guildId, type, limit);
                 
                 // Resolve usernames for leaderboard
@@ -2310,17 +2308,16 @@ class Dashboard {
             }
         });
 
-        // Bot health dashboard
-        this.app.get('/dashboard/:guildId/health', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+        // Bot health dashboard (owner only)
+        this.app.get('/dashboard/owner/health', this.checkAuth, this.checkOwnerAccess, async (req, res) => {
             try {
-                const guildId = req.params.guildId;
-                const guild = this.client.guilds.cache.get(guildId);
                 const memUsage = process.memoryUsage();
-                const auditLogs = readDashboardAuditEntries({ guildId, limit: 30 });
+                const auditLogs = readDashboardAuditEntries({ limit: 30 });
 
                 res.render('health', {
-                    guild,
+                    guild: null,
                     user: req.user,
+                    isOwnerView: true,
                     health: {
                         status: this.client?.isReady?.() ? 'Online' : 'Starting',
                         uptime: Math.floor(process.uptime()),
@@ -2800,7 +2797,7 @@ class Dashboard {
         this.app.get('/api/:guildId/leaderboard', async (req, res) => {
             try {
                 const guildId = req.params.guildId;
-                const limit = req.query.limit || 50;
+                                const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 50));
                 const guild = this.client.guilds.cache.get(guildId);
                 let leaderboard = economyManager.getLeaderboard(guildId, 'balance', parseInt(limit));
                 
