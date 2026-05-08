@@ -26,3 +26,5 @@ data/
 # Generator scripts
 generate_commands_list.js
 data/economy.json
+data/economy.json
+data/stats.json

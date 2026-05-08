@@ -23,8 +23,9 @@ function httpsGetJson(url) {
 
                 try {
                     resolve(JSON.parse(data));
-                } catch {
-                    reject(new Error('Invalid JSON response from Epic Games API'));
+                } catch (parseError) {
+                    const preview = data.substring(0, 200).replace(/\n/g, ' ');
+                    reject(new Error(`Invalid JSON response from Epic Games API: ${parseError.message}. Response start: ${preview}`));
                 }
             });
         });
@@ -189,7 +190,15 @@ class EpicGamesAlertsManager {
         const elements = payload?.data?.Catalog?.searchStore?.elements;
 
         if (!Array.isArray(elements)) {
-            throw new Error('Epic Games API returned an unexpected payload');
+            const dataStructure = payload?.data ? Object.keys(payload.data) : 'no data field';
+            const catalogStructure = payload?.data?.Catalog ? Object.keys(payload.data.Catalog) : 'no Catalog field';
+            const hasErrors = Array.isArray(payload?.errors) && payload.errors.length > 0;
+            
+            const debugInfo = `Expected elements array but got: elements=${Array.isArray(elements) ? 'array' : typeof elements}, ` +
+                `data keys=${dataStructure}, Catalog keys=${catalogStructure}, ` +
+                `API errors=${hasErrors ? payload.errors.length + ' error(s)' : 'none'}`;
+            
+            throw new Error(`Epic Games API returned an unexpected payload: ${debugInfo}`);
         }
 
         const now = Date.now();
