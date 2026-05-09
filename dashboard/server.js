@@ -1496,6 +1496,29 @@ class Dashboard {
             }
         });
 
+        this.app.post('/api/live-alerts/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const { platform, identifier } = req.body || {};
+                const normalizedPlatform = String(platform || '').toLowerCase();
+                const normalizedIdentifier = identifier != null ? String(identifier).trim() : null;
+
+                if (!['twitch', 'youtube'].includes(normalizedPlatform)) {
+                    return res.status(400).json({ success: false, error: 'Platform must be twitch or youtube' });
+                }
+
+                const result = await liveAlertsManager.sendTestAlert(guildId, normalizedPlatform, normalizedIdentifier);
+                if (!result?.success) {
+                    return res.status(400).json({ success: false, error: result?.error || 'Failed to send test alert' });
+                }
+
+                return res.json({ success: true, result });
+            } catch (error) {
+                console.error('Error sending live alert test:', error);
+                return res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         // API: Epic Games alerts
         this.app.get('/api/epic-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {

@@ -24,7 +24,7 @@ function findTargetRoleId(message, args, fromIndex = 3, skipId = null) {
 module.exports = {
     name: 'livealerts',
     description: 'Manage Twitch live and YouTube new video notifications.',
-    usage: '!livealerts add twitch <username> #channel [@role]\n!livealerts add youtube <channelId|channelUrl> #channel [@role]\n!livealerts remove twitch <username>\n!livealerts remove youtube <channelId|channelUrl>\n!livealerts list',
+    usage: '!livealerts add twitch <username> #channel [@role]\n!livealerts add youtube <channelId|channelUrl|@handle> #channel [@role]\n!livealerts remove twitch <username>\n!livealerts remove youtube <channelId|channelUrl|@handle>\n!livealerts test <twitch|youtube> [username|channelId|@handle]\n!livealerts list',
     aliases: ['streamalert', 'streamalerts'],
     category: 'admin',
     async execute(message, args, client) {
@@ -140,6 +140,30 @@ module.exports = {
                 return message.reply(`✅ Removed YouTube alert for \`${identifier}\`.`);
             }
             return message.reply('❌ Unknown platform. Use `twitch` or `youtube`.');
+        }
+
+        // ── test ─────────────────────────────────────────────────────────────
+        if (sub === 'test') {
+            const platform = args[1]?.toLowerCase();
+            const identifier = args[2] || null;
+
+            if (!platform || !['twitch', 'youtube'].includes(platform)) {
+                return message.reply('❌ Usage: `!livealerts test <twitch|youtube> [username|channelId|@handle]`');
+            }
+
+            const result = await liveAlertsManager.sendTestAlert(message.guild.id, platform, identifier);
+            if (!result?.success) {
+                return message.reply(`❌ Test alert failed: ${result?.error || 'Unknown error'}`);
+            }
+
+            const embed = new EmbedBuilder()
+                .setColor(platform === 'twitch' ? 0x9146ff : 0xff0000)
+                .setTitle('✅ Test Alert Sent')
+                .setDescription(`Sent a test **${platform}** alert for **${result.target}** to <#${result.channelId}>.`)
+                .setFooter({ text: 'This only verifies Discord delivery and embed formatting.' })
+                .setTimestamp();
+
+            return message.reply({ embeds: [embed] });
         }
 
         return message.reply(`❓ Unknown subcommand. Usage:\n\`\`\`\n${module.exports.usage}\n\`\`\``);

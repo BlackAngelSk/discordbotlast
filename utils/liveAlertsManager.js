@@ -149,6 +149,86 @@ class LiveAlertsManager {
         return this.data[guildId] || { twitch: [], youtube: [] };
     }
 
+    async sendTestAlert(guildId, platform, identifier = null) {
+        const config = this.data[guildId] || { twitch: [], youtube: [] };
+        const normalizedPlatform = String(platform || '').toLowerCase();
+
+        if (!['twitch', 'youtube'].includes(normalizedPlatform)) {
+            return { success: false, error: 'Platform must be twitch or youtube.' };
+        }
+
+        if (normalizedPlatform === 'twitch') {
+            const normalizedIdentifier = String(identifier || '').trim().toLowerCase();
+            const entry = normalizedIdentifier
+                ? (config.twitch || []).find(item => item.username === normalizedIdentifier)
+                : (config.twitch || [])[0];
+
+            if (!entry) {
+                return {
+                    success: false,
+                    error: normalizedIdentifier
+                        ? `No Twitch alert found for "${normalizedIdentifier}".`
+                        : 'No Twitch alerts configured for this server.'
+                };
+            }
+
+            const now = Date.now();
+            const testStream = {
+                user_name: entry.username,
+                title: 'This is a test live alert from your Discord bot.',
+                game_name: 'Just Chatting',
+                viewer_count: Math.floor((now / 1000) % 150) + 1,
+                started_at: new Date(now - (15 * 60 * 1000)).toISOString()
+            };
+
+            await this._postTwitchAlert(guildId, entry, testStream);
+            return {
+                success: true,
+                platform: 'twitch',
+                target: entry.username,
+                channelId: entry.channelId
+            };
+        }
+
+        const normalizedIdentifier = normalizeYouTubeChannelIdentifier(identifier || '');
+        const entry = normalizedIdentifier
+            ? (config.youtube || []).find(item => normalizeYouTubeChannelIdentifier(item.channelId) === normalizedIdentifier)
+            : (config.youtube || [])[0];
+
+        if (!entry) {
+            return {
+                success: false,
+                error: normalizedIdentifier
+                    ? `No YouTube alert found for "${normalizedIdentifier}".`
+                    : 'No YouTube alerts configured for this server.'
+            };
+        }
+
+        const now = Date.now();
+        const testVideoId = `test${String(now).slice(-8)}`;
+        const testItem = {
+            videoId: testVideoId,
+            title: 'Test Upload Notification',
+            thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+            snippet: {
+                channelTitle: entry.channelName || 'YouTube Channel',
+                description: 'This is a test YouTube alert embed to verify formatting and channel permissions.',
+                publishedAt: new Date(now).toISOString(),
+                thumbnails: {
+                    high: { url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' }
+                }
+            }
+        };
+
+        await this._postYouTubeAlert(guildId, entry, testItem);
+        return {
+            success: true,
+            platform: 'youtube',
+            target: entry.channelName || entry.channelId,
+            channelId: entry.discordChannelId
+        };
+    }
+
     // ── Twitch ────────────────────────────────────────────────────────────────
     async _getTwitchToken() {
         if (this._twitchToken && Date.now() < this._twitchTokenExpiry) return this._twitchToken;

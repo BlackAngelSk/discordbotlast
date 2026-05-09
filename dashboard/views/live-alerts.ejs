@@ -141,7 +141,7 @@
                     <table>
                         <thead>
                             <tr style="background:linear-gradient(90deg, rgba(145,71,255,0.1) 0%, rgba(145,71,255,0.05) 100%);border-bottom:2px solid #9147ff"><th colspan="5" style="padding:14px;text-align:left;font-weight:600;color:#9147ff"><i class="fab fa-twitch"></i> Twitch Alerts</th></tr>
-                            <tr style="background:rgba(145,71,255,0.05)"><th>Username</th><th>Channel</th><th>Role</th><th>Status</th><th>Action</th></tr>
+                            <tr style="background:rgba(145,71,255,0.05)"><th>Username</th><th>Channel</th><th>Role</th><th>Status</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                             <% if (alerts.twitch && alerts.twitch.length > 0) { %>
@@ -151,7 +151,12 @@
                                         <td><%= guild.channels.cache.get(entry.channelId) ? '#' + guild.channels.cache.get(entry.channelId).name : entry.channelId %></td>
                                         <td><%= entry.roleId && guild.roles.cache.get(entry.roleId) ? guild.roles.cache.get(entry.roleId).name : 'None' %></td>
                                         <td><span class="badge <%= entry.lastLive ? 'badge-green' : 'badge-blue' %>"><%= entry.lastLive ? 'Live seen' : 'Watching' %></span></td>
-                                        <td><button class="btn btn-danger btn-sm remove-alert-btn" data-platform="twitch" data-identifier="<%= entry.username %>"><i class="fas fa-trash"></i> Remove</button></td>
+                                        <td>
+                                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                                <button class="btn btn-secondary btn-sm test-alert-btn" data-platform="twitch" data-identifier="<%= entry.username %>"><i class="fas fa-paper-plane"></i> Send Test</button>
+                                                <button class="btn btn-danger btn-sm remove-alert-btn" data-platform="twitch" data-identifier="<%= entry.username %>"><i class="fas fa-trash"></i> Remove</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 <% }) %>
                             <% } else { %>
@@ -165,7 +170,7 @@
                     <table>
                         <thead>
                             <tr style="background:linear-gradient(90deg, rgba(255,0,0,0.1) 0%, rgba(255,0,0,0.05) 100%);border-bottom:2px solid #ff0000"><th colspan="6" style="padding:14px;text-align:left;font-weight:600;color:#ff0000"><i class="fab fa-youtube"></i> YouTube Alerts</th></tr>
-                            <tr style="background:rgba(255,0,0,0.05)"><th>Channel</th><th>Channel Link</th><th>Discord Channel</th><th>Role</th><th>Status</th><th>Action</th></tr>
+                            <tr style="background:rgba(255,0,0,0.05)"><th>Channel</th><th>Channel Link</th><th>Discord Channel</th><th>Role</th><th>Status</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                             <% if (alerts.youtube && alerts.youtube.length > 0) { %>
@@ -176,7 +181,12 @@
                                         <td><%= guild.channels.cache.get(entry.discordChannelId) ? '#' + guild.channels.cache.get(entry.discordChannelId).name : entry.discordChannelId %></td>
                                         <td><%= entry.roleId && guild.roles.cache.get(entry.roleId) ? guild.roles.cache.get(entry.roleId).name : 'None' %></td>
                                         <td><span class="badge <%= entry.lastVideoId ? 'badge-green' : 'badge-blue' %>"><%= entry.lastVideoId ? 'Last: ' + entry.lastVideoId.substring(0, 8) : 'Watching' %></span></td>
-                                        <td><button class="btn btn-danger btn-sm remove-alert-btn" data-platform="youtube" data-identifier="<%= entry.channelId %>"><i class="fas fa-trash"></i> Remove</button></td>
+                                        <td>
+                                            <div style="display:flex;gap:8px;flex-wrap:wrap">
+                                                <button class="btn btn-secondary btn-sm test-alert-btn" data-platform="youtube" data-identifier="<%= entry.channelId %>"><i class="fas fa-paper-plane"></i> Send Test</button>
+                                                <button class="btn btn-danger btn-sm remove-alert-btn" data-platform="youtube" data-identifier="<%= entry.channelId %>"><i class="fas fa-trash"></i> Remove</button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 <% }) %>
                             <% } else { %>
@@ -278,6 +288,36 @@ document.querySelectorAll('.remove-alert-btn').forEach(button => {
             setTimeout(() => location.reload(), 500);
         } catch (error) {
             toast(error.message || 'Failed to remove live alert', 'error');
+            button.disabled = false;
+            button.innerHTML = original;
+        }
+    });
+});
+
+document.querySelectorAll('.test-alert-btn').forEach(button => {
+    button.addEventListener('click', async () => {
+        const platform = button.dataset.platform;
+        const identifier = button.dataset.identifier;
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner"></span>';
+
+        try {
+            const response = await fetch(`/api/live-alerts/${guildId}/test`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ platform, identifier })
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Failed to send test alert');
+            }
+
+            toast(`Test ${platform} alert sent`);
+        } catch (error) {
+            toast(error.message || 'Failed to send test alert', 'error');
+        } finally {
             button.disabled = false;
             button.innerHTML = original;
         }
