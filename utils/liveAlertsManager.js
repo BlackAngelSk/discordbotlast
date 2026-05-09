@@ -46,8 +46,8 @@ function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
             let data = '';
             res.on('data', c => (data += c));
             res.on('end', () => {
-                try { resolve({ status: res.statusCode, body: JSON.parse(data) }); }
-                catch { resolve({ status: res.statusCode, body: data }); }
+                try { resolve({ status: res.statusCode, headers: res.headers || {}, body: JSON.parse(data) }); }
+                catch { resolve({ status: res.statusCode, headers: res.headers || {}, body: data }); }
             });
         });
 
@@ -69,7 +69,15 @@ function normalizeYouTubeChannelIdentifier(input) {
 
     // Accept direct UC channel IDs anywhere in the string (raw value or URL).
     const match = value.match(/(UC[\w-]{22})/);
-    return match ? match[1] : value;
+    if (match) return match[1];
+
+    // Normalize handles from URLs or raw input so downstream resolution is consistent.
+    const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
+    if (handleMatch?.[1]) {
+        return `@${handleMatch[1]}`;
+    }
+
+    return value;
 }
 
 class LiveAlertsManager {
@@ -85,6 +93,7 @@ class LiveAlertsManager {
         this._warnedYouTubeQuota = false;
         this._youtubeFailureCount = {}; // Track consecutive 404 failures per channel
         this._youtubeFailureThreshold = 3; // Remove channel after N consecutive 404s
+        this._youtubeUnresolvedIdentifierWarned = {}; // Track unresolved non-UC identifiers to avoid log spam
     }
 
     async init(client) {
@@ -324,6 +333,67 @@ class LiveAlertsManager {
         return null;
     }
 
+    _extractUcChannelIdFromHtml(html) {
+        const text = String(html || '');
+        if (!text) return null;
+
+        const patterns = [
+            /"externalId"\s*:\s*"(UC[\w-]{22})"/i,
+            /"channelId"\s*:\s*"(UC[\w-]{22})"/i,
+            /\/channel\/(UC[\w-]{22})/i
+        ];
+
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match?.[1]) {
+                return match[1];
+            }
+        }
+
+        return null;
+    }
+
+    async _resolveYouTubeChannelIdWithoutApi(identifier) {
+        const raw = normalizeYouTubeChannelIdentifier(identifier);
+        if (!raw) return null;
+        if (/^UC[\w-]{22}$/.test(raw)) return raw;
+
+        const handle = raw.match(/^@([A-Za-z0-9._-]+)$/)?.[1]
+            || raw.match(/@([A-Za-z0-9._-]+)/)?.[1]
+            || null;
+
+        if (!handle) return null;
+
+        let url = `https://www.youtube.com/@${handle}`;
+        for (let i = 0; i < 4; i += 1) {
+            const res = await httpsGet(url, {
+                'Accept': 'text/html,application/xhtml+xml',
+                'User-Agent': 'Mozilla/5.0 (compatible; discordbotlivealerts/1.0)'
+            }).catch(() => null);
+
+            if (!res) return null;
+
+            const status = Number(res.status || 0);
+            const location = typeof res.headers?.location === 'string' ? res.headers.location : null;
+            if ([301, 302, 303, 307, 308].includes(status) && location) {
+                if (/^https?:\/\//i.test(location)) {
+                    url = location;
+                } else {
+                    url = `https://www.youtube.com${location.startsWith('/') ? '' : '/'}${location}`;
+                }
+                continue;
+            }
+
+            if (status >= 400) return null;
+
+            const resolved = this._extractUcChannelIdFromHtml(res.body);
+            if (resolved) return resolved;
+            return null;
+        }
+
+        return null;
+    }
+
     async _checkYouTube(entry, guildId) {
         if (Date.now() < this._youtubeQuotaBlockedUntil) return;
 
@@ -334,7 +404,8 @@ class LiveAlertsManager {
 
         try {
             // Resolve/persist channel name + ensure UC id — uses API only when data is missing.
-            const hasUcId = /^UC[\w-]{22}$/.test(String(entry.channelId || ''));
+            const originalIdentifier = String(entry.channelId || '').trim();
+            const hasUcId = /^UC[\w-]{22}$/.test(originalIdentifier);
             if (!entry.channelName || !hasUcId) {
                 const apiKey = process.env.YOUTUBE_API_KEY;
                 if (apiKey) {
@@ -347,8 +418,27 @@ class LiveAlertsManager {
                         entry.channelName = resolvedMeta.channelName;
                         await this.save();
                     }
+                } else if (!hasUcId) {
+                    const resolvedChannelId = await this._resolveYouTubeChannelIdWithoutApi(entry.channelId);
+                    if (resolvedChannelId && entry.channelId !== resolvedChannelId) {
+                        entry.channelId = resolvedChannelId;
+                        await this.save();
+                    }
                 }
             }
+
+            const resolvedChannelId = String(entry.channelId || '').trim();
+            const resolvedHasUcId = /^UC[\w-]{22}$/.test(resolvedChannelId);
+            const unresolvedKey = `${guildId}_${originalIdentifier || resolvedChannelId}`;
+            if (!resolvedHasUcId) {
+                if (!this._youtubeUnresolvedIdentifierWarned[unresolvedKey]) {
+                    console.warn(`YouTube alert unresolved identifier (${originalIdentifier || resolvedChannelId}) in guild ${guildId}. Waiting for a resolvable UC channel ID instead of counting RSS 404 failures.`);
+                    this._youtubeUnresolvedIdentifierWarned[unresolvedKey] = true;
+                }
+                return;
+            }
+
+            delete this._youtubeUnresolvedIdentifierWarned[unresolvedKey];
 
             // Use the free public RSS feed — costs zero API quota.
             const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(entry.channelId)}`;
