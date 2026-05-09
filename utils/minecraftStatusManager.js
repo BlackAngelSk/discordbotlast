@@ -11,6 +11,11 @@ const UPDATE_TICK_MS = 60 * 1000;
 const OFFLINE_CONFIRMATION_CHECKS = 3;
 const MINECRAFT_ICON_URL = 'https://cdn.discordapp.com/emojis/1218277823286202398.webp?size=128&quality=lossless';
 const MAX_TRACKED_PLAYERS = 200;
+const DISCORD_RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
+const DISCORD_MAX_RETRY_ATTEMPTS = 3;
+const DISCORD_RETRY_BASE_DELAY_MS = 1200;
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const normalizeIntervalMinutes = (value) => {
     const parsed = Number(value);
@@ -317,6 +322,53 @@ class MinecraftStatusManager {
         await fs.writeFile(DATA_FILE, JSON.stringify(this.data, null, 2));
     }
 
+    isDiscordTransientError(error) {
+        if (!error || typeof error !== 'object') {
+            return false;
+        }
+
+        if (DISCORD_RETRYABLE_STATUSES.has(Number(error.status))) {
+            return true;
+        }
+
+        const code = String(error.code || '').toUpperCase();
+        return code === 'ECONNRESET'
+            || code === 'ETIMEDOUT'
+            || code === 'ENOTFOUND'
+            || code === 'UND_ERR_CONNECT_TIMEOUT';
+    }
+
+    isDiscordMessageMissingError(error) {
+        if (!error || typeof error !== 'object') {
+            return false;
+        }
+
+        return Number(error.status) === 404 || Number(error.code) === 10008;
+    }
+
+    async withDiscordRetry(operation, contextLabel) {
+        let lastError = null;
+
+        for (let attempt = 1; attempt <= DISCORD_MAX_RETRY_ATTEMPTS; attempt += 1) {
+            try {
+                return await operation();
+            } catch (error) {
+                lastError = error;
+                const retryable = this.isDiscordTransientError(error);
+                if (!retryable || attempt >= DISCORD_MAX_RETRY_ATTEMPTS) {
+                    throw error;
+                }
+
+                const jitterMs = Math.floor(Math.random() * 300);
+                const waitMs = DISCORD_RETRY_BASE_DELAY_MS * attempt + jitterMs;
+                console.warn(`Minecraft status ${contextLabel} transient Discord error (attempt ${attempt}/${DISCORD_MAX_RETRY_ATTEMPTS}, status ${error.status || 'n/a'}). Retrying in ${waitMs}ms.`);
+                await delay(waitMs);
+            }
+        }
+
+        throw lastError;
+    }
+
     getGuildConfig(guildId) {
         const config = this.data.guilds[guildId] || null;
         if (!config) return null;
@@ -506,8 +558,12 @@ class MinecraftStatusManager {
                 const guild = this.client.guilds.cache.get(guildId) || await this.client.guilds.fetch(guildId).catch(() => null);
                 const channel = guild ? (guild.channels.cache.get(current.channelId) || await guild.channels.fetch(current.channelId).catch(() => null)) : null;
                 if (channel?.isTextBased?.()) {
-                    const message = await this.sendOrEditMessage(channel, current.messageId, this.buildErrorEmbed(guild, current, error.message || 'Update failed'));
-                    current.messageId = message?.id || current.messageId || null;
+                    try {
+                        const message = await this.sendOrEditMessage(channel, current.messageId, this.buildErrorEmbed(guild, current, error.message || 'Update failed'));
+                        current.messageId = message?.id || current.messageId || null;
+                    } catch (secondaryError) {
+                        console.warn('Minecraft status fallback message update failed:', secondaryError?.message || secondaryError);
+                    }
                 }
 
                 await this.save();
@@ -522,14 +578,29 @@ class MinecraftStatusManager {
     async sendOrEditMessage(channel, messageId, embed) {
         let message = null;
         if (messageId) {
-            message = await channel.messages.fetch(messageId).catch(() => null);
+            try {
+                message = await this.withDiscordRetry(
+                    () => channel.messages.fetch(messageId),
+                    'message fetch'
+                );
+            } catch (error) {
+                if (!this.isDiscordMessageMissingError(error)) {
+                    throw error;
+                }
+            }
         }
 
         if (message) {
-            return message.edit({ embeds: [embed] });
+            return this.withDiscordRetry(
+                () => message.edit({ embeds: [embed] }),
+                'message edit'
+            );
         }
 
-        return channel.send({ embeds: [embed] });
+        return this.withDiscordRetry(
+            () => channel.send({ embeds: [embed] }),
+            'message send'
+        );
     }
 
     buildStatusEmbed(guild, config, status, playerSessionTracker = null) {
