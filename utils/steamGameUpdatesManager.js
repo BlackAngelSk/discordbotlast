@@ -8,7 +8,7 @@ const settingsManager = require('./settingsManager');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'steamGameUpdates.json');
 const APP_DETAILS_URL = 'https://store.steampowered.com/api/appdetails?l=en&appids=';
-const APP_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?maxlength=0&format=json&count=10&appid=';
+const APP_NEWS_URL = 'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?maxlength=0&format=json&count=25&appid=';
 const APP_SEARCH_URL = 'https://store.steampowered.com/api/storesearch/?l=en&cc=US&term=';
 const MINECRAFT_UPDATES_URL = 'https://www.minecraft.net/en-us/updates/';
 const MINECRAFT_VERSION_MANIFEST_URL = 'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
@@ -417,6 +417,87 @@ function buildSteamChangelogUrl(appId, article) {
     }
 
     return buildSteamArticleUrl(appId, article) || buildNewsHubUrl(appId);
+}
+
+function scoreSteamChangelogCandidate(article) {
+    if (!article || typeof article !== 'object') return 0;
+
+    const title = sanitizeText(article.title || '').toLowerCase();
+    const url = String(article.url || '').toLowerCase();
+    const rawContents = String(article.contents || '');
+    const cleanedContents = sanitizeText(removeSteamImageMarkup(rawContents)).toLowerCase();
+    const text = `${title} ${url} ${cleanedContents}`;
+    let score = 0;
+
+    const strongSignals = [
+        /\bpatch\s*notes?\b/i,
+        /\bchangelog\b/i,
+        /\bupdate\s*notes?\b/i,
+        /\brelease\s*notes?\b/i,
+        /\bhotfix(?:es)?\b/i,
+        /\bbug\s*fix(?:es)?\b/i,
+        /\bversion\s*(?:\d+\.)+\d+/i
+    ];
+
+    const weakSignals = [
+        /\bpatch\b/i,
+        /\bupdate\b/i,
+        /\bfixed\b/i,
+        /\bchanges?\b/i,
+        /\bimprovements?\b/i,
+        /\bbalance\b/i,
+        /\bquality\s+of\s+life\b/i,
+        /\bserver\s+maintenance\b/i,
+        /\bknown\s+issues?\b/i
+    ];
+
+    const negativeSignals = [
+        /\bsale\b/i,
+        /\bdiscount\b/i,
+        /\bweekend\s+deal\b/i,
+        /\bspotlight\b/i,
+        /\btrailer\b/i,
+        /\blivestream\b/i,
+        /\bstream\b/i,
+        /\besports?\b/i,
+        /\btournament\b/i,
+        /\bgiveaway\b/i,
+        /\bcommunity\s+event\b/i,
+        /\bfan\s+art\b/i,
+        /\bsoundtrack\b/i,
+        /\bwallpaper\b/i,
+        /\binterview\b/i,
+        /\bguide\b/i,
+        /\bworkshop\b/i
+    ];
+
+    for (const pattern of strongSignals) {
+        if (pattern.test(text)) score += 4;
+    }
+
+    for (const pattern of weakSignals) {
+        if (pattern.test(text)) score += 1;
+    }
+
+    for (const pattern of negativeSignals) {
+        if (pattern.test(text)) score -= 3;
+    }
+
+    const sections = parseSteamSections(removeSteamImageMarkup(rawContents));
+    if (sections.length > 0) score += 2;
+    const listItemCount = sections.reduce((total, section) => total + (Array.isArray(section.items) ? section.items.length : 0), 0);
+    if (listItemCount >= 3) score += 2;
+
+    const titleWordCount = title.split(/\s+/).filter(Boolean).length;
+    if (titleWordCount > 0 && titleWordCount <= 2 && !/\bpatch|update|hotfix|notes|changelog\b/i.test(title)) {
+        score -= 2;
+    }
+
+    return score;
+}
+
+function isLikelySteamChangelog(article) {
+    return scoreSteamChangelogCandidate(article) >= 3;
 }
 
 function buildSourceKey(game) {
@@ -1505,7 +1586,22 @@ class SteamGameUpdatesManager {
     async fetchNewsForApp(appId, game) {
         const payload = await httpsGetJson(`${APP_NEWS_URL}${encodeURIComponent(appId)}`);
         const items = Array.isArray(payload?.appnews?.newsitems) ? payload.appnews.newsitems : [];
-        return items
+        const rankedItems = items
+            .map(article => ({ article, score: scoreSteamChangelogCandidate(article) }))
+            .sort((left, right) => {
+                if (right.score !== left.score) return right.score - left.score;
+                return Number(right.article?.date || 0) - Number(left.article?.date || 0);
+            });
+
+        const likelyChangelogs = rankedItems
+            .filter(entry => isLikelySteamChangelog(entry.article))
+            .map(entry => entry.article);
+
+        const preferredItems = likelyChangelogs.length > 0
+            ? likelyChangelogs
+            : rankedItems.map(entry => entry.article);
+
+        return preferredItems
             .map(article => buildSteamUpdate(appId, article, game))
             .filter(article => article.key)
             .sort((left, right) => Number(right.date) - Number(left.date));
