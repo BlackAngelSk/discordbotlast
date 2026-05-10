@@ -30,6 +30,7 @@ import argparse
 import fnmatch
 import json
 import os
+import socket
 import shlex
 import shutil
 import ssl
@@ -59,6 +60,9 @@ PROTECTED_LOCAL_PATTERNS = {
     "token.txt",
     "tokens.json",
 }
+
+NETWORK_RETRY_ATTEMPTS = 3
+NETWORK_RETRY_BASE_DELAY_SECONDS = 2
 
 
 class UpdaterError(Exception):
@@ -286,16 +290,38 @@ def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
         headers["Authorization"] = f"Bearer {token}"
 
     req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=30, context=_build_ssl_context()) as resp:
-            data = resp.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="ignore")
-        raise UpdaterError(f"GitHub API HTTP {e.code}: {body or e.reason}") from e
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ssl.SSLCertVerificationError):
-            raise UpdaterError(_cert_error_hint()) from e
-        raise UpdaterError(f"Network error while calling GitHub API: {e.reason}") from e
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=30, context=_build_ssl_context()) as resp:
+                data = resp.read().decode("utf-8")
+            break
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="ignore")
+            raise UpdaterError(f"GitHub API HTTP {e.code}: {body or e.reason}") from e
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ssl.SSLCertVerificationError):
+                raise UpdaterError(_cert_error_hint()) from e
+
+            last_error = e
+            is_timeout = isinstance(e.reason, TimeoutError) or isinstance(e.reason, socket.timeout)
+            if not is_timeout or attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise UpdaterError(f"Network error while calling GitHub API: {e.reason}") from e
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"GitHub API timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
+        except (TimeoutError, socket.timeout) as e:
+            last_error = e
+            if attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise UpdaterError("GitHub API request timed out") from e
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"GitHub API timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
+    else:
+        raise UpdaterError("GitHub API request failed after retries") from last_error
 
     try:
         return json.loads(data)
@@ -311,17 +337,38 @@ def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Pa
         headers["Authorization"] = f"Bearer {token}"
 
     req = urllib.request.Request(url, headers=headers)
+    last_error: Optional[Exception] = None
 
-    try:
-        with urllib.request.urlopen(req, timeout=120, context=_build_ssl_context()) as resp, output.open("wb") as f:
-            shutil.copyfileobj(resp, f)
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="ignore")
-        raise UpdaterError(f"Download failed (HTTP {e.code}): {body or e.reason}") from e
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ssl.SSLCertVerificationError):
-            raise UpdaterError(_cert_error_hint()) from e
-        raise UpdaterError(f"Download failed: {e.reason}") from e
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=120, context=_build_ssl_context()) as resp, output.open("wb") as f:
+                shutil.copyfileobj(resp, f)
+            break
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="ignore")
+            raise UpdaterError(f"Download failed (HTTP {e.code}): {body or e.reason}") from e
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ssl.SSLCertVerificationError):
+                raise UpdaterError(_cert_error_hint()) from e
+
+            last_error = e
+            is_timeout = isinstance(e.reason, TimeoutError) or isinstance(e.reason, socket.timeout)
+            if not is_timeout or attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise UpdaterError(f"Download failed: {e.reason}") from e
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"Download timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
+        except (TimeoutError, socket.timeout) as e:
+            last_error = e
+            if attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise UpdaterError("Download request timed out") from e
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"Download timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
+    else:
+        raise UpdaterError("Download failed after retries") from last_error
 
     if output.stat().st_size == 0:
         raise UpdaterError("Downloaded file is empty")

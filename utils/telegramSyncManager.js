@@ -12,6 +12,10 @@ const TELEGRAM_MAX_DOWNLOAD_BYTES = getPositiveInteger(process.env.TELEGRAM_SYNC
 const TELEGRAM_POLL_CONCURRENCY = getPositiveInteger(process.env.TELEGRAM_SYNC_POLL_CONCURRENCY, 3);
 const TELEGRAM_MAX_MEDIA_PER_MESSAGE = getPositiveInteger(process.env.TELEGRAM_SYNC_MAX_MEDIA_PER_MESSAGE, 4);
 const RETRY_ATTEMPTS = 3;
+const POLL_DELAY_MS = 1200;
+const POLL_INFLIGHT_DELAY_MS = 1500;
+const POLL_CONFLICT_INITIAL_BACKOFF_MS = 15000;
+const POLL_CONFLICT_MAX_BACKOFF_MS = 10 * 60 * 1000;
 
 function getPositiveInteger(value, fallback) {
     const parsed = Number.parseInt(String(value || '').trim(), 10);
@@ -25,6 +29,11 @@ function wait(ms) {
 function isTransientError(error) {
     const text = String(error?.message || '').toLowerCase();
     return /(timeout|timed out|econnreset|socket hang up|enotfound|eai_again|429|502|503|504|rate limit)/.test(text);
+}
+
+function isPollingConflictError(error) {
+    const text = String(error?.message || '').toLowerCase();
+    return /terminated by other getupdates request|conflict/i.test(text);
 }
 
 async function withRetry(task, label, attempts = RETRY_ATTEMPTS) {
@@ -369,6 +378,8 @@ class TelegramSyncManager {
         this.pollInFlight = false;
         this.updateOffset = null;
         this.warnedMissingToken = false;
+        this.pollConflictBackoffMs = POLL_CONFLICT_INITIAL_BACKOFF_MS;
+        this.pollConflictActive = false;
     }
 
     async init(client) {
@@ -719,7 +730,7 @@ class TelegramSyncManager {
         if (this.pollTimer) {
             clearTimeout(this.pollTimer);
         }
-        this.pollTimer = setTimeout(() => this._pollLoop(), 1200);
+        this.pollTimer = setTimeout(() => this._pollLoop(), POLL_DELAY_MS);
     }
 
     _hasTelegramToDiscordTargets() {
@@ -765,11 +776,12 @@ class TelegramSyncManager {
 
     async _pollLoop() {
         if (this.pollInFlight) {
-            this.pollTimer = setTimeout(() => this._pollLoop(), 1500);
+            this.pollTimer = setTimeout(() => this._pollLoop(), POLL_INFLIGHT_DELAY_MS);
             return;
         }
 
         this.pollInFlight = true;
+        let nextDelayMs = POLL_DELAY_MS;
         try {
             if (!this.hasBotToken()) {
                 return;
@@ -780,6 +792,12 @@ class TelegramSyncManager {
             }
 
             const updates = await this._fetchUpdates({ timeout: 20, offset: this.updateOffset });
+            if (this.pollConflictActive) {
+                this.pollConflictActive = false;
+                this.pollConflictBackoffMs = POLL_CONFLICT_INITIAL_BACKOFF_MS;
+                console.log('[Telegram Sync] Polling conflict cleared; resumed normal getUpdates polling.');
+            }
+
             if (updates.length > 0) {
                 console.log(`[Telegram Sync] Received ${updates.length} update(s)`);
                 this.updateOffset = updates[updates.length - 1].update_id + 1;
@@ -792,12 +810,23 @@ class TelegramSyncManager {
                 }
             });
         } catch (error) {
-            if (!/timeout/i.test(error.message)) {
+            if (isPollingConflictError(error)) {
+                nextDelayMs = this.pollConflictBackoffMs;
+                this.pollConflictBackoffMs = Math.min(this.pollConflictBackoffMs * 2, POLL_CONFLICT_MAX_BACKOFF_MS);
+
+                if (!this.pollConflictActive) {
+                    this.pollConflictActive = true;
+                    console.warn(
+                        `[Telegram Sync] getUpdates conflict detected (another bot instance is polling). `
+                        + `Backing off for ${Math.floor(nextDelayMs / 1000)}s and retrying automatically.`
+                    );
+                }
+            } else if (!/timeout/i.test(error.message)) {
                 console.error('[Telegram Sync] Polling error:', error.message);
             }
         } finally {
             this.pollInFlight = false;
-            this.pollTimer = setTimeout(() => this._pollLoop(), 1200);
+            this.pollTimer = setTimeout(() => this._pollLoop(), nextDelayMs);
         }
     }
 
