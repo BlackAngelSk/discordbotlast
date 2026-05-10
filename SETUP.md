@@ -78,6 +78,22 @@ MONGODB_SYNC_ON_STARTUP=true
 MONGODB_SYNC_ON_SHUTDOWN=true
 ```
 
+Auto update support:
+
+```env
+AUTO_UPDATE_ENABLED=false
+AUTO_UPDATE_REF=main
+AUTO_UPDATE_INTERVAL_SECONDS=900
+AUTO_UPDATE_INITIAL_DELAY_SECONDS=45
+AUTO_UPDATE_RESTART_DELAY_MS=2000
+AUTO_UPDATE_BACKUP=true
+AUTO_UPDATE_DELETE_MISSING=false
+PYTHON_EXE=python3
+GITHUB_TOKEN=
+```
+
+When enabled, the bot periodically checks GitHub for new commits and applies updates with `self updater/updater.py`, then exits so PM2 can restart it.
+
 For complete database guidance, see [`MONGODB.md`](MONGODB.md).
 
 ## Discord Application Setup

@@ -78,6 +78,7 @@ Not every feature is available in both styles, but most major systems support on
 | `/mongodb-sync status` | View sync configuration |
 | `/mongodb-sync schedule` | Switch between manual and timed updates |
 | `/mongodb-sync run` | Trigger a sync immediately |
+| `/force-update-check [apply_update]` | Force-check GitHub for updates now (optionally check-only) |
 | `/testcommands` | Validate slash command availability |
 | `/system-stats` | Show CPU and memory information |
 | `/botstatus` | Review bot health and status |

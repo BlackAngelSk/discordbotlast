@@ -71,6 +71,16 @@ DASHBOARD_CALLBACK=http://127.0.0.1:3000/callback
 
 MONGODB_URI=
 MONGODB_DBNAME=discord-bot
+
+AUTO_UPDATE_ENABLED=false
+AUTO_UPDATE_REF=main
+AUTO_UPDATE_INTERVAL_SECONDS=900
+AUTO_UPDATE_INITIAL_DELAY_SECONDS=45
+AUTO_UPDATE_RESTART_DELAY_MS=2000
+AUTO_UPDATE_BACKUP=true
+AUTO_UPDATE_DELETE_MISSING=false
+PYTHON_EXE=python3
+GITHUB_TOKEN=
 ```
 
 4. Start the bot:
@@ -125,6 +135,16 @@ Owner-only sync controls are available through:
 ### Dashboard
 
 Set `DASHBOARD_ENABLED=true` and provide the Discord OAuth values in `.env` if you want the web dashboard enabled.
+
+### Auto Update
+
+Set `AUTO_UPDATE_ENABLED=true` to let the bot check GitHub for new commits and install updates automatically.
+
+- The bot compares the latest commit on `AUTO_UPDATE_REF` (default `main`) every `AUTO_UPDATE_INTERVAL_SECONDS`.
+- If a new commit is found, it runs `self updater/updater.py redo --target <project root>`.
+- After a successful update, the bot exits and should be restarted by your process manager (PM2 recommended).
+- Optional `GITHUB_TOKEN` helps avoid API rate limits.
+- Keep `AUTO_UPDATE_DELETE_MISSING=false` unless you explicitly want files deleted when missing from GitHub.
 
 ### Development Mode
 

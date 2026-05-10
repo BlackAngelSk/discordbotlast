@@ -433,8 +433,9 @@ class TelegramSyncManager {
         }
 
         if (Object.prototype.hasOwnProperty.call(updates, 'telegramChatId')) {
-            const normalizedChatId = normalizeChatId(updates.telegramChatId);
-            if (updates.telegramChatId && !normalizedChatId) {
+            const rawChatId = String(updates.telegramChatId ?? '').trim();
+            const normalizedChatId = normalizeChatId(rawChatId);
+            if (rawChatId && !normalizedChatId) {
                 throw new Error('Telegram chat ID must be a number (e.g. -1001234567890) or a public @username');
             }
             config.telegramChatId = normalizedChatId;

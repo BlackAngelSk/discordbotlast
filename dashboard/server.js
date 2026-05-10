@@ -1782,6 +1782,7 @@ class Dashboard {
                 }
 
                 const discordChannelId = String(req.body?.discordChannelId || '').trim();
+                const telegramChatId = String(req.body?.telegramChatId || '').trim();
                 if (discordChannelId) {
                     const channel = guild.channels.cache.get(discordChannelId);
                     if (!channel || channel.type !== 0) {
@@ -1792,7 +1793,7 @@ class Dashboard {
                 const config = await telegramSyncManager.updateGuildConfig(guildId, {
                     enabled: req.body?.enabled,
                     discordChannelId,
-                    telegramChatId: req.body?.telegramChatId,
+                    telegramChatId,
                     syncDiscordToTelegram: req.body?.syncDiscordToTelegram,
                     syncTelegramToDiscord: req.body?.syncTelegramToDiscord,
                     includeAttachments: req.body?.includeAttachments

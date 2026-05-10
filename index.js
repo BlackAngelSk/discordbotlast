@@ -85,6 +85,7 @@ const Dashboard = require('./dashboard/server');
 const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 const { isDevModeEnabled } = require('./utils/devMode');
 const { notifyOwnerIfUpdated } = require('./utils/updateNotifier');
+const autoUpdateManager = require('./utils/autoUpdateManager');
 
 // New system managers
 const ErrorHandler = require('./utils/errorHandler');
@@ -303,6 +304,12 @@ loadHandlers().then(() => {
                 await notifyOwnerIfUpdated(client);
             } catch (error) {
                 console.error('Error sending update notification DM:', error);
+            }
+
+            try {
+                await autoUpdateManager.start();
+            } catch (error) {
+                console.error('Error starting auto updater:', error);
             }
 
             // Migrate usernames in existing seasons
