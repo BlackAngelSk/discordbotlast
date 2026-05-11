@@ -49,6 +49,95 @@
       </div>
 
       <div class="card" style="margin-bottom:20px">
+        <div class="card-header" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div>
+            <div class="card-title"><i class="fas fa-list-check"></i> Setup Assistant</div>
+            <div class="card-subtitle">Complete these steps to finish bot setup from the dashboard.</div>
+          </div>
+          <div style="min-width:240px;flex:1;max-width:360px;margin-left:auto">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:6px">
+              <span>Progress</span>
+              <strong style="color:var(--text-1)"><%= setupCompletedCount %>/<%= setupChecklist.length %> completed</strong>
+            </div>
+            <div style="height:10px;border-radius:999px;background:var(--bg-card-2);border:1px solid var(--border);overflow:hidden">
+              <div id="setupProgressBarFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--green));"></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-2);margin-top:6px"><%= setupProgressPercent %>% ready</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+          <% setupChecklist.forEach(item => { %>
+            <a href="<%= item.href %>" style="text-decoration:none;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card-2);display:block">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px">
+                <div style="font-weight:700;color:var(--text-1)"><i class="fas <%= item.icon %>" style="color:var(--brand);margin-right:8px"></i><%= item.title %></div>
+                <% if (item.done) { %>
+                  <span class="badge badge-green"><i class="fas fa-check"></i> Ready</span>
+                <% } else { %>
+                  <span class="badge badge-yellow"><i class="fas fa-clock"></i> Needed</span>
+                <% } %>
+              </div>
+              <div style="font-size:12px;color:var(--text-2)"><%= item.description %></div>
+            </a>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-wand-magic-sparkles"></i> Setup Actions</div>
+            <div class="card-subtitle">Use one-click setup to auto-create categories/channels, then check permissions and run full tests.</div>
+          </div>
+        </div>
+        <div class="quick-action-row" style="margin-bottom:14px">
+          <button type="button" class="btn btn-primary" id="autoSetupBtn"><i class="fas fa-wand-magic-sparkles"></i> Auto Setup</button>
+          <button type="button" class="btn btn-secondary" id="setupPermissionCheckBtn"><i class="fas fa-shield-check"></i> Check Permissions</button>
+          <button type="button" class="btn btn-secondary" id="setupRunAllTestsBtn"><i class="fas fa-vials"></i> Run All Tests</button>
+          <button type="button" class="btn btn-ghost" id="refreshSetupHistoryBtn"><i class="fas fa-rotate"></i> Refresh History</button>
+        </div>
+
+        <div id="setupPermissionResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:12px"></div>
+        <div id="setupBatchTestResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:12px"></div>
+
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:8px">Setup history</div>
+        <div id="setupHistoryList" style="display:flex;flex-direction:column;gap:8px">
+          <% if (setupHistory && setupHistory.length > 0) { %>
+            <% setupHistory.forEach(entry => { %>
+              <div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card-2)">
+                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+                  <strong style="color:var(--text-1)"><%= entry.action %></strong>
+                  <span style="font-size:12px;color:var(--text-3)"><%= new Date(entry.timestamp).toLocaleString() %></span>
+                </div>
+                <div style="font-size:12px;color:var(--text-2)">By <strong><%= entry.username %></strong></div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div style="padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-3)">No setup history yet.</div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-floppy-disk"></i> Backup & Restore</div>
+            <div class="card-subtitle">Export this server's dashboard config or paste a previous backup to restore it.</div>
+          </div>
+        </div>
+        <div class="quick-action-row" style="margin-bottom:14px">
+          <button type="button" class="btn btn-primary" id="exportBackupBtn"><i class="fas fa-download"></i> Export Backup</button>
+          <button type="button" class="btn btn-secondary" id="restoreBackupBtn"><i class="fas fa-upload"></i> Restore Backup</button>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="backupJsonInput">Paste backup JSON</label>
+          <textarea class="form-control" id="backupJsonInput" rows="10" placeholder='{"version":1,"settings":{...}}'></textarea>
+          <div class="form-hint">Restore accepts a backup generated from this dashboard. It will re-apply all settings it can match in the current server.</div>
+        </div>
+        <div id="backupRestoreResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2)"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
         <div class="card-header">
           <div><div class="card-title"><i class="fas fa-sparkles"></i> New Dashboard Tools</div><div class="card-subtitle">Quick access to the features you asked to add</div></div>
         </div>
@@ -345,7 +434,24 @@
 <%- include('partials/dashboard-common-scripts') %>
 <script>
 const guildId = '<%= guild.id %>';
+const setupProgressPercent = Number('<%= setupProgressPercent %>') || 0;
 const minecraftStorageKey = `dashboard.minecraftStatus.${guildId}`;
+const setupProgressBarFill = document.getElementById('setupProgressBarFill');
+const autoSetupBtn = document.getElementById('autoSetupBtn');
+const setupPermissionCheckBtn = document.getElementById('setupPermissionCheckBtn');
+const setupRunAllTestsBtn = document.getElementById('setupRunAllTestsBtn');
+const refreshSetupHistoryBtn = document.getElementById('refreshSetupHistoryBtn');
+const exportBackupBtn = document.getElementById('exportBackupBtn');
+const restoreBackupBtn = document.getElementById('restoreBackupBtn');
+const backupJsonInput = document.getElementById('backupJsonInput');
+const backupRestoreResult = document.getElementById('backupRestoreResult');
+const setupPermissionResult = document.getElementById('setupPermissionResult');
+const setupBatchTestResult = document.getElementById('setupBatchTestResult');
+const setupHistoryList = document.getElementById('setupHistoryList');
+if (setupProgressBarFill) {
+  const safeSetupProgress = Math.max(0, Math.min(100, setupProgressPercent));
+  setupProgressBarFill.style.width = `${safeSetupProgress}%`;
+}
 function toast(msg, type = 'success') {
   const c = document.getElementById('toasts');
   const t = document.createElement('div');
@@ -422,6 +528,44 @@ function removePrefix(btn) {
   btn.closest('.prefix-item').remove();
 }
 function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
+function renderSetupHistoryEntries(entries) {
+  if (!setupHistoryList) return;
+  if (!Array.isArray(entries) || entries.length === 0) {
+    setupHistoryList.innerHTML = '<div style="padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-3)">No setup history yet.</div>';
+    return;
+  }
+
+  setupHistoryList.innerHTML = entries.map((entry) => {
+    const timestamp = entry?.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown time';
+    return `
+      <div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card-2)">
+        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px">
+          <strong style="color:var(--text-1)">${escapeHtml(entry?.action || 'Unknown action')}</strong>
+          <span style="font-size:12px;color:var(--text-3)">${escapeHtml(timestamp)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-2)">By <strong>${escapeHtml(entry?.username || 'Unknown')}</strong></div>
+      </div>
+    `;
+  }).join('');
+}
+async function refreshSetupHistory() {
+  try {
+    const response = await fetch(`/api/settings/${guildId}/setup/history?limit=20`);
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to load setup history.');
+    }
+    renderSetupHistoryEntries(payload.entries || []);
+  } catch (error) {
+    toast(error.message || 'Failed to load setup history.', 'error');
+  }
+}
+function showBackupRestoreResult(message, kind = 'info') {
+  if (!backupRestoreResult) return;
+  const colors = { success: 'var(--green)', error: 'var(--red)', warning: 'var(--yellow)', info: 'var(--brand)' };
+  backupRestoreResult.hidden = false;
+  backupRestoreResult.innerHTML = `<strong style="color:${colors[kind] || 'var(--brand)'}">${escapeHtml(message)}</strong>`;
+}
 const minecraftHostInput = document.getElementById('minecraftHostInput');
 const minecraftPortInput = document.getElementById('minecraftPortInput');
 const minecraftLiveChannel = document.getElementById('minecraftLiveChannel');
@@ -618,6 +762,172 @@ document.querySelectorAll('.dashboard-test-btn').forEach(btn => {
       btn.innerHTML = original;
     }
   });
+});
+
+autoSetupBtn?.addEventListener('click', async () => {
+  if (!confirm('Apply recommended setup defaults for this server?')) {
+    return;
+  }
+
+  const original = autoSetupBtn.innerHTML;
+  autoSetupBtn.disabled = true;
+  autoSetupBtn.innerHTML = '<span class="spinner"></span> Applying...';
+  try {
+    const response = await fetch(`/api/settings/${guildId}/setup/auto`, { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Auto setup failed.');
+    }
+
+    toast(payload.message || 'Auto setup completed.', 'success');
+    await refreshSetupHistory();
+    setTimeout(() => location.reload(), 900);
+  } catch (error) {
+    toast(error.message || 'Auto setup failed.', 'error');
+  } finally {
+    autoSetupBtn.disabled = false;
+    autoSetupBtn.innerHTML = original;
+  }
+});
+
+setupPermissionCheckBtn?.addEventListener('click', async () => {
+  const original = setupPermissionCheckBtn.innerHTML;
+  setupPermissionCheckBtn.disabled = true;
+  setupPermissionCheckBtn.innerHTML = '<span class="spinner"></span> Checking...';
+  try {
+    const response = await fetch(`/api/settings/${guildId}/setup/permissions`);
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Permission check failed.');
+    }
+
+    setupPermissionResult.hidden = false;
+    const statusColor = payload.status === 'ok' ? 'var(--green)' : (payload.status === 'warning' ? 'var(--yellow)' : 'var(--red)');
+    setupPermissionResult.innerHTML = `
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <strong style="color:${statusColor}">${escapeHtml(payload.summary || 'Permission check complete')}</strong>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px">
+        ${(payload.checks || []).map((check) => `
+          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
+            <div style="font-weight:700;color:var(--text-1);margin-bottom:4px">${escapeHtml(check.label || 'Check')}</div>
+            <div style="font-size:12px;color:${check.ok ? 'var(--green)' : 'var(--red)'}">${check.ok ? 'OK' : `Missing: ${escapeHtml((check.missing || []).join(', '))}`}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    await refreshSetupHistory();
+  } catch (error) {
+    toast(error.message || 'Permission check failed.', 'error');
+  } finally {
+    setupPermissionCheckBtn.disabled = false;
+    setupPermissionCheckBtn.innerHTML = original;
+  }
+});
+
+setupRunAllTestsBtn?.addEventListener('click', async () => {
+  const original = setupRunAllTestsBtn.innerHTML;
+  setupRunAllTestsBtn.disabled = true;
+  setupRunAllTestsBtn.innerHTML = '<span class="spinner"></span> Testing...';
+  try {
+    const response = await fetch(`/api/settings/${guildId}/test-all`, { method: 'POST' });
+    const payload = await response.json();
+    if (!response.ok || (!payload.success && !payload.passed)) {
+      throw new Error(payload.error || 'Batch test failed.');
+    }
+
+    setupBatchTestResult.hidden = false;
+    setupBatchTestResult.innerHTML = `
+      <div style="font-weight:700;color:var(--text-1);margin-bottom:8px">${escapeHtml(payload.message || 'Test run complete')}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
+        ${(payload.passed || []).map((item) => `
+          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
+            <div style="font-size:12px;color:var(--green)">Passed: ${escapeHtml(item.type)}</div>
+          </div>
+        `).join('')}
+        ${(payload.failed || []).map((item) => `
+          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
+            <div style="font-size:12px;color:var(--red)">Failed: ${escapeHtml(item.type)} - ${escapeHtml(item.error)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    if (Array.isArray(payload.failed) && payload.failed.length > 0) {
+      toast(`Completed with ${payload.failed.length} failed test(s).`, 'warning');
+    } else {
+      toast('All setup tests passed.', 'success');
+    }
+    await refreshSetupHistory();
+  } catch (error) {
+    toast(error.message || 'Batch test failed.', 'error');
+  } finally {
+    setupRunAllTestsBtn.disabled = false;
+    setupRunAllTestsBtn.innerHTML = original;
+  }
+});
+
+refreshSetupHistoryBtn?.addEventListener('click', refreshSetupHistory);
+
+exportBackupBtn?.addEventListener('click', async () => {
+  const original = exportBackupBtn.innerHTML;
+  exportBackupBtn.disabled = true;
+  exportBackupBtn.innerHTML = '<span class="spinner"></span> Exporting...';
+  try {
+    const response = await fetch(`/api/settings/${guildId}/backup`);
+    const payload = await response.json();
+    if (!response.ok || !payload || payload.success === false) {
+      throw new Error(payload.error || 'Backup export failed.');
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${guildId}-backup.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showBackupRestoreResult('Backup exported successfully.', 'success');
+    await refreshSetupHistory();
+  } catch (error) {
+    showBackupRestoreResult(error.message || 'Backup export failed.', 'error');
+  } finally {
+    exportBackupBtn.disabled = false;
+    exportBackupBtn.innerHTML = original;
+  }
+});
+
+restoreBackupBtn?.addEventListener('click', async () => {
+  const original = restoreBackupBtn.innerHTML;
+  restoreBackupBtn.disabled = true;
+  restoreBackupBtn.innerHTML = '<span class="spinner"></span> Restoring...';
+  try {
+    const raw = backupJsonInput?.value?.trim();
+    if (!raw) {
+      throw new Error('Paste backup JSON first.');
+    }
+
+    const parsed = JSON.parse(raw);
+    const response = await fetch(`/api/settings/${guildId}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backup: parsed })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Backup restore failed.');
+    }
+
+    showBackupRestoreResult(payload.message || 'Backup restored successfully.', 'success');
+    await refreshSetupHistory();
+    setTimeout(() => location.reload(), 900);
+  } catch (error) {
+    showBackupRestoreResult(error.message || 'Backup restore failed.', 'error');
+  } finally {
+    restoreBackupBtn.disabled = false;
+    restoreBackupBtn.innerHTML = original;
+  }
 });
 </script>
 </body>

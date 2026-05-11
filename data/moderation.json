@@ -1,22 +1,72 @@
 {
   "warnings": {},
   "modLogs": {
-    "421968526547353601": "817871935878463549",
-    "865544990625497088": "1063777404834816011"
+    "1503426187651973220": "1503426534906659029",
+    "1503434074675740784": "1503434550410219633"
   },
   "automod": {
     "421968526547353601": {
       "enabled": false,
-      "antiSpam": false,
-      "antiInvite": false,
-      "badWords": [
-        "nigger",
-        "NEG3R"
-      ],
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
       "maxMentions": 5,
-      "maxEmojis": 10,
-      "modLogChannel": "",
-      "emojiOnly": false
+      "maxEmojis": 10
+    },
+    "865544990625497088": {
+      "enabled": false,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
+    },
+    "1183343645454245898": {
+      "enabled": false,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
+    },
+    "1414776322500333723": {
+      "enabled": false,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
+    },
+    "1479187624953381049": {
+      "enabled": false,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
+    },
+    "1503426187651973220": {
+      "enabled": true,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
+    },
+    "1503434074675740784": {
+      "enabled": true,
+      "antiSpam": true,
+      "antiInvite": true,
+      "emojiOnly": false,
+      "badWords": [],
+      "maxMentions": 5,
+      "maxEmojis": 10
     }
   }
 }

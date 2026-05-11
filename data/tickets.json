@@ -9,6 +9,36 @@
       "categoryId": "1473784830566076518",
       "logsChannelId": "1473784832172622035",
       "enabled": true
+    },
+    "1183343645454245898": {
+      "categoryId": null,
+      "logsChannelId": null,
+      "enabled": false
+    },
+    "1414776322500333723": {
+      "categoryId": null,
+      "logsChannelId": null,
+      "enabled": false
+    },
+    "1479187624953381049": {
+      "categoryId": null,
+      "logsChannelId": null,
+      "enabled": false
+    },
+    "1503422681800904715": {
+      "categoryId": null,
+      "logsChannelId": "1503422682803339316",
+      "enabled": true
+    },
+    "1503426187651973220": {
+      "categoryId": "1503426528195903508",
+      "logsChannelId": "1503426550429909074",
+      "enabled": true
+    },
+    "1503434074675740784": {
+      "categoryId": "1503434543913242697",
+      "logsChannelId": "1503434563257634989",
+      "enabled": true
     }
   },
   "tickets": {

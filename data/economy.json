@@ -1,10 +1,10 @@
 {
   "users": {
     "396685113804587009": {
-      "balance": 7446,
-      "xp": 19589,
-      "level": 14,
-      "highestLevelReached": 14,
+      "balance": 7476,
+      "xp": 19739,
+      "level": 15,
+      "highestLevelReached": 15,
       "lastDaily": 1775915698104,
       "lastWeekly": 1775915700265,
       "inventory": [],
@@ -31,8 +31,8 @@
       ]
     },
     "195140009748201472": {
-      "balance": 99840,
-      "xp": 26246,
+      "balance": 99870,
+      "xp": 26396,
       "level": 17,
       "highestLevelReached": 17,
       "lastDaily": null,
@@ -46,8 +46,8 @@
       ]
     },
     "534769701297979392": {
-      "balance": 6433,
-      "xp": 32177,
+      "balance": 6463,
+      "xp": 32327,
       "level": 18,
       "highestLevelReached": 18,
       "lastDaily": null,
@@ -62,7 +62,7 @@
     },
     "349649557896036354": {
       "balance": 735403,
-      "xp": 18782,
+      "xp": 18812,
       "level": 14,
       "highestLevelReached": 14,
       "lastDaily": 1775919046103,
@@ -1144,8 +1144,8 @@
       ]
     },
     "1364265413982031973": {
-      "balance": 912,
-      "xp": 4560,
+      "balance": 942,
+      "xp": 4710,
       "level": 7,
       "highestLevelReached": 7,
       "lastDaily": null,

@@ -5,7 +5,7 @@ const DiscordStrategy = require('passport-discord').Strategy;
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 require('dotenv').config();
 
 const databaseManager = require('../utils/databaseManager');
@@ -74,6 +74,7 @@ const resolveGlobalUsername = async (client, userId) => {
 const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');
 const DASHBOARD_AUDIT_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
 const BOT_UPDATE_STATE_FILE = path.join(__dirname, '..', 'data', 'botUpdateState.json');
+const DASHBOARD_BACKUPS_DIR = path.join(__dirname, '..', 'data', 'backups', 'dashboard');
 
 let dashboardAuditWriteQueue = Promise.resolve();
 
@@ -225,7 +226,405 @@ const normalizeTextInput = (value, fallback, maxLength = 256) => {
     return trimmed.slice(0, maxLength);
 };
 
+const ensureDashboardBackupsDir = async () => {
+    await fs.promises.mkdir(DASHBOARD_BACKUPS_DIR, { recursive: true });
+};
+
+const sanitizeBackupName = (value) => String(value || '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80) || 'backup';
+
+const findChannelByIdOrName = (guild, channelRef) => {
+    const normalized = String(channelRef || '').trim();
+    if (!guild || !normalized) return null;
+    return guild.channels.cache.get(normalized)
+        || guild.channels.cache.find((channel) => String(channel.name || '').toLowerCase() === normalized.toLowerCase())
+        || null;
+};
+
+const buildServerBackupPayload = async (guildId, client) => {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+        throw new Error('Guild not found');
+    }
+
+    const settings = settingsManager.get(guildId);
+    const modSettings = moderationManager.getAutomodSettings(guildId);
+    const modLogChannel = moderationManager.getModLogChannel(guildId);
+    const loggingChannel = await loggingManager.getLoggingChannel(guildId);
+    const suggestionSettings = suggestionManager.getSettings(guildId);
+    const ticketSettings = ticketManager.getSettings(guildId);
+    const raidSettings = raidProtectionManager.getSettings(guildId);
+    const voiceSettings = voiceRewardsManager.getSettings(guildId);
+    const tempVoiceHubChannelId = tempVoiceManager.getHub(guildId);
+    const liveAlerts = liveAlertsManager.getAlerts(guildId);
+    const epicGamesConfig = epicGamesAlertsManager.getGuildConfig(guildId);
+    const steamConfig = steamGameUpdatesManager.getGuildConfig(guildId);
+    const telegramConfig = telegramSyncManager.getGuildConfig(guildId);
+
+    return {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        guild: {
+            id: guild.id,
+            name: guild.name
+        },
+        settings: {
+            ...settings
+        },
+        moderation: {
+            automod: { ...modSettings },
+            modLogChannel,
+            warnings: moderationManager.data?.warnings?.[guildId] || null
+        },
+        logging: {
+            channelId: loggingChannel || null
+        },
+        community: {
+            suggestions: { ...suggestionSettings },
+            reactionRoles: Object.entries(reactionRoleManager.data || {})
+                .filter(([key]) => key.startsWith(`${guildId}_`))
+                .reduce((result, [key, value]) => {
+                    result[key] = value;
+                    return result;
+                }, {}),
+            roleMenus: roleMenuManager.getMenus(guildId)
+        },
+        tickets: {
+            settings: { ...ticketSettings }
+        },
+        safety: {
+            raidProtection: { ...raidSettings },
+            starboard: settings.starboardChannel ? {
+                channelId: settings.starboardChannel,
+                threshold: settings.starboardThreshold || 3
+            } : null
+        },
+        voice: {
+            tempVoiceHubChannelId,
+            rewards: { ...voiceSettings }
+        },
+        alerts: {
+            liveAlerts,
+            epicGames: epicGamesConfig,
+            steam: steamConfig,
+            telegram: telegramConfig
+        }
+    };
+};
+
+const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
+    const guild = client.guilds.cache.get(guildId);
+    if (!guild) {
+        throw new Error('Guild not found');
+    }
+
+    const applied = [];
+    const backupSettings = payload.settings || {};
+
+    const restoredSettings = {
+        ...settingsManager.get(guildId),
+        ...backupSettings
+    };
+
+    if (backupSettings.welcomeChannel) {
+        const channel = findChannelByIdOrName(guild, backupSettings.welcomeChannel);
+        if (channel) restoredSettings.welcomeChannel = channel.id;
+    }
+    if (backupSettings.leaveChannel) {
+        const channel = findChannelByIdOrName(guild, backupSettings.leaveChannel);
+        if (channel) restoredSettings.leaveChannel = channel.id;
+    }
+    if (backupSettings.starboardChannel) {
+        const channel = findChannelByIdOrName(guild, backupSettings.starboardChannel);
+        if (channel) restoredSettings.starboardChannel = channel.id;
+    }
+
+    await settingsManager.setMultiple(guildId, restoredSettings);
+    applied.push('Core settings');
+
+    if (payload.moderation?.automod) {
+        await moderationManager.updateAutomodSettings(guildId, payload.moderation.automod);
+        applied.push('Auto-moderation');
+    }
+    if (payload.moderation?.modLogChannel) {
+        const channel = findChannelByIdOrName(guild, payload.moderation.modLogChannel);
+        if (channel) {
+            moderationManager.setModLogChannel(guildId, channel.id);
+            applied.push('Moderation log channel');
+        }
+    }
+
+    if (payload.logging?.channelId) {
+        const channel = findChannelByIdOrName(guild, payload.logging.channelId);
+        if (channel) {
+            await loggingManager.setLoggingChannel(guildId, channel.id);
+            applied.push('Logging channel');
+        }
+    }
+
+    if (payload.community?.suggestions) {
+        const suggestionSettings = { ...payload.community.suggestions };
+        if (suggestionSettings.channelId) {
+            const channel = findChannelByIdOrName(guild, suggestionSettings.channelId);
+            if (channel) suggestionSettings.channelId = channel.id;
+        }
+        await suggestionManager.updateSettings(guildId, suggestionSettings);
+        applied.push('Suggestion center');
+    }
+
+    if (payload.tickets?.settings) {
+        const ticketSettings = { ...payload.tickets.settings };
+        if (ticketSettings.categoryId) {
+            const category = findChannelByIdOrName(guild, ticketSettings.categoryId);
+            if (category && category.type === ChannelType.GuildCategory) ticketSettings.categoryId = category.id;
+        }
+        if (ticketSettings.logsChannelId) {
+            const channel = findChannelByIdOrName(guild, ticketSettings.logsChannelId);
+            if (channel) ticketSettings.logsChannelId = channel.id;
+        }
+        await ticketManager.setSettings(guildId, ticketSettings);
+        applied.push('Tickets');
+    }
+
+    if (payload.safety?.raidProtection) {
+        await raidProtectionManager.updateSettings(guildId, payload.safety.raidProtection);
+        applied.push('Raid protection');
+    }
+
+    if (payload.voice?.rewards) {
+        await voiceRewardsManager.updateSettings(guildId, payload.voice.rewards);
+        applied.push('Voice rewards');
+    }
+    if (payload.voice?.tempVoiceHubChannelId) {
+        const channel = findChannelByIdOrName(guild, payload.voice.tempVoiceHubChannelId);
+        if (channel) {
+            await tempVoiceManager.setHub(guildId, channel.id);
+            applied.push('Temporary voice hub');
+        }
+    }
+
+    if (payload.alerts?.epicGames?.channelId) {
+        const channel = findChannelByIdOrName(guild, payload.alerts.epicGames.channelId);
+        if (channel) {
+            await epicGamesAlertsManager.enableAlerts(guildId, channel.id);
+            applied.push('Epic Games alerts');
+        }
+    }
+    if (payload.alerts?.steam?.channelId) {
+        const channel = findChannelByIdOrName(guild, payload.alerts.steam.channelId);
+        if (channel) {
+            await steamGameUpdatesManager.updateGuildConfig(guildId, channel.id, payload.alerts.steam.rawGames || payload.alerts.steam.trackedGames || [], {
+                enabled: payload.alerts.steam.enabled
+            });
+            applied.push('Steam updates');
+        }
+    }
+    if (payload.alerts?.telegram) {
+        const telegramConfig = { ...payload.alerts.telegram };
+        if (telegramConfig.discordChannelId) {
+            const channel = findChannelByIdOrName(guild, telegramConfig.discordChannelId);
+            if (channel) telegramConfig.discordChannelId = channel.id;
+        }
+        await telegramSyncManager.updateGuildConfig(guildId, telegramConfig);
+        applied.push('Telegram sync');
+    }
+
+    return { applied };
+};
+
 const parseDashboardBoolean = (value) => value === true || value === 'true' || value === 'on' || value === '1' || value === 1;
+
+const buildSetupChecklist = ({ guildId, settings, modSettings, modLogChannel, loggingChannel, suggestionSettings, ticketSettings, raidSettings, voiceSettings, tempVoiceHubChannelId, liveAlertsCount }) => {
+    return [
+        {
+            title: 'Welcome + Leave Messages',
+            description: 'Enable onboarding and leave notifications with a channel.',
+            done: Boolean((settings.welcomeEnabled && settings.welcomeChannel) || (settings.leaveEnabled && settings.leaveChannel)),
+            href: `/dashboard/${guildId}`,
+            icon: 'fa-hand-wave'
+        },
+        {
+            title: 'Server Logging',
+            description: 'Choose a logging channel to capture server events.',
+            done: Boolean(loggingChannel),
+            href: `/dashboard/${guildId}`,
+            icon: 'fa-scroll'
+        },
+        {
+            title: 'Auto-Moderation',
+            description: 'Turn on auto-mod and set your moderation log channel.',
+            done: Boolean(modSettings.enabled && modLogChannel),
+            href: `/dashboard/${guildId}/automod`,
+            icon: 'fa-robot'
+        },
+        {
+            title: 'Suggestions',
+            description: 'Enable suggestion center and select a suggestion channel.',
+            done: Boolean(suggestionSettings.enabled && suggestionSettings.channelId),
+            href: `/dashboard/${guildId}/community`,
+            icon: 'fa-lightbulb'
+        },
+        {
+            title: 'Voice Tools',
+            description: 'Set a temp voice hub or enable voice rewards.',
+            done: Boolean(tempVoiceHubChannelId || voiceSettings.enabled),
+            href: `/dashboard/${guildId}/voice-tools`,
+            icon: 'fa-microphone-lines'
+        },
+        {
+            title: 'Support Tickets',
+            description: 'Enable tickets and set at least one ticket destination.',
+            done: Boolean(ticketSettings.enabled && (ticketSettings.categoryId || ticketSettings.logsChannelId)),
+            href: `/dashboard/${guildId}/commands`,
+            icon: 'fa-ticket'
+        },
+        {
+            title: 'Safety Center',
+            description: 'Configure raid protection or starboard settings.',
+            done: Boolean(raidSettings.enabled || settings.starboardChannel),
+            href: `/dashboard/${guildId}/safety`,
+            icon: 'fa-user-shield'
+        },
+        {
+            title: 'Live Alerts',
+            description: 'Add at least one Twitch or YouTube alert.',
+            done: Boolean(liveAlertsCount > 0),
+            href: `/dashboard/${guildId}/live-alerts`,
+            icon: 'fa-satellite-dish'
+        }
+    ];
+};
+
+const summarizeSetupProgress = (setupChecklist = []) => {
+    const setupCompletedCount = setupChecklist.filter((item) => item.done).length;
+    const setupProgressPercent = setupChecklist.length
+        ? Math.round((setupCompletedCount / setupChecklist.length) * 100)
+        : 0;
+
+    return {
+        setupCompletedCount,
+        setupProgressPercent
+    };
+};
+
+const collectSetupContextForGuild = async (guildId) => {
+    const settings = settingsManager.get(guildId);
+    const modSettings = moderationManager.getAutomodSettings(guildId);
+    const modLogChannel = moderationManager.getModLogChannel(guildId);
+    const loggingChannel = await loggingManager.getLoggingChannel(guildId);
+    const suggestionSettings = suggestionManager.getSettings(guildId);
+    const ticketSettings = ticketManager.getSettings(guildId);
+    const raidSettings = raidProtectionManager.getSettings(guildId);
+    const voiceSettings = voiceRewardsManager.getSettings(guildId);
+    const tempVoiceHubChannelId = tempVoiceManager.getHub(guildId);
+    const liveAlerts = liveAlertsManager.getAlerts(guildId);
+    const liveAlertsCount = (liveAlerts.twitch?.length || 0) + (liveAlerts.youtube?.length || 0);
+
+    const setupChecklist = buildSetupChecklist({
+        guildId,
+        settings,
+        modSettings,
+        modLogChannel,
+        loggingChannel,
+        suggestionSettings,
+        ticketSettings,
+        raidSettings,
+        voiceSettings,
+        tempVoiceHubChannelId,
+        liveAlertsCount
+    });
+
+    return {
+        settings,
+        modSettings,
+        modLogChannel,
+        loggingChannel,
+        suggestionSettings,
+        ticketSettings,
+        raidSettings,
+        voiceSettings,
+        tempVoiceHubChannelId,
+        liveAlertsCount,
+        setupChecklist,
+        ...summarizeSetupProgress(setupChecklist)
+    };
+};
+
+const runDashboardTestAction = async ({ guildId, guild, member, type, client }) => {
+    if (type === 'welcome') {
+        const settings = settingsManager.get(guildId);
+        const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
+        if (!settings.welcomeEnabled || !channel) {
+            throw new Error('Welcome messages are not fully configured yet.');
+        }
+
+        const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
+        await channel.send(`🧪 Test welcome message\n${message}`);
+        return 'Sent welcome test successfully.';
+    }
+
+    if (type === 'leave') {
+        const settings = settingsManager.get(guildId);
+        const channel = resolveStoredTextChannel(guild, settings.leaveChannel);
+        if (!settings.leaveEnabled || !channel) {
+            throw new Error('Leave messages are not fully configured yet.');
+        }
+
+        const message = replaceMemberTemplateTokens(settings.leaveMessage, member, guild);
+        await channel.send(`🧪 Test leave message\n${message}`);
+        return 'Sent leave test successfully.';
+    }
+
+    if (type === 'logging') {
+        const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
+        if (!loggingChannelId) {
+            throw new Error('No logging channel is configured.');
+        }
+
+        const embed = new EmbedBuilder()
+            .setColor(0x5865F2)
+            .setTitle('🧪 Logging Channel Test')
+            .setDescription('This is a test log entry from the dashboard.')
+            .addFields(
+                { name: 'Triggered By', value: `${member.user.tag}`, inline: true },
+                { name: 'Server', value: guild.name, inline: true }
+            )
+            .setTimestamp();
+
+        await loggingManager.sendLog(guildId, embed, client);
+        return 'Sent logging test successfully.';
+    }
+
+    if (type === 'suggestions') {
+        const suggestionSettings = suggestionManager.getSettings(guildId);
+        const channel = suggestionSettings.channelId ? guild.channels.cache.get(suggestionSettings.channelId) : null;
+        if (!suggestionSettings.enabled || !channel || !channel.isTextBased()) {
+            throw new Error('Suggestions are not fully configured yet.');
+        }
+
+        const staffMention = suggestionSettings.staffRoleId ? `<@&${suggestionSettings.staffRoleId}>` : 'No staff role configured';
+        await channel.send({
+            embeds: [
+                new EmbedBuilder()
+                    .setColor(0x57F287)
+                    .setTitle('🧪 Suggestion System Test')
+                    .setDescription('This is a dashboard test message for the suggestion channel.')
+                    .addFields(
+                        { name: 'Voting Enabled', value: suggestionSettings.votingEnabled ? 'Yes' : 'No', inline: true },
+                        { name: 'Auto Thread', value: suggestionSettings.autoThread ? 'Yes' : 'No', inline: true },
+                        { name: 'Staff Role', value: staffMention, inline: false }
+                    )
+                    .setTimestamp()
+            ]
+        });
+
+        return 'Sent suggestions test successfully.';
+    }
+
+    throw new Error('Unknown test action.');
+};
 
 const applyPreviewTemplate = (template, context = {}) => String(template || '').replace(/\{(\w+)\}/g, (match, token) => {
     if (!Object.prototype.hasOwnProperty.call(context, token)) {
@@ -765,7 +1164,7 @@ class Dashboard {
         });
 
         // Dashboard - list servers
-        this.app.get('/dashboard', this.checkAuth, (req, res) => {
+        this.app.get('/dashboard', this.checkAuth, async (req, res) => {
             const adminPermission = PermissionFlagsBits.Administrator;
             const guilds = req.user.guilds.filter(guild => {
                 if (!this.client.guilds.cache.has(guild.id)) {
@@ -779,9 +1178,28 @@ class Dashboard {
                 }
             });
 
+            const guildsWithSetup = await Promise.all(guilds.map(async (guild) => {
+                try {
+                    const setupContext = await collectSetupContextForGuild(guild.id);
+                    return {
+                        ...guild,
+                        setupScore: setupContext.setupProgressPercent,
+                        setupCompletedCount: setupContext.setupCompletedCount,
+                        setupTotalCount: setupContext.setupChecklist.length
+                    };
+                } catch {
+                    return {
+                        ...guild,
+                        setupScore: 0,
+                        setupCompletedCount: 0,
+                        setupTotalCount: 0
+                    };
+                }
+            }));
+
             res.render('dashboard', {
                 user: req.user,
-                guilds: guilds,
+                guilds: guildsWithSetup,
                 isBotOwner: this.isBotOwner(req.user?.id)
             });
         });
@@ -931,35 +1349,38 @@ class Dashboard {
         // Server settings page
         this.app.get('/dashboard/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
-                const guild = this.client.guilds.cache.get(req.params.guildId);
-                const settings = settingsManager.get(req.params.guildId);
-                const modSettings = moderationManager.getAutomodSettings(req.params.guildId);
-                const modLogChannel = moderationManager.getModLogChannel(req.params.guildId);
-                const loggingChannel = await loggingManager.getLoggingChannel(req.params.guildId);
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const setupContext = await collectSetupContextForGuild(guildId);
                 const topInviters = await inviteManager.getLeaderboard(req.params.guildId, 5);
                 const serverStats = await statsManager.getServerStats(req.params.guildId);
                 const economyLeaderboard = economyManager.getLeaderboard(req.params.guildId, 'balance', 10);
                 const customCommands = customCommandManager.getCommands(req.params.guildId);
                 const allTickets = ticketManager.getGuildTickets(req.params.guildId);
                 const activeTickets = Object.values(allTickets).filter(t => t.status === 'open').length;
-                const liveAlerts = liveAlertsManager.getAlerts(req.params.guildId);
-                const liveAlertsCount = (liveAlerts.twitch?.length || 0) + (liveAlerts.youtube?.length || 0);
                 const minecraftStatusConfig = minecraftStatusManager.getGuildConfig(req.params.guildId);
+                const setupHistory = readDashboardAuditEntries({ guildId, limit: 100 })
+                    .filter((entry) => String(entry.action || '').startsWith('SETUP_') || String(entry.action || '').startsWith('RUN_SERVER_TEST'))
+                    .slice(0, 20);
                 
                 res.render('server', {
                     user: req.user,
                     guild: guild,
                     isBotOwner: this.isBotOwner(req.user?.id),
-                    settings: settings,
-                    modSettings: modSettings,
-                    modLogChannel: modLogChannel,
-                    loggingChannel: loggingChannel,
+                    settings: setupContext.settings,
+                    modSettings: setupContext.modSettings,
+                    modLogChannel: setupContext.modLogChannel,
+                    loggingChannel: setupContext.loggingChannel,
                     topInviters: topInviters,
                     serverStats: serverStats,
                     economyLeaderboard: economyLeaderboard,
                     customCommands: customCommands,
                     activeTickets: activeTickets,
-                    liveAlertsCount: liveAlertsCount,
+                    liveAlertsCount: setupContext.liveAlertsCount,
+                    setupChecklist: setupContext.setupChecklist,
+                    setupCompletedCount: setupContext.setupCompletedCount,
+                    setupProgressPercent: setupContext.setupProgressPercent,
+                    setupHistory,
                     minecraftStatusConfig,
                     minecraftDefaults: {
                         intervalMinutes: minecraftStatusConfig?.intervalMinutes || DEFAULT_INTERVAL_MINUTES,
@@ -1149,6 +1570,70 @@ class Dashboard {
             }
         });
 
+        this.app.get('/api/settings/:guildId/backup', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                await ensureDashboardBackupsDir();
+                const backupPayload = await buildServerBackupPayload(guildId, this.client);
+                const safeGuildName = sanitizeBackupName(guild.name);
+                const fileName = `${safeGuildName}-${guildId}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+                const filePath = path.join(DASHBOARD_BACKUPS_DIR, fileName);
+                await fs.promises.writeFile(filePath, JSON.stringify(backupPayload, null, 2));
+
+                logDashboardAudit(req, 'EXPORT_SERVER_BACKUP', { fileName });
+
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+                res.json(backupPayload);
+            } catch (error) {
+                console.error('Error exporting server backup:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/restore', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const payload = typeof req.body?.backup === 'string'
+                    ? JSON.parse(req.body.backup)
+                    : (req.body?.backup || req.body || null);
+
+                if (!payload || typeof payload !== 'object') {
+                    return res.status(400).json({ success: false, error: 'Backup data is required.' });
+                }
+
+                if (payload.guild?.id && payload.guild.id !== guildId) {
+                    return res.status(400).json({ success: false, error: 'This backup was created for a different server.' });
+                }
+
+                const result = await restoreServerBackupPayload(guildId, this.client, payload);
+                const backupPayload = await buildServerBackupPayload(guildId, this.client);
+                await ensureDashboardBackupsDir();
+                const fileName = `${sanitizeBackupName(guild.name)}-${guildId}-restored-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+                await fs.promises.writeFile(path.join(DASHBOARD_BACKUPS_DIR, fileName), JSON.stringify(backupPayload, null, 2));
+
+                logDashboardAudit(req, 'RESTORE_SERVER_BACKUP', {
+                    applied: result.applied,
+                    sourceExportedAt: payload.exportedAt || null
+                });
+
+                res.json({ success: true, message: 'Backup restored successfully.', applied: result.applied });
+            } catch (error) {
+                console.error('Error restoring server backup:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         this.app.post('/api/settings/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
                 const guildId = req.params.guildId;
@@ -1164,71 +1649,490 @@ class Dashboard {
                     return res.status(404).json({ success: false, error: 'Could not resolve your guild member profile for the test.' });
                 }
 
-                if (type === 'welcome') {
-                    const settings = settingsManager.get(guildId);
-                    const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
-                    if (!settings.welcomeEnabled || !channel) {
-                        return res.status(400).json({ success: false, error: 'Welcome messages are not fully configured yet.' });
-                    }
-
-                    const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
-                    await channel.send(`🧪 Test welcome message\n${message}`);
-                } else if (type === 'leave') {
-                    const settings = settingsManager.get(guildId);
-                    const channel = resolveStoredTextChannel(guild, settings.leaveChannel);
-                    if (!settings.leaveEnabled || !channel) {
-                        return res.status(400).json({ success: false, error: 'Leave messages are not fully configured yet.' });
-                    }
-
-                    const message = replaceMemberTemplateTokens(settings.leaveMessage, member, guild);
-                    await channel.send(`🧪 Test leave message\n${message}`);
-                } else if (type === 'logging') {
-                    const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
-                    if (!loggingChannelId) {
-                        return res.status(400).json({ success: false, error: 'No logging channel is configured.' });
-                    }
-
-                    const embed = new EmbedBuilder()
-                        .setColor(0x5865F2)
-                        .setTitle('🧪 Logging Channel Test')
-                        .setDescription('This is a test log entry from the dashboard.')
-                        .addFields(
-                            { name: 'Triggered By', value: `${member.user.tag}`, inline: true },
-                            { name: 'Server', value: guild.name, inline: true }
-                        )
-                        .setTimestamp();
-
-                    await loggingManager.sendLog(guildId, embed, this.client);
-                } else if (type === 'suggestions') {
-                    const suggestionSettings = suggestionManager.getSettings(guildId);
-                    const channel = suggestionSettings.channelId ? guild.channels.cache.get(suggestionSettings.channelId) : null;
-                    if (!suggestionSettings.enabled || !channel || !channel.isTextBased()) {
-                        return res.status(400).json({ success: false, error: 'Suggestions are not fully configured yet.' });
-                    }
-
-                    const staffMention = suggestionSettings.staffRoleId ? `<@&${suggestionSettings.staffRoleId}>` : 'No staff role configured';
-                    await channel.send({
-                        embeds: [
-                            new EmbedBuilder()
-                                .setColor(0x57F287)
-                                .setTitle('🧪 Suggestion System Test')
-                                .setDescription('This is a dashboard test message for the suggestion channel.')
-                                .addFields(
-                                    { name: 'Voting Enabled', value: suggestionSettings.votingEnabled ? 'Yes' : 'No', inline: true },
-                                    { name: 'Auto Thread', value: suggestionSettings.autoThread ? 'Yes' : 'No', inline: true },
-                                    { name: 'Staff Role', value: staffMention, inline: false }
-                                )
-                                .setTimestamp()
-                        ]
-                    });
-                } else {
-                    return res.status(400).json({ success: false, error: 'Unknown test action.' });
-                }
+                const message = await runDashboardTestAction({ guildId, guild, member, type, client: this.client });
 
                 logDashboardAudit(req, 'RUN_SERVER_TEST', { type });
-                res.json({ success: true, message: `Sent ${type} test successfully.` });
+                res.json({ success: true, message });
             } catch (error) {
                 console.error('Error running dashboard test action:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/test-all', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const testTypes = ['welcome', 'leave', 'logging', 'suggestions'];
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+                if (!member) {
+                    return res.status(404).json({ success: false, error: 'Could not resolve your guild member profile for the test.' });
+                }
+
+                const passed = [];
+                const failed = [];
+
+                for (const type of testTypes) {
+                    try {
+                        const message = await runDashboardTestAction({ guildId, guild, member, type, client: this.client });
+                        passed.push({ type, message });
+                    } catch (error) {
+                        failed.push({ type, error: error.message || 'Test failed' });
+                    }
+                }
+
+                logDashboardAudit(req, 'RUN_SERVER_TEST_ALL', {
+                    passedTypes: passed.map((item) => item.type),
+                    failedTypes: failed.map((item) => item.type)
+                });
+
+                res.json({
+                    success: failed.length === 0,
+                    message: `Completed ${passed.length}/${testTypes.length} setup tests.`,
+                    passed,
+                    failed
+                });
+            } catch (error) {
+                console.error('Error running all setup tests:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.get('/api/settings/:guildId/setup/permissions', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember) {
+                    return res.status(404).json({ success: false, error: 'Could not resolve bot member in this guild.' });
+                }
+
+                const settings = settingsManager.get(guildId);
+                const suggestionSettings = suggestionManager.getSettings(guildId);
+                const modLogChannelId = moderationManager.getModLogChannel(guildId);
+                const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
+                const tempHubChannelId = tempVoiceManager.getHub(guildId);
+                const globalPerms = botMember.permissions;
+
+                const REQUIRED_GLOBAL = [
+                    ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                    ['SendMessages', PermissionFlagsBits.SendMessages],
+                    ['EmbedLinks', PermissionFlagsBits.EmbedLinks],
+                    ['ManageRoles', PermissionFlagsBits.ManageRoles],
+                    ['ManageChannels', PermissionFlagsBits.ManageChannels],
+                    ['MoveMembers', PermissionFlagsBits.MoveMembers],
+                    ['ModerateMembers', PermissionFlagsBits.ModerateMembers]
+                ];
+
+                const checkMissing = (channel, requiredPerms) => {
+                    const perms = channel ? channel.permissionsFor(botMember) : globalPerms;
+                    if (!perms) return requiredPerms.map(([name]) => name);
+                    return requiredPerms
+                        .filter(([, bit]) => !perms.has(bit))
+                        .map(([name]) => name);
+                };
+
+                const checks = [];
+                const addCheck = (label, channelId, requiredPerms) => {
+                    const channel = channelId ? guild.channels.cache.get(channelId) : null;
+                    const missing = checkMissing(channel, requiredPerms);
+                    checks.push({
+                        label,
+                        channelId: channel?.id || channelId || null,
+                        channelName: channel?.name || null,
+                        missing,
+                        ok: missing.length === 0
+                    });
+                };
+
+                addCheck('Global bot permissions', null, REQUIRED_GLOBAL);
+
+                const welcomeChannel = resolveStoredTextChannel(guild, settings.welcomeChannel);
+                if (welcomeChannel) {
+                    addCheck('Welcome channel permissions', welcomeChannel.id, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages]
+                    ]);
+                }
+
+                const leaveChannel = resolveStoredTextChannel(guild, settings.leaveChannel);
+                if (leaveChannel) {
+                    addCheck('Leave channel permissions', leaveChannel.id, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages]
+                    ]);
+                }
+
+                if (loggingChannelId) {
+                    addCheck('Logging channel permissions', loggingChannelId, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages],
+                        ['EmbedLinks', PermissionFlagsBits.EmbedLinks]
+                    ]);
+                }
+
+                if (suggestionSettings.channelId) {
+                    const required = [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages],
+                        ['EmbedLinks', PermissionFlagsBits.EmbedLinks],
+                        ['AddReactions', PermissionFlagsBits.AddReactions]
+                    ];
+                    if (suggestionSettings.autoThread) {
+                        required.push(['CreatePublicThreads', PermissionFlagsBits.CreatePublicThreads]);
+                    }
+                    addCheck('Suggestion channel permissions', suggestionSettings.channelId, required);
+                }
+
+                if (modLogChannelId) {
+                    addCheck('Mod log channel permissions', modLogChannelId, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages],
+                        ['EmbedLinks', PermissionFlagsBits.EmbedLinks]
+                    ]);
+                }
+
+                if (tempHubChannelId) {
+                    addCheck('Temp voice hub permissions', tempHubChannelId, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['Connect', PermissionFlagsBits.Connect],
+                        ['ManageChannels', PermissionFlagsBits.ManageChannels],
+                        ['MoveMembers', PermissionFlagsBits.MoveMembers]
+                    ]);
+                }
+
+                if (settings.starboardChannel) {
+                    addCheck('Starboard channel permissions', settings.starboardChannel, [
+                        ['ViewChannel', PermissionFlagsBits.ViewChannel],
+                        ['SendMessages', PermissionFlagsBits.SendMessages],
+                        ['EmbedLinks', PermissionFlagsBits.EmbedLinks],
+                        ['ManageMessages', PermissionFlagsBits.ManageMessages]
+                    ]);
+                }
+
+                const okCount = checks.filter((item) => item.ok).length;
+                const status = okCount === checks.length ? 'ok' : (okCount === 0 ? 'fail' : 'warning');
+
+                logDashboardAudit(req, 'SETUP_PERMISSION_CHECK', {
+                    checks: checks.map((item) => ({ label: item.label, ok: item.ok, missingCount: item.missing.length }))
+                });
+
+                res.json({
+                    success: true,
+                    status,
+                    summary: `${okCount}/${checks.length} permission checks passed.`,
+                    checks
+                });
+            } catch (error) {
+                console.error('Error checking setup permissions:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/setup/auto', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember) {
+                    return res.status(404).json({ success: false, error: 'Could not resolve bot member in this guild.' });
+                }
+
+                const canManageChannels = guild.members.me?.permissions?.has(PermissionFlagsBits.ManageChannels)
+                    || botMember.permissions?.has(PermissionFlagsBits.ManageChannels);
+                if (!canManageChannels) {
+                    return res.status(403).json({
+                        success: false,
+                        error: 'Bot needs Manage Channels permission to create setup categories and channels automatically.'
+                    });
+                }
+
+                const canManageRoles = guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles)
+                    || botMember.permissions?.has(PermissionFlagsBits.ManageRoles);
+                if (!canManageRoles) {
+                    return res.status(403).json({
+                        success: false,
+                        error: 'Bot needs Manage Roles permission to create setup roles automatically.'
+                    });
+                }
+
+                const ensureCategory = async ({ name, hidden = false }) => {
+                    let category = guild.channels.cache.find((channel) => channel.type === ChannelType.GuildCategory && channel.name.toLowerCase() === name.toLowerCase());
+
+                    if (!category) {
+                        category = await guild.channels.create({
+                            name,
+                            type: ChannelType.GuildCategory,
+                            permissionOverwrites: hidden
+                                ? [
+                                    {
+                                        id: guild.id,
+                                        deny: [PermissionFlagsBits.ViewChannel]
+                                    }
+                                ]
+                                : undefined
+                        });
+                    } else if (hidden) {
+                        await category.permissionOverwrites.edit(guild.id, {
+                            ViewChannel: false
+                        }).catch(() => null);
+                    }
+
+                    return category;
+                };
+
+                const ensureTextChannel = async ({ name, categoryId }) => {
+                    let channel = guild.channels.cache.find((item) => item.type === ChannelType.GuildText && item.name.toLowerCase() === name.toLowerCase());
+                    if (!channel) {
+                        channel = await guild.channels.create({
+                            name,
+                            type: ChannelType.GuildText,
+                            parent: categoryId || undefined
+                        });
+                    } else if (categoryId && channel.parentId !== categoryId) {
+                        await channel.setParent(categoryId).catch(() => null);
+                    }
+                    return channel;
+                };
+
+                const ensureVoiceChannel = async ({ name, categoryId }) => {
+                    let channel = guild.channels.cache.find((item) => item.type === ChannelType.GuildVoice && item.name.toLowerCase() === name.toLowerCase());
+                    if (!channel) {
+                        channel = await guild.channels.create({
+                            name,
+                            type: ChannelType.GuildVoice,
+                            parent: categoryId || undefined
+                        });
+                    } else if (categoryId && channel.parentId !== categoryId) {
+                        await channel.setParent(categoryId).catch(() => null);
+                    }
+                    return channel;
+                };
+
+                const ensureRole = async ({ name, color, reason }) => {
+                    let role = guild.roles.cache.find((item) => item.name.toLowerCase() === name.toLowerCase());
+                    if (!role) {
+                        role = await guild.roles.create({
+                            name,
+                            colors: { primaryColor: color },
+                            permissions: [],
+                            reason
+                        });
+                    }
+                    return role;
+                };
+
+                const botSystemCategory = await ensureCategory({ name: 'BOT SYSTEM' });
+                const botCommunityCategory = await ensureCategory({ name: 'BOT COMMUNITY' });
+                const botVoiceCategory = await ensureCategory({ name: 'BOT VOICE' });
+                const moderationCategory = await ensureCategory({ name: 'MODERATION', hidden: true });
+                const ticketsCategory = await ensureCategory({ name: 'TICKETS', hidden: true });
+
+                const createdRoles = {
+                    djRole: await ensureRole({
+                        name: settingsManager.get(guildId).djRole || 'DJ',
+                        color: 0xFF0080,
+                        reason: 'Music bot DJ role created by dashboard setup'
+                    }),
+                    autoRole: await ensureRole({
+                        name: settingsManager.get(guildId).autoRole || 'Member',
+                        color: 0x99AAB5,
+                        reason: 'Default member role created by dashboard setup'
+                    }),
+                    botWatcherRole: await ensureRole({
+                        name: settingsManager.get(guildId).botWatcherRole || 'Bot Watcher',
+                        color: 0x5865F2,
+                        reason: 'Bot watcher role created by dashboard setup'
+                    })
+                };
+
+                const createdChannels = {
+                    welcome: await ensureTextChannel({ name: 'welcome', categoryId: botSystemCategory.id }),
+                    goodbye: await ensureTextChannel({ name: 'goodbye', categoryId: botSystemCategory.id }),
+                    logs: await ensureTextChannel({ name: 'bot-logs', categoryId: moderationCategory.id }),
+                    modLogs: await ensureTextChannel({ name: 'mod-logs', categoryId: moderationCategory.id }),
+                    suggestions: await ensureTextChannel({ name: 'suggestions', categoryId: botCommunityCategory.id }),
+                    starboard: await ensureTextChannel({ name: 'starboard', categoryId: botCommunityCategory.id }),
+                    liveAlerts: await ensureTextChannel({ name: 'live-alerts', categoryId: botCommunityCategory.id }),
+                    epicGames: await ensureTextChannel({ name: 'epic-games', categoryId: botCommunityCategory.id }),
+                    steamUpdates: await ensureTextChannel({ name: 'steam-updates', categoryId: botCommunityCategory.id }),
+                    telegramSync: await ensureTextChannel({ name: 'telegram-sync', categoryId: botCommunityCategory.id }),
+                    ticketLogs: await ensureTextChannel({ name: 'ticket-logs', categoryId: ticketsCategory.id }),
+                    tempVoiceHub: await ensureVoiceChannel({ name: 'Create Channel', categoryId: botVoiceCategory.id })
+                };
+
+                const textChannels = Array.from(guild.channels.cache.values())
+                    .filter((channel) => channel.type === ChannelType.GuildText && channel.permissionsFor(botMember)?.has(PermissionFlagsBits.SendMessages));
+                const fallbackChannel = createdChannels.logs || guild.systemChannel || textChannels[0] || null;
+
+                if (!fallbackChannel) {
+                    return res.status(400).json({ success: false, error: 'No writable text channel found for auto setup.' });
+                }
+
+                const settings = settingsManager.get(guildId);
+                const settingUpdates = {};
+                const applied = [];
+
+                if (!settings.welcomeChannel || settings.welcomeChannel !== createdChannels.welcome.id) {
+                    settingUpdates.welcomeChannel = createdChannels.welcome.id;
+                    applied.push('Welcome channel configured');
+                }
+                if (!settings.leaveChannel || settings.leaveChannel !== createdChannels.goodbye.id) {
+                    settingUpdates.leaveChannel = createdChannels.goodbye.id;
+                    applied.push('Leave channel configured');
+                }
+                if (!settings.welcomeEnabled) {
+                    settingUpdates.welcomeEnabled = true;
+                    applied.push('Welcome enabled');
+                }
+                if (!settings.leaveEnabled) {
+                    settingUpdates.leaveEnabled = true;
+                    applied.push('Leave enabled');
+                }
+                if (createdRoles.djRole?.name && settings.djRole !== createdRoles.djRole.name) {
+                    settingUpdates.djRole = createdRoles.djRole.name;
+                    applied.push('DJ role configured');
+                }
+                if (createdRoles.autoRole?.name && settings.autoRole !== createdRoles.autoRole.name) {
+                    settingUpdates.autoRole = createdRoles.autoRole.name;
+                    applied.push('Auto-role configured');
+                }
+                if (createdRoles.botWatcherRole?.name && settings.botWatcherRole !== createdRoles.botWatcherRole.name) {
+                    settingUpdates.botWatcherRole = createdRoles.botWatcherRole.name;
+                    applied.push('Bot watcher role configured');
+                }
+                if (!settings.starboardChannel || settings.starboardChannel !== createdChannels.starboard.id) {
+                    settingUpdates.starboardChannel = createdChannels.starboard.id;
+                    settingUpdates.starboardThreshold = Number(settings.starboardThreshold) || 3;
+                    applied.push('Starboard configured');
+                }
+                if (Object.keys(settingUpdates).length > 0) {
+                    await settingsManager.setMultiple(guildId, settingUpdates);
+                }
+
+                const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
+                if (!loggingChannelId || loggingChannelId !== createdChannels.logs.id) {
+                    await loggingManager.setLoggingChannel(guildId, createdChannels.logs.id);
+                    applied.push('Logging channel set');
+                }
+
+                const modLogChannelId = moderationManager.getModLogChannel(guildId);
+                if (!modLogChannelId || modLogChannelId !== createdChannels.modLogs.id) {
+                    moderationManager.setModLogChannel(guildId, createdChannels.modLogs.id);
+                    applied.push('Mod log channel set');
+                }
+
+                const modSettings = moderationManager.getAutomodSettings(guildId);
+                if (!modSettings.enabled) {
+                    await moderationManager.updateAutomodSettings(guildId, { enabled: true, antiSpam: true, antiInvite: true });
+                    applied.push('Auto-mod enabled');
+                }
+
+                const suggestionSettings = suggestionManager.getSettings(guildId);
+                const suggestionUpdates = {};
+                if (!suggestionSettings.channelId || suggestionSettings.channelId !== createdChannels.suggestions.id) suggestionUpdates.channelId = createdChannels.suggestions.id;
+                if (!suggestionSettings.enabled) suggestionUpdates.enabled = true;
+                if (Object.keys(suggestionUpdates).length > 0) {
+                    await suggestionManager.updateSettings(guildId, suggestionUpdates);
+                    applied.push('Suggestion center configured');
+                }
+
+                const ticketSettings = ticketManager.getSettings(guildId);
+                if (!ticketSettings.enabled
+                    || ticketSettings.logsChannelId !== createdChannels.ticketLogs.id
+                    || ticketSettings.categoryId !== ticketsCategory.id) {
+                    await ticketManager.setSettings(guildId, {
+                        ...ticketSettings,
+                        enabled: true,
+                        categoryId: ticketsCategory.id,
+                        logsChannelId: createdChannels.ticketLogs.id
+                    });
+                    applied.push('Ticket settings configured');
+                }
+
+                const tempVoiceHubId = tempVoiceManager.getHub(guildId);
+                if (!tempVoiceHubId || tempVoiceHubId !== createdChannels.tempVoiceHub.id) {
+                    await tempVoiceManager.setHub(guildId, createdChannels.tempVoiceHub.id);
+                    applied.push('Temporary voice hub configured');
+                }
+
+                const epicConfig = epicGamesAlertsManager.getGuildConfig(guildId);
+                if (!epicConfig?.channelId) {
+                    try {
+                        await epicGamesAlertsManager.enableAlerts(guildId, createdChannels.epicGames.id);
+                        applied.push('Epic Games channel configured');
+                    } catch {
+                        applied.push('Epic Games channel created (enable failed, configure manually)');
+                    }
+                }
+
+                const raidSettings = raidProtectionManager.getSettings(guildId);
+                if (!raidSettings.enabled) {
+                    await raidProtectionManager.updateSettings(guildId, { enabled: true });
+                    applied.push('Raid protection enabled');
+                }
+
+                const voiceSettings = voiceRewardsManager.getSettings(guildId);
+                if (!voiceSettings.enabled) {
+                    await voiceRewardsManager.updateSettings(guildId, { enabled: true });
+                    applied.push('Voice rewards enabled');
+                }
+
+                const setupContext = await collectSetupContextForGuild(guildId);
+
+                logDashboardAudit(req, 'SETUP_AUTO_APPLY', {
+                    fallbackChannelId: fallbackChannel.id,
+                    fallbackChannelName: fallbackChannel.name,
+                    createdCategories: [botSystemCategory.id, botCommunityCategory.id, botVoiceCategory.id, ticketsCategory.id],
+                    createdRoles: Object.fromEntries(Object.entries(createdRoles).map(([key, role]) => [key, role?.id || null])),
+                    createdChannels: Object.fromEntries(Object.entries(createdChannels).map(([key, channel]) => [key, channel?.id || null])),
+                    applied
+                });
+
+                res.json({
+                    success: true,
+                    message: applied.length > 0 ? `Auto setup applied ${applied.length} changes.` : 'Auto setup found nothing to change.',
+                    applied,
+                    setupProgressPercent: setupContext.setupProgressPercent
+                });
+            } catch (error) {
+                console.error('Error running auto setup:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.get('/api/settings/:guildId/setup/history', this.checkAuth, this.checkGuildAccess, (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+                const entries = readDashboardAuditEntries({ guildId, limit: 200 })
+                    .filter((entry) => String(entry.action || '').startsWith('SETUP_') || String(entry.action || '').startsWith('RUN_SERVER_TEST'))
+                    .slice(0, limit)
+                    .map((entry) => ({
+                        timestamp: entry.timestamp,
+                        username: entry.username,
+                        action: entry.action,
+                        details: entry.details || {}
+                    }));
+
+                res.json({ success: true, entries });
+            } catch (error) {
+                console.error('Error fetching setup history:', error);
                 res.status(500).json({ success: false, error: error.message });
             }
         });

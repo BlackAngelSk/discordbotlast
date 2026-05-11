@@ -162,6 +162,15 @@
             <% } %>
             <div class="server-card-name"><%= guild.name %></div>
             <div class="server-card-meta"><i class="fas fa-arrow-right"></i> Manage server</div>
+            <div style="margin-top:8px;font-size:12px;color:var(--text-2)">
+              <span class="badge <%= Number(guild.setupScore || 0) >= 80 ? 'badge-green' : Number(guild.setupScore || 0) >= 40 ? 'badge-yellow' : 'badge-red' %>">
+                <i class="fas fa-list-check"></i>
+                Setup <%= Number(guild.setupScore || 0) %>%
+              </span>
+              <% if (Number(guild.setupTotalCount || 0) > 0) { %>
+                <span style="margin-left:6px"><%= Number(guild.setupCompletedCount || 0) %>/<%= Number(guild.setupTotalCount || 0) %></span>
+              <% } %>
+            </div>
           </a>
         <% }); %>
       <% } %>
