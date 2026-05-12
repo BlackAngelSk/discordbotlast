@@ -136,7 +136,7 @@ const getDashboardSectionLabel = (sectionKey) => DASHBOARD_SECTION_LABELS[sectio
 const inferDashboardSectionKey = (requestPath) => {
     const pathValue = String(requestPath || '');
 
-    if (/^\/dashboard\/[^/]+$/.test(pathValue) || /^\/api\/settings\/[^/]+/.test(pathValue)) return 'settings';
+    if (/^\/dashboard\/[^/]+$/.test(pathValue) || /^\/dashboard\/[^/]+\/server-builder$/.test(pathValue) || /^\/api\/settings\/[^/]+/.test(pathValue) || /^\/api\/server-profile\/[^/]+/.test(pathValue) || /^\/api\/server-resources\/[^/]+/.test(pathValue)) return 'settings';
     if (/^\/dashboard\/[^/]+\/economy$/.test(pathValue) || /^\/api\/economy\/[^/]+/.test(pathValue) || /^\/api\/[^/]+\/leaderboard$/.test(pathValue)) return 'economy';
     if (/^\/dashboard\/[^/]+\/shop$/.test(pathValue)) return 'shop';
     if (/^\/dashboard\/[^/]+\/commands$/.test(pathValue) || /^\/api\/commands\/[^/]+/.test(pathValue) || /^\/api\/command-permissions\/[^/]+/.test(pathValue)) return 'commands';
@@ -224,6 +224,30 @@ const normalizeTextInput = (value, fallback, maxLength = 256) => {
     const trimmed = String(value ?? '').trim();
     if (!trimmed) return String(fallback || '');
     return trimmed.slice(0, maxLength);
+};
+
+const normalizeBooleanInput = (value, fallback = false) => {
+    if (typeof value === 'boolean') return value;
+    if (value === 'true' || value === '1' || value === 1) return true;
+    if (value === 'false' || value === '0' || value === 0) return false;
+    return fallback;
+};
+
+const normalizeServerProfile = (profile = {}, guild = null) => {
+    const inviteUrl = String(profile.inviteUrl || '').trim();
+    const safeInviteUrl = /^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl) ? inviteUrl : '';
+
+    return {
+        enabled: Boolean(profile.enabled),
+        title: normalizeTextInput(profile.title, guild?.name || 'Server', 80),
+        summary: normalizeTextInput(profile.summary, guild?.description || 'Shared from the dashboard.', 180),
+        description: normalizeTextInput(profile.description, '', 1200),
+        inviteUrl: safeInviteUrl,
+        accentColor: normalizeHexColorInput(profile.accentColor, '#5865F2'),
+        showMemberCount: profile.showMemberCount !== false,
+        showChannelCount: profile.showChannelCount !== false,
+        showRoleCount: profile.showRoleCount !== false
+    };
 };
 
 const ensureDashboardBackupsDir = async () => {
@@ -1351,6 +1375,7 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
+                const serverProfile = normalizeServerProfile(settingsManager.get(guildId).serverProfile, guild);
                 const setupContext = await collectSetupContextForGuild(guildId);
                 const topInviters = await inviteManager.getLeaderboard(req.params.guildId, 5);
                 const serverStats = await statsManager.getServerStats(req.params.guildId);
@@ -1381,6 +1406,8 @@ class Dashboard {
                     setupCompletedCount: setupContext.setupCompletedCount,
                     setupProgressPercent: setupContext.setupProgressPercent,
                     setupHistory,
+                    serverProfile,
+                    serverProfileShareUrl: `${req.protocol}://${req.get('host')}/server-profile/${guildId}`,
                     minecraftStatusConfig,
                     minecraftDefaults: {
                         intervalMinutes: minecraftStatusConfig?.intervalMinutes || DEFAULT_INTERVAL_MINUTES,
@@ -1393,6 +1420,96 @@ class Dashboard {
             } catch (error) {
                 console.error('Error loading server dashboard:', error);
                 res.status(500).send('Error loading dashboard');
+            }
+        });
+
+        this.app.get('/server-profile/:guildId', async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId) || await this.client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).send('Server not found');
+                }
+
+                const serverProfile = normalizeServerProfile(settingsManager.get(guildId).serverProfile, guild);
+                if (!serverProfile.enabled) {
+                    return res.status(404).send('This server profile is not shared publicly.');
+                }
+
+                res.render('server-profile-public', {
+                    guild,
+                    serverProfile,
+                    stats: {
+                        memberCount: guild.memberCount || 0,
+                        channelCount: guild.channels?.cache?.filter((channel) => channel.type === 0).size || 0,
+                        roleCount: guild.roles?.cache?.filter((role) => role.name !== '@everyone').size || 0
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading public server profile:', error);
+                res.status(500).send('Error loading server profile');
+            }
+        });
+
+        this.app.get('/dashboard/:guildId/server-builder', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId) || await this.client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).send('Guild not found');
+                }
+
+                await guild.channels.fetch().catch(() => null);
+                await guild.roles.fetch().catch(() => null);
+
+                const categories = Array.from(guild.channels.cache.values())
+                    .filter((channel) => channel.type === ChannelType.GuildCategory)
+                    .sort((left, right) => left.rawPosition - right.rawPosition || left.name.localeCompare(right.name))
+                    .map((category) => ({
+                        id: category.id,
+                        name: category.name,
+                        hidden: category.permissionOverwrites.cache.get(guild.id)?.deny?.has(PermissionFlagsBits.ViewChannel) || false,
+                        childCount: guild.channels.cache.filter((channel) => channel.parentId === category.id).size
+                    }));
+
+                const manageableChannels = Array.from(guild.channels.cache.values())
+                    .filter((channel) => channel.type === ChannelType.GuildText || channel.type === ChannelType.GuildVoice)
+                    .sort((left, right) => left.rawPosition - right.rawPosition || left.name.localeCompare(right.name))
+                    .map((channel) => ({
+                        id: channel.id,
+                        name: channel.name,
+                        type: channel.type === ChannelType.GuildVoice ? 'voice' : 'text',
+                        parentId: channel.parentId || '',
+                        parentName: channel.parent?.name || '',
+                        position: channel.rawPosition
+                    }));
+
+                const manageableRoles = Array.from(guild.roles.cache.values())
+                    .filter((role) => role.name !== '@everyone')
+                    .sort((left, right) => right.position - left.position)
+                    .map((role) => ({
+                        id: role.id,
+                        name: role.name,
+                        color: normalizeEmbedPreviewColor(role.color || 0x99AAB5),
+                        mentionable: role.mentionable,
+                        hoist: role.hoist,
+                        managed: role.managed,
+                        position: role.position
+                    }));
+
+                const serverProfile = normalizeServerProfile(settingsManager.get(guildId).serverProfile, guild);
+                res.render('server-profile', {
+                    user: req.user,
+                    guild,
+                    serverProfile,
+                    serverProfileShareUrl: `${req.protocol}://${req.get('host')}/server-profile/${guildId}`,
+                    categories,
+                    channels: manageableChannels,
+                    roles: manageableRoles
+                });
+            } catch (error) {
+                console.error('Error loading server builder:', error);
+                res.status(500).send('Error loading server builder');
             }
         });
 
@@ -1473,6 +1590,313 @@ class Dashboard {
             } catch (error) {
                 console.error('Error updating settings:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/server-profile/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId) || await this.client.guilds.fetch(guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const profileUpdates = normalizeServerProfile(req.body || {}, guild);
+                await settingsManager.setMultiple(guildId, {
+                    serverProfile: profileUpdates
+                });
+
+                logDashboardAudit(req, 'UPDATE_SERVER_PROFILE', {
+                    enabled: profileUpdates.enabled,
+                    hasInviteUrl: Boolean(profileUpdates.inviteUrl)
+                });
+
+                res.json({
+                    success: true,
+                    profile: profileUpdates,
+                    shareUrl: `${req.protocol}://${req.get('host')}/server-profile/${guildId}`
+                });
+            } catch (error) {
+                console.error('Error updating server profile:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to update server profile.' });
+            }
+        });
+
+        this.app.post('/api/server-resources/:guildId/category', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+                    return res.status(403).json({ success: false, error: 'Bot needs Manage Channels permission.' });
+                }
+
+                const name = normalizeTextInput(req.body?.name, '', 100);
+                if (!name) {
+                    return res.status(400).json({ success: false, error: 'Category name is required.' });
+                }
+
+                const hidden = normalizeBooleanInput(req.body?.hidden, false);
+                const category = await guild.channels.create({
+                    name,
+                    type: ChannelType.GuildCategory,
+                    permissionOverwrites: hidden
+                        ? [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] }]
+                        : undefined
+                });
+
+                logDashboardAudit(req, 'CREATE_SERVER_CATEGORY', { categoryId: category.id, hidden });
+                res.json({ success: true, categoryId: category.id });
+            } catch (error) {
+                console.error('Error creating category:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to create category.' });
+            }
+        });
+
+        this.app.patch('/api/server-resources/:guildId/category/:categoryId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const category = guild?.channels?.cache?.get(req.params.categoryId);
+                if (!guild || !category || category.type !== ChannelType.GuildCategory) {
+                    return res.status(404).json({ success: false, error: 'Category not found.' });
+                }
+
+                const updates = [];
+                if (req.body?.name !== undefined) {
+                    const name = normalizeTextInput(req.body.name, '', 100);
+                    if (!name) {
+                        return res.status(400).json({ success: false, error: 'Category name is required.' });
+                    }
+                    if (name !== category.name) {
+                        updates.push(category.setName(name));
+                    }
+                }
+                if (req.body?.hidden !== undefined) {
+                    const hidden = normalizeBooleanInput(req.body.hidden, false);
+                    updates.push(category.permissionOverwrites.edit(guild.id, { ViewChannel: hidden ? false : null }));
+                }
+
+                await Promise.all(updates);
+                logDashboardAudit(req, 'UPDATE_SERVER_CATEGORY', { categoryId: category.id });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error updating category:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to update category.' });
+            }
+        });
+
+        this.app.delete('/api/server-resources/:guildId/category/:categoryId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const category = guild?.channels?.cache?.get(req.params.categoryId);
+                if (!guild || !category || category.type !== ChannelType.GuildCategory) {
+                    return res.status(404).json({ success: false, error: 'Category not found.' });
+                }
+
+                if (guild.channels.cache.some((channel) => channel.parentId === category.id)) {
+                    return res.status(400).json({ success: false, error: 'Move or delete child channels before deleting this category.' });
+                }
+
+                await category.delete('Deleted from dashboard server builder');
+                logDashboardAudit(req, 'DELETE_SERVER_CATEGORY', { categoryId: req.params.categoryId });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error deleting category:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to delete category.' });
+            }
+        });
+
+        this.app.post('/api/server-resources/:guildId/channel', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember?.permissions?.has(PermissionFlagsBits.ManageChannels)) {
+                    return res.status(403).json({ success: false, error: 'Bot needs Manage Channels permission.' });
+                }
+
+                const name = normalizeTextInput(req.body?.name, '', 100);
+                const type = String(req.body?.type || 'text').toLowerCase();
+                const parentId = String(req.body?.parentId || '').trim();
+                if (!name) {
+                    return res.status(400).json({ success: false, error: 'Channel name is required.' });
+                }
+                if (!['text', 'voice'].includes(type)) {
+                    return res.status(400).json({ success: false, error: 'Channel type must be text or voice.' });
+                }
+                if (parentId) {
+                    const parent = guild.channels.cache.get(parentId);
+                    if (!parent || parent.type !== ChannelType.GuildCategory) {
+                        return res.status(400).json({ success: false, error: 'Selected category was not found.' });
+                    }
+                }
+
+                const channel = await guild.channels.create({
+                    name,
+                    type: type === 'voice' ? ChannelType.GuildVoice : ChannelType.GuildText,
+                    parent: parentId || undefined
+                });
+
+                logDashboardAudit(req, 'CREATE_SERVER_CHANNEL', { channelId: channel.id, type });
+                res.json({ success: true, channelId: channel.id });
+            } catch (error) {
+                console.error('Error creating channel:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to create channel.' });
+            }
+        });
+
+        this.app.patch('/api/server-resources/:guildId/channel/:channelId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const channel = guild?.channels?.cache?.get(req.params.channelId);
+                if (!guild || !channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildVoice)) {
+                    return res.status(404).json({ success: false, error: 'Channel not found.' });
+                }
+
+                if (req.body?.name !== undefined) {
+                    const name = normalizeTextInput(req.body.name, '', 100);
+                    if (!name) {
+                        return res.status(400).json({ success: false, error: 'Channel name is required.' });
+                    }
+                    if (name !== channel.name) {
+                        await channel.setName(name);
+                    }
+                }
+
+                if (req.body?.parentId !== undefined) {
+                    const parentId = String(req.body.parentId || '').trim();
+                    if (parentId) {
+                        const parent = guild.channels.cache.get(parentId);
+                        if (!parent || parent.type !== ChannelType.GuildCategory) {
+                            return res.status(400).json({ success: false, error: 'Selected category was not found.' });
+                        }
+                    }
+                    if ((channel.parentId || '') !== parentId) {
+                        await channel.setParent(parentId || null);
+                    }
+                }
+
+                logDashboardAudit(req, 'UPDATE_SERVER_CHANNEL', { channelId: channel.id });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error updating channel:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to update channel.' });
+            }
+        });
+
+        this.app.delete('/api/server-resources/:guildId/channel/:channelId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const channel = guild?.channels?.cache?.get(req.params.channelId);
+                if (!guild || !channel || (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildVoice)) {
+                    return res.status(404).json({ success: false, error: 'Channel not found.' });
+                }
+
+                await channel.delete('Deleted from dashboard server builder');
+                logDashboardAudit(req, 'DELETE_SERVER_CHANNEL', { channelId: req.params.channelId });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error deleting channel:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to delete channel.' });
+            }
+        });
+
+        this.app.post('/api/server-resources/:guildId/role', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found.' });
+                }
+
+                const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+                if (!botMember?.permissions?.has(PermissionFlagsBits.ManageRoles)) {
+                    return res.status(403).json({ success: false, error: 'Bot needs Manage Roles permission.' });
+                }
+
+                const name = normalizeTextInput(req.body?.name, '', 100);
+                if (!name) {
+                    return res.status(400).json({ success: false, error: 'Role name is required.' });
+                }
+
+                const color = normalizeHexColorInput(req.body?.color, '#99AAB5');
+                const role = await guild.roles.create({
+                    name,
+                    colors: { primaryColor: Number.parseInt(color.slice(1), 16) },
+                    hoist: normalizeBooleanInput(req.body?.hoist, false),
+                    mentionable: normalizeBooleanInput(req.body?.mentionable, false),
+                    permissions: []
+                });
+
+                logDashboardAudit(req, 'CREATE_SERVER_ROLE', { roleId: role.id });
+                res.json({ success: true, roleId: role.id });
+            } catch (error) {
+                console.error('Error creating role:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to create role.' });
+            }
+        });
+
+        this.app.patch('/api/server-resources/:guildId/role/:roleId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const role = guild?.roles?.cache?.get(req.params.roleId);
+                if (!guild || !role || role.name === '@everyone') {
+                    return res.status(404).json({ success: false, error: 'Role not found.' });
+                }
+                if (role.managed) {
+                    return res.status(400).json({ success: false, error: 'Managed roles cannot be edited here.' });
+                }
+
+                const updates = {};
+                if (req.body?.name !== undefined) {
+                    const name = normalizeTextInput(req.body.name, '', 100);
+                    if (!name) {
+                        return res.status(400).json({ success: false, error: 'Role name is required.' });
+                    }
+                    updates.name = name;
+                }
+                if (req.body?.color !== undefined) {
+                    const color = normalizeHexColorInput(req.body.color, '#99AAB5');
+                    updates.colors = { primaryColor: Number.parseInt(color.slice(1), 16) };
+                }
+                if (req.body?.hoist !== undefined) {
+                    updates.hoist = normalizeBooleanInput(req.body.hoist, false);
+                }
+                if (req.body?.mentionable !== undefined) {
+                    updates.mentionable = normalizeBooleanInput(req.body.mentionable, false);
+                }
+
+                await role.edit(updates);
+                logDashboardAudit(req, 'UPDATE_SERVER_ROLE', { roleId: role.id });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error updating role:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to update role.' });
+            }
+        });
+
+        this.app.delete('/api/server-resources/:guildId/role/:roleId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guild = this.client.guilds.cache.get(req.params.guildId) || await this.client.guilds.fetch(req.params.guildId).catch(() => null);
+                const role = guild?.roles?.cache?.get(req.params.roleId);
+                if (!guild || !role || role.name === '@everyone') {
+                    return res.status(404).json({ success: false, error: 'Role not found.' });
+                }
+                if (role.managed) {
+                    return res.status(400).json({ success: false, error: 'Managed roles cannot be deleted here.' });
+                }
+
+                await role.delete('Deleted from dashboard server builder');
+                logDashboardAudit(req, 'DELETE_SERVER_ROLE', { roleId: req.params.roleId });
+                res.json({ success: true });
+            } catch (error) {
+                console.error('Error deleting role:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to delete role.' });
             }
         });
 

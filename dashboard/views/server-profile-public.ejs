@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= serverProfile.title %> | Server Profile</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+  <style>
+    .public-profile-shell { min-height: 100vh; background: radial-gradient(circle at top, rgba(88, 101, 242, 0.22), transparent 40%), linear-gradient(180deg, #10131a 0%, #0a0c10 100%); padding: 48px 20px; }
+    .public-profile-card { max-width: 960px; margin: 0 auto; background: rgba(21, 24, 31, 0.94); border: 1px solid rgba(255,255,255,0.08); border-left: 6px solid <%= serverProfile.accentColor %>; border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,0.35); }
+    .public-profile-banner { padding: 40px 32px 28px; background: linear-gradient(135deg, <%= serverProfile.accentColor %>22 0%, rgba(255,255,255,0.03) 100%); }
+    .public-profile-title { font-size: clamp(30px, 6vw, 48px); line-height: 1.05; margin: 0 0 10px; color: #fff; }
+    .public-profile-summary { font-size: 17px; color: #d0d7e2; line-height: 1.6; max-width: 720px; }
+    .public-profile-body { padding: 32px; }
+    .public-profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .public-profile-stat { padding: 16px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); }
+    .public-profile-stat-label { font-size: 12px; color: #b8c0cc; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
+    .public-profile-stat-value { font-size: 28px; font-weight: 800; color: #fff; }
+    .public-profile-description { color: #e7ebf1; line-height: 1.75; font-size: 16px; white-space: pre-line; }
+    .public-profile-actions { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
+    .public-profile-icon { width: 96px; height: 96px; border-radius: 24px; object-fit: cover; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 14px 30px rgba(0,0,0,0.24); }
+    .public-profile-header-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    .public-profile-meta { font-size: 12px; color: #b8c0cc; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 10px; }
+    @media (max-width: 640px) {
+      .public-profile-banner, .public-profile-body { padding: 24px 18px; }
+      .public-profile-header-row { align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="public-profile-shell">
+    <article class="public-profile-card">
+      <section class="public-profile-banner">
+        <div class="public-profile-header-row">
+          <% if (guild.iconURL()) { %>
+            <img class="public-profile-icon" src="<%= guild.iconURL({ size: 256 }) %>" alt="<%= guild.name %> icon">
+          <% } %>
+          <div>
+            <div class="public-profile-meta">Shared server profile</div>
+            <h1 class="public-profile-title"><%= serverProfile.title %></h1>
+            <div class="public-profile-summary"><%= serverProfile.summary %></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="public-profile-body">
+        <div class="public-profile-grid">
+          <% if (serverProfile.showMemberCount) { %>
+            <div class="public-profile-stat">
+              <div class="public-profile-stat-label">Members</div>
+              <div class="public-profile-stat-value"><%= stats.memberCount %></div>
+            </div>
+          <% } %>
+          <% if (serverProfile.showChannelCount) { %>
+            <div class="public-profile-stat">
+              <div class="public-profile-stat-label">Channels</div>
+              <div class="public-profile-stat-value"><%= stats.channelCount %></div>
+            </div>
+          <% } %>
+          <% if (serverProfile.showRoleCount) { %>
+            <div class="public-profile-stat">
+              <div class="public-profile-stat-label">Roles</div>
+              <div class="public-profile-stat-value"><%= stats.roleCount %></div>
+            </div>
+          <% } %>
+        </div>
+
+        <div class="public-profile-description"><%= serverProfile.description || 'This server has not added a longer description yet.' %></div>
+
+        <% if (serverProfile.inviteUrl) { %>
+          <div class="public-profile-actions">
+            <a class="btn btn-primary" href="<%= serverProfile.inviteUrl %>" target="_blank" rel="noopener noreferrer"><i class="fas fa-user-plus"></i> Join Server</a>
+          </div>
+        <% } %>
+      </section>
+    </article>
+  </div>
+</body>
+</html>

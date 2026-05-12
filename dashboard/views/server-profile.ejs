@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= guild.name %> — Server Builder</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+  <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+  <div class="main-wrapper">
+    <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Server Builder' }) %>
+
+    <main class="content">
+      <div class="page-header">
+        <h1><i class="fas fa-screwdriver-wrench" style="color:var(--brand);margin-right:8px"></i>Server Builder</h1>
+        <p>Edit your public server profile and manage categories, channels, and roles from one place.</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Categories</span><div class="stat-card-icon blue"><i class="fas fa-folder-tree"></i></div></div>
+          <div class="stat-card-value"><%= categories.length %></div>
+          <div class="stat-card-change"><i class="fas fa-layer-group"></i> Server structure</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Managed Channels</span><div class="stat-card-icon purple"><i class="fas fa-hashtag"></i></div></div>
+          <div class="stat-card-value"><%= channels.length %></div>
+          <div class="stat-card-change"><i class="fas fa-microphone-lines"></i> Text and voice</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Roles</span><div class="stat-card-icon orange"><i class="fas fa-tag"></i></div></div>
+          <div class="stat-card-value"><%= roles.length %></div>
+          <div class="stat-card-change"><i class="fas fa-users-gear"></i> Access and identity</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header"><span class="stat-card-label">Public Profile</span><div class="stat-card-icon <%= serverProfile.enabled ? 'green' : 'yellow' %>"><i class="fas <%= serverProfile.enabled ? 'fa-earth-europe' : 'fa-eye-slash' %>"></i></div></div>
+          <div class="stat-card-value"><%= serverProfile.enabled ? 'Live' : 'Private' %></div>
+          <div class="stat-card-change"><i class="fas fa-link"></i> Share-ready page</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div>
+            <div class="card-title"><i class="fas fa-id-card"></i> Server Profile Share</div>
+            <div class="card-subtitle">Create a public page for your server and keep the preview in sync while you edit.</div>
+          </div>
+          <div class="badge <%= serverProfile.enabled ? 'badge-green' : 'badge-yellow' %>"><i class="fas <%= serverProfile.enabled ? 'fa-earth-europe' : 'fa-eye-slash' %>"></i> <%= serverProfile.enabled ? 'Public' : 'Private' %></div>
+        </div>
+
+        <form id="serverProfileForm">
+          <div class="toggle-group" style="margin-bottom:16px">
+            <div class="toggle-info"><h4>Public Share Page</h4><p>Enable this to let anyone with the link open your server profile page.</p></div>
+            <label class="toggle-switch"><input type="checkbox" id="serverProfileEnabled" name="enabled" <%= serverProfile.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="serverProfileTitle">Profile Title</label>
+              <input type="text" class="form-control" id="serverProfileTitle" name="title" maxlength="80" value="<%= serverProfile.title %>">
+            </div>
+            <div class="form-group" style="max-width:180px">
+              <label class="form-label" for="serverProfileAccentColor">Accent Color</label>
+              <input type="color" class="form-control" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>" style="min-height:48px;padding:6px 8px">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="serverProfileSummary">Short Summary</label>
+            <textarea class="form-control" id="serverProfileSummary" name="summary" rows="2" maxlength="180"><%= serverProfile.summary %></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="serverProfileDescription">Editor</label>
+            <textarea class="form-control" id="serverProfileDescription" name="description" rows="6" maxlength="1200"><%= serverProfile.description %></textarea>
+            <div class="form-hint">Use this editor to write the text shown on the public server profile page.</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="serverProfileInviteUrl">Discord Invite URL</label>
+              <input type="url" class="form-control" id="serverProfileInviteUrl" name="inviteUrl" value="<%= serverProfile.inviteUrl %>" placeholder="https://discord.gg/yourinvite">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="serverProfileShareUrl">Share Link</label>
+              <input type="text" class="form-control" id="serverProfileShareUrl" value="<%= serverProfileShareUrl %>" readonly>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="permission-role-option"><input type="checkbox" id="serverProfileShowMemberCount" name="showMemberCount" <%= serverProfile.showMemberCount ? 'checked' : '' %>> <span>Show member count</span></label>
+            </div>
+            <div class="form-group">
+              <label class="permission-role-option"><input type="checkbox" id="serverProfileShowChannelCount" name="showChannelCount" <%= serverProfile.showChannelCount ? 'checked' : '' %>> <span>Show channel count</span></label>
+            </div>
+            <div class="form-group">
+              <label class="permission-role-option"><input type="checkbox" id="serverProfileShowRoleCount" name="showRoleCount" <%= serverProfile.showRoleCount ? 'checked' : '' %>> <span>Show role count</span></label>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);padding:16px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+              <strong style="color:var(--text-1)">Live Preview</strong>
+              <span id="serverProfilePreviewStatus" class="badge badge-yellow"><i class="fas fa-eye-slash"></i> Private</span>
+            </div>
+            <div id="serverProfilePreviewCard" style="border:1px solid var(--border);border-left:4px solid var(--brand);border-radius:var(--radius);background:var(--bg-card);padding:18px">
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+                <% if (guild.iconURL()) { %>
+                  <img src="<%= guild.iconURL({ size: 128 }) %>" alt="<%= guild.name %> icon" style="width:72px;height:72px;border-radius:18px;object-fit:cover;border:1px solid var(--border)">
+                <% } %>
+                <div>
+                  <div id="serverProfilePreviewTitle" style="font-size:24px;font-weight:800;color:var(--text-1);line-height:1.2"><%= serverProfile.title %></div>
+                  <div id="serverProfilePreviewSummary" style="color:var(--text-2);margin-top:6px"><%= serverProfile.summary %></div>
+                </div>
+              </div>
+              <div id="serverProfilePreviewStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+              <div id="serverProfilePreviewDescription" style="color:var(--text-1);line-height:1.6;white-space:pre-line"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
+              <div id="serverProfilePreviewInviteWrap" style="margin-top:16px;display:none">
+                <a id="serverProfilePreviewInvite" href="<%= serverProfile.inviteUrl || '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fas fa-user-plus"></i> Join Server</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-action-row">
+            <button type="submit" class="btn btn-primary" id="saveServerProfileBtn"><i class="fas fa-save"></i> Save Profile</button>
+            <button type="button" class="btn btn-secondary" id="copyServerProfileLinkBtn"><i class="fas fa-link"></i> Copy Share Link</button>
+            <a href="<%= serverProfileShareUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-ghost"><i class="fas fa-arrow-up-right-from-square"></i> Open Public Page</a>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-bolt"></i> Quick Create</div>
+            <div class="card-subtitle">Fast forms for the most common server resources.</div>
+          </div>
+        </div>
+        <div class="permission-grid">
+          <section class="permission-card">
+            <div class="permission-card-header"><h3>Create Category</h3></div>
+            <form id="createCategoryForm">
+              <div class="form-group">
+                <label class="form-label" for="newCategoryName">Name</label>
+                <input type="text" class="form-control" id="newCategoryName" name="name" placeholder="Moderation">
+              </div>
+              <label class="permission-role-option" style="margin-bottom:12px"><input type="checkbox" id="newCategoryHidden" name="hidden"> <span>Hide from members</span></label>
+              <button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-folder-plus"></i> Create Category</button>
+            </form>
+          </section>
+
+          <section class="permission-card">
+            <div class="permission-card-header"><h3>Create Channel</h3></div>
+            <form id="createChannelForm">
+              <div class="form-group">
+                <label class="form-label" for="newChannelName">Name</label>
+                <input type="text" class="form-control" id="newChannelName" name="name" placeholder="announcements">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newChannelType">Type</label>
+                <select class="form-control" id="newChannelType" name="type">
+                  <option value="text">Text Channel</option>
+                  <option value="voice">Voice Channel</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newChannelParent">Category</label>
+                <select class="form-control" id="newChannelParent" name="parentId">
+                  <option value="">No category</option>
+                  <% categories.forEach(category => { %>
+                    <option value="<%= category.id %>"><%= category.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-plus"></i> Create Channel</button>
+            </form>
+          </section>
+
+          <section class="permission-card">
+            <div class="permission-card-header"><h3>Create Role</h3></div>
+            <form id="createRoleForm">
+              <div class="form-group">
+                <label class="form-label" for="newRoleName">Name</label>
+                <input type="text" class="form-control" id="newRoleName" name="name" placeholder="Moderator">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newRoleColor">Color</label>
+                <input type="color" class="form-control" id="newRoleColor" name="color" value="#5865F2" style="min-height:48px;padding:6px 8px">
+              </div>
+              <label class="permission-role-option"><input type="checkbox" id="newRoleHoist" name="hoist"> <span>Show separately</span></label>
+              <label class="permission-role-option" style="margin-bottom:12px"><input type="checkbox" id="newRoleMentionable" name="mentionable"> <span>Allow mentions</span></label>
+              <button type="submit" class="btn btn-primary" style="width:100%"><i class="fas fa-tag"></i> Create Role</button>
+            </form>
+          </section>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-folder-tree"></i> Categories</div>
+            <div class="card-subtitle">Rename categories, toggle visibility, and remove empty ones.</div>
+          </div>
+        </div>
+        <div class="table-wrapper"><table>
+          <thead><tr><th>Name</th><th>Members</th><th>Child Channels</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (categories.length === 0) { %>
+              <tr><td colspan="4" class="table-empty">No categories yet</td></tr>
+            <% } %>
+            <% categories.forEach(category => { %>
+              <tr data-category-row data-id="<%= category.id %>">
+                <td><input type="text" class="form-control" data-field="name" value="<%= category.name %>"></td>
+                <td><label class="permission-role-option"><input type="checkbox" data-field="hidden" <%= category.hidden ? 'checked' : '' %>> <span><%= category.hidden ? 'Hidden' : 'Visible' %></span></label></td>
+                <td><span class="badge badge-brand"><%= category.childCount %> channel(s)</span></td>
+                <td>
+                  <div class="quick-action-row">
+                    <button type="button" class="btn btn-secondary btn-sm save-category-btn"><i class="fas fa-save"></i> Save</button>
+                    <button type="button" class="btn btn-danger btn-sm delete-category-btn"><i class="fas fa-trash"></i> Delete</button>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-list"></i> Channels</div>
+            <div class="card-subtitle">Quick rename and recategorize your text and voice channels.</div>
+          </div>
+          <div style="min-width:240px"><input type="text" class="form-control" id="channelSearchInput" placeholder="Search channels"></div>
+        </div>
+        <div class="table-wrapper"><table>
+          <thead><tr><th>Name</th><th>Type</th><th>Category</th><th>Actions</th></tr></thead>
+          <tbody id="channelTableBody">
+            <% if (channels.length === 0) { %>
+              <tr><td colspan="4" class="table-empty">No text or voice channels yet</td></tr>
+            <% } %>
+            <% channels.forEach(channel => { %>
+              <tr data-channel-row data-search="<%= `${channel.name} ${channel.type} ${channel.parentName}`.toLowerCase() %>" data-id="<%= channel.id %>">
+                <td><input type="text" class="form-control" data-field="name" value="<%= channel.name %>"></td>
+                <td><span class="badge <%= channel.type === 'voice' ? 'badge-yellow' : 'badge-brand' %>"><%= channel.type %></span></td>
+                <td>
+                  <select class="form-control" data-field="parentId">
+                    <option value="">No category</option>
+                    <% categories.forEach(category => { %>
+                      <option value="<%= category.id %>" <%= channel.parentId === category.id ? 'selected' : '' %>><%= category.name %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td>
+                  <div class="quick-action-row">
+                    <button type="button" class="btn btn-secondary btn-sm save-channel-btn"><i class="fas fa-save"></i> Save</button>
+                    <button type="button" class="btn btn-danger btn-sm delete-channel-btn"><i class="fas fa-trash"></i> Delete</button>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title"><i class="fas fa-tags"></i> Roles</div>
+            <div class="card-subtitle">Edit name, color, visibility, and mention settings for roles.</div>
+          </div>
+          <div style="min-width:240px"><input type="text" class="form-control" id="roleSearchInput" placeholder="Search roles"></div>
+        </div>
+        <div class="table-wrapper"><table>
+          <thead><tr><th>Name</th><th>Color</th><th>Options</th><th>Actions</th></tr></thead>
+          <tbody id="roleTableBody">
+            <% if (roles.length === 0) { %>
+              <tr><td colspan="4" class="table-empty">No roles available</td></tr>
+            <% } %>
+            <% roles.forEach(role => { %>
+              <tr data-role-row data-search="<%= role.name.toLowerCase() %>" data-id="<%= role.id %>">
+                <td>
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <input type="text" class="form-control" data-field="name" value="<%= role.name %>" <%= role.managed ? 'disabled' : '' %>>
+                    <% if (role.managed) { %><span class="badge badge-yellow">Managed</span><% } %>
+                  </div>
+                </td>
+                <td><input type="color" class="form-control" data-field="color" value="<%= role.color %>" <%= role.managed ? 'disabled' : '' %> style="min-height:46px;padding:6px 8px"></td>
+                <td>
+                  <label class="permission-role-option"><input type="checkbox" data-field="hoist" <%= role.hoist ? 'checked' : '' %> <%= role.managed ? 'disabled' : '' %>> <span>Separate</span></label>
+                  <label class="permission-role-option"><input type="checkbox" data-field="mentionable" <%= role.mentionable ? 'checked' : '' %> <%= role.managed ? 'disabled' : '' %>> <span>Mentionable</span></label>
+                </td>
+                <td>
+                  <div class="quick-action-row">
+                    <button type="button" class="btn btn-secondary btn-sm save-role-btn" <%= role.managed ? 'disabled' : '' %>><i class="fas fa-save"></i> Save</button>
+                    <button type="button" class="btn btn-danger btn-sm delete-role-btn" <%= role.managed ? 'disabled' : '' %>><i class="fas fa-trash"></i> Delete</button>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+<script id="serverBuilderPageData" type="application/json"><%- JSON.stringify({
+  guildId: guild.id,
+  defaultTitle: guild.name,
+  stats: {
+    memberCount: guild.memberCount || 0,
+    channelCount: channels.length,
+    roleCount: roles.length
+  },
+  serverProfile
+}) %></script>
+<script>
+const serverBuilderPageData = JSON.parse(document.getElementById('serverBuilderPageData').textContent);
+const guildId = serverBuilderPageData.guildId;
+const serverProfileDefaultTitle = serverBuilderPageData.defaultTitle;
+const serverProfileGuildStats = serverBuilderPageData.stats;
+const initialServerProfile = serverBuilderPageData.serverProfile;
+const showToast = (message, type = 'info') => {
+  if (window.dashboardUI?.showToast) {
+    window.dashboardUI.showToast(message, type);
+    return;
+  }
+  alert(message);
+};
+const serverProfileForm = document.getElementById('serverProfileForm');
+const saveServerProfileBtn = document.getElementById('saveServerProfileBtn');
+const copyServerProfileLinkBtn = document.getElementById('copyServerProfileLinkBtn');
+const serverProfileShareUrlInput = document.getElementById('serverProfileShareUrl');
+const serverProfileEnabledInput = document.getElementById('serverProfileEnabled');
+const serverProfileTitleInput = document.getElementById('serverProfileTitle');
+const serverProfileSummaryInput = document.getElementById('serverProfileSummary');
+const serverProfileDescriptionInput = document.getElementById('serverProfileDescription');
+const serverProfileInviteUrlInput = document.getElementById('serverProfileInviteUrl');
+const serverProfileAccentColorInput = document.getElementById('serverProfileAccentColor');
+const serverProfileShowMemberCountInput = document.getElementById('serverProfileShowMemberCount');
+const serverProfileShowChannelCountInput = document.getElementById('serverProfileShowChannelCount');
+const serverProfileShowRoleCountInput = document.getElementById('serverProfileShowRoleCount');
+const serverProfilePreviewCard = document.getElementById('serverProfilePreviewCard');
+const serverProfilePreviewTitle = document.getElementById('serverProfilePreviewTitle');
+const serverProfilePreviewSummary = document.getElementById('serverProfilePreviewSummary');
+const serverProfilePreviewDescription = document.getElementById('serverProfilePreviewDescription');
+const serverProfilePreviewInviteWrap = document.getElementById('serverProfilePreviewInviteWrap');
+const serverProfilePreviewInvite = document.getElementById('serverProfilePreviewInvite');
+const serverProfilePreviewStats = document.getElementById('serverProfilePreviewStats');
+const serverProfilePreviewStatus = document.getElementById('serverProfilePreviewStatus');
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderServerProfilePreview() {
+  const title = serverProfileTitleInput.value.trim() || initialServerProfile.title || serverProfileDefaultTitle;
+  const summary = serverProfileSummaryInput.value.trim() || 'Shared from the dashboard.';
+  const description = serverProfileDescriptionInput.value.trim() || 'Your profile description will appear here.';
+  const inviteUrl = serverProfileInviteUrlInput.value.trim();
+  const accentColor = serverProfileAccentColorInput.value || '#5865F2';
+  const enabled = serverProfileEnabledInput.checked;
+  const stats = [];
+
+  if (serverProfileShowMemberCountInput.checked) stats.push({ label: 'Members', value: serverProfileGuildStats.memberCount });
+  if (serverProfileShowChannelCountInput.checked) stats.push({ label: 'Channels', value: serverProfileGuildStats.channelCount });
+  if (serverProfileShowRoleCountInput.checked) stats.push({ label: 'Roles', value: serverProfileGuildStats.roleCount });
+
+  serverProfilePreviewCard.style.borderLeftColor = accentColor;
+  serverProfilePreviewTitle.textContent = title;
+  serverProfilePreviewSummary.textContent = summary;
+  serverProfilePreviewDescription.textContent = description;
+  serverProfilePreviewStats.innerHTML = stats.map((item) => `
+    <div style="padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:var(--bg-card-2);font-size:13px;color:var(--text-1)">
+      <strong>${escapeHtml(String(item.value))}</strong> ${escapeHtml(item.label)}
+    </div>
+  `).join('');
+
+  if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl)) {
+    serverProfilePreviewInviteWrap.style.display = '';
+    serverProfilePreviewInvite.href = inviteUrl;
+  } else {
+    serverProfilePreviewInviteWrap.style.display = 'none';
+    serverProfilePreviewInvite.href = '#';
+  }
+
+  serverProfilePreviewStatus.className = `badge ${enabled ? 'badge-green' : 'badge-yellow'}`;
+  serverProfilePreviewStatus.innerHTML = enabled
+    ? '<i class="fas fa-earth-europe"></i> Public'
+    : '<i class="fas fa-eye-slash"></i> Private';
+}
+
+async function sendJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.error || 'Request failed.');
+  }
+  return payload;
+}
+
+function reloadSoon(message, type = 'success') {
+  showToast(message, type);
+  setTimeout(() => location.reload(), 500);
+}
+
+function attachSearch(inputId, rowSelector) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    document.querySelectorAll(rowSelector).forEach((row) => {
+      row.hidden = query ? !String(row.dataset.search || '').includes(query) : false;
+    });
+  });
+}
+
+[
+  serverProfileEnabledInput,
+  serverProfileTitleInput,
+  serverProfileSummaryInput,
+  serverProfileDescriptionInput,
+  serverProfileInviteUrlInput,
+  serverProfileAccentColorInput,
+  serverProfileShowMemberCountInput,
+  serverProfileShowChannelCountInput,
+  serverProfileShowRoleCountInput
+].forEach((element) => {
+  element.addEventListener('input', renderServerProfilePreview);
+  element.addEventListener('change', renderServerProfilePreview);
+});
+renderServerProfilePreview();
+attachSearch('channelSearchInput', '[data-channel-row]');
+attachSearch('roleSearchInput', '[data-role-row]');
+
+copyServerProfileLinkBtn?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(serverProfileShareUrlInput.value);
+    showToast('Share link copied.', 'success');
+  } catch {
+    serverProfileShareUrlInput.select();
+    document.execCommand('copy');
+    showToast('Share link copied.', 'success');
+  }
+});
+
+serverProfileForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const original = saveServerProfileBtn.innerHTML;
+  saveServerProfileBtn.disabled = true;
+  saveServerProfileBtn.innerHTML = '<span class="spinner"></span> Saving...';
+  try {
+    const payload = await sendJson(`/api/server-profile/${guildId}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        enabled: serverProfileEnabledInput.checked,
+        title: serverProfileTitleInput.value,
+        summary: serverProfileSummaryInput.value,
+        description: serverProfileDescriptionInput.value,
+        inviteUrl: serverProfileInviteUrlInput.value,
+        accentColor: serverProfileAccentColorInput.value,
+        showMemberCount: serverProfileShowMemberCountInput.checked,
+        showChannelCount: serverProfileShowChannelCountInput.checked,
+        showRoleCount: serverProfileShowRoleCountInput.checked
+      })
+    });
+    if (payload.shareUrl) {
+      serverProfileShareUrlInput.value = payload.shareUrl;
+    }
+    renderServerProfilePreview();
+    showToast(payload.profile?.enabled ? 'Server profile saved and public link is active.' : 'Server profile saved.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Failed to save server profile.', 'error');
+  } finally {
+    saveServerProfileBtn.disabled = false;
+    saveServerProfileBtn.innerHTML = original;
+  }
+});
+
+document.getElementById('createCategoryForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Creating...';
+  try {
+    await sendJson(`/api/server-resources/${guildId}/category`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('newCategoryName').value,
+        hidden: document.getElementById('newCategoryHidden').checked
+      })
+    });
+    reloadSoon('Category created.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Failed to create category.', 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = original;
+  }
+});
+
+document.getElementById('createChannelForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Creating...';
+  try {
+    await sendJson(`/api/server-resources/${guildId}/channel`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('newChannelName').value,
+        type: document.getElementById('newChannelType').value,
+        parentId: document.getElementById('newChannelParent').value
+      })
+    });
+    reloadSoon('Channel created.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Failed to create channel.', 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = original;
+  }
+});
+
+document.getElementById('createRoleForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const button = event.submitter;
+  const original = button.innerHTML;
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span> Creating...';
+  try {
+    await sendJson(`/api/server-resources/${guildId}/role`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name: document.getElementById('newRoleName').value,
+        color: document.getElementById('newRoleColor').value,
+        hoist: document.getElementById('newRoleHoist').checked,
+        mentionable: document.getElementById('newRoleMentionable').checked
+      })
+    });
+    reloadSoon('Role created.', 'success');
+  } catch (error) {
+    showToast(error.message || 'Failed to create role.', 'error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = original;
+  }
+});
+
+document.querySelectorAll('.save-category-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const row = button.closest('[data-category-row]');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> Saving...';
+    try {
+      await sendJson(`/api/server-resources/${guildId}/category/${row.dataset.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: row.querySelector('[data-field="name"]').value,
+          hidden: row.querySelector('[data-field="hidden"]').checked
+        })
+      });
+      reloadSoon('Category updated.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to update category.', 'error');
+    } finally {
+      button.disabled = false;
+      button.innerHTML = original;
+    }
+  });
+});
+
+document.querySelectorAll('.delete-category-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    if (!confirm('Delete this category? It must be empty first.')) return;
+    const row = button.closest('[data-category-row]');
+    try {
+      await sendJson(`/api/server-resources/${guildId}/category/${row.dataset.id}`, { method: 'DELETE' });
+      reloadSoon('Category deleted.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to delete category.', 'error');
+    }
+  });
+});
+
+document.querySelectorAll('.save-channel-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const row = button.closest('[data-channel-row]');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> Saving...';
+    try {
+      await sendJson(`/api/server-resources/${guildId}/channel/${row.dataset.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: row.querySelector('[data-field="name"]').value,
+          parentId: row.querySelector('[data-field="parentId"]').value
+        })
+      });
+      reloadSoon('Channel updated.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to update channel.', 'error');
+    } finally {
+      button.disabled = false;
+      button.innerHTML = original;
+    }
+  });
+});
+
+document.querySelectorAll('.delete-channel-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    if (!confirm('Delete this channel?')) return;
+    const row = button.closest('[data-channel-row]');
+    try {
+      await sendJson(`/api/server-resources/${guildId}/channel/${row.dataset.id}`, { method: 'DELETE' });
+      reloadSoon('Channel deleted.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to delete channel.', 'error');
+    }
+  });
+});
+
+document.querySelectorAll('.save-role-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    const row = button.closest('[data-role-row]');
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> Saving...';
+    try {
+      await sendJson(`/api/server-resources/${guildId}/role/${row.dataset.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: row.querySelector('[data-field="name"]').value,
+          color: row.querySelector('[data-field="color"]').value,
+          hoist: row.querySelector('[data-field="hoist"]').checked,
+          mentionable: row.querySelector('[data-field="mentionable"]').checked
+        })
+      });
+      reloadSoon('Role updated.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to update role.', 'error');
+    } finally {
+      button.disabled = false;
+      button.innerHTML = original;
+    }
+  });
+});
+
+document.querySelectorAll('.delete-role-btn').forEach((button) => {
+  button.addEventListener('click', async () => {
+    if (!confirm('Delete this role?')) return;
+    const row = button.closest('[data-role-row]');
+    try {
+      await sendJson(`/api/server-resources/${guildId}/role/${row.dataset.id}`, { method: 'DELETE' });
+      reloadSoon('Role deleted.', 'success');
+    } catch (error) {
+      showToast(error.message || 'Failed to delete role.', 'error');
+    }
+  });
+});
+</script>
+</body>
+</html>

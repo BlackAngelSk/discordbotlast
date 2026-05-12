@@ -18,6 +18,7 @@ const isActive = (path) => activePath === path ? ' active' : '';
   <nav class="sidebar-nav">
     <div class="sidebar-section-label">Server</div>
     <a href="<%= dashboardBasePath %>" class="sidebar-link<%= isActive(dashboardBasePath) %>"><i class="fas fa-cog"></i> Settings</a>
+    <a href="<%= `${dashboardBasePath}/server-builder` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/server-builder`) %>"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
     <a href="<%= `${dashboardBasePath}/economy` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/economy`) %>"><i class="fas fa-coins"></i> Economy</a>
     <a href="<%= `${dashboardBasePath}/shop` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/shop`) %>"><i class="fas fa-store"></i> Shop</a>
     <a href="<%= `${dashboardBasePath}/commands` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/commands`) %>"><i class="fas fa-terminal"></i> Commands</a>

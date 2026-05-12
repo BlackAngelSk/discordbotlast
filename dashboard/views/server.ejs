@@ -143,6 +143,7 @@
         </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
           <a href="#minecraftStatusCard" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-cube"></i> Minecraft Status</a>
+          <a href="/dashboard/<%= guild.id %>/server-builder" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
           <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-users-gear"></i> Community Center</a>
           <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
           <a href="/dashboard/<%= guild.id %>/epic-games" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-gift"></i> Epic Games Alerts</a>
@@ -156,6 +157,100 @@
             <a href="/dashboard/owner" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-crown"></i> Bot Owner Settings</a>
           <% } %>
         </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div>
+            <div class="card-title"><i class="fas fa-id-card"></i> Server Profile Share</div>
+            <div class="card-subtitle">Create a public server profile page, share it, and edit the content directly from the dashboard.</div>
+          </div>
+          <div class="badge <%= serverProfile.enabled ? 'badge-green' : 'badge-yellow' %>"><i class="fas <%= serverProfile.enabled ? 'fa-earth-europe' : 'fa-eye-slash' %>"></i> <%= serverProfile.enabled ? 'Public' : 'Private' %></div>
+        </div>
+
+        <form id="serverProfileForm">
+          <div class="toggle-group" style="margin-bottom:16px">
+            <div class="toggle-info"><h4>Public Share Page</h4><p>When enabled, anyone with the link can view this server profile page.</p></div>
+            <label class="toggle-switch"><input type="checkbox" id="serverProfileEnabled" name="enabled" <%= serverProfile.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="serverProfileTitle">Profile Title</label>
+              <input type="text" class="form-control" id="serverProfileTitle" name="title" maxlength="80" value="<%= serverProfile.title %>" placeholder="Your server title">
+            </div>
+            <div class="form-group" style="max-width:180px">
+              <label class="form-label" for="serverProfileAccentColor">Accent Color</label>
+              <input type="color" class="form-control" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>" style="min-height:48px;padding:6px 8px">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="serverProfileSummary">Short Summary</label>
+            <textarea class="form-control" id="serverProfileSummary" name="summary" rows="2" maxlength="180" placeholder="One-line summary for your server"><%= serverProfile.summary %></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="serverProfileDescription">Editor</label>
+            <textarea class="form-control" id="serverProfileDescription" name="description" rows="6" maxlength="1200" placeholder="Describe your server, events, rules, and what new members should expect."><%= serverProfile.description %></textarea>
+            <div class="form-hint">This text appears on the public server profile page. Line breaks are preserved.</div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="serverProfileInviteUrl">Discord Invite URL</label>
+              <input type="url" class="form-control" id="serverProfileInviteUrl" name="inviteUrl" value="<%= serverProfile.inviteUrl %>" placeholder="https://discord.gg/yourinvite">
+              <div class="form-hint">Optional. Only Discord invite links are accepted.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="serverProfileShareUrl">Share Link</label>
+              <input type="text" class="form-control" id="serverProfileShareUrl" value="<%= serverProfileShareUrl %>" readonly>
+              <div class="form-hint">Share this link after you enable the public profile.</div>
+            </div>
+          </div>
+
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Show Member Count</h4><p>Display member count on the public profile.</p></div>
+            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowMemberCount" name="showMemberCount" <%= serverProfile.showMemberCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group">
+            <div class="toggle-info"><h4>Show Channel Count</h4><p>Display text channel count on the public profile.</p></div>
+            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowChannelCount" name="showChannelCount" <%= serverProfile.showChannelCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+          <div class="toggle-group" style="margin-bottom:16px">
+            <div class="toggle-info"><h4>Show Role Count</h4><p>Display role count on the public profile.</p></div>
+            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowRoleCount" name="showRoleCount" <%= serverProfile.showRoleCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+          </div>
+
+          <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);padding:16px;margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+              <strong style="color:var(--text-1)">Live Preview</strong>
+              <span id="serverProfilePreviewStatus" class="badge badge-yellow"><i class="fas fa-eye-slash"></i> Private</span>
+            </div>
+            <div id="serverProfilePreviewCard" style="border:1px solid var(--border);border-left:4px solid <%= serverProfile.accentColor %>;border-radius:var(--radius);background:var(--bg-card);padding:18px">
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+                <% if (guild.iconURL()) { %>
+                  <img src="<%= guild.iconURL({ size: 128 }) %>" alt="<%= guild.name %> icon" style="width:72px;height:72px;border-radius:18px;object-fit:cover;border:1px solid var(--border)">
+                <% } %>
+                <div>
+                  <div id="serverProfilePreviewTitle" style="font-size:24px;font-weight:800;color:var(--text-1);line-height:1.2"><%= serverProfile.title %></div>
+                  <div id="serverProfilePreviewSummary" style="color:var(--text-2);margin-top:6px"><%= serverProfile.summary %></div>
+                </div>
+              </div>
+              <div id="serverProfilePreviewStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+              <div id="serverProfilePreviewDescription" style="color:var(--text-1);line-height:1.6;white-space:pre-line"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
+              <div id="serverProfilePreviewInviteWrap" style="margin-top:16px;<%= serverProfile.inviteUrl ? '' : 'display:none' %>">
+                <a id="serverProfilePreviewInvite" href="<%= serverProfile.inviteUrl || '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fas fa-user-plus"></i> Join Server</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-action-row">
+            <button type="submit" class="btn btn-primary" id="saveServerProfileBtn"><i class="fas fa-save"></i> Save Profile</button>
+            <button type="button" class="btn btn-secondary" id="copyServerProfileLinkBtn"><i class="fas fa-link"></i> Copy Share Link</button>
+            <a href="<%= serverProfileShareUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" id="openServerProfileBtn"><i class="fas fa-arrow-up-right-from-square"></i> Open Public Page</a>
+          </div>
+        </form>
       </div>
 
       <div class="card" id="minecraftStatusCard" style="margin-bottom:20px">
@@ -448,6 +543,34 @@ const backupRestoreResult = document.getElementById('backupRestoreResult');
 const setupPermissionResult = document.getElementById('setupPermissionResult');
 const setupBatchTestResult = document.getElementById('setupBatchTestResult');
 const setupHistoryList = document.getElementById('setupHistoryList');
+const serverProfileForm = document.getElementById('serverProfileForm');
+const saveServerProfileBtn = document.getElementById('saveServerProfileBtn');
+const copyServerProfileLinkBtn = document.getElementById('copyServerProfileLinkBtn');
+const serverProfileShareUrlInput = document.getElementById('serverProfileShareUrl');
+const serverProfileEnabledInput = document.getElementById('serverProfileEnabled');
+const serverProfileTitleInput = document.getElementById('serverProfileTitle');
+const serverProfileSummaryInput = document.getElementById('serverProfileSummary');
+const serverProfileDescriptionInput = document.getElementById('serverProfileDescription');
+const serverProfileInviteUrlInput = document.getElementById('serverProfileInviteUrl');
+const serverProfileAccentColorInput = document.getElementById('serverProfileAccentColor');
+const serverProfileShowMemberCountInput = document.getElementById('serverProfileShowMemberCount');
+const serverProfileShowChannelCountInput = document.getElementById('serverProfileShowChannelCount');
+const serverProfileShowRoleCountInput = document.getElementById('serverProfileShowRoleCount');
+const serverProfilePreviewCard = document.getElementById('serverProfilePreviewCard');
+const serverProfilePreviewTitle = document.getElementById('serverProfilePreviewTitle');
+const serverProfilePreviewSummary = document.getElementById('serverProfilePreviewSummary');
+const serverProfilePreviewDescription = document.getElementById('serverProfilePreviewDescription');
+const serverProfilePreviewInviteWrap = document.getElementById('serverProfilePreviewInviteWrap');
+const serverProfilePreviewInvite = document.getElementById('serverProfilePreviewInvite');
+const serverProfilePreviewStats = document.getElementById('serverProfilePreviewStats');
+const serverProfilePreviewStatus = document.getElementById('serverProfilePreviewStatus');
+const initialServerProfile = <%- JSON.stringify(serverProfile) %>;
+const serverProfileDefaultTitle = <%- JSON.stringify(guild.name) %>;
+const serverProfileGuildStats = {
+  memberCount: <%= guild.memberCount || 0 %>,
+  channelCount: <%= channels.length %>,
+  roleCount: <%= roles.length %>
+};
 if (setupProgressBarFill) {
   const safeSetupProgress = Math.max(0, Math.min(100, setupProgressPercent));
   setupProgressBarFill.style.width = `${safeSetupProgress}%`;
@@ -566,6 +689,44 @@ function showBackupRestoreResult(message, kind = 'info') {
   backupRestoreResult.hidden = false;
   backupRestoreResult.innerHTML = `<strong style="color:${colors[kind] || 'var(--brand)'}">${escapeHtml(message)}</strong>`;
 }
+function renderServerProfilePreview() {
+  if (!serverProfilePreviewCard) return;
+
+  const title = serverProfileTitleInput.value.trim() || initialServerProfile.title || serverProfileDefaultTitle;
+  const summary = serverProfileSummaryInput.value.trim() || 'Shared from the dashboard.';
+  const description = serverProfileDescriptionInput.value.trim() || 'Your profile description will appear here.';
+  const inviteUrl = serverProfileInviteUrlInput.value.trim();
+  const accentColor = serverProfileAccentColorInput.value || '#5865F2';
+  const enabled = serverProfileEnabledInput.checked;
+  const stats = [];
+
+  if (serverProfileShowMemberCountInput.checked) stats.push({ label: 'Members', value: serverProfileGuildStats.memberCount });
+  if (serverProfileShowChannelCountInput.checked) stats.push({ label: 'Channels', value: serverProfileGuildStats.channelCount });
+  if (serverProfileShowRoleCountInput.checked) stats.push({ label: 'Roles', value: serverProfileGuildStats.roleCount });
+
+  serverProfilePreviewCard.style.borderLeftColor = accentColor;
+  serverProfilePreviewTitle.textContent = title;
+  serverProfilePreviewSummary.textContent = summary;
+  serverProfilePreviewDescription.textContent = description;
+  serverProfilePreviewStats.innerHTML = stats.map((item) => `
+    <div style="padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:var(--bg-card-2);font-size:13px;color:var(--text-1)">
+      <strong>${escapeHtml(String(item.value))}</strong> ${escapeHtml(item.label)}
+    </div>
+  `).join('');
+
+  if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl)) {
+    serverProfilePreviewInviteWrap.style.display = '';
+    serverProfilePreviewInvite.href = inviteUrl;
+  } else {
+    serverProfilePreviewInviteWrap.style.display = 'none';
+    serverProfilePreviewInvite.href = '#';
+  }
+
+  serverProfilePreviewStatus.className = `badge ${enabled ? 'badge-green' : 'badge-yellow'}`;
+  serverProfilePreviewStatus.innerHTML = enabled
+    ? '<i class="fas fa-earth-europe"></i> Public'
+    : '<i class="fas fa-eye-slash"></i> Private';
+}
 const minecraftHostInput = document.getElementById('minecraftHostInput');
 const minecraftPortInput = document.getElementById('minecraftPortInput');
 const minecraftLiveChannel = document.getElementById('minecraftLiveChannel');
@@ -594,6 +755,21 @@ function persistMinecraftSettings() {
     intervalMinutes: minecraftIntervalInput.value.trim()
   }));
 }
+[
+  serverProfileEnabledInput,
+  serverProfileTitleInput,
+  serverProfileSummaryInput,
+  serverProfileDescriptionInput,
+  serverProfileInviteUrlInput,
+  serverProfileAccentColorInput,
+  serverProfileShowMemberCountInput,
+  serverProfileShowChannelCountInput,
+  serverProfileShowRoleCountInput
+].filter(Boolean).forEach((element) => {
+  element.addEventListener('input', renderServerProfilePreview);
+  element.addEventListener('change', renderServerProfilePreview);
+});
+renderServerProfilePreview();
 document.getElementById('addPrefixBtn').addEventListener('click', addPrefix);
 document.getElementById('closeResetModalBtn').addEventListener('click', closeModal);
 document.getElementById('cancelResetModalBtn').addEventListener('click', closeModal);
@@ -927,6 +1103,57 @@ restoreBackupBtn?.addEventListener('click', async () => {
   } finally {
     restoreBackupBtn.disabled = false;
     restoreBackupBtn.innerHTML = original;
+  }
+});
+
+copyServerProfileLinkBtn?.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(serverProfileShareUrlInput.value);
+    toast('Share link copied.', 'success');
+  } catch (error) {
+    serverProfileShareUrlInput.select();
+    document.execCommand('copy');
+    toast('Share link copied.', 'success');
+  }
+});
+
+serverProfileForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const original = saveServerProfileBtn.innerHTML;
+  saveServerProfileBtn.disabled = true;
+  saveServerProfileBtn.innerHTML = '<span class="spinner"></span> Saving...';
+
+  try {
+    const response = await fetch(`/api/server-profile/${guildId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        enabled: serverProfileEnabledInput.checked,
+        title: serverProfileTitleInput.value,
+        summary: serverProfileSummaryInput.value,
+        description: serverProfileDescriptionInput.value,
+        inviteUrl: serverProfileInviteUrlInput.value,
+        accentColor: serverProfileAccentColorInput.value,
+        showMemberCount: serverProfileShowMemberCountInput.checked,
+        showChannelCount: serverProfileShowChannelCountInput.checked,
+        showRoleCount: serverProfileShowRoleCountInput.checked
+      })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to save server profile.');
+    }
+
+    if (payload.shareUrl) {
+      serverProfileShareUrlInput.value = payload.shareUrl;
+    }
+    toast(payload.profile?.enabled ? 'Server profile saved and public link is active.' : 'Server profile saved.', 'success');
+    renderServerProfilePreview();
+  } catch (error) {
+    toast(error.message || 'Failed to save server profile.', 'error');
+  } finally {
+    saveServerProfileBtn.disabled = false;
+    saveServerProfileBtn.innerHTML = original;
   }
 });
 </script>

@@ -16,7 +16,18 @@ const DEFAULT_SETTINGS = {
     leaveMessage: '👋 {user} has left the server.',
     autoRole: 'Member',
     djRole: 'DJ',
-    botWatcherRole: 'Bot Watcher'
+    botWatcherRole: 'Bot Watcher',
+    serverProfile: {
+        enabled: false,
+        title: '',
+        summary: '',
+        description: '',
+        inviteUrl: '',
+        accentColor: '#5865F2',
+        showMemberCount: true,
+        showChannelCount: true,
+        showRoleCount: true
+    }
 };
 
 class SettingsManager {
@@ -27,6 +38,10 @@ class SettingsManager {
 
     normalizeGuildSettings(settings = {}) {
         const normalized = { ...DEFAULT_SETTINGS, ...settings };
+        normalized.serverProfile = {
+            ...DEFAULT_SETTINGS.serverProfile,
+            ...(settings.serverProfile || {})
+        };
 
         if (!Array.isArray(normalized.prefixes) || normalized.prefixes.length === 0) {
             normalized.prefixes = [normalized.prefix || DEFAULT_SETTINGS.prefixes[0]];
