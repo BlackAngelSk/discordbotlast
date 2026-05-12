@@ -177,16 +177,15 @@ class EconomyManager {
 
     async addXP(guildId, userId, xp) {
         const userData = this.getUserData(guildId, userId);
+        // Capture the current level BEFORE adding XP (normalizeUserData already ran in getUserData)
+        const oldLevel = userData.level;
         userData.xp += xp;
         
         // Calculate level (xp = level^2 * 100)
         const newLevel = calculateLevelFromXP(userData.xp);
-        const previousHighest = Number.isFinite(userData.highestLevelReached)
-            ? userData.highestLevelReached
-            : userData.level;
-        const leveledUp = newLevel > previousHighest;
+        const leveledUp = newLevel > oldLevel;
         userData.level = newLevel;
-        userData.highestLevelReached = Math.min(MAX_LEVEL, Math.max(previousHighest, newLevel));
+        userData.highestLevelReached = Math.min(MAX_LEVEL, Math.max(userData.highestLevelReached || 1, newLevel));
         
         await this.save();
         return { leveledUp, level: newLevel };

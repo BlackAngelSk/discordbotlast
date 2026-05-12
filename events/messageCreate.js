@@ -343,6 +343,9 @@ module.exports = {
                 const baseXP = Math.floor(Math.random() * 11) + 5; // 5-15 XP
                 const xpGain = Math.floor(baseXP * channelMultiplier * eventMultiplier);
                 
+                // Set cooldown immediately so it persists even if notification fails below
+                global[lastXpKey] = Date.now();
+
                 const result = await economyManager.addXP(message.guildId, message.author.id, xpGain);
                 
                 if (result.leveledUp) {
@@ -386,13 +389,12 @@ module.exports = {
                             .setTitle('🎉 Level Up!')
                             .setDescription(`${message.author} reached level **${result.level}**!${roleRewardText}`)
                             .addFields({ name: 'Reward', value: `💰 ${reward} coins` })
-                            .setThumbnail(message.author.displayAvatarURL());
+                            .setThumbnail(message.author.displayAvatarURL())
+                            .setTimestamp();
                         
-                        await message.channel.send({ embeds: [embed] });
+                        await message.channel.send({ content: `${message.author}`, embeds: [embed] });
                     }
                 }
-                
-                global[lastXpKey] = Date.now();
             }
         } catch (error) {
             console.error('XP tracking error:', error);

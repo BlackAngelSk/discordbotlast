@@ -1,5 +1,22 @@
 {
   "users": {
+    "999": {
+      "balance": 0,
+      "xp": 5030,
+      "level": 8,
+      "highestLevelReached": 8,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "TEST_GUILD_999",
+        "TEST",
+        "USER"
+      ]
+    },
     "396685113804587009": {
       "balance": 7483,
       "xp": 19774,
@@ -1246,6 +1263,21 @@
       "seasonalCoins": 0,
       "guilds": [
         "421968526547353601"
+      ]
+    },
+    "userTest": {
+      "balance": 0,
+      "xp": 32402,
+      "level": 19,
+      "highestLevelReached": 19,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "guild123"
       ]
     }
   },
