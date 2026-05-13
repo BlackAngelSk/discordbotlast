@@ -28,9 +28,28 @@ function parseYouTubeRssFeed(xml) {
     const videoIdRaw = parseXmlText(entry, 'yt:videoId');
     const title = parseXmlText(entry, 'title');
     const channelName = parseXmlText(xml, 'title'); // channel title is before entries
-    const thumb = (entry.match(/medium_url="([^"]+)"/) || entry.match(/url="([^"]+)"/))?.[1] || null;
+    const thumb = buildYouTubeThumbnailUrl(
+        videoIdRaw,
+        (entry.match(/medium_url="([^"]+)"/) || entry.match(/url="([^"]+)"/))?.[1] || null
+    );
 
     return videoIdRaw ? { videoId: videoIdRaw, title: title || 'New Video', channelName: channelName || null, thumb } : null;
+}
+
+function isHttpUrl(value) {
+    if (!value) return false;
+    try {
+        const parsed = new URL(String(value));
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}
+
+function buildYouTubeThumbnailUrl(videoId, preferredUrl = null) {
+    if (isHttpUrl(preferredUrl)) return preferredUrl;
+    if (!videoId) return null;
+    return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
 
 function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
@@ -607,7 +626,10 @@ class LiveAlertsManager {
         const title = item.title || item.snippet?.title || 'New Video';
         const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
         const videoId = item.videoId || item.id?.videoId;
-        const thumbUrl = item.thumb || item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || null;
+        const thumbUrl = buildYouTubeThumbnailUrl(
+            videoId,
+            item.thumb || item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || null
+        );
         const description = item.snippet?.description ? item.snippet.description.substring(0, 200) + (item.snippet.description.length > 200 ? '...' : '') : 'New video uploaded';
         const publishedAt = item.snippet?.publishedAt || new Date().toISOString();
         
@@ -622,9 +644,12 @@ class LiveAlertsManager {
                 { name: '⏰ Published', value: `<t:${Math.floor(new Date(publishedAt).getTime() / 1000)}:R>`, inline: true },
                 { name: '🔗 Channel', value: `[Visit Channel](https://youtube.com/@${entry.channelName || 'channel'})`, inline: true },
             )
-            .setImage(thumbUrl)
             .setFooter({ text: 'YouTube • Video Alert', iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
             .setTimestamp();
+
+        if (thumbUrl) {
+            embed.setImage(thumbUrl);
+        }
         
         const buttons = new ActionRowBuilder()
             .addComponents(

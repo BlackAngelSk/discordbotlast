@@ -1,7 +1,8 @@
 const { fetch } = require('undici');
 const dns = require('dns').promises;
 
-const MINECRAFT_STATUS_TIMEOUT_MS = 5000;
+const MINECRAFT_STATUS_TIMEOUT_MS = Math.max(1000, Number(process.env.MINECRAFT_STATUS_TIMEOUT_MS) || 8000);
+const MINECRAFT_STATUS_TIMEOUT_RETRIES = 1;
 const MCSTATUS_API_BASE = 'https://api.mcstatus.io/v2/status';
 
 const normalizeMinecraftStatusInput = (hostInput, portInput) => {
@@ -56,32 +57,42 @@ const fetchMinecraftServerStatus = async (host, port) => {
     const normalizedPort = normalizedInput.port;
 
     const fetchJsonWithTimeout = async (url) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), MINECRAFT_STATUS_TIMEOUT_MS);
+        let lastError = null;
 
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    accept: 'application/json',
-                    'user-agent': 'discordbot-dashboard/1.6.1'
-                },
-                signal: controller.signal
-            });
+        for (let attempt = 0; attempt <= MINECRAFT_STATUS_TIMEOUT_RETRIES; attempt += 1) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), MINECRAFT_STATUS_TIMEOUT_MS);
 
-            if (!response.ok) {
-                throw new Error(`Status lookup failed with HTTP ${response.status}.`);
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        accept: 'application/json',
+                        'user-agent': 'discordbot-dashboard/1.6.1'
+                    },
+                    signal: controller.signal
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Status lookup failed with HTTP ${response.status}.`);
+                }
+
+                return response.json();
+            } catch (error) {
+                lastError = error;
+                const isTimeout = error?.name === 'AbortError' || error?.name === 'TimeoutError' || error?.code === 'ABORT_ERR';
+                if (!isTimeout || attempt >= MINECRAFT_STATUS_TIMEOUT_RETRIES) {
+                    if (isTimeout) {
+                        throw new Error('Minecraft status lookup timed out.');
+                    }
+
+                    throw error;
+                }
+            } finally {
+                clearTimeout(timeout);
             }
-
-            return response.json();
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new Error('Minecraft status lookup timed out.');
-            }
-
-            throw error;
-        } finally {
-            clearTimeout(timeout);
         }
+
+        throw lastError || new Error('Minecraft status lookup timed out.');
     };
 
     const toMotdText = (motdValue) => {
