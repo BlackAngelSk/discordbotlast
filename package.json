@@ -12,7 +12,8 @@
     "pm2:save": "pm2 save",
     "slots:sim": "node scripts/simulate-slots-rtp.js",
     "test:slots": "node scripts/test-slots-logic.js",
-    "test:steam-dates": "node scripts/test-steam-update-dates.js"
+    "test:steam-dates": "node scripts/test-steam-update-dates.js",
+    "test": "node tests/run-all.js"
   },
   "keywords": [
     "discord",
