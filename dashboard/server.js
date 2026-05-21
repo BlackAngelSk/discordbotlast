@@ -24,6 +24,7 @@ const ticketManager = require('../utils/ticketManager');
 const analyticsManager = require('../utils/analyticsManager');
 const liveAlertsManager = require('../utils/liveAlertsManager');
 const epicGamesAlertsManager = require('../utils/epicGamesAlertsManager');
+const steamFreeGamesAlertsManager = require('../utils/steamFreeGamesAlertsManager');
 const steamGameUpdatesManager = require('../utils/steamGameUpdatesManager');
 const telegramSyncManager = require('../utils/telegramSyncManager');
 const suggestionManager = require('../utils/suggestionManager');
@@ -120,6 +121,7 @@ const DASHBOARD_SECTION_LABELS = {
     commands: 'Commands',
     liveAlerts: 'Live Alerts',
     epicGamesAlerts: 'Epic Games Alerts',
+    steamFreeGamesAlerts: 'Steam Free Games',
     steamGameUpdates: 'Steam Updates',
     telegramSync: 'Telegram Sync',
     community: 'Community',
@@ -142,6 +144,7 @@ const inferDashboardSectionKey = (requestPath) => {
     if (/^\/dashboard\/[^/]+\/commands$/.test(pathValue) || /^\/api\/commands\/[^/]+/.test(pathValue) || /^\/api\/command-permissions\/[^/]+/.test(pathValue)) return 'commands';
     if (/^\/dashboard\/[^/]+\/live-alerts$/.test(pathValue) || /^\/api\/live-alerts\/[^/]+/.test(pathValue)) return 'liveAlerts';
     if (/^\/dashboard\/[^/]+\/epic-games$/.test(pathValue) || /^\/api\/epic-games\/[^/]+/.test(pathValue)) return 'epicGamesAlerts';
+    if (/^\/dashboard\/[^/]+\/steam-free-games$/.test(pathValue) || /^\/api\/steam-free-games\/[^/]+/.test(pathValue)) return 'steamFreeGamesAlerts';
     if (/^\/dashboard\/[^/]+\/steam-updates$/.test(pathValue) || /^\/api\/steam-updates\/[^/]+/.test(pathValue)) return 'steamGameUpdates';
     if (/^\/dashboard\/[^/]+\/telegram-sync$/.test(pathValue) || /^\/api\/telegram-sync\/[^/]+/.test(pathValue)) return 'telegramSync';
     if (/^\/dashboard\/[^/]+\/community$/.test(pathValue) || /^\/api\/community\/[^/]+/.test(pathValue)) return 'community';
@@ -284,6 +287,7 @@ const buildServerBackupPayload = async (guildId, client) => {
     const tempVoiceHubChannelId = tempVoiceManager.getHub(guildId);
     const liveAlerts = liveAlertsManager.getAlerts(guildId);
     const epicGamesConfig = epicGamesAlertsManager.getGuildConfig(guildId);
+    const steamFreeGamesConfig = steamFreeGamesAlertsManager.getGuildConfig(guildId);
     const steamConfig = steamGameUpdatesManager.getGuildConfig(guildId);
     const telegramConfig = telegramSyncManager.getGuildConfig(guildId);
 
@@ -332,6 +336,7 @@ const buildServerBackupPayload = async (guildId, client) => {
         alerts: {
             liveAlerts,
             epicGames: epicGamesConfig,
+            steamFreeGames: steamFreeGamesConfig,
             steam: steamConfig,
             telegram: telegramConfig
         }
@@ -434,6 +439,13 @@ const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
         if (channel) {
             await epicGamesAlertsManager.enableAlerts(guildId, channel.id);
             applied.push('Epic Games alerts');
+        }
+    }
+    if (payload.alerts?.steamFreeGames?.channelId) {
+        const channel = findChannelByIdOrName(guild, payload.alerts.steamFreeGames.channelId);
+        if (channel) {
+            await steamFreeGamesAlertsManager.enableAlerts(guildId, channel.id);
+            applied.push('Steam free game alerts');
         }
     }
     if (payload.alerts?.steam?.channelId) {
@@ -2949,6 +2961,107 @@ class Dashboard {
             }
         });
 
+        this.app.get('/api/steam-free-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = steamFreeGamesAlertsManager.getGuildConfig(guildId);
+                const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot().catch(() => null);
+
+                res.json({
+                    success: true,
+                    config: config ? {
+                        ...config,
+                        channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
+                    } : null,
+                    giveaways: snapshot?.giveaways || []
+                });
+            } catch (error) {
+                console.error('Error fetching Steam free games alerts:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-free-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const { channelId } = req.body;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!channelId) {
+                    return res.status(400).json({ success: false, error: 'Channel is required' });
+                }
+
+                const channel = guild.channels.cache.get(channelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const snapshot = await steamFreeGamesAlertsManager.enableAlerts(guildId, channelId);
+                res.json({
+                    success: true,
+                    message: 'Steam free game alert channel saved successfully',
+                    config: steamFreeGamesAlertsManager.getGuildConfig(guildId),
+                    giveaways: snapshot?.giveaways || []
+                });
+            } catch (error) {
+                console.error('Error saving Steam free game alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.delete('/api/steam-free-games/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                await steamFreeGamesAlertsManager.disableAlerts(req.params.guildId);
+                res.json({ success: true, message: 'Steam free game alerts removed successfully' });
+            } catch (error) {
+                console.error('Error removing Steam free game alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-free-games/:guildId/test', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const configured = steamFreeGamesAlertsManager.getGuildConfig(guildId);
+                const requestedChannelId = String(req.body?.channelId || '').trim();
+                const targetChannelId = requestedChannelId || configured?.channelId;
+
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                if (!targetChannelId) {
+                    return res.status(400).json({ success: false, error: 'Choose a channel first' });
+                }
+
+                const channel = guild.channels.cache.get(targetChannelId);
+                if (!channel || channel.type !== 0) {
+                    return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
+                }
+
+                const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot();
+                const payload = steamFreeGamesAlertsManager.buildCurrentAlert(snapshot);
+                if (!payload) {
+                    return res.status(400).json({ success: false, error: 'No free Steam game giveaways were returned right now.' });
+                }
+
+                for (const messagePayload of payload.messages) {
+                    await channel.send(messagePayload);
+                }
+
+                res.json({ success: true, message: `Sent a test Steam free game alert to #${channel.name}` });
+            } catch (error) {
+                console.error('Error sending Steam free game test alert:', error);
+                res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
         this.app.get('/api/steam-updates/:guildId', this.checkAuth, this.checkGuildAccess, async (req, res) => {
             try {
                 const guildId = req.params.guildId;
@@ -3842,6 +3955,26 @@ class Dashboard {
             } catch (error) {
                 console.error('Epic Games alerts page error:', error);
                 res.status(500).send('Error loading Epic Games alerts');
+            }
+        });
+
+        this.app.get('/dashboard/:guildId/steam-free-games', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                const config = steamFreeGamesAlertsManager.getGuildConfig(guildId);
+                const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot().catch(() => null);
+
+                res.render('steam-free-games', {
+                    guild,
+                    config,
+                    channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
+                    giveaways: snapshot?.giveaways || [],
+                    user: req.user
+                });
+            } catch (error) {
+                console.error('Steam free games page error:', error);
+                res.status(500).send('Error loading Steam free games alerts');
             }
         });
 

@@ -132,6 +132,16 @@ module.exports = {
 
         setTimeout(async () => {
             try {
+                const steamFreeGamesAlertsManager = require('../utils/steamFreeGamesAlertsManager');
+                await steamFreeGamesAlertsManager.init(readyClient);
+                console.log('✅ Steam free game alerts polling started');
+            } catch (error) {
+                console.error('Error starting Steam free game alerts:', error);
+            }
+        }, 20000);
+
+        setTimeout(async () => {
+            try {
                 const telegramSyncManager = require('../utils/telegramSyncManager');
                 await telegramSyncManager.init(readyClient);
                 console.log('✅ Telegram sync bridge started');
@@ -149,6 +159,6 @@ module.exports = {
             } catch (error) {
                 console.error('Error starting stat channels:', error);
             }
-        }, 20000);
+        }, 22000);
     }
 };
