@@ -206,6 +206,9 @@ class EpicGamesAlertsManager {
         const upcomingOffers = [];
 
         for (const element of elements) {
+            const sellerName = element.seller?.name || '';
+            if (/discord/i.test(sellerName)) continue;
+
             const promotions = element.promotions || {};
             const activeGroups = Array.isArray(promotions.promotionalOffers) ? promotions.promotionalOffers : [];
             const upcomingGroups = Array.isArray(promotions.upcomingPromotionalOffers) ? promotions.upcomingPromotionalOffers : [];
