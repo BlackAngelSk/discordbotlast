@@ -99,6 +99,26 @@ function normalizeYouTubeChannelIdentifier(input) {
     return value;
 }
 
+function buildYouTubeChannelUrl(input, fallbackChannelId = null) {
+    const value = String(input || '').trim();
+
+    if (value.includes('youtube.com') || value.includes('youtu.be')) {
+        return value;
+    }
+
+    const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
+    if (handleMatch?.[1]) {
+        return `https://www.youtube.com/@${handleMatch[1]}`;
+    }
+
+    const ucMatch = value.match(/(UC[\w-]{22})/) || String(fallbackChannelId || '').match(/(UC[\w-]{22})/);
+    if (ucMatch?.[1]) {
+        return `https://www.youtube.com/channel/${ucMatch[1]}`;
+    }
+
+    return null;
+}
+
 class LiveAlertsManager {
     constructor() {
         // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, channelName?, discordChannelId, roleId?, lastVideoId }] } }
@@ -148,11 +168,31 @@ class LiveAlertsManager {
 
     async addYouTubeAlert(guildId, ytChannelId, discordChannelId, roleId = null, channelUrl = null) {
         if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
-        const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
-        const existing = this.data[guildId].youtube.find(e => e.channelId === normalizedChannelId);
-        const constructedUrl = channelUrl || `https://www.youtube.com/channel/${normalizedChannelId}`;
-        if (existing) { existing.discordChannelId = discordChannelId; existing.roleId = roleId; existing.channelUrl = constructedUrl; }
-        else this.data[guildId].youtube.push({ channelId: normalizedChannelId, channelName: null, discordChannelId, roleId, lastVideoId: null, channelUrl: constructedUrl });
+        const originalIdentifier = String(ytChannelId || '').trim();
+        const normalizedChannelId = normalizeYouTubeChannelIdentifier(originalIdentifier);
+        const existing = this.data[guildId].youtube.find(e =>
+            e.channelId === normalizedChannelId
+            || normalizeYouTubeChannelIdentifier(e.sourceIdentifier || '') === normalizedChannelId
+        );
+
+        const constructedUrl = buildYouTubeChannelUrl(channelUrl || originalIdentifier, normalizedChannelId);
+
+        if (existing) {
+            existing.discordChannelId = discordChannelId;
+            existing.roleId = roleId;
+            existing.sourceIdentifier = originalIdentifier || existing.sourceIdentifier || existing.channelId;
+            existing.channelUrl = constructedUrl || existing.channelUrl || buildYouTubeChannelUrl(existing.sourceIdentifier, existing.channelId);
+        } else {
+            this.data[guildId].youtube.push({
+                channelId: normalizedChannelId,
+                sourceIdentifier: originalIdentifier || normalizedChannelId,
+                channelName: null,
+                discordChannelId,
+                roleId,
+                lastVideoId: null,
+                channelUrl: constructedUrl
+            });
+        }
         await this.save();
         setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
     }
@@ -511,6 +551,9 @@ class LiveAlertsManager {
                     const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
                     if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
                         entry.channelId = resolvedMeta.channelId;
+                        if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
+                            entry.channelUrl = buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId);
+                        }
                         await this.save();
                     }
                     if (resolvedMeta?.channelName && entry.channelName !== resolvedMeta.channelName) {
@@ -521,6 +564,9 @@ class LiveAlertsManager {
                     const resolvedChannelId = await this._resolveYouTubeChannelIdWithoutApi(entry.channelId);
                     if (resolvedChannelId && entry.channelId !== resolvedChannelId) {
                         entry.channelId = resolvedChannelId;
+                        if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
+                            entry.channelUrl = buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId);
+                        }
                         await this.save();
                     }
                 }
@@ -544,40 +590,29 @@ class LiveAlertsManager {
             const rssRes = await httpsGet(rssUrl, { 'Accept': 'application/rss+xml, application/xml, text/xml' });
             if (rssRes.status >= 400) {
                 const failKey = `${guildId}_${entry.channelId}`;
-                
-                // Handle 404 - Channel not found (remove after 3 failures)
+
+                // Keep tracking error streaks for diagnostics, but never auto-remove alerts.
+                // External APIs can return temporary 404/5xx and we should not "forget" subscriptions.
                 if (rssRes.status === 404) {
                     this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
-                    
+
                     if (this._youtubeFailureCount[failKey] === 1) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP 404 - Channel not found. Will be removed after ${this._youtubeFailureThreshold} consecutive failures.`);
+                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP 404 - Channel not found. Keeping alert configured and retrying automatically.`);
                     }
-                    
-                    // Remove alert after N consecutive 404s
-                    if (this._youtubeFailureCount[failKey] >= this._youtubeFailureThreshold) {
-                        console.warn(`Removing YouTube alert for channel ${entry.channelId} (Guild: ${guildId}) - persistent 404 errors.`);
-                        this.removeYouTubeAlert(guildId, entry.channelId).catch(() => {});
-                        delete this._youtubeFailureCount[failKey];
+
+                    if (this._youtubeFailureCount[failKey] % 10 === 0) {
+                        console.warn(`YouTube RSS still failing for ${entry.channelId}: ${this._youtubeFailureCount[failKey]} consecutive 404 responses.`);
                     }
                 }
-                // Handle 5xx errors - YouTube service issues (remove after 20 failures)
                 else if (rssRes.status >= 500) {
                     this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
-                    
+
                     if (this._youtubeFailureCount[failKey] === 1) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - YouTube service issue. Will be removed after 20 consecutive failures.`);
+                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - YouTube service issue. Keeping alert configured and retrying automatically.`);
                     } else if (this._youtubeFailureCount[failKey] % 5 === 0) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - Retry ${this._youtubeFailureCount[failKey]}/20`);
-                    }
-                    
-                    // Remove alert after 20 consecutive 5xx errors (about 100 minutes at 5 min intervals)
-                    if (this._youtubeFailureCount[failKey] >= 20) {
-                        console.warn(`Removing YouTube alert for channel ${entry.channelId} (Guild: ${guildId}) - persistent HTTP ${rssRes.status} errors.`);
-                        this.removeYouTubeAlert(guildId, entry.channelId).catch(() => {});
-                        delete this._youtubeFailureCount[failKey];
+                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - Retry ${this._youtubeFailureCount[failKey]}`);
                     }
                 }
-                // Handle other errors (4xx, etc)
                 else {
                     console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
                 }
@@ -632,6 +667,7 @@ class LiveAlertsManager {
         );
         const description = item.snippet?.description ? item.snippet.description.substring(0, 200) + (item.snippet.description.length > 200 ? '...' : '') : 'New video uploaded';
         const publishedAt = item.snippet?.publishedAt || new Date().toISOString();
+        const channelVisitUrl = entry.channelUrl || buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId) || `https://www.youtube.com/channel/${entry.channelId}`;
         
         const embed = new EmbedBuilder()
             .setColor(0xff0000)
@@ -642,7 +678,7 @@ class LiveAlertsManager {
             .addFields(
                 { name: '📝 Description', value: description || 'No description', inline: false },
                 { name: '⏰ Published', value: `<t:${Math.floor(new Date(publishedAt).getTime() / 1000)}:R>`, inline: true },
-                { name: '🔗 Channel', value: `[Visit Channel](https://youtube.com/@${entry.channelName || 'channel'})`, inline: true },
+                { name: '🔗 Channel', value: `[Visit Channel](${channelVisitUrl})`, inline: true },
             )
             .setFooter({ text: 'YouTube • Video Alert', iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
             .setTimestamp();
