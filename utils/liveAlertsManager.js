@@ -28,9 +28,10 @@ function parseYouTubeRssFeed(xml) {
     const videoIdRaw = parseXmlText(entry, 'yt:videoId');
     const title = parseXmlText(entry, 'title');
     const channelName = parseXmlText(xml, 'title'); // channel title is before entries
+    const mediaThumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]+)"/i);
     const thumb = buildYouTubeThumbnailUrl(
         videoIdRaw,
-        (entry.match(/medium_url="([^"]+)"/) || entry.match(/url="([^"]+)"/))?.[1] || null
+        mediaThumbMatch?.[1] || (entry.match(/medium_url="([^"]+)"/))?.[1] || null
     );
 
     return videoIdRaw ? { videoId: videoIdRaw, title: title || 'New Video', channelName: channelName || null, thumb } : null;
@@ -46,8 +47,26 @@ function isHttpUrl(value) {
     }
 }
 
+function isLikelyImageUrl(value) {
+    if (!isHttpUrl(value)) return false;
+
+    try {
+        const parsed = new URL(String(value));
+        const host = parsed.hostname.toLowerCase();
+        const pathName = parsed.pathname.toLowerCase();
+
+        // YouTube thumbnails are served from ytimg hosts and may not include extensions.
+        if (host.includes('ytimg.com') || host.includes('ggpht.com')) return true;
+
+        // Generic image URL fallback.
+        return /(\.png|\.jpe?g|\.gif|\.webp|\.bmp)$/.test(pathName);
+    } catch {
+        return false;
+    }
+}
+
 function buildYouTubeThumbnailUrl(videoId, preferredUrl = null) {
-    if (isHttpUrl(preferredUrl)) return preferredUrl;
+    if (isLikelyImageUrl(preferredUrl)) return preferredUrl;
     if (!videoId) return null;
     return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
