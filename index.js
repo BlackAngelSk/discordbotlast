@@ -1,8 +1,76 @@
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config({
     path: path.join(__dirname, '.env'),
     override: true
 });
+
+const INSTANCE_LOCK_FILE = path.join(__dirname, '.discord-bot.lock');
+
+function isPidRunning(pid) {
+    if (!Number.isInteger(pid) || pid <= 0) return false;
+    try {
+        process.kill(pid, 0);
+        return true;
+    } catch (error) {
+        return error?.code === 'EPERM';
+    }
+}
+
+function readLockPid() {
+    try {
+        const raw = fs.readFileSync(INSTANCE_LOCK_FILE, 'utf8');
+        const parsed = JSON.parse(raw);
+        return Number(parsed?.pid) || null;
+    } catch {
+        return null;
+    }
+}
+
+function releaseInstanceLock() {
+    try {
+        const lockPid = readLockPid();
+        if (!lockPid || lockPid === process.pid) {
+            fs.unlinkSync(INSTANCE_LOCK_FILE);
+        }
+    } catch {
+        // Ignore lock release errors during shutdown.
+    }
+}
+
+function acquireSingleInstanceLock() {
+    const allowMultiple = String(process.env.ALLOW_MULTIPLE_BOT_INSTANCES || '').toLowerCase() === 'true';
+    if (allowMultiple) return;
+
+    const existingPid = readLockPid();
+    if (existingPid && existingPid !== process.pid && isPidRunning(existingPid)) {
+        console.error(`❌ Another bot instance is already running (PID ${existingPid}). Exiting to prevent double boot.`);
+        process.exit(1);
+    }
+
+    if (existingPid && !isPidRunning(existingPid)) {
+        try {
+            fs.unlinkSync(INSTANCE_LOCK_FILE);
+        } catch {
+            // Continue and attempt to create a fresh lock.
+        }
+    }
+
+    try {
+        fs.writeFileSync(INSTANCE_LOCK_FILE, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), { flag: 'wx' });
+    } catch (error) {
+        if (error?.code === 'EEXIST') {
+            const lockPid = readLockPid();
+            console.error(`❌ Bot lock file already exists${lockPid ? ` (PID ${lockPid})` : ''}. Exiting to prevent double boot.`);
+            process.exit(1);
+        }
+        throw error;
+    }
+
+    process.on('exit', releaseInstanceLock);
+}
+
+acquireSingleInstanceLock();
 
 // ── Environment variable validation ───────────────────────────────────────────
 (function validateEnv() {

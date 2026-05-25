@@ -270,6 +270,35 @@ const findChannelByIdOrName = (guild, channelRef) => {
         || null;
 };
 
+const findRoleByIdOrName = (guild, roleRef) => {
+    const normalized = String(roleRef || '').trim();
+    if (!guild || !normalized) return null;
+    return guild.roles.cache.get(normalized)
+        || guild.roles.cache.find((role) => String(role.name || '').toLowerCase() === normalized.toLowerCase())
+        || null;
+};
+
+const getUserAdminGuildsInBot = (user, client, excludeGuildId = null) => {
+    const adminPermission = PermissionFlagsBits.Administrator;
+    const allGuilds = Array.isArray(user?.guilds) ? user.guilds : [];
+
+    return allGuilds.filter((guild) => {
+        if (!guild || !guild.id) return false;
+        if (excludeGuildId && guild.id === excludeGuildId) return false;
+        if (!client.guilds.cache.has(guild.id)) return false;
+
+        try {
+            return (BigInt(guild.permissions) & adminPermission) === adminPermission;
+        } catch {
+            return false;
+        }
+    }).map((guild) => ({
+        id: guild.id,
+        name: guild.name,
+        icon: guild.icon || null
+    }));
+};
+
 const buildServerBackupPayload = async (guildId, client) => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
@@ -465,6 +494,44 @@ const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
         }
         await telegramSyncManager.updateGuildConfig(guildId, telegramConfig);
         applied.push('Telegram sync');
+    }
+
+    if (payload.alerts?.liveAlerts) {
+        const incoming = payload.alerts.liveAlerts;
+        const mapped = { twitch: [], youtube: [] };
+
+        for (const entry of Array.isArray(incoming.twitch) ? incoming.twitch : []) {
+            const channel = findChannelByIdOrName(guild, entry.channelId);
+            if (!channel) continue;
+
+            const role = entry.roleId ? findRoleByIdOrName(guild, entry.roleId) : null;
+            mapped.twitch.push({
+                username: String(entry.username || '').toLowerCase().trim(),
+                channelId: channel.id,
+                roleId: role?.id || null,
+                lastLive: false
+            });
+        }
+
+        for (const entry of Array.isArray(incoming.youtube) ? incoming.youtube : []) {
+            const channel = findChannelByIdOrName(guild, entry.discordChannelId);
+            if (!channel) continue;
+
+            const role = entry.roleId ? findRoleByIdOrName(guild, entry.roleId) : null;
+            mapped.youtube.push({
+                channelId: String(entry.channelId || '').trim(),
+                sourceIdentifier: String(entry.sourceIdentifier || entry.channelId || '').trim(),
+                channelName: entry.channelName || null,
+                discordChannelId: channel.id,
+                roleId: role?.id || null,
+                lastVideoId: entry.lastVideoId || null,
+                channelUrl: entry.channelUrl || null
+            });
+        }
+
+        liveAlertsManager.data[guildId] = mapped;
+        await liveAlertsManager.save();
+        applied.push('Live alerts');
     }
 
     return { applied };
@@ -1399,6 +1466,7 @@ class Dashboard {
                 const setupHistory = readDashboardAuditEntries({ guildId, limit: 100 })
                     .filter((entry) => String(entry.action || '').startsWith('SETUP_') || String(entry.action || '').startsWith('RUN_SERVER_TEST'))
                     .slice(0, 20);
+                const cloneSourceGuilds = getUserAdminGuildsInBot(req.user, this.client, guildId);
                 
                 res.render('server', {
                     user: req.user,
@@ -1420,6 +1488,7 @@ class Dashboard {
                     setupHistory,
                     serverProfile,
                     serverProfileShareUrl: `${req.protocol}://${req.get('host')}/server-profile/${guildId}`,
+                    cloneSourceGuilds,
                     minecraftStatusConfig,
                     minecraftDefaults: {
                         intervalMinutes: minecraftStatusConfig?.intervalMinutes || DEFAULT_INTERVAL_MINUTES,
@@ -2029,6 +2098,66 @@ class Dashboard {
             } catch (error) {
                 console.error('Error exporting server backup:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.get('/api/settings/:guildId/clone-sources', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guilds = getUserAdminGuildsInBot(req.user, this.client, guildId);
+                res.json({ success: true, guilds });
+            } catch (error) {
+                console.error('Error fetching clone sources:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to load source servers.' });
+            }
+        });
+
+        this.app.post('/api/settings/:guildId/clone', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const targetGuildId = req.params.guildId;
+                const sourceGuildId = String(req.body?.sourceGuildId || '').trim();
+
+                if (!sourceGuildId) {
+                    return res.status(400).json({ success: false, error: 'Source server is required.' });
+                }
+                if (sourceGuildId === targetGuildId) {
+                    return res.status(400).json({ success: false, error: 'Choose a different source server.' });
+                }
+
+                const allowedSources = getUserAdminGuildsInBot(req.user, this.client, targetGuildId);
+                if (!allowedSources.some((guild) => guild.id === sourceGuildId)) {
+                    return res.status(403).json({ success: false, error: 'You need Administrator access in the source server.' });
+                }
+
+                const sourceGuild = this.client.guilds.cache.get(sourceGuildId) || await this.client.guilds.fetch(sourceGuildId).catch(() => null);
+                if (!sourceGuild) {
+                    return res.status(404).json({ success: false, error: 'Source server not found.' });
+                }
+
+                const sourceMember = await withTimeout(sourceGuild.members.fetch(req.user.id).catch(() => null), 3000);
+                if (!sourceMember || !sourceMember.permissions.has(PermissionFlagsBits.Administrator)) {
+                    return res.status(403).json({ success: false, error: 'Administrator permission is required in the source server.' });
+                }
+
+                const sourcePayload = await buildServerBackupPayload(sourceGuildId, this.client);
+                const result = await restoreServerBackupPayload(targetGuildId, this.client, sourcePayload);
+
+                logDashboardAudit(req, 'CLONE_SERVER_CONFIG', {
+                    sourceGuildId,
+                    sourceGuildName: sourceGuild.name,
+                    targetGuildId,
+                    applied: result.applied
+                });
+
+                res.json({
+                    success: true,
+                    message: `Cloned setup from ${sourceGuild.name}.`,
+                    applied: result.applied,
+                    sourceGuild: { id: sourceGuild.id, name: sourceGuild.name }
+                });
+            } catch (error) {
+                console.error('Error cloning server config:', error);
+                res.status(500).json({ success: false, error: error.message || 'Failed to clone server config.' });
             }
         });
 

@@ -129,6 +129,20 @@
           <button type="button" class="btn btn-primary" id="exportBackupBtn"><i class="fas fa-download"></i> Export Backup</button>
           <button type="button" class="btn btn-secondary" id="restoreBackupBtn"><i class="fas fa-upload"></i> Restore Backup</button>
         </div>
+        <div class="form-group" style="margin-bottom:14px">
+          <label class="form-label" for="cloneSourceGuildId">Clone From Another Server</label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <select class="form-control" id="cloneSourceGuildId" style="min-width:260px;flex:1 1 260px">
+              <option value="">Choose source server</option>
+              <% (cloneSourceGuilds || []).forEach(sourceGuild => { %>
+                <option value="<%= sourceGuild.id %>"><%= sourceGuild.name %></option>
+              <% }) %>
+            </select>
+            <button type="button" class="btn btn-secondary" id="refreshCloneSourcesBtn"><i class="fas fa-rotate"></i> Refresh</button>
+            <button type="button" class="btn btn-primary" id="cloneServerConfigBtn"><i class="fas fa-clone"></i> Clone Setup</button>
+          </div>
+          <div class="form-hint">Copies dashboard setup from another server where you have Administrator access. Channel and role references are mapped by ID/name when possible.</div>
+        </div>
         <div class="form-group">
           <label class="form-label" for="backupJsonInput">Paste backup JSON</label>
           <textarea class="form-control" id="backupJsonInput" rows="10" placeholder='{"version":1,"settings":{...}}'></textarea>
@@ -541,6 +555,9 @@ const exportBackupBtn = document.getElementById('exportBackupBtn');
 const restoreBackupBtn = document.getElementById('restoreBackupBtn');
 const backupJsonInput = document.getElementById('backupJsonInput');
 const backupRestoreResult = document.getElementById('backupRestoreResult');
+const cloneSourceGuildIdInput = document.getElementById('cloneSourceGuildId');
+const refreshCloneSourcesBtn = document.getElementById('refreshCloneSourcesBtn');
+const cloneServerConfigBtn = document.getElementById('cloneServerConfigBtn');
 const setupPermissionResult = document.getElementById('setupPermissionResult');
 const setupBatchTestResult = document.getElementById('setupBatchTestResult');
 const setupHistoryList = document.getElementById('setupHistoryList');
@@ -566,6 +583,7 @@ const serverProfilePreviewInvite = document.getElementById('serverProfilePreview
 const serverProfilePreviewStats = document.getElementById('serverProfilePreviewStats');
 const serverProfilePreviewStatus = document.getElementById('serverProfilePreviewStatus');
 const initialServerProfile = <%- JSON.stringify(serverProfile) %>;
+const initialCloneSourceGuilds = <%- JSON.stringify(cloneSourceGuilds || []) %>;
 const serverProfileDefaultTitle = <%- JSON.stringify(guild.name) %>;
 const serverProfileGuildStats = {
   memberCount: <%= guild.memberCount || 0 %>,
@@ -690,6 +708,32 @@ function showBackupRestoreResult(message, kind = 'info') {
   backupRestoreResult.hidden = false;
   backupRestoreResult.innerHTML = `<strong style="color:${colors[kind] || 'var(--brand)'}">${escapeHtml(message)}</strong>`;
 }
+function renderCloneSourceOptions(guilds) {
+  if (!cloneSourceGuildIdInput) return;
+  const selected = cloneSourceGuildIdInput.value;
+  const list = Array.isArray(guilds) ? guilds : [];
+  cloneSourceGuildIdInput.innerHTML = ['<option value="">Choose source server</option>']
+    .concat(list.map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name || guild.id)}</option>`))
+    .join('');
+
+  if (selected && list.some((guild) => String(guild.id) === String(selected))) {
+    cloneSourceGuildIdInput.value = selected;
+  }
+}
+async function refreshCloneSources() {
+  try {
+    const response = await fetch(`/api/settings/${guildId}/clone-sources`);
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Failed to load source servers.');
+    }
+    renderCloneSourceOptions(payload.guilds || []);
+  } catch (error) {
+    toast(error.message || 'Failed to load source servers.', 'error');
+  }
+}
+
+renderCloneSourceOptions(initialCloneSourceGuilds);
 function renderServerProfilePreview() {
   if (!serverProfilePreviewCard) return;
 
@@ -1044,6 +1088,7 @@ setupRunAllTestsBtn?.addEventListener('click', async () => {
 });
 
 refreshSetupHistoryBtn?.addEventListener('click', refreshSetupHistory);
+refreshCloneSourcesBtn?.addEventListener('click', refreshCloneSources);
 
 exportBackupBtn?.addEventListener('click', async () => {
   const original = exportBackupBtn.innerHTML;
@@ -1104,6 +1149,44 @@ restoreBackupBtn?.addEventListener('click', async () => {
   } finally {
     restoreBackupBtn.disabled = false;
     restoreBackupBtn.innerHTML = original;
+  }
+});
+
+cloneServerConfigBtn?.addEventListener('click', async () => {
+  const sourceGuildId = String(cloneSourceGuildIdInput?.value || '').trim();
+  if (!sourceGuildId) {
+    showBackupRestoreResult('Choose a source server first.', 'warning');
+    return;
+  }
+
+  if (!confirm('Clone setup from selected server? This will overwrite matching settings in this server.')) {
+    return;
+  }
+
+  const original = cloneServerConfigBtn.innerHTML;
+  cloneServerConfigBtn.disabled = true;
+  cloneServerConfigBtn.innerHTML = '<span class="spinner"></span> Cloning...';
+  try {
+    const response = await fetch(`/api/settings/${guildId}/clone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceGuildId })
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.error || 'Clone failed.');
+    }
+
+    const appliedCount = Array.isArray(payload.applied) ? payload.applied.length : 0;
+    showBackupRestoreResult(`${payload.message || 'Clone completed.'} Applied ${appliedCount} section(s).`, 'success');
+    toast('Server setup cloned.', 'success');
+    await refreshSetupHistory();
+    setTimeout(() => location.reload(), 900);
+  } catch (error) {
+    showBackupRestoreResult(error.message || 'Clone failed.', 'error');
+  } finally {
+    cloneServerConfigBtn.disabled = false;
+    cloneServerConfigBtn.innerHTML = original;
   }
 });
 
