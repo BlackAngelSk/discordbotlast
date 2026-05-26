@@ -73,6 +73,24 @@ function buildOfferKey(offers) {
         .join('|');
 }
 
+function isGameActuallyFree(element) {
+    // Check if game has any promotions that represent actual free offers
+    const promotions = element.promotions || {};
+    const activeGroups = Array.isArray(promotions.promotionalOffers) ? promotions.promotionalOffers : [];
+    
+    for (const group of activeGroups) {
+        for (const promo of (group.promotionalOffers || [])) {
+            // Check if discount percentage is 100% (completely free)
+            const discountPercentage = promo.discountPercentage;
+            if (discountPercentage === 100) {
+                return true;
+            }
+        }
+    }
+    
+    return false;
+}
+
 function formatOfferLine(offer, includeStart = false) {
     const parts = [`• **${offer.title}**`];
     const startUnix = toUnixTimestamp(offer.startDate);
@@ -135,6 +153,30 @@ class EpicGamesAlertsManager {
         this.interval = null;
         this.data = { guilds: {} };
         this.pollInFlight = false;
+    }
+
+    shouldSendAlert(config) {
+        // Check if it's Thursday (day 4, where 0 = Sunday)
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const isThursday = dayOfWeek === 4;
+
+        if (!isThursday) {
+            return false;
+        }
+
+        // Check if we've already sent an alert today (within last 24 hours)
+        if (config.lastAlertSentDate) {
+            const lastSendDate = new Date(config.lastAlertSentDate);
+            const hoursSinceLast = (now - lastSendDate) / (1000 * 60 * 60);
+            
+            // Only allow sending once per 24 hours
+            if (hoursSinceLast < 24) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     async init(client) {
@@ -209,6 +251,9 @@ class EpicGamesAlertsManager {
             const sellerName = element.seller?.name || '';
             if (/discord/i.test(sellerName)) continue;
 
+            // Skip games that are not actually free
+            if (!isGameActuallyFree(element)) continue;
+
             const promotions = element.promotions || {};
             const activeGroups = Array.isArray(promotions.promotionalOffers) ? promotions.promotionalOffers : [];
             const upcomingGroups = Array.isArray(promotions.upcomingPromotionalOffers) ? promotions.upcomingPromotionalOffers : [];
@@ -219,6 +264,9 @@ class EpicGamesAlertsManager {
                     const end = new Date(promo.endDate).getTime();
                     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
                     if (start > now || end <= now) continue;
+                    
+                    // Only include if it's a 100% discount (free)
+                    if (promo.discountPercentage !== 100) continue;
 
                     currentOffers.push({
                         id: element.id,
@@ -235,6 +283,9 @@ class EpicGamesAlertsManager {
                 for (const promo of (group.promotionalOffers || [])) {
                     const start = new Date(promo.startDate).getTime();
                     if (!Number.isFinite(start) || start <= now) continue;
+                    
+                    // Only include if it's a 100% discount (free)
+                    if (promo.discountPercentage !== 100) continue;
 
                     upcomingOffers.push({
                         id: element.id,
@@ -340,11 +391,15 @@ class EpicGamesAlertsManager {
                     continue;
                 }
 
+                // Only send alert if offer list changed AND it's the right time to send
                 if (config.lastCurrentKey !== currentKey && snapshot.currentOffers.length > 0) {
-                    const payload = this.buildCurrentAlert(snapshot);
-                    if (payload) {
-                        for (const messagePayload of payload.messages) {
-                            await channel.send(messagePayload).catch(() => {});
+                    if (this.shouldSendAlert(config)) {
+                        const payload = this.buildCurrentAlert(snapshot);
+                        if (payload) {
+                            for (const messagePayload of payload.messages) {
+                                await channel.send(messagePayload).catch(() => {});
+                            }
+                            config.lastAlertSentDate = new Date().toISOString();
                         }
                     }
                 }
