@@ -73,6 +73,22 @@ function buildOfferKey(offers) {
         .join('|');
 }
 
+function getOfferDurationHours(offer) {
+    const start = new Date(offer.startDate).getTime();
+    const end = new Date(offer.endDate).getTime();
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        return null;
+    }
+
+    return (end - start) / (1000 * 60 * 60);
+}
+
+function isHolidayStyleOffer(offer) {
+    const durationHours = getOfferDurationHours(offer);
+    return Number.isFinite(durationHours) && durationHours <= 30;
+}
+
 function isGameActuallyFree(element) {
     // Check if game has any promotions that represent actual free offers
     const promotions = element.promotions || {};
@@ -155,22 +171,24 @@ class EpicGamesAlertsManager {
         this.pollInFlight = false;
     }
 
-    shouldSendAlert(config) {
-        // Check if it's Thursday (day 4, where 0 = Sunday)
+    shouldSendAlert(config, snapshot) {
         const now = new Date();
         const dayOfWeek = now.getDay();
         const isThursday = dayOfWeek === 4;
 
-        if (!isThursday) {
+        const isHolidayStyleEvent = Array.isArray(snapshot?.currentOffers) && snapshot.currentOffers.some(isHolidayStyleOffer);
+
+        // Holiday-style giveaways run daily and usually last about 24 hours.
+        // Regular Epic free-game drops still stay on Thursday.
+        if (!isHolidayStyleEvent && !isThursday) {
             return false;
         }
 
-        // Check if we've already sent an alert today (within last 24 hours)
+        // Prevent duplicate sends if the offer changes more than once in a day.
         if (config.lastAlertSentDate) {
             const lastSendDate = new Date(config.lastAlertSentDate);
             const hoursSinceLast = (now - lastSendDate) / (1000 * 60 * 60);
-            
-            // Only allow sending once per 24 hours
+
             if (hoursSinceLast < 24) {
                 return false;
             }
@@ -393,7 +411,7 @@ class EpicGamesAlertsManager {
 
                 // Only send alert if offer list changed AND it's the right time to send
                 if (config.lastCurrentKey !== currentKey && snapshot.currentOffers.length > 0) {
-                    if (this.shouldSendAlert(config)) {
+                    if (this.shouldSendAlert(config, snapshot)) {
                         const payload = this.buildCurrentAlert(snapshot);
                         if (payload) {
                             for (const messagePayload of payload.messages) {
