@@ -13,6 +13,7 @@ const raidProtectionManager = require('../utils/raidProtectionManager');
 const stickyMessages = require('../utils/stickyMessages');
 const seasonManager = require('../utils/seasonManager');
 const telegramSyncManager = require('../utils/telegramSyncManager');
+const countCommand = require('../commands/fun/count');
 
 // Track user message timestamps for spam detection
 const userMessageTimestamps = new Map();
@@ -306,6 +307,13 @@ module.exports = {
                     console.error('Bump reminder error:', err);
                 }
             }
+        }
+
+        // Continue active counting games even after bot restarts
+        try {
+            await countCommand.handleMessage(message);
+        } catch (error) {
+            console.error('Counting game message handling error:', error);
         }
 
         // Track message statistics
