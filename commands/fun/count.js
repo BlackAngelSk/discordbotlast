@@ -46,11 +46,12 @@ function saveCountingData(countingData) {
 
         fs.writeFileSync(COUNTING_DATA_FILE, JSON.stringify(payload, null, 2));
     } catch (error) {
-        // Ignore save errors to avoid breaking command execution
+        console.error('[count] Failed to save counting data:', error.message, '| path:', COUNTING_DATA_FILE);
     }
 }
 
 const countingData = loadCountingData();
+console.log(`[count] Loaded ${countingData.size} active game(s) from disk. File: ${COUNTING_DATA_FILE}`);
 
 function formatDuration(startTime) {
     return `${Math.floor((Date.now() - startTime) / 1000)}s`;
