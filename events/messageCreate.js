@@ -84,6 +84,13 @@ module.exports = {
         // Ignore bot messages
         if (message.author.bot) return;
 
+        // Continue active counting games immediately so moderation returns do not block recovery.
+        try {
+            await countCommand.handleMessage(message);
+        } catch (error) {
+            console.error('Counting game message handling error:', error);
+        }
+
         // Bot owner bypass - skip all moderation for bot owner
         const botOwnerId = process.env.BOT_OWNER_ID;
         const isBotOwner = botOwnerId && message.author.id === botOwnerId;
@@ -307,13 +314,6 @@ module.exports = {
                     console.error('Bump reminder error:', err);
                 }
             }
-        }
-
-        // Continue active counting games even after bot restarts
-        try {
-            await countCommand.handleMessage(message);
-        } catch (error) {
-            console.error('Counting game message handling error:', error);
         }
 
         // Track message statistics

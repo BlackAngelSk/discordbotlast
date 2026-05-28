@@ -91,13 +91,82 @@ function resetGameState(gameState) {
     gameState.startTime = Date.now();
 }
 
+async function bootstrapFromHistory(message) {
+    if (!message?.channel?.messages?.fetch) {
+        return null;
+    }
+
+    try {
+        const recentMessages = await message.channel.messages.fetch({ limit: 15 });
+        const numericHistory = Array.from(recentMessages.values())
+            .filter((entry) => entry.id !== message.id)
+            .filter((entry) => !entry.author?.bot)
+            .filter((entry) => /^\d+$/.test(String(entry.content || '').trim()))
+            .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+
+        if (numericHistory.length < 2) {
+            return null;
+        }
+
+        let isSequential = true;
+        for (let index = 1; index < numericHistory.length; index += 1) {
+            const previousNumber = Number.parseInt(String(numericHistory[index - 1].content).trim(), 10);
+            const currentNumber = Number.parseInt(String(numericHistory[index].content).trim(), 10);
+
+            if (!Number.isSafeInteger(previousNumber) || !Number.isSafeInteger(currentNumber)) {
+                isSequential = false;
+                break;
+            }
+
+            if (currentNumber !== previousNumber + 1) {
+                isSequential = false;
+                break;
+            }
+
+            if (numericHistory[index].author.id === numericHistory[index - 1].author.id) {
+                isSequential = false;
+                break;
+            }
+        }
+
+        if (!isSequential) {
+            return null;
+        }
+
+        const key = `${message.guildId}_${message.channelId}`;
+        const lastMessage = numericHistory[numericHistory.length - 1];
+        const lastNumber = Number.parseInt(String(lastMessage.content).trim(), 10);
+        const players = new Set(numericHistory.map((entry) => entry.author.id));
+
+        countingData.set(key, {
+            currentNumber: lastNumber,
+            lastUserId: lastMessage.author.id,
+            lastUsername: lastMessage.author.username,
+            players,
+            startTime: numericHistory[0].createdTimestamp || Date.now(),
+            gameActive: true
+        });
+
+        console.log(`[count] Bootstrapped count game from channel history in ${key} at ${lastNumber}`);
+        saveCountingData(countingData);
+        return countingData.get(key);
+    } catch (error) {
+        console.error('[count] Failed to bootstrap game from history:', error.message);
+        return null;
+    }
+}
+
 async function handleMessage(message) {
     if (!message || !message.guildId || !message.channelId || message.author.bot) {
         return;
     }
 
     const key = `${message.guildId}_${message.channelId}`;
-    const gameState = countingData.get(key);
+    let gameState = countingData.get(key);
+
+    if ((!gameState || !gameState.gameActive) && /^\d+$/.test(String(message.content || '').trim())) {
+        gameState = await bootstrapFromHistory(message);
+    }
 
     if (!gameState || !gameState.gameActive) {
         return;
@@ -210,6 +279,8 @@ module.exports = {
             gameActive: true
         });
         saveCountingData(countingData);
+
+        console.log(`[count] Started new counting game in ${key}`);
 
         await message.reply('🎮 **Counting Game Started!**\n\n**How to play:**\n- Users count sequentially: 1, 2, 3, 4...\n- Each user must count after a different user\n- Wrong number resets the game back to `1`\n\nReady? Start counting with `1`!\nUse `count stop` to end it manually.');
     },
