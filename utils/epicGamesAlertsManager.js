@@ -89,21 +89,34 @@ function isHolidayStyleOffer(offer) {
     return Number.isFinite(durationHours) && durationHours <= 30;
 }
 
+function isPromoActuallyFree(element, promo) {
+    const discountPrice = element.price?.totalPrice?.discountPrice;
+    if (typeof discountPrice === 'number' && discountPrice === 0) {
+        return true;
+    }
+
+    const discountPct = promo?.discountSetting?.discountPercentage;
+    if (discountPct === 100) {
+        return true;
+    }
+
+    // Epic free giveaways can also appear as 0% with effective price 0.
+    const fmtDiscountPrice = element.price?.totalPrice?.fmtPrice?.discountPrice;
+    return discountPct === 0 && fmtDiscountPrice === '0';
+}
+
 function isGameActuallyFree(element) {
-    // Check if game has any promotions that represent actual free offers
     const promotions = element.promotions || {};
     const activeGroups = Array.isArray(promotions.promotionalOffers) ? promotions.promotionalOffers : [];
-    
+
     for (const group of activeGroups) {
         for (const promo of (group.promotionalOffers || [])) {
-            // Check if discount percentage is 100% (completely free)
-            const discountPercentage = promo.discountPercentage;
-            if (discountPercentage === 100) {
+            if (isPromoActuallyFree(element, promo)) {
                 return true;
             }
         }
     }
-    
+
     return false;
 }
 
@@ -282,9 +295,8 @@ class EpicGamesAlertsManager {
                     const end = new Date(promo.endDate).getTime();
                     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
                     if (start > now || end <= now) continue;
-                    
-                    // Only include if it's a 100% discount (free)
-                    if (promo.discountPercentage !== 100) continue;
+
+                    if (!isPromoActuallyFree(element, promo)) continue;
 
                     currentOffers.push({
                         id: element.id,
@@ -301,9 +313,8 @@ class EpicGamesAlertsManager {
                 for (const promo of (group.promotionalOffers || [])) {
                     const start = new Date(promo.startDate).getTime();
                     if (!Number.isFinite(start) || start <= now) continue;
-                    
-                    // Only include if it's a 100% discount (free)
-                    if (promo.discountPercentage !== 100) continue;
+
+                    if (!isPromoActuallyFree(element, promo)) continue;
 
                     upcomingOffers.push({
                         id: element.id,
