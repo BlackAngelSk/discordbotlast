@@ -104,38 +104,18 @@ async function bootstrapFromHistory(message) {
             .filter((entry) => /^\d+$/.test(String(entry.content || '').trim()))
             .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
-        if (numericHistory.length < 2) {
-            return null;
-        }
-
-        let isSequential = true;
-        for (let index = 1; index < numericHistory.length; index += 1) {
-            const previousNumber = Number.parseInt(String(numericHistory[index - 1].content).trim(), 10);
-            const currentNumber = Number.parseInt(String(numericHistory[index].content).trim(), 10);
-
-            if (!Number.isSafeInteger(previousNumber) || !Number.isSafeInteger(currentNumber)) {
-                isSequential = false;
-                break;
-            }
-
-            if (currentNumber !== previousNumber + 1) {
-                isSequential = false;
-                break;
-            }
-
-            if (numericHistory[index].author.id === numericHistory[index - 1].author.id) {
-                isSequential = false;
-                break;
-            }
-        }
-
-        if (!isSequential) {
+        if (numericHistory.length < 1) {
             return null;
         }
 
         const key = `${message.guildId}_${message.channelId}`;
         const lastMessage = numericHistory[numericHistory.length - 1];
         const lastNumber = Number.parseInt(String(lastMessage.content).trim(), 10);
+
+        if (!Number.isSafeInteger(lastNumber)) {
+            return null;
+        }
+
         const players = new Set(numericHistory.map((entry) => entry.author.id));
 
         countingData.set(key, {
