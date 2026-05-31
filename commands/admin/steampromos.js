@@ -2,10 +2,10 @@ const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const steamFreeGamesAlertsManager = require('../../utils/steamFreeGamesAlertsManager');
 
 module.exports = {
-    name: 'steamfreegames',
-    description: 'Configure Steam free game giveaway alerts.',
-    usage: '!steamfreegames list\n!steamfreegames set #channel\n!steamfreegames remove\n!steamfreegames test [#channel]',
-    aliases: ['steamgifts', 'steamgiveaways', 'steamfreealerts'],
+    name: 'steampromos',
+    description: 'Configure Steam limited-time promo game alerts.',
+    usage: '!steampromos list\n!steampromos set #channel\n!steampromos remove\n!steampromos test [#channel]',
+    aliases: ['steampromoalerts', 'steamfreeweekend'],
     category: 'admin',
     async execute(message, args) {
         if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
@@ -13,22 +13,22 @@ module.exports = {
         }
 
         const subcommand = args[0]?.toLowerCase() || 'list';
-        const config = steamFreeGamesAlertsManager.getGuildConfig(message.guild.id);
+        const config = steamFreeGamesAlertsManager.getPromoGuildConfig(message.guild.id);
 
         if (subcommand === 'list' || subcommand === 'status') {
             const embed = new EmbedBuilder()
-                .setColor(0x1b2838)
-                .setTitle('🎮 Steam Free Game Alerts')
+                .setColor(0xf4a318)
+                .setTitle('🕹️ Steam Promo Game Alerts')
                 .setTimestamp();
 
             if (!config?.channelId) {
-                embed.setDescription('No alert channel is configured. Use `!steamfreegames set #channel` to enable alerts.');
+                embed.setDescription('No alert channel is configured. Use `!steampromos set #channel` to enable alerts for limited-time free-to-play Steam games.');
             } else {
                 embed.setDescription(`Alerts are enabled in <#${config.channelId}>.`)
                     .addFields(
                         {
                             name: 'What gets posted',
-                            value: '• Newly detected free Steam game giveaways'
+                            value: '• Steam games available free for a limited time (free weekends, trials, promos)'
                         },
                         {
                             name: 'Last checked',
@@ -43,11 +43,11 @@ module.exports = {
         if (subcommand === 'set') {
             const channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
             if (!channel) {
-                return message.reply('❌ Mention a valid text channel, for example `!steamfreegames set #game-alerts`.');
+                return message.reply('❌ Mention a valid text channel, for example `!steampromos set #game-alerts`.');
             }
 
             if (!channel.isTextBased()) {
-                return message.reply('❌ The Steam free game alert channel must be a text channel.');
+                return message.reply('❌ The Steam promo alert channel must be a text channel.');
             }
 
             const botMember = message.guild.members.me;
@@ -55,17 +55,17 @@ module.exports = {
                 return message.reply(`❌ I need **Send Messages** and **Embed Links** in ${channel}.`);
             }
 
-            const snapshot = await steamFreeGamesAlertsManager.enableAlerts(message.guild.id, channel.id);
-            const currentNames = snapshot?.freeToKeepGiveaways?.map(giveaway => `**${giveaway.title}**`).join(', ') || 'none right now';
+            const snapshot = await steamFreeGamesAlertsManager.enablePromoAlerts(message.guild.id, channel.id);
+            const currentNames = snapshot?.promoGiveaways?.map(g => `**${g.title}**`).join(', ') || 'none right now';
 
             return message.reply(
-                `✅ Steam free game alerts will now be sent to ${channel}. Current giveaways: ${currentNames}.`
+                `✅ Steam promo game alerts will now be sent to ${channel}. Current promos: ${currentNames}.`
             );
         }
 
         if (subcommand === 'remove' || subcommand === 'clear' || subcommand === 'disable') {
-            await steamFreeGamesAlertsManager.disableAlerts(message.guild.id);
-            return message.reply('✅ Steam free game alerts have been disabled for this server.');
+            await steamFreeGamesAlertsManager.disablePromoAlerts(message.guild.id);
+            return message.reply('✅ Steam promo game alerts have been disabled for this server.');
         }
 
         if (subcommand === 'test') {
@@ -78,19 +78,17 @@ module.exports = {
             }
 
             const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot();
-            const payloads = [steamFreeGamesAlertsManager.buildCurrentAlert(snapshot)].filter(Boolean);
+            const payload = steamFreeGamesAlertsManager.buildPromoAlert(snapshot);
 
-            if (payloads.length === 0) {
-                return message.reply('❌ No free Steam game giveaways were returned right now.');
+            if (!payload) {
+                return message.reply('❌ No Steam promo games are available right now.');
             }
 
-            for (const payload of payloads) {
-                for (const messagePayload of payload.messages) {
-                    await channel.send(messagePayload);
-                }
+            for (const messagePayload of payload.messages) {
+                await channel.send(messagePayload);
             }
 
-            return message.reply(`✅ Sent a test Steam free game alert to ${channel}.`);
+            return message.reply(`✅ Sent a test Steam promo alert to ${channel}.`);
         }
 
         return message.reply(`❓ Unknown subcommand. Usage:\n\`\`\`\n${module.exports.usage}\n\`\`\``);
