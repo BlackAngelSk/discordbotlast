@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> — Steam Promo Games</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+    <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+    <div class="main-wrapper">
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Promo Games' }) %>
+
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fab fa-steam" style="color:#f4a318;margin-right:8px"></i>Steam Promo Game Alerts</h1>
+                <p>Get notified when Steam games are available <strong>free to play for a limited time</strong> — free weekends, trials, and temporary promos.</p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
+                    <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
+                    <div class="stat-card-change"><i class="fas fa-clock"></i> Limited-time promos only</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Alert Channel</span><div class="stat-card-icon blue"><i class="fas fa-hashtag"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.channelId ? `#${guild.channels.cache.get(config.channelId)?.name || config.channelId}` : 'Not set' %></div>
+                    <div class="stat-card-change"><i class="fas fa-message"></i> Destination channel</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Active Promos</span><div class="stat-card-icon orange"><i class="fab fa-steam"></i></div></div>
+                    <div class="stat-card-value"><%= giveaways.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-stopwatch"></i> Current limited-time offers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Last Checked</span><div class="stat-card-icon purple"><i class="fas fa-clock"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem"><%= config?.lastCheckedAt ? 'Saved' : 'Waiting' %></div>
+                    <div class="stat-card-change"><%= config?.lastCheckedAt ? new Date(config.lastCheckedAt).toLocaleString() : 'No checks yet' %></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-sliders"></i> Alert Setup</div>
+                        <div class="card-subtitle">Choose a channel to post promo game alerts, then save. Use the test button to preview an alert.</div>
+                    </div>
+                </div>
+
+                <form id="steamPromosForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Discord Channel</label>
+                            <select name="channelId" class="form-control" required>
+                                <option value="">Select channel</option>
+                                <% channels.forEach(channel => { %>
+                                    <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">The bot will post new limited-time Steam promo game alerts here.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="justify-content:flex-start">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Channel</button>
+                        <button type="button" class="btn btn-secondary" id="testSteamPromosBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
+                        <button type="button" class="btn btn-danger" id="clearSteamPromosBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-list"></i> Current Promo Games</div>
+                        <div class="card-subtitle">Steam games currently free to play for a limited time. These differ from free-to-keep giveaways.</div>
+                    </div>
+                </div>
+
+                <% if (giveaways.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+                        <% giveaways.forEach(giveaway => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2);border-left:3px solid #f4a318">
+                                <% if (giveaway.imageUrl) { %>
+                                    <img src="<%= giveaway.imageUrl %>" alt="<%= giveaway.title %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px"><%= giveaway.title %></div>
+                                <div class="form-hint" style="margin-bottom:10px">
+                                    <% if (giveaway.worth && !/^n\/a$/i.test(giveaway.worth)) { %>
+                                        <span style="color:#f4a318"><i class="fas fa-tag"></i> <%= giveaway.worth %></span>
+                                    <% } %>
+                                    <% if (giveaway.endDate) { %>
+                                        &nbsp;·&nbsp;<i class="fas fa-stopwatch"></i> Ends <%= new Date(giveaway.endDate).toLocaleString() %>
+                                    <% } else { %>
+                                        &nbsp;·&nbsp;<i class="fas fa-stopwatch"></i> Limited time
+                                    <% } %>
+                                </div>
+                                <% if (giveaway.description) { %>
+                                    <p style="margin:0 0 12px;color:var(--text-secondary);font-size:0.88rem"><%= giveaway.description %></p>
+                                <% } %>
+                                <a href="<%= giveaway.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> View on Steam</a>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fab fa-steam"></i> No Steam promo games are available right now. Check back later for free weekends and trials.</div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+<script>
+const guildId = '<%= guild.id %>';
+const form = document.getElementById('steamPromosForm');
+const channelSelect = form.querySelector('select[name="channelId"]');
+const saveButton = form.querySelector('button[type="submit"]');
+const testButton = document.getElementById('testSteamPromosBtn');
+const clearButton = document.getElementById('clearSteamPromosBtn');
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const original = saveButton.innerHTML;
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner"></span> Saving...';
+
+    try {
+        const response = await fetch(`/api/steam-promos/${guildId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to save Steam promo alert channel');
+        }
+        dashboardUI.showToast('Steam promo alert channel saved.', 'success');
+        setTimeout(() => location.reload(), 600);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to save Steam promo alert channel.', 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.innerHTML = original;
+    }
+});
+
+testButton.addEventListener('click', async () => {
+    const original = testButton.innerHTML;
+    testButton.disabled = true;
+    testButton.innerHTML = '<span class="spinner"></span> Sending...';
+
+    try {
+        const response = await fetch(`/api/steam-promos/${guildId}/test`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channelId: channelSelect.value || null })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to send Steam promo test alert');
+        }
+        dashboardUI.showToast(result.message || 'Steam promo test alert sent.', 'success');
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to send Steam promo test alert.', 'error');
+    } finally {
+        testButton.disabled = false;
+        testButton.innerHTML = original;
+    }
+});
+
+clearButton.addEventListener('click', async () => {
+    if (!confirm('Disable Steam promo game alerts for this server?')) {
+        return;
+    }
+
+    const original = clearButton.innerHTML;
+    clearButton.disabled = true;
+    clearButton.innerHTML = '<span class="spinner"></span> Removing...';
+
+    try {
+        const response = await fetch(`/api/steam-promos/${guildId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to disable Steam promo alerts');
+        }
+        dashboardUI.showToast('Steam promo game alerts disabled.', 'success');
+        setTimeout(() => location.reload(), 500);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to disable Steam promo alerts.', 'error');
+    } finally {
+        clearButton.disabled = false;
+        clearButton.innerHTML = original;
+    }
+});
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= guild.name %> — Steam Promos</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
+</head>
+<body>
+<div class="app-layout">
+    <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
+
+    <div class="main-wrapper">
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Promos' }) %>
+
+        <main class="content">
+            <div class="page-header">
+                <h1><i class="fab fa-steam" style="color:var(--brand);margin-right:8px"></i>Steam Temporary Promos</h1>
+                <p>These are temporary offers like weekend or trial promos that usually do <strong>not</strong> stay forever in a user's library.</p>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Active Promos</span><div class="stat-card-icon purple"><i class="fab fa-steam"></i></div></div>
+                    <div class="stat-card-value"><%= giveaways.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-bolt"></i> Temporary availability</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Type</span><div class="stat-card-icon yellow"><i class="fas fa-hourglass-half"></i></div></div>
+                    <div class="stat-card-value" style="font-size:1rem">Promo</div>
+                    <div class="stat-card-change">Usually expires and does not remain forever</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-bullhorn"></i> Current Steam Promos</div>
+                        <div class="card-subtitle">Separated from free-to-keep offers so users can clearly see temporary promotions.</div>
+                    </div>
+                </div>
+
+                <% if (giveaways.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+                        <% giveaways.forEach(giveaway => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2)">
+                                <% if (giveaway.imageUrl) { %>
+                                    <img src="<%= giveaway.imageUrl %>" alt="<%= giveaway.title %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px"><%= giveaway.title %></div>
+                                <div class="form-hint" style="margin-bottom:10px">
+                                    <% if (giveaway.worth) { %>
+                                        Worth <%= giveaway.worth %>
+                                    <% } else { %>
+                                        Free promo right now
+                                    <% } %>
+                                    <% if (giveaway.endDate) { %>
+                                        · Ends <%= new Date(giveaway.endDate).toLocaleString() %>
+                                    <% } %>
+                                </div>
+                                <% if (giveaway.description) { %>
+                                    <p style="margin:0 0 12px;color:var(--text-secondary)"><%= giveaway.description %></p>
+                                <% } %>
+                                <a href="<%= giveaway.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> Open Promo</a>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fab fa-steam"></i>No temporary Steam promos are available right now.</div>
+                <% } %>
+            </div>
+        </main>
+    </div>
+</div>
+
+<%- include('partials/dashboard-common-scripts') %>
+</body>
+</html>

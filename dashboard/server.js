@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const session = require('express-session');
 const passport = require('passport');
 const DiscordStrategy = require('passport-discord').Strategy;
@@ -1173,9 +1174,10 @@ class Dashboard {
             this.app.set('trust proxy', 1);
         }
 
+        this.app.use(compression());
         this.app.use(express.json());
         this.app.use(express.urlencoded({ extended: true }));
-        this.app.use(express.static(path.join(__dirname, 'public')));
+        this.app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1h' }));
         this.app.set('view engine', 'ejs');
         this.app.set('views', path.join(__dirname, 'views'));
 
@@ -1456,9 +1458,11 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const serverProfile = normalizeServerProfile(settingsManager.get(guildId).serverProfile, guild);
-                const setupContext = await collectSetupContextForGuild(guildId);
-                const topInviters = await inviteManager.getLeaderboard(req.params.guildId, 5);
-                const serverStats = await statsManager.getServerStats(req.params.guildId);
+                const [setupContext, topInviters, serverStats] = await Promise.all([
+                    collectSetupContextForGuild(guildId),
+                    inviteManager.getLeaderboard(req.params.guildId, 5),
+                    statsManager.getServerStats(req.params.guildId)
+                ]);
                 const economyLeaderboard = economyManager.getLeaderboard(req.params.guildId, 'balance', 10);
                 const customCommands = customCommandManager.getCommands(req.params.guildId);
                 const allTickets = ticketManager.getGuildTickets(req.params.guildId);
@@ -4300,11 +4304,10 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
-                let leaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
+                let rawLeaderboard = economyManager.getLeaderboard(guildId, 'balance', 50);
                 const seasonLeaderboardConfig = seasonLeaderboardManager.getGuildConfig(guildId);
                 const currentSeasonName = seasonManager.getCurrentSeason(guildId);
                 const currentSeason = currentSeasonName ? seasonManager.getSeason(guildId, currentSeasonName) : null;
-                const seasonLeaderboardPreview = await buildSeasonLeaderboardPreviewPayload(guildId, this.client);
                 const channels = guild.channels.cache
                     .filter((channel) => channel.type === 0)
                     .sort((left, right) => left.rawPosition - right.rawPosition)
@@ -4314,11 +4317,14 @@ class Dashboard {
                     .sort((left, right) => right.position - left.position)
                     .map((role) => ({ id: role.id, name: role.name }));
 
-                // Resolve usernames for leaderboard
-                leaderboard = await Promise.all(leaderboard.map(async (user) => ({
-                    ...user,
-                    username: await resolveGuildUsername(guild, user.userId)
-                })));
+                // Resolve usernames and build season preview in parallel
+                const [leaderboard, seasonLeaderboardPreview] = await Promise.all([
+                    Promise.all(rawLeaderboard.map(async (user) => ({
+                        ...user,
+                        username: await resolveGuildUsername(guild, user.userId)
+                    }))),
+                    buildSeasonLeaderboardPreviewPayload(guildId, this.client)
+                ]);
 
                 res.render('economy', {
                     guildId,
@@ -4590,7 +4596,20 @@ class Dashboard {
                 return res.status(403).send('You do not have access to this server');
             }
 
-            const member = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+            // Cache member objects for 30s to avoid repeated Discord API calls
+            const cacheKey = `${guildId}:${req.user.id}`;
+            const now = Date.now();
+            let member = this._memberCache?.get(cacheKey);
+            if (!member || now - member._cachedAt > 30000) {
+                const fetched = await withTimeout(guild.members.fetch(req.user.id).catch(() => null), 3000);
+                if (fetched) {
+                    fetched._cachedAt = now;
+                    if (!this._memberCache) this._memberCache = new Map();
+                    this._memberCache.set(cacheKey, fetched);
+                }
+                member = fetched;
+            }
+
             if (!member) {
                 return res.status(403).send('Unable to verify your current server permissions');
             }

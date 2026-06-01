@@ -476,6 +476,9 @@ class SteamFreeGamesAlertsManager {
         this.interval = null;
         this.data = { guilds: {} };
         this.pollInFlight = false;
+        this._snapshotCache = null;
+        this._snapshotCachedAt = 0;
+        this._snapshotInFlight = null;
     }
 
     async init(client) {
@@ -571,6 +574,28 @@ class SteamFreeGamesAlertsManager {
     }
 
     async fetchSnapshot() {
+        const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+        const now = Date.now();
+        if (this._snapshotCache && now - this._snapshotCachedAt < CACHE_TTL) {
+            return this._snapshotCache;
+        }
+        // Dedupe concurrent fetches — only one HTTP call in flight at a time
+        if (this._snapshotInFlight) {
+            return this._snapshotInFlight;
+        }
+        this._snapshotInFlight = this._doFetchSnapshot().then(result => {
+            this._snapshotCache = result;
+            this._snapshotCachedAt = Date.now();
+            this._snapshotInFlight = null;
+            return result;
+        }).catch(err => {
+            this._snapshotInFlight = null;
+            throw err;
+        });
+        return this._snapshotInFlight;
+    }
+
+    async _doFetchSnapshot() {
         const payload = await httpsGetJson(API_URL);
         if (!Array.isArray(payload)) {
             throw new Error(`Steam giveaways API returned an unexpected payload: ${typeof payload}`);
@@ -606,6 +631,11 @@ class SteamFreeGamesAlertsManager {
             freeToKeepGiveaways,
             promoGiveaways
         };
+    }
+
+    invalidateSnapshotCache() {
+        this._snapshotCache = null;
+        this._snapshotCachedAt = 0;
     }
 
     buildCurrentAlert(snapshot, giveaways = snapshot?.freeToKeepGiveaways || snapshot?.giveaways || []) {
