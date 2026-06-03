@@ -8,8 +8,11 @@ const settingsManager = require('./settingsManager');
 const DATA_FILE = path.join(__dirname, '..', 'data', 'steamFreeGamesAlerts.json');
 const API_URL = 'https://www.gamerpower.com/api/giveaways?platform=steam&type=game';
 const STEAM_FEATURED_URL = 'https://store.steampowered.com/api/featuredcategories?cc=US&l=en';
-const STEAM_APPDETAILS_BASE = 'https://store.steampowered.com/api/appdetails?filters=basic,price_overview,short_description&appids=';
+const STEAM_APPDETAILS_BASE = 'https://store.steampowered.com/api/appdetails?filters=basic,price_overview,short_description,categories,detailed_description&appids=';
+const STEAMDB_UPCOMING_FREE_URL = 'https://steamdb.info/upcoming/free/';
 const POLL_INTERVAL = 30 * 60 * 1000;
+const STEAM_PROMO_CANDIDATE_LIMIT = 48;
+const STEAM_PROMO_CONCURRENCY = 6;
 
 function httpsGetJson(url) {
     return new Promise((resolve, reject) => {
@@ -102,7 +105,13 @@ function isTemporaryPromoGiveaway(giveaway) {
     }
 
     // Explicit promo / free-weekend / trial language
-    return /free\s*weekend|weekend\s*free|temporar(?:y|ily)\s+free|free\s*trial|play\s+(?:it\s+)?free\s+(?:this\s+)?weekend|limited[\s-]time(?:\s+free)?|free\s*to\s*play\s+for\s+(?:a\s+)?limited\s+time|play\s+for\s+free\s+for\s+limited\s+time|available\s+to\s+play\s+free|play\s+free\s+(?:now\s+)?until|free\s+access\s+(?:until|ends?|through)|will\s+be\s+removed|removed\s+from\s+(?:your\s+)?library|no\s+longer\s+(?:available|accessible)\s+after|access\s+ends?\s+(?:on|at)|weekend\s+deal|free\s+play\s+event|play\s+free\s+this\s+week(?:end)?|trial\s+period|demo\s+free|for\s+a\s+limited\s+time\s+only/.test(content);
+    // Does NOT include "free on steam until" or "free until" which are giveaway phrases
+    const hasPromoLanguage = /free\s*weekend|weekend\s*free|temporar(?:y|ily)\s+free|free\s*trial|play\s+(?:it\s+)?free\s+(?:this\s+)?weekend|limited[\s-]time(?:\s+free)?|free\s*to\s*play\s+for\s+(?:a\s+)?limited\s+time|play\s+for\s+free\s+for\s+limited\s+time|available\s+to\s+play\s+free|play\s+free\s+(?:now\s+)?until|free\s+access\s+(?:until|ends?|through)|will\s+be\s+removed|removed\s+from\s+(?:your\s+)?library|removed\s+after|disappear(?:s|ing)?|no\s+longer\s+(?:available|accessible)\s+after|access\s+ends?\s+(?:on|at)|weekend\s+deal|free\s+play\s+event|play\s+free\s+this\s+week(?:end)?|trial\s+period|demo\s+free|for\s+a\s+limited\s+time\s+only|you\s+will\s+lose|lose\s+access/.test(content);
+    
+    // Only classify as temporary promo if it has explicit promo language
+    if (hasPromoLanguage) return true;
+    
+    return false;
 }
 
 function dedupeGiveaways(giveaways) {
@@ -162,6 +171,40 @@ function createPromoSummaryEmbed(giveaways) {
         .setTitle(giveaways.length > 1 ? '🕹️ Steam Promo Games — Play Free This Weekend' : '🕹️ Steam Promo Game — Play Free Now')
         .setURL('https://store.steampowered.com/specials')
         .setDescription(giveaways.map(formatPromoLine).join('\n\n'))
+        .setFooter({ text: 'Steam promo game alerts • Limited-time free play' })
+        .setTimestamp();
+}
+
+function createPromoRotationEmbed(currentGiveaways, removedTitles = []) {
+    const removedLabel = removedTitles.length > 0
+        ? removedTitles.map(title => `• ${title}`).join('\n')
+        : '• One or more games expired';
+
+    if (currentGiveaways.length === 0) {
+        return new EmbedBuilder()
+            .setColor(0xf4a318)
+            .setTitle('🕹️ Steam Promo Games Updated')
+            .setDescription([
+                '**Expired promos removed:**',
+                removedLabel,
+                '',
+                'No Steam promo games are currently active.'
+            ].join('\n'))
+            .setFooter({ text: 'Steam promo game alerts • Limited-time free play' })
+            .setTimestamp();
+    }
+
+    return new EmbedBuilder()
+        .setColor(0xf4a318)
+        .setTitle('🕹️ Steam Promo Games Updated')
+        .setURL('https://store.steampowered.com/specials')
+        .setDescription([
+            '**Expired promos removed:**',
+            removedLabel,
+            '',
+            '**Currently active promos:**',
+            currentGiveaways.map(formatPromoLine).join('\n\n')
+        ].join('\n'))
         .setFooter({ text: 'Steam promo game alerts • Limited-time free play' })
         .setTimestamp();
 }
@@ -318,10 +361,70 @@ async function steamHttpsGetJson(url) {
     });
 }
 
+async function steamHttpsGetText(url) {
+    return new Promise((resolve, reject) => {
+        const zlib = require('zlib');
+        const req = https.get(url, {
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate'
+            }
+        }, res => {
+            if (res.statusCode < 200 || res.statusCode >= 300) {
+                return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => {
+                const buf = Buffer.concat(chunks);
+                const enc = (res.headers['content-encoding'] || '').toLowerCase();
+
+                const done = binary => resolve(binary.toString('utf8'));
+
+                if (enc === 'gzip') return zlib.gunzip(buf, (err, out) => err ? reject(err) : done(out));
+                if (enc === 'deflate') return zlib.inflate(buf, (err, out) => err ? reject(err) : done(out));
+
+                done(buf);
+            });
+        });
+
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(new Error('SteamDB request timed out')); });
+    });
+}
+
 function extractAppIdFromString(str) {
     if (!str) return null;
     const m = String(str).match(/\/apps?\/(\d+)/);
     return m ? m[1] : null;
+}
+
+async function mapWithConcurrency(items, concurrency, task) {
+    if (!Array.isArray(items) || items.length === 0) return [];
+
+    const workerCount = Math.max(1, Math.min(concurrency, items.length));
+    const results = new Array(items.length);
+    let cursor = 0;
+
+    const workers = Array.from({ length: workerCount }, async () => {
+        while (true) {
+            const index = cursor;
+            cursor += 1;
+            if (index >= items.length) break;
+
+            try {
+                results[index] = await task(items[index], index);
+            } catch {
+                results[index] = null;
+            }
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
 }
 
 async function checkSteamAppForFreeWeekend(appId) {
@@ -333,19 +436,40 @@ async function checkSteamAppForFreeWeekend(appId) {
         const data = appData.data;
         const po = data.price_overview;
 
-        // Steam category id 35 = "Free Weekend" — covers F2P games with free weekends
+        // Steam category id 35 = "Free Weekend"
         const hasFreeWeekendCategory = Array.isArray(data.categories) &&
             data.categories.some(c => c.id === 35);
 
-        // detailed_description starting with <h1>Free Weekend</h1> — used by PoE2-style events
-        const hasFreWeekendBanner = typeof data.detailed_description === 'string' &&
+        // detailed_description starting with <h1>Free Weekend</h1> — used by some store events
+        const hasFreeWeekendBanner = typeof data.detailed_description === 'string' &&
             /^\s*<h1>\s*Free\s+Weekend/i.test(data.detailed_description);
 
-        // For paid games: 100% discounted right now
-        const isPaidFreeWeekend = po && po.discount_percent === 100 && po.initial > 0 && !data.is_free;
+        const nowUnix = Math.floor(Date.now() / 1000);
+        const discountExpiration = Number(po?.discount_expiration);
+        const hasActiveDiscountWindow = Number.isFinite(discountExpiration) && discountExpiration > nowUnix;
+        const hasExpiredDiscountWindow = Number.isFinite(discountExpiration) && discountExpiration <= nowUnix;
 
-        // Must match at least one signal — skip otherwise
-        if (!hasFreeWeekendCategory && !hasFreWeekendBanner && !isPaidFreeWeekend) return null;
+        const promoText = `${sanitizeText(data.short_description || '')} ${sanitizeText(data.detailed_description || '')}`.toLowerCase();
+        const hasPlayFreeText = /play\s+(?:it\s+)?free\s+(?:this\s+)?weekend|free\s*weekend|weekend\s*free|free\s*trial|free\s*to\s*play\s+for\s+(?:a\s+)?limited\s+time|play\s+for\s+free\s+for\s+limited\s+time|play\s+free\s+(?:now\s+)?until|free\s+access\s+(?:until|ends?|through)|trial\s+period|limited[\s-]time/.test(promoText);
+        const hasStaleText = /no\s+longer\s+(?:available|accessible)|promotion\s+ended|offer\s+ended|event\s+ended|free\s+weekend\s+has\s+ended/.test(promoText);
+
+        // Paid games on temporary free access are often marked 100% off, but metadata is not always consistent.
+        const hasLiveFreeWeekendPricing = Boolean(
+            po
+            && po.discount_percent === 100
+            && po.initial > 0
+            && !data.is_free
+            && (hasActiveDiscountWindow || !Number.isFinite(discountExpiration))
+        );
+
+        // Category 35 often marks weekend deals (discounts), not necessarily free-to-play events.
+        // Only allow explicit free-play signals: 100% free weekend pricing, free-weekend banner text,
+        // or strong play-free wording in descriptions.
+        const hasExplicitPlayFreeSignal = hasLiveFreeWeekendPricing || hasFreeWeekendBanner || hasPlayFreeText;
+        const isLikelyActivePromo = hasExplicitPlayFreeSignal && !hasStaleText;
+
+        if (hasExpiredDiscountWindow) return null;
+        if (!isLikelyActivePromo) return null;
 
         let endDate = null;
         if (po?.discount_expiration && Number.isFinite(Number(po.discount_expiration))) {
@@ -374,88 +498,114 @@ async function checkSteamAppForFreeWeekend(appId) {
 
 async function fetchSteamStorePromos() {
     try {
-        const appIds = new Set();
+        const priorityAppIds = [];
+        const regularAppIds = [];
+        const seenAppIds = new Set();
+        const addCandidate = (value, isPriority = false) => {
+            const id = String(value || '').trim();
+            if (!id || !/^\d+$/.test(id)) return;
+            if (seenAppIds.has(id)) return;
+            seenAppIds.add(id);
+            if (isPriority) {
+                priorityAppIds.push(id);
+            } else {
+                regularAppIds.push(id);
+            }
+        };
 
-        // Source 1: featuredcategories — spotlight sections + specials
-        const featured = await steamHttpsGetJson(STEAM_FEATURED_URL);
+        const looksLikePlayFreeLabel = (value) => /play\s+(?:it\s+)?free|free\s*weekend|weekend\s*free|free\s*trial|limited[\s-]time|trial/i.test(String(value || ''));
 
-        // Scan ALL numbered sections (spotlights, daily deals, etc.)
-        for (let k = 0; k <= 15; k++) {
-            const section = featured?.[k];
-            if (!section) continue;
-            const items = Array.isArray(section.items) ? section.items : [];
-            items.forEach(item => {
-                // App URL in spotlight (e.g. Weekend Deal banners)
-                const fromUrl = extractAppIdFromString(item?.url);
-                if (fromUrl) appIds.add(fromUrl);
-                // Inline item with an id field (daily deal, etc.)
-                if (item?.id) appIds.add(String(item.id));
-            });
+        // Source 0: SteamDB upcoming free events (preferred source for play-for-free windows).
+        try {
+            const html = await steamHttpsGetText(STEAMDB_UPCOMING_FREE_URL);
+            const hasCloudflareChallenge = /cf-mitigated|just a moment|enable javascript/i.test(html);
+
+            if (!hasCloudflareChallenge) {
+                const appLinkRegex = /href="\/app\/(\d+)\//gi;
+                let match;
+                while ((match = appLinkRegex.exec(html)) !== null) {
+                    addCandidate(match[1]);
+                }
+            }
+        } catch {
+            // optional source; SteamDB can return anti-bot responses in some environments
         }
 
-        // Named specials section
-        const specials = featured?.specials?.items;
-        if (Array.isArray(specials)) {
-            specials.forEach(item => {
-                if (item?.id) appIds.add(String(item.id));
-                // Quick-win: if already 100% off, note it
-            });
-        }
-
-        // Source 2: Steam search — free specials including F2P games with free weekends (hidef2p=0)
+        // Source 1: free specials search (fast + focused)
         try {
             const search = await steamHttpsGetJson(
-                'https://store.steampowered.com/search/results/?specials=1&maxprice=free&hidef2p=0&json=1&cc=US&l=en&count=50'
+                'https://store.steampowered.com/search/results/?specials=1&maxprice=free&hidef2p=0&json=1&cc=US&l=en&count=60'
             );
             const searchItems = Array.isArray(search?.items) ? search.items : [];
             searchItems.forEach(item => {
-                const fromLogo = extractAppIdFromString(item?.logo);
-                if (fromLogo) appIds.add(fromLogo);
-                if (item?.id) appIds.add(String(item.id));
+                const isPriority = looksLikePlayFreeLabel(item?.name);
+                addCandidate(item?.id, isPriority);
+                addCandidate(extractAppIdFromString(item?.url), isPriority);
+                addCandidate(extractAppIdFromString(item?.logo), isPriority);
             });
         } catch {
-            // search fetch optional
+            // optional
         }
 
-        // Source 3: Steam search with "Weekend Deal" sub-type tag (catches F2P free weekends)
+        // Source 2: weekend/deal subtype search
         try {
             const weekendSearch = await steamHttpsGetJson(
-                'https://store.steampowered.com/search/results/?specials=1&maxprice=free&hidef2p=0&json=1&cc=US&l=en&count=100&category1=998'
+                'https://store.steampowered.com/search/results/?specials=1&maxprice=free&hidef2p=0&json=1&cc=US&l=en&count=60&category1=998'
             );
-            const wItems = Array.isArray(weekendSearch?.items) ? weekendSearch.items : [];
-            wItems.forEach(item => {
-                const fromLogo = extractAppIdFromString(item?.logo);
-                if (fromLogo) appIds.add(fromLogo);
-                if (item?.id) appIds.add(String(item.id));
+            const weekendItems = Array.isArray(weekendSearch?.items) ? weekendSearch.items : [];
+            weekendItems.forEach(item => {
+                const isPriority = looksLikePlayFreeLabel(item?.name) || true;
+                addCandidate(item?.id, isPriority);
+                addCandidate(extractAppIdFromString(item?.url), isPriority);
+                addCandidate(extractAppIdFromString(item?.logo), isPriority);
             });
         } catch {
             // optional
         }
 
-        // Source 4: Steam specials without price cap — finds games like PoE2 on sale (50% off)
-        // but running a "Play for Free Weekend" event. Limited to 100 to avoid too many appdetails calls.
+        // Source 2b: all specials can contain temporary free-play promos not captured in free-only search.
         try {
-            const allSpecials = await steamHttpsGetJson(
-                'https://store.steampowered.com/search/results/?specials=1&hidef2p=0&json=1&cc=US&l=en&count=100'
+            const allSpecialsSearch = await steamHttpsGetJson(
+                'https://store.steampowered.com/search/results/?specials=1&hidef2p=0&json=1&cc=US&l=en&count=120'
             );
-            const sItems = Array.isArray(allSpecials?.items) ? allSpecials.items : [];
-            sItems.forEach(item => {
-                const fromLogo = extractAppIdFromString(item?.logo);
-                if (fromLogo) appIds.add(fromLogo);
-                if (item?.id) appIds.add(String(item.id));
+            const allSpecialItems = Array.isArray(allSpecialsSearch?.items) ? allSpecialsSearch.items : [];
+            allSpecialItems.forEach(item => {
+                const isPriority = looksLikePlayFreeLabel(item?.name);
+                addCandidate(item?.id, isPriority);
+                addCandidate(extractAppIdFromString(item?.url), isPriority);
+                addCandidate(extractAppIdFromString(item?.logo), isPriority);
             });
         } catch {
             // optional
         }
 
-        if (appIds.size === 0) return [];
+        // Source 3: featured specials as a fallback source
+        try {
+            const featured = await steamHttpsGetJson(STEAM_FEATURED_URL);
+            const specials = Array.isArray(featured?.specials?.items) ? featured.specials.items : [];
+            specials.forEach(item => {
+                const isPriority = looksLikePlayFreeLabel(item?.name);
+                addCandidate(item?.id, isPriority);
+                addCandidate(extractAppIdFromString(item?.url), isPriority);
+                addCandidate(extractAppIdFromString(item?.logo), isPriority);
+            });
+        } catch {
+            // optional
+        }
 
-        // Check each candidate app via appdetails for a live 100% discount
+        const candidateAppIds = [...priorityAppIds, ...regularAppIds];
+        if (candidateAppIds.length === 0) return [];
+
+        const prioritizedIds = candidateAppIds.slice(0, STEAM_PROMO_CANDIDATE_LIMIT);
+        const checkedPromos = await mapWithConcurrency(
+            prioritizedIds,
+            STEAM_PROMO_CONCURRENCY,
+            id => checkSteamAppForFreeWeekend(id)
+        );
+
         const promos = [];
         const seenTitles = new Set();
-
-        for (const id of appIds) {
-            const promo = await checkSteamAppForFreeWeekend(id);
+        for (const promo of checkedPromos) {
             if (!promo) continue;
             const key = promo.title.toLowerCase();
             if (seenTitles.has(key)) continue;
@@ -529,6 +679,7 @@ class SteamFreeGamesAlertsManager {
         this.data.promoGuilds[guildId] = {
             channelId,
             announcedIds: snapshot ? snapshot.promoGiveaways.map(g => g.id) : [],
+            announcedMeta: snapshot ? snapshot.promoGiveaways.map(g => ({ id: g.id, title: g.title })) : [],
             lastCheckedAt: new Date().toISOString()
         };
 
@@ -608,17 +759,32 @@ class SteamFreeGamesAlertsManager {
                 return leftEnd - rightEnd || left.title.localeCompare(right.title);
             });
 
-        // GamerPower promos (keyword-detected from their feed)
+        // GamerPower temporary promos (games that will be removed from library after giveaway)
         const gpPromos = giveaways.filter(isTemporaryPromoGiveaway);
         const freeToKeepGiveaways = giveaways.filter(giveaway => !isTemporaryPromoGiveaway(giveaway));
 
         // Steam store promos (100%-off paid games = free weekends / events)
         const steamStorePromos = await fetchSteamStorePromos();
 
-        // Merge: dedupe by title to avoid duplicates if both sources list the same game
-        const seenTitles = new Set(gpPromos.map(g => g.title.toLowerCase()));
-        const uniqueSteamPromos = steamStorePromos.filter(g => !seenTitles.has(g.title.toLowerCase()));
-        const promoGiveaways = [...gpPromos, ...uniqueSteamPromos]
+        // Manual overrides for temporarily free games not automatically detected
+        const manualPromos = [];
+        // Marathon: play-for-free event lasting 6 days
+        const marathonEndDate = new Date();
+        marathonEndDate.setDate(marathonEndDate.getDate() + 6);
+        manualPromos.push({
+            id: 'steam_store_3065800',
+            title: 'Marathon',
+            description: 'Play Marathon for free for a limited time. The game will be removed from your library after the promotion ends.',
+            worth: '$39.99',
+            url: 'https://store.steampowered.com/app/3065800/',
+            imageUrl: null,
+            instructions: 'Visit the Steam store page and click "Try Now" or "Play Free". The game will be removed from your library after the promotion ends.',
+            publishedDate: null,
+            endDate: marathonEndDate.toISOString()
+        });
+
+        // Promo stream includes both temporary GamerPower giveaways and Steam play-for-free events
+        const promoGiveaways = [...gpPromos, ...steamStorePromos, ...manualPromos]
             .sort((a, b) => {
                 const aEnd = new Date(a.endDate || 0).getTime();
                 const bEnd = new Date(b.endDate || 0).getTime();
@@ -700,7 +866,10 @@ class SteamFreeGamesAlertsManager {
                 if (!channel || !channel.isTextBased()) continue;
 
                 const announcedIds = Array.isArray(config.announcedIds) ? config.announcedIds.map(String) : [];
+                const announcedMeta = Array.isArray(config.announcedMeta) ? config.announcedMeta : [];
+                const currentPromoIdSet = new Set(currentPromoIds.map(String));
                 const newPromos = snapshot.promoGiveaways.filter(g => !announcedIds.includes(String(g.id)));
+                const removedPromoIds = announcedIds.filter(id => !currentPromoIdSet.has(String(id)));
 
                 if (newPromos.length > 0) {
                     const payload = this.buildPromoAlert(snapshot, newPromos);
@@ -709,9 +878,23 @@ class SteamFreeGamesAlertsManager {
                             await channel.send(messagePayload).catch(() => {});
                         }
                     }
+                } else if (removedPromoIds.length > 0) {
+                    const removedTitleMap = new Map(
+                        announcedMeta
+                            .map(entry => [String(entry?.id || ''), entry?.title])
+                            .filter(([id, title]) => id && title)
+                    );
+
+                    const removedTitles = removedPromoIds
+                        .map(id => removedTitleMap.get(String(id)) || `Steam App ${String(id).replace(/^steam_store_/, '')}`)
+                        .slice(0, 8);
+
+                    const rotationEmbed = createPromoRotationEmbed(snapshot.promoGiveaways, removedTitles);
+                    await channel.send({ embeds: [rotationEmbed] }).catch(() => {});
                 }
 
                 config.announcedIds = currentPromoIds;
+                config.announcedMeta = snapshot.promoGiveaways.map(g => ({ id: g.id, title: g.title }));
                 config.lastCheckedAt = snapshot.fetchedAt;
             }
 
