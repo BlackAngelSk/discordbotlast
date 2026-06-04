@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
 import json
 import os
 import socket
@@ -45,8 +46,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, Optional
 
 GITHUB_API = "https://api.github.com"
 FIXED_REPO = "BlackAngelSk/discordbotlast"
@@ -61,8 +63,50 @@ PROTECTED_LOCAL_PATTERNS = {
     "tokens.json",
 }
 
+RELEASE_CHANNEL_TAGS: Dict[str, str] = {
+    "stable": "latest",
+    "beta": "beta",
+    "nightly": "nightly",
+}
+
 NETWORK_RETRY_ATTEMPTS = 3
 NETWORK_RETRY_BASE_DELAY_SECONDS = 2
+
+LOG_JSON = False
+LOG_FILE: Optional[Path] = None
+DRY_RUN = False
+
+
+def _init_logging(log_json: bool = False, log_file: Optional[str] = None) -> None:
+    global LOG_JSON, LOG_FILE
+    LOG_JSON = bool(log_json)
+    LOG_FILE = Path(log_file).expanduser().resolve() if log_file else None
+
+
+def _emit_log_line(line: str) -> None:
+    print(line)
+    if LOG_FILE:
+        LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with LOG_FILE.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
+def _log_event(message: str, **fields: Any) -> None:
+    if LOG_JSON:
+        payload: Dict[str, Any] = {
+            "ts": int(time.time()),
+            "level": "info",
+            "message": message,
+        }
+        payload.update(fields)
+        _emit_log_line(json.dumps(payload, ensure_ascii=True, sort_keys=True))
+        return
+
+    if fields:
+        details = " ".join(f"{k}={v}" for k, v in sorted(fields.items()))
+        _emit_log_line(f"[updater] {message} ({details})")
+    else:
+        _emit_log_line(f"[updater] {message}")
 
 
 class UpdaterError(Exception):
@@ -70,7 +114,174 @@ class UpdaterError(Exception):
 
 
 def _print(msg: str) -> None:
-    print(f"[updater] {msg}")
+    _log_event(msg)
+
+
+def _set_dry_run(enabled: bool) -> None:
+    global DRY_RUN
+    DRY_RUN = bool(enabled)
+
+
+def _dry_run_note(action: str, **fields: Any) -> None:
+    data = {"dry_run": True}
+    data.update(fields)
+    _log_event(f"DRY-RUN: {action}", **data)
+
+
+def _compute_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while True:
+            chunk = f.read(1024 * 1024)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_sha256(path: Path, expected_sha256: Optional[str]) -> None:
+    if not expected_sha256:
+        return
+    actual = _compute_sha256(path)
+    expected = expected_sha256.lower().strip()
+    if actual.lower() != expected:
+        raise UpdaterError(
+            f"Checksum mismatch for {path.name}: expected {expected}, got {actual}"
+        )
+    _log_event("Checksum verified", path=str(path), sha256=actual)
+
+
+def _read_pid_file(pid_file: Path) -> Optional[int]:
+    if not pid_file.exists():
+        return None
+    try:
+        raw = pid_file.read_text(encoding="utf-8", errors="ignore").strip()
+        if not raw:
+            return None
+        return int(raw)
+    except Exception:
+        return None
+
+
+def _is_pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def _wait_for_startup(
+    started_proc: Optional[subprocess.Popen[Any]],
+    verify_seconds: int,
+    pid_file: Optional[Path] = None,
+    health_cmd: Optional[str] = None,
+) -> bool:
+    if verify_seconds <= 0:
+        return True
+
+    deadline = time.time() + verify_seconds
+    while time.time() < deadline:
+        if health_cmd:
+            result = subprocess.run(
+                health_cmd,
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            if result.returncode == 0:
+                return True
+
+        if pid_file:
+            pid = _read_pid_file(pid_file)
+            if pid is not None and _is_pid_alive(pid):
+                return True
+
+        if started_proc is not None and started_proc.poll() is None:
+            return True
+
+        time.sleep(1)
+
+    return False
+
+
+def _snapshot_target(target: Path) -> Optional[Path]:
+    if not target.exists():
+        return None
+    snapshot_dir = Path(tempfile.mkdtemp(prefix="updater-snapshot-"))
+    snapshot_path = snapshot_dir / target.name
+    if target.is_dir():
+        shutil.copytree(target, snapshot_path, dirs_exist_ok=True)
+    else:
+        shutil.copy2(target, snapshot_path)
+    return snapshot_path
+
+
+def _restore_snapshot(target: Path, snapshot_path: Path) -> None:
+    _log_event("Restoring snapshot", target=str(target), snapshot=str(snapshot_path))
+    if DRY_RUN:
+        _dry_run_note("restore snapshot", target=str(target), snapshot=str(snapshot_path))
+        return
+
+    if target.exists():
+        if target.is_dir():
+            shutil.rmtree(target)
+        else:
+            target.unlink(missing_ok=True)
+
+    if snapshot_path.is_dir():
+        shutil.copytree(snapshot_path, target, dirs_exist_ok=True)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(snapshot_path, target)
+
+
+@contextmanager
+def _acquire_single_instance_lock(lock_file: Optional[Path]) -> Iterator[None]:
+    if not lock_file:
+        yield
+        return
+
+    lock_file.parent.mkdir(parents=True, exist_ok=True)
+    f = lock_file.open("a+", encoding="utf-8")
+
+    try:
+        if os.name == "nt":
+            import msvcrt  # type: ignore
+
+            try:
+                msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+            except OSError as e:
+                raise UpdaterError(f"Another updater instance is already running ({lock_file})") from e
+        else:
+            import fcntl
+
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as e:
+                raise UpdaterError(f"Another updater instance is already running ({lock_file})") from e
+
+        f.seek(0)
+        f.truncate()
+        f.write(str(os.getpid()))
+        f.flush()
+        _log_event("Lock acquired", lock_file=str(lock_file), pid=os.getpid())
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                import msvcrt  # type: ignore
+
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        finally:
+            f.close()
 
 
 def _repair_embedded_windows_args(argv: list[str]) -> list[str]:
@@ -173,37 +384,66 @@ def _cert_error_hint() -> str:
     )
 
 
-def _stop_process(stop_process: Optional[str]) -> None:
+def _stop_process(
+    stop_process: Optional[str],
+    pid_file: Optional[Path] = None,
+    exact_match: bool = False,
+    grace_seconds: int = 5,
+) -> None:
+    stopped = False
+
+    if pid_file:
+        pid = _read_pid_file(pid_file)
+        if pid is not None:
+            _print(f"Stopping PID from file: {pid}")
+            if DRY_RUN:
+                _dry_run_note("stop pid", pid=pid)
+            else:
+                try:
+                    os.kill(pid, 15)
+                except OSError:
+                    pass
+                deadline = time.time() + max(0, grace_seconds)
+                while time.time() < deadline and _is_pid_alive(pid):
+                    time.sleep(0.5)
+                if _is_pid_alive(pid):
+                    try:
+                        os.kill(pid, 9)
+                    except OSError:
+                        pass
+                stopped = True
+
     if not stop_process:
         return
 
-    _print(f"Stopping process: {stop_process}")
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/F", "/IM", stop_process],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    else:
-        subprocess.run(
-            ["pkill", "-f", stop_process],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-
-def _start_command(start_cmd: Optional[str]) -> None:
-    if not start_cmd:
+    _print(f"Stopping process pattern: {stop_process}")
+    if DRY_RUN:
+        _dry_run_note("stop process", process=stop_process, exact_match=exact_match)
         return
 
+    if os.name == "nt":
+        cmd = ["taskkill", "/F", "/IM", stop_process]
+    else:
+        cmd = ["pkill", "-x" if exact_match else "-f", stop_process]
+    subprocess.run(cmd, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not stopped:
+        time.sleep(0.5)
+
+
+def _start_command(start_cmd: Optional[str]) -> Optional[subprocess.Popen[Any]]:
+    if not start_cmd:
+        return None
+
     _print(f"Starting command: {start_cmd}")
+    if DRY_RUN:
+        _dry_run_note("start command", command=start_cmd)
+        return None
+
     try:
         if os.name == "nt":
-            subprocess.Popen(["cmd", "/c", start_cmd], shell=False)
+            return subprocess.Popen(["cmd", "/c", start_cmd], shell=False)
         else:
-            subprocess.Popen(start_cmd, shell=True, start_new_session=True)
+            return subprocess.Popen(start_cmd, shell=True, start_new_session=True)
     except Exception as e:
         raise UpdaterError(f"Failed to start command: {e}") from e
 
@@ -218,9 +458,9 @@ def _normalize_start_cmd_arg(start_cmd: Any) -> Optional[str]:
     return value or None
 
 
-def _start_bat_file(start_bat: Optional[str]) -> None:
+def _start_bat_file(start_bat: Optional[str]) -> Optional[subprocess.Popen[Any]]:
     if not start_bat:
-        return
+        return None
 
     bat_path = start_bat.strip().strip('"').strip("'")
     _print(f"Starting .bat: {bat_path}")
@@ -254,8 +494,11 @@ def _start_bat_file(start_bat: Optional[str]) -> None:
             raise UpdaterError(f"Failed to read {env_file}: {e}") from e
 
     if os.name == "nt":
+        if DRY_RUN:
+            _dry_run_note("start bat", path=str(bat_file))
+            return None
         try:
-            subprocess.Popen(
+            return subprocess.Popen(
                 ["cmd", "/c", "call", str(bat_file)],
                 cwd=str(bat_file.parent),
                 shell=False,
@@ -264,6 +507,7 @@ def _start_bat_file(start_bat: Optional[str]) -> None:
             raise UpdaterError(f"Failed to start .bat: {e}") from e
     else:
         _print("Ignored --start-bat on non-Windows OS")
+        return None
 
 
 def _stop_then_start_if_changed(
@@ -271,14 +515,86 @@ def _stop_then_start_if_changed(
     stop_process: Optional[str] = None,
     start_cmd: Optional[str] = None,
     start_bat: Optional[str] = None,
+    pid_file: Optional[Path] = None,
+    exact_match: bool = False,
+    grace_seconds: int = 5,
+    verify_startup_seconds: int = 0,
+    health_cmd: Optional[str] = None,
+    rollback_target: Optional[Path] = None,
+    rollback_snapshot: Optional[Path] = None,
 ) -> None:
     if not changed:
         return
-    _stop_process(stop_process)
+
+    _stop_process(
+        stop_process=stop_process,
+        pid_file=pid_file,
+        exact_match=exact_match,
+        grace_seconds=grace_seconds,
+    )
+
+    proc: Optional[subprocess.Popen[Any]] = None
     if start_bat:
-        _start_bat_file(start_bat)
+        proc = _start_bat_file(start_bat)
     else:
-        _start_command(start_cmd)
+        proc = _start_command(start_cmd)
+
+    should_verify = verify_startup_seconds > 0 and (
+        start_bat is not None or start_cmd is not None or pid_file is not None or health_cmd is not None
+    )
+    startup_ok = True
+    if should_verify:
+        startup_ok = _wait_for_startup(
+            started_proc=proc,
+            verify_seconds=verify_startup_seconds,
+            pid_file=pid_file,
+            health_cmd=health_cmd,
+        )
+    if verify_startup_seconds > 0 and not startup_ok:
+        if rollback_target is not None and rollback_snapshot is not None:
+            _print("Startup check failed. Rolling back to previous version.")
+            _restore_snapshot(rollback_target, rollback_snapshot)
+            _stop_process(
+                stop_process=stop_process,
+                pid_file=pid_file,
+                exact_match=exact_match,
+                grace_seconds=grace_seconds,
+            )
+            if start_bat:
+                _start_bat_file(start_bat)
+            else:
+                _start_command(start_cmd)
+        raise UpdaterError("Startup verification failed")
+
+
+def _run_update_with_snapshot(
+    target: Path,
+    update_action: Callable[[], bool],
+    stop_process: Optional[str] = None,
+    start_cmd: Optional[str] = None,
+    start_bat: Optional[str] = None,
+    pid_file: Optional[Path] = None,
+    exact_match: bool = False,
+    grace_seconds: int = 5,
+    verify_startup_seconds: int = 0,
+    health_cmd: Optional[str] = None,
+) -> bool:
+    snapshot = _snapshot_target(target)
+    changed = update_action()
+    _stop_then_start_if_changed(
+        changed=changed,
+        stop_process=stop_process,
+        start_cmd=start_cmd,
+        start_bat=start_bat,
+        pid_file=pid_file,
+        exact_match=exact_match,
+        grace_seconds=grace_seconds,
+        verify_startup_seconds=verify_startup_seconds,
+        health_cmd=health_cmd,
+        rollback_target=target if snapshot else None,
+        rollback_snapshot=snapshot,
+    )
+    return changed
 
 
 def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
@@ -329,7 +645,46 @@ def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
         raise UpdaterError("Invalid JSON response from GitHub API") from e
 
 
+def _request_json_conditional(
+    url: str,
+    token: Optional[str] = None,
+    etag: Optional[str] = None,
+) -> tuple[Optional[Dict[str, Any]], Optional[str], bool]:
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "simple-github-updater",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if etag:
+        headers["If-None-Match"] = etag
+
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30, context=_build_ssl_context()) as resp:
+            data = resp.read().decode("utf-8")
+            new_etag = resp.headers.get("ETag")
+    except urllib.error.HTTPError as e:
+        if e.code == 304:
+            return None, etag, True
+        body = e.read().decode("utf-8", errors="ignore")
+        raise UpdaterError(f"GitHub API HTTP {e.code}: {body or e.reason}") from e
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, ssl.SSLCertVerificationError):
+            raise UpdaterError(_cert_error_hint()) from e
+        raise UpdaterError(f"Network error while calling GitHub API: {e.reason}") from e
+
+    try:
+        return json.loads(data), new_etag, False
+    except json.JSONDecodeError as e:
+        raise UpdaterError("Invalid JSON response from GitHub API") from e
+
+
 def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Path:
+    if DRY_RUN:
+        _dry_run_note("download file", url=url, output=str(output))
+        return output
+
     output.parent.mkdir(parents=True, exist_ok=True)
 
     headers = {"User-Agent": "simple-github-updater"}
@@ -394,6 +749,29 @@ def _get_release_data(repo: str, tag: str, token: Optional[str]) -> Dict[str, An
     return _request_json(url, token=token)
 
 
+def _get_release_data_conditional(
+    repo: str,
+    tag: str,
+    token: Optional[str],
+    etag: Optional[str],
+) -> tuple[Optional[Dict[str, Any]], Optional[str], bool]:
+    repo = _ensure_fixed_repo(repo)
+    if "/" not in repo:
+        raise UpdaterError("--repo must be in format owner/repo")
+
+    owner, name = repo.split("/", 1)
+    safe_owner = urllib.parse.quote(owner)
+    safe_name = urllib.parse.quote(name)
+
+    if tag.lower() == "latest":
+        url = f"{GITHUB_API}/repos/{safe_owner}/{safe_name}/releases/latest"
+    else:
+        safe_tag = urllib.parse.quote(tag)
+        url = f"{GITHUB_API}/repos/{safe_owner}/{safe_name}/releases/tags/{safe_tag}"
+
+    return _request_json_conditional(url, token=token, etag=etag)
+
+
 def download_repo_source_archive(
     repo: str,
     output: Path,
@@ -425,7 +803,8 @@ def get_repo_commit_sha(repo: str, ref: str = "main", token: Optional[str] = Non
 
 
 def _state_file_for_target(target: Path) -> Path:
-    return target / ".updater_state.json"
+    root = target if target.is_dir() or target.suffix == "" else target.parent
+    return root / ".updater_state.json"
 
 
 def _load_target_state(target: Path) -> Dict[str, Any]:
@@ -443,8 +822,12 @@ def _load_target_state(target: Path) -> Dict[str, Any]:
 
 
 def _save_target_state(target: Path, data: Dict[str, Any]) -> None:
-    target.mkdir(parents=True, exist_ok=True)
+    if DRY_RUN:
+        _dry_run_note("save state", target=str(target))
+        return
+
     state_file = _state_file_for_target(target)
+    state_file.parent.mkdir(parents=True, exist_ok=True)
     temp_file = state_file.with_suffix(state_file.suffix + ".tmp")
     payload = json.dumps(data, indent=2, sort_keys=True)
     temp_file.write_text(payload, encoding="utf-8")
@@ -455,12 +838,27 @@ def _state_key_for_repo_ref(repo: str, ref: str) -> str:
     return f"{repo}@{ref}"
 
 
+def _state_key_for_release_etag(repo: str, tag: str) -> str:
+    return f"release_etag:{repo}@{tag}"
+
+
+def _resolve_release_tag(tag: Optional[str], channel: Optional[str]) -> str:
+    if tag:
+        return tag
+    if channel:
+        mapped = RELEASE_CHANNEL_TAGS.get(channel.lower())
+        if mapped:
+            return mapped
+    return "latest"
+
+
 def download_release_asset(
     repo: str,
     asset_name: str,
     output: Path,
     tag: str = "latest",
     token: Optional[str] = None,
+    expected_sha256: Optional[str] = None,
 ) -> Path:
     release = _get_release_data(repo, tag=tag, token=token)
 
@@ -471,7 +869,9 @@ def download_release_asset(
             if not url:
                 raise UpdaterError("Asset has no browser_download_url")
             _print(f"Downloading release asset: {asset_name}")
-            return _download_to_file(url, output, token=token)
+            downloaded = _download_to_file(url, output, token=token)
+            _verify_sha256(downloaded, expected_sha256)
+            return downloaded
 
     available = ", ".join(a.get("name", "<unnamed>") for a in assets) or "<none>"
     raise UpdaterError(
@@ -554,6 +954,32 @@ def _extract_asset_to_dir(asset_path: Path, extract_dir: Path) -> Optional[Path]
     return None
 
 
+def _matches_pattern(rel_path: Path, patterns: Iterable[str]) -> bool:
+    rel_value = rel_path.as_posix().lower()
+    name_value = rel_path.name.lower()
+    for pattern in patterns:
+        p = pattern.strip().lower()
+        if not p:
+            continue
+        if fnmatch.fnmatch(rel_value, p) or fnmatch.fnmatch(name_value, p):
+            return True
+    return False
+
+
+def _should_sync_file(
+    rel_path: Path,
+    include_patterns: Optional[list[str]],
+    exclude_patterns: Optional[list[str]],
+) -> bool:
+    if _is_protected_local_file(rel_path):
+        return False
+    if exclude_patterns and _matches_pattern(rel_path, exclude_patterns):
+        return False
+    if include_patterns:
+        return _matches_pattern(rel_path, include_patterns)
+    return True
+
+
 def _is_protected_local_file(rel_path: Path) -> bool:
     name = rel_path.name.lower()
     for pattern in PROTECTED_LOCAL_PATTERNS:
@@ -567,6 +993,8 @@ def _sync_directory(
     target_dir: Path,
     backup: bool = False,
     delete_missing: bool = False,
+    include_patterns: Optional[list[str]] = None,
+    exclude_patterns: Optional[list[str]] = None,
 ) -> bool:
     if not source_dir.exists() or not source_dir.is_dir():
         raise UpdaterError(f"Extracted source directory not found: {source_dir}")
@@ -583,7 +1011,7 @@ def _sync_directory(
             continue
 
         rel = src.relative_to(source_dir)
-        if _is_protected_local_file(rel):
+        if not _should_sync_file(rel, include_patterns, exclude_patterns):
             continue
         source_files.add(rel)
 
@@ -596,14 +1024,20 @@ def _sync_directory(
 
         if dst.exists() and backup:
             backup_path = dst.with_suffix(dst.suffix + ".bak")
-            shutil.copy2(dst, backup_path)
+            if DRY_RUN:
+                _dry_run_note("backup file", source=str(dst), backup=str(backup_path))
+            else:
+                shutil.copy2(dst, backup_path)
 
         if dst.exists():
             replaced += 1
         else:
             added += 1
 
-        shutil.copy2(src, dst)
+        if DRY_RUN:
+            _dry_run_note("sync file", source=str(src), target=str(dst))
+        else:
+            shutil.copy2(src, dst)
 
     removed = 0
     if delete_missing:
@@ -611,21 +1045,28 @@ def _sync_directory(
             if not dst.is_file():
                 continue
             rel = dst.relative_to(target_dir)
-            if _is_protected_local_file(rel):
+            if not _should_sync_file(rel, include_patterns, exclude_patterns):
                 continue
             if rel not in source_files:
                 if backup:
                     backup_path = dst.with_suffix(dst.suffix + ".bak")
-                    shutil.copy2(dst, backup_path)
-                dst.unlink(missing_ok=True)
+                    if DRY_RUN:
+                        _dry_run_note("backup file", source=str(dst), backup=str(backup_path))
+                    else:
+                        shutil.copy2(dst, backup_path)
+                if DRY_RUN:
+                    _dry_run_note("remove file", target=str(dst))
+                else:
+                    dst.unlink(missing_ok=True)
                 removed += 1
 
-        for directory in sorted(target_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-            if directory.is_dir():
-                try:
-                    directory.rmdir()
-                except OSError:
-                    pass
+        if not DRY_RUN:
+            for directory in sorted(target_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+                if directory.is_dir():
+                    try:
+                        directory.rmdir()
+                    except OSError:
+                        pass
 
     _print(
         f"Directory install complete: added={added}, replaced={replaced}, "
@@ -648,9 +1089,16 @@ def update_program_file(source: Path, target: Path, backup: bool = False) -> boo
 
     if target.exists() and backup:
         _print(f"Creating backup: {backup_path}")
-        shutil.copy2(target, backup_path)
+        if DRY_RUN:
+            _dry_run_note("backup file", source=str(target), backup=str(backup_path))
+        else:
+            shutil.copy2(target, backup_path)
 
     temp_target = target.with_suffix(target.suffix + ".new")
+    if DRY_RUN:
+        _dry_run_note("replace file", source=str(source), target=str(target))
+        return True
+
     shutil.copy2(source, temp_target)
 
     if target.exists():
@@ -670,6 +1118,9 @@ def update_from_github(
     backup: bool = False,
     delete_missing: bool = False,
     token: Optional[str] = None,
+    expected_sha256: Optional[str] = None,
+    include_patterns: Optional[list[str]] = None,
+    exclude_patterns: Optional[list[str]] = None,
 ) -> bool:
     with tempfile.TemporaryDirectory(prefix="updater-") as tmp:
         downloaded = Path(tmp) / asset_name
@@ -679,6 +1130,7 @@ def update_from_github(
             output=downloaded,
             tag=tag,
             token=token,
+            expected_sha256=expected_sha256,
         )
 
         extract_dir = Path(tmp) / "extract"
@@ -695,6 +1147,8 @@ def update_from_github(
                 target_dir=target,
                 backup=backup,
                 delete_missing=delete_missing,
+                include_patterns=include_patterns,
+                exclude_patterns=exclude_patterns,
             )
 
 
@@ -704,6 +1158,8 @@ def redo_fixed_repo(
     backup: bool = False,
     delete_missing: bool = False,
     token: Optional[str] = None,
+    include_patterns: Optional[list[str]] = None,
+    exclude_patterns: Optional[list[str]] = None,
 ) -> bool:
     with tempfile.TemporaryDirectory(prefix="updater-redo-") as tmp:
         downloaded = Path(tmp) / "repo.zip"
@@ -726,6 +1182,8 @@ def redo_fixed_repo(
             target_dir=target,
             backup=backup,
             delete_missing=delete_missing,
+            include_patterns=include_patterns,
+            exclude_patterns=exclude_patterns,
         )
 
 
@@ -741,6 +1199,13 @@ def redo_fixed_repo_loop(
     start_on_launch: bool = False,
     restart_each_cycle: bool = False,
     token: Optional[str] = None,
+    include_patterns: Optional[list[str]] = None,
+    exclude_patterns: Optional[list[str]] = None,
+    pid_file: Optional[Path] = None,
+    exact_match: bool = False,
+    grace_seconds: int = 5,
+    verify_startup_seconds: int = 0,
+    health_cmd: Optional[str] = None,
 ) -> None:
     if interval < 1:
         raise UpdaterError("--interval must be at least 1 second")
@@ -774,6 +1239,11 @@ def redo_fixed_repo_loop(
                         stop_process=stop_process,
                         start_cmd=start_cmd,
                         start_bat=start_bat,
+                        pid_file=pid_file,
+                        exact_match=exact_match,
+                        grace_seconds=grace_seconds,
+                        verify_startup_seconds=verify_startup_seconds,
+                        health_cmd=health_cmd,
                     )
                 _print(f"Waiting {interval} seconds for next check.")
                 time.sleep(interval)
@@ -786,6 +1256,8 @@ def redo_fixed_repo_loop(
                 backup=backup,
                 delete_missing=delete_missing,
                 token=token,
+                include_patterns=include_patterns,
+                exclude_patterns=exclude_patterns,
             )
 
             state[repo_key] = latest_sha
@@ -800,6 +1272,11 @@ def redo_fixed_repo_loop(
                 stop_process=stop_process,
                 start_cmd=start_cmd,
                 start_bat=start_bat,
+                pid_file=pid_file,
+                exact_match=exact_match,
+                grace_seconds=grace_seconds,
+                verify_startup_seconds=verify_startup_seconds,
+                health_cmd=health_cmd,
             )
         except UpdaterError as e:
             _print(f"Cycle error: {e}")
@@ -821,6 +1298,14 @@ def update_from_github_loop(
     start_bat: Optional[str] = None,
     start_on_launch: bool = False,
     token: Optional[str] = None,
+    expected_sha256: Optional[str] = None,
+    include_patterns: Optional[list[str]] = None,
+    exclude_patterns: Optional[list[str]] = None,
+    pid_file: Optional[Path] = None,
+    exact_match: bool = False,
+    grace_seconds: int = 5,
+    verify_startup_seconds: int = 0,
+    health_cmd: Optional[str] = None,
 ) -> None:
     if interval < 1:
         raise UpdaterError("--interval must be at least 1 second")
@@ -840,6 +1325,30 @@ def update_from_github_loop(
     while True:
         _print("Checking for updates...")
         try:
+            state = _load_target_state(target)
+            etag_key = _state_key_for_release_etag(repo, tag)
+            prev_etag = state.get(etag_key)
+            release_data, new_etag, not_modified = _get_release_data_conditional(
+                repo=repo,
+                tag=tag,
+                token=token,
+                etag=prev_etag if isinstance(prev_etag, str) else None,
+            )
+
+            if not_modified:
+                _print("Release metadata unchanged (ETag). Skipping download.")
+                _print(f"Waiting {interval} seconds for next check.")
+                time.sleep(interval)
+                continue
+
+            if new_etag:
+                state[etag_key] = new_etag
+                _save_target_state(target, state)
+
+            # release_data is fetched to support conditional checks; update flow still resolves assets safely.
+            if release_data is not None and release_data.get("tag_name"):
+                _log_event("Release metadata changed", tag_name=release_data.get("tag_name"))
+
             changed = update_from_github(
                 repo=repo,
                 asset_name=asset_name,
@@ -848,12 +1357,20 @@ def update_from_github_loop(
                 backup=backup,
                 delete_missing=delete_missing,
                 token=token,
+                expected_sha256=expected_sha256,
+                include_patterns=include_patterns,
+                exclude_patterns=exclude_patterns,
             )
             _stop_then_start_if_changed(
                 changed=changed,
                 stop_process=stop_process,
                 start_cmd=start_cmd,
                 start_bat=start_bat,
+                pid_file=pid_file,
+                exact_match=exact_match,
+                grace_seconds=grace_seconds,
+                verify_startup_seconds=verify_startup_seconds,
+                health_cmd=health_cmd,
             )
         except UpdaterError as e:
             _print(f"Cycle error: {e}")
@@ -1235,12 +1752,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--cacert",
         help="Path to CA bundle file for TLS verification",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview actions without changing files or processes",
+    )
+    parser.add_argument(
+        "--log-json",
+        action="store_true",
+        help="Emit structured JSON logs",
+    )
+    parser.add_argument(
+        "--log-file",
+        help="Append logs to this file",
+    )
+    parser.add_argument(
+        "--lock-file",
+        help="Path to lock file for single updater instance protection",
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_download_url = sub.add_parser("download-url", help="Download any URL to a local file")
     p_download_url.add_argument("--url", required=True, help="File URL")
     p_download_url.add_argument("--output", required=True, help="Output file path")
+    p_download_url.add_argument("--sha256", help="Expected SHA-256 of downloaded file")
 
     p_download_asset = sub.add_parser(
         "download-release-asset",
@@ -1249,7 +1785,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_download_asset.add_argument("--repo", default=FIXED_REPO, help="owner/repo (locked)")
     p_download_asset.add_argument("--asset-name", required=True, help="Asset filename in release")
     p_download_asset.add_argument("--tag", default="latest", help="Release tag or 'latest'")
+    p_download_asset.add_argument(
+        "--channel",
+        choices=sorted(RELEASE_CHANNEL_TAGS.keys()),
+        help="Release channel shortcut (maps to a tag)",
+    )
     p_download_asset.add_argument("--output", required=True, help="Output file path")
+    p_download_asset.add_argument("--sha256", help="Expected SHA-256 of downloaded asset")
 
     p_update = sub.add_parser("update-file", help="Replace target file with source file")
     p_update.add_argument("--source", required=True, help="Downloaded file path")
@@ -1262,9 +1804,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_update_github.add_argument("--repo", default=FIXED_REPO, help="owner/repo (locked)")
     p_update_github.add_argument("--asset-name", required=True, help="Asset filename in release")
-    p_update_github.add_argument("--tag", default="latest", help="Release tag or 'latest'")
+    p_update_github.add_argument("--tag", help="Release tag (overrides --channel)")
+    p_update_github.add_argument(
+        "--channel",
+        choices=sorted(RELEASE_CHANNEL_TAGS.keys()),
+        help="Release channel shortcut (maps to a tag)",
+    )
     p_update_github.add_argument("--target", required=True, help="Program file path or directory to install")
     p_update_github.add_argument("--backup", action="store_true", help="Create .bak backup")
+    p_update_github.add_argument("--sha256", help="Expected SHA-256 of downloaded asset")
     p_update_github.add_argument(
         "--stop-process",
         help="Process name/pattern to stop after update install (example: bot.bat or python)",
@@ -1282,6 +1830,43 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="When installing archive updates, remove files not present in the update",
     )
+    p_update_github.add_argument(
+        "--pid-file",
+        help="PID file to stop/verify process lifecycle",
+    )
+    p_update_github.add_argument(
+        "--stop-exact",
+        action="store_true",
+        help="Use exact process name matching when stopping",
+    )
+    p_update_github.add_argument(
+        "--stop-grace-seconds",
+        type=int,
+        default=5,
+        help="Grace period before force-kill (default: 5)",
+    )
+    p_update_github.add_argument(
+        "--verify-startup-seconds",
+        type=int,
+        default=0,
+        help="Verify restart health for this many seconds (default: disabled)",
+    )
+    p_update_github.add_argument(
+        "--health-cmd",
+        help="Health-check command (exit 0 means healthy)",
+    )
+    p_update_github.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Include glob for archive sync (can repeat)",
+    )
+    p_update_github.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Exclude glob for archive sync (can repeat)",
+    )
 
     p_update_github_loop = sub.add_parser(
         "update-from-github-loop",
@@ -1291,7 +1876,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_update_github_loop.add_argument(
         "--asset-name", required=True, help="Asset filename in release"
     )
-    p_update_github_loop.add_argument("--tag", default="latest", help="Release tag or 'latest'")
+    p_update_github_loop.add_argument("--tag", help="Release tag (overrides --channel)")
+    p_update_github_loop.add_argument(
+        "--channel",
+        choices=sorted(RELEASE_CHANNEL_TAGS.keys()),
+        help="Release channel shortcut (maps to a tag)",
+    )
     p_update_github_loop.add_argument(
         "--target", required=True, help="Program file path or directory to install"
     )
@@ -1323,6 +1913,41 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="When installing archive updates, remove files not present in the update",
     )
+    p_update_github_loop.add_argument("--sha256", help="Expected SHA-256 of downloaded asset")
+    p_update_github_loop.add_argument("--pid-file", help="PID file to stop/verify process lifecycle")
+    p_update_github_loop.add_argument(
+        "--stop-exact",
+        action="store_true",
+        help="Use exact process name matching when stopping",
+    )
+    p_update_github_loop.add_argument(
+        "--stop-grace-seconds",
+        type=int,
+        default=5,
+        help="Grace period before force-kill (default: 5)",
+    )
+    p_update_github_loop.add_argument(
+        "--verify-startup-seconds",
+        type=int,
+        default=0,
+        help="Verify restart health for this many seconds (default: disabled)",
+    )
+    p_update_github_loop.add_argument(
+        "--health-cmd",
+        help="Health-check command (exit 0 means healthy)",
+    )
+    p_update_github_loop.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Include glob for archive sync (can repeat)",
+    )
+    p_update_github_loop.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Exclude glob for archive sync (can repeat)",
+    )
 
     sub.add_parser("ui", help="Open desktop UI")
 
@@ -1352,6 +1977,40 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Remove files not present in repository snapshot",
+    )
+    p_redo.add_argument("--pid-file", help="PID file to stop/verify process lifecycle")
+    p_redo.add_argument(
+        "--stop-exact",
+        action="store_true",
+        help="Use exact process name matching when stopping",
+    )
+    p_redo.add_argument(
+        "--stop-grace-seconds",
+        type=int,
+        default=5,
+        help="Grace period before force-kill (default: 5)",
+    )
+    p_redo.add_argument(
+        "--verify-startup-seconds",
+        type=int,
+        default=0,
+        help="Verify restart health for this many seconds (default: disabled)",
+    )
+    p_redo.add_argument(
+        "--health-cmd",
+        help="Health-check command (exit 0 means healthy)",
+    )
+    p_redo.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Include glob for repo sync (can repeat)",
+    )
+    p_redo.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Exclude glob for repo sync (can repeat)",
     )
 
     p_redo_loop = sub.add_parser(
@@ -1394,6 +2053,40 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Remove files not present in repository snapshot",
     )
+    p_redo_loop.add_argument("--pid-file", help="PID file to stop/verify process lifecycle")
+    p_redo_loop.add_argument(
+        "--stop-exact",
+        action="store_true",
+        help="Use exact process name matching when stopping",
+    )
+    p_redo_loop.add_argument(
+        "--stop-grace-seconds",
+        type=int,
+        default=5,
+        help="Grace period before force-kill (default: 5)",
+    )
+    p_redo_loop.add_argument(
+        "--verify-startup-seconds",
+        type=int,
+        default=0,
+        help="Verify restart health for this many seconds (default: disabled)",
+    )
+    p_redo_loop.add_argument(
+        "--health-cmd",
+        help="Health-check command (exit 0 means healthy)",
+    )
+    p_redo_loop.add_argument(
+        "--include",
+        action="append",
+        default=[],
+        help="Include glob for repo sync (can repeat)",
+    )
+    p_redo_loop.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        help="Exclude glob for repo sync (can repeat)",
+    )
 
     return parser
 
@@ -1420,101 +2113,148 @@ def main() -> int:
     TLS_INSECURE = bool(args.insecure)
     TLS_CAFILE = args.cacert
 
-    try:
-        cmd = args.command
-        token = args.token
+    _init_logging(log_json=bool(args.log_json), log_file=args.log_file)
+    _set_dry_run(bool(args.dry_run))
 
-        if cmd == "download-url":
-            out = download_url(args.url, Path(args.output), token=token)
-            _print(f"Saved: {out}")
-        elif cmd == "download-release-asset":
-            out = download_release_asset(
-                repo=args.repo,
-                asset_name=args.asset_name,
-                output=Path(args.output),
-                tag=args.tag,
-                token=token,
-            )
-            _print(f"Saved: {out}")
-        elif cmd == "update-file":
-            update_program_file(Path(args.source), Path(args.target), backup=args.backup)
-            _print("Update complete")
-        elif cmd == "update-from-github":
-            changed = update_from_github(
-                repo=args.repo,
-                asset_name=args.asset_name,
-                target=Path(args.target),
-                tag=args.tag,
-                backup=args.backup,
-                delete_missing=args.delete_missing,
-                token=token,
-            )
-            _stop_then_start_if_changed(
-                changed=changed,
-                stop_process=args.stop_process,
-                start_cmd=_normalize_start_cmd_arg(args.start_cmd),
-                start_bat=args.start_bat,
-            )
-            _print("Update complete")
-        elif cmd == "update-from-github-loop":
-            try:
-                update_from_github_loop(
+    lock_path = Path(args.lock_file).expanduser().resolve() if args.lock_file else None
+
+    try:
+        with _acquire_single_instance_lock(lock_path):
+            cmd = args.command
+            token = args.token
+
+            if cmd == "download-url":
+                out = download_url(args.url, Path(args.output), token=token)
+                _verify_sha256(out, args.sha256)
+                _print(f"Saved: {out}")
+            elif cmd == "download-release-asset":
+                resolved_tag = _resolve_release_tag(args.tag, args.channel)
+                out = download_release_asset(
                     repo=args.repo,
                     asset_name=args.asset_name,
+                    output=Path(args.output),
+                    tag=resolved_tag,
+                    token=token,
+                    expected_sha256=args.sha256,
+                )
+                _print(f"Saved: {out}")
+            elif cmd == "update-file":
+                changed = _run_update_with_snapshot(
                     target=Path(args.target),
-                    interval=args.interval,
-                    tag=args.tag,
-                    backup=args.backup,
-                    delete_missing=args.delete_missing,
+                    update_action=lambda: update_program_file(Path(args.source), Path(args.target), backup=args.backup),
+                )
+                if changed:
+                    _print("Update complete")
+            elif cmd == "update-from-github":
+                resolved_tag = _resolve_release_tag(args.tag, args.channel)
+                changed = _run_update_with_snapshot(
+                    target=Path(args.target),
+                    update_action=lambda: update_from_github(
+                        repo=args.repo,
+                        asset_name=args.asset_name,
+                        target=Path(args.target),
+                        tag=resolved_tag,
+                        backup=args.backup,
+                        delete_missing=args.delete_missing,
+                        token=token,
+                        expected_sha256=args.sha256,
+                        include_patterns=args.include,
+                        exclude_patterns=args.exclude,
+                    ),
                     stop_process=args.stop_process,
                     start_cmd=_normalize_start_cmd_arg(args.start_cmd),
                     start_bat=args.start_bat,
-                    start_on_launch=args.start_on_launch,
-                    token=token,
+                    pid_file=Path(args.pid_file).expanduser().resolve() if args.pid_file else None,
+                    exact_match=bool(args.stop_exact),
+                    grace_seconds=max(0, args.stop_grace_seconds),
+                    verify_startup_seconds=max(0, args.verify_startup_seconds),
+                    health_cmd=_normalize_start_cmd_arg(args.health_cmd),
                 )
-            except KeyboardInterrupt:
-                _print("Stopped by user")
-        elif cmd == "ui":
-            try:
-                run_ui()
-            except UpdaterError as e:
-                _print(f"UI unavailable: {e}")
-                run_terminal_ui()
-        elif cmd == "redo":
-            changed = redo_fixed_repo(
-                target=Path(args.target),
-                ref=args.ref,
-                backup=args.backup,
-                delete_missing=args.delete_missing,
-                token=token,
-            )
-            _stop_then_start_if_changed(
-                changed=changed,
-                stop_process=args.stop_process,
-                start_cmd=_normalize_start_cmd_arg(args.start_cmd),
-                start_bat=args.start_bat,
-            )
-            _print("Redo complete")
-        elif cmd == "redo-loop":
-            try:
-                redo_fixed_repo_loop(
+                if changed:
+                    _print("Update complete")
+            elif cmd == "update-from-github-loop":
+                resolved_tag = _resolve_release_tag(args.tag, args.channel)
+                try:
+                    update_from_github_loop(
+                        repo=args.repo,
+                        asset_name=args.asset_name,
+                        target=Path(args.target),
+                        interval=args.interval,
+                        tag=resolved_tag,
+                        backup=args.backup,
+                        delete_missing=args.delete_missing,
+                        stop_process=args.stop_process,
+                        start_cmd=_normalize_start_cmd_arg(args.start_cmd),
+                        start_bat=args.start_bat,
+                        start_on_launch=args.start_on_launch,
+                        token=token,
+                        expected_sha256=args.sha256,
+                        include_patterns=args.include,
+                        exclude_patterns=args.exclude,
+                        pid_file=Path(args.pid_file).expanduser().resolve() if args.pid_file else None,
+                        exact_match=bool(args.stop_exact),
+                        grace_seconds=max(0, args.stop_grace_seconds),
+                        verify_startup_seconds=max(0, args.verify_startup_seconds),
+                        health_cmd=_normalize_start_cmd_arg(args.health_cmd),
+                    )
+                except KeyboardInterrupt:
+                    _print("Stopped by user")
+            elif cmd == "ui":
+                try:
+                    run_ui()
+                except UpdaterError as e:
+                    _print(f"UI unavailable: {e}")
+                    run_terminal_ui()
+            elif cmd == "redo":
+                changed = _run_update_with_snapshot(
                     target=Path(args.target),
-                    interval=args.interval,
-                    ref=args.ref,
-                    backup=args.backup,
-                    delete_missing=args.delete_missing,
+                    update_action=lambda: redo_fixed_repo(
+                        target=Path(args.target),
+                        ref=args.ref,
+                        backup=args.backup,
+                        delete_missing=args.delete_missing,
+                        token=token,
+                        include_patterns=args.include,
+                        exclude_patterns=args.exclude,
+                    ),
                     stop_process=args.stop_process,
                     start_cmd=_normalize_start_cmd_arg(args.start_cmd),
                     start_bat=args.start_bat,
-                    start_on_launch=args.start_on_launch,
-                    restart_each_cycle=args.restart_each_cycle,
-                    token=token,
+                    pid_file=Path(args.pid_file).expanduser().resolve() if args.pid_file else None,
+                    exact_match=bool(args.stop_exact),
+                    grace_seconds=max(0, args.stop_grace_seconds),
+                    verify_startup_seconds=max(0, args.verify_startup_seconds),
+                    health_cmd=_normalize_start_cmd_arg(args.health_cmd),
                 )
-            except KeyboardInterrupt:
-                _print("Stopped by user")
-        else:
-            parser.print_help()
-            return 2
+                if changed:
+                    _print("Redo complete")
+            elif cmd == "redo-loop":
+                try:
+                    redo_fixed_repo_loop(
+                        target=Path(args.target),
+                        interval=args.interval,
+                        ref=args.ref,
+                        backup=args.backup,
+                        delete_missing=args.delete_missing,
+                        stop_process=args.stop_process,
+                        start_cmd=_normalize_start_cmd_arg(args.start_cmd),
+                        start_bat=args.start_bat,
+                        start_on_launch=args.start_on_launch,
+                        restart_each_cycle=args.restart_each_cycle,
+                        token=token,
+                        include_patterns=args.include,
+                        exclude_patterns=args.exclude,
+                        pid_file=Path(args.pid_file).expanduser().resolve() if args.pid_file else None,
+                        exact_match=bool(args.stop_exact),
+                        grace_seconds=max(0, args.stop_grace_seconds),
+                        verify_startup_seconds=max(0, args.verify_startup_seconds),
+                        health_cmd=_normalize_start_cmd_arg(args.health_cmd),
+                    )
+                except KeyboardInterrupt:
+                    _print("Stopped by user")
+            else:
+                parser.print_help()
+                return 2
 
         return 0
     except UpdaterError as e:
