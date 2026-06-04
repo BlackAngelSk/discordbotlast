@@ -1247,9 +1247,16 @@ class Dashboard {
 
         // Home page
         this.app.get('/', (req, res) => {
+            const landingStats = {
+                servers: this.client.guilds.cache.size,
+                users: this.client.guilds.cache.reduce((total, guild) => total + (Number(guild.memberCount) || 0), 0),
+                channels: this.client.channels.cache.size
+            };
+
             res.render('index', {
                 user: req.user,
-                client: this.client
+                client: this.client,
+                landingStats
             });
         });
 
