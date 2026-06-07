@@ -3164,7 +3164,8 @@ class Dashboard {
                         ...config,
                         channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
                     } : null,
-                    giveaways: snapshot?.freeToKeepGiveaways || []
+                    giveaways: snapshot?.freeToKeepGiveaways || [],
+                    sourceHealth: snapshot?.sourceHealth || null
                 });
             } catch (error) {
                 console.error('Error fetching Steam free games alerts:', error);
@@ -3351,6 +3352,37 @@ class Dashboard {
             } catch (error) {
                 console.error('Error sending Steam free game test alert:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-free-games/:guildId/refresh', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const snapshot = await steamFreeGamesAlertsManager.forceCheckNow();
+                const freeCount = snapshot?.freeToKeepGiveaways?.length || 0;
+                const promoCount = snapshot?.promoGiveaways?.length || 0;
+
+                return res.json({
+                    success: true,
+                    message: `Steam sources refreshed. ${freeCount} free-to-keep and ${promoCount} promo game(s) detected.`,
+                    counts: {
+                        freeToKeep: freeCount,
+                        promos: promoCount
+                    },
+                    sourceHealth: snapshot?.sourceHealth || null
+                });
+            } catch (error) {
+                if (error?.code === 'STEAM_FORCE_CHECK_TIMEOUT') {
+                    return res.status(504).json({ success: false, error: 'Refresh timed out while waiting for Steam sources. Please try again.' });
+                }
+
+                console.error('Error forcing Steam free games refresh:', error);
+                return res.status(500).json({ success: false, error: error.message || 'Failed to refresh Steam sources' });
             }
         });
 
@@ -4262,6 +4294,8 @@ class Dashboard {
                     config,
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
                     giveaways: snapshot?.freeToKeepGiveaways || [],
+                    promoCount: snapshot?.promoGiveaways?.length || 0,
+                    sourceHealth: snapshot?.sourceHealth || null,
                     user: req.user
                 });
             } catch (error) {

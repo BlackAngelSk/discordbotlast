@@ -4,7 +4,7 @@ const steamFreeGamesAlertsManager = require('../../utils/steamFreeGamesAlertsMan
 module.exports = {
     name: 'steampromos',
     description: 'Configure Steam limited-time promo game alerts.',
-    usage: '!steampromos list\n!steampromos set #channel\n!steampromos remove\n!steampromos test [#channel]',
+    usage: '!steampromos list\n!steampromos set #channel\n!steampromos remove\n!steampromos test [#channel]\n!steampromos forcecheck',
     aliases: ['steampromoalerts', 'steamfreeweekend'],
     category: 'admin',
     async execute(message, args) {
@@ -89,6 +89,27 @@ module.exports = {
             }
 
             return message.reply(`✅ Sent a test Steam promo alert to ${channel}.`);
+        }
+
+        if (subcommand === 'forcecheck' || subcommand === 'force' || subcommand === 'checknow') {
+            if (!config?.channelId) {
+                return message.reply('❌ Steam promo alerts are not enabled yet. Use `!steampromos set #channel` first.');
+            }
+
+            await message.reply('🔄 Running Steam promo force check now... (can take up to 90s)');
+
+            try {
+                const snapshot = await steamFreeGamesAlertsManager.forceCheckNow();
+                const total = snapshot?.promoGiveaways?.length || 0;
+                return message.channel.send(`✅ Force check complete. Tracking ${total} active Steam promo game(s).`);
+            } catch (error) {
+                if (error?.code === 'STEAM_FORCE_CHECK_TIMEOUT') {
+                    return message.channel.send('⚠️ Force check timed out. The data source was too slow or unresponsive. Try again in a minute.');
+                }
+
+                console.error('Steam promos force check failed:', error);
+                return message.channel.send('❌ Force check failed due to an internal error. Check logs and try again.');
+            }
         }
 
         return message.reply(`❓ Unknown subcommand. Usage:\n\`\`\`\n${module.exports.usage}\n\`\`\``);

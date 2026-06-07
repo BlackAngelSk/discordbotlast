@@ -11,9 +11,33 @@ const STEAM_FEATURED_URL = 'https://store.steampowered.com/api/featuredcategorie
 const STEAM_APPDETAILS_BASE = 'https://store.steampowered.com/api/appdetails?filters=basic,price_overview,short_description,categories,detailed_description&appids=';
 const STEAMDB_UPCOMING_FREE_URL = 'https://steamdb.info/upcoming/free/';
 const STEAMDB_COOKIE = String(process.env.STEAMDB_COOKIE || '').trim();
-const POLL_INTERVAL = 30 * 60 * 1000;
+const POLL_INTERVAL = 60 * 60 * 1000;
+const SNAPSHOT_FETCH_TIMEOUT_MS = 75 * 1000;
+const FORCE_CHECK_TIMEOUT_MS = 90 * 1000;
 const STEAM_PROMO_CANDIDATE_LIMIT = 48;
 const STEAM_PROMO_CONCURRENCY = 6;
+const STEAM_KEEP_CANDIDATE_LIMIT = 80;
+const STEAM_KEEP_CONCURRENCY = 8;
+
+function withTimeout(promise, timeoutMs, label, timeoutCode = 'STEAM_OPERATION_TIMEOUT') {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            const error = new Error(`${label} timed out after ${Math.ceil(timeoutMs / 1000)}s`);
+            error.code = timeoutCode;
+            reject(error);
+        }, timeoutMs);
+
+        Promise.resolve(promise)
+            .then(result => {
+                clearTimeout(timer);
+                resolve(result);
+            })
+            .catch(error => {
+                clearTimeout(timer);
+                reject(error);
+            });
+    });
+}
 
 function httpsGetJson(url) {
     return new Promise((resolve, reject) => {
@@ -481,15 +505,26 @@ function parseSteamDbPlayForFreePromos(html) {
     const blocks = [];
     let markerMatch;
     while ((markerMatch = markerRegex.exec(source)) !== null) {
-        const start = Math.max(0, markerMatch.index - 9000);
-        const end = Math.min(source.length, markerMatch.index + 9000);
+        const markerIndex = markerMatch.index;
+        const rowStart = source.lastIndexOf('<tr', markerIndex);
+        const rowEndClose = source.indexOf('</tr>', markerIndex);
+
+        if (rowStart !== -1 && rowEndClose !== -1 && rowEndClose > rowStart) {
+            const rowEnd = Math.min(source.length, rowEndClose + 5);
+            blocks.push(source.slice(rowStart, rowEnd));
+            continue;
+        }
+
+        // Fallback for layout variants where rows are not obvious.
+        const start = Math.max(0, markerIndex - 1800);
+        const end = Math.min(source.length, markerIndex + 1800);
         blocks.push(source.slice(start, end));
     }
 
     const seenPromoIds = new Set();
     for (const block of blocks) {
         const appIdMatches = [...String(block || '').matchAll(/\/app\/(\d+)\//gi)];
-        const appId = appIdMatches.length > 0 ? appIdMatches[appIdMatches.length - 1][1] : extractAppIdFromString(block);
+        const appId = appIdMatches.length > 0 ? appIdMatches[0][1] : extractAppIdFromString(block);
         if (!appId) continue;
         if (seenPromoIds.has(appId)) continue;
         seenPromoIds.add(appId);
@@ -511,6 +546,84 @@ function parseSteamDbPlayForFreePromos(html) {
     }
 
     return promos;
+}
+
+function parseSteamDbFreeToKeepGiveaways(html) {
+    const giveaways = [];
+    const source = String(html || '');
+
+    // Prefer explicit category class marker, with text fallback for layout variants.
+    const markerRegex = /<[^>]*class=["'][^"']*\bcat-free-to-keep\b[^"']*["'][^>]*>\s*free\s*to\s*keep\s*<\/[^>]+>|<[^>]+>\s*free\s*to\s*keep\s*<\/[^>]+>/gi;
+    const blocks = [];
+    let markerMatch;
+    while ((markerMatch = markerRegex.exec(source)) !== null) {
+        const markerIndex = markerMatch.index;
+        const rowStart = source.lastIndexOf('<tr', markerIndex);
+        const rowEndClose = source.indexOf('</tr>', markerIndex);
+
+        if (rowStart !== -1 && rowEndClose !== -1 && rowEndClose > rowStart) {
+            const rowEnd = Math.min(source.length, rowEndClose + 5);
+            blocks.push(source.slice(rowStart, rowEnd));
+            continue;
+        }
+
+        const start = Math.max(0, markerIndex - 1800);
+        const end = Math.min(source.length, markerIndex + 1800);
+        blocks.push(source.slice(start, end));
+    }
+
+    const seenIds = new Set();
+    for (const block of blocks) {
+        const appIdMatches = [...String(block || '').matchAll(/\/app\/(\d+)\//gi)];
+        const appId = appIdMatches.length > 0 ? appIdMatches[0][1] : extractAppIdFromString(block);
+        if (!appId) continue;
+        if (seenIds.has(appId)) continue;
+        seenIds.add(appId);
+
+        const title = extractSteamDbPromoTitle(block) || `Steam App ${appId}`;
+        giveaways.push({
+            id: `steamdb_keep_${appId}`,
+            title,
+            description: 'Free to Keep on SteamDB',
+            worth: 'Free',
+            url: `https://store.steampowered.com/app/${appId}/`,
+            imageUrl: steamHeaderImageUrl(appId),
+            instructions: 'Open the Steam store page and add the game to your library before the offer expires.',
+            publishedDate: null,
+            endDate: extractSteamDbPromoEndDate(block),
+            type: 'Game',
+            platforms: 'Steam'
+        });
+    }
+
+    return giveaways;
+}
+
+function mergeUniqueGiveawaysByAppOrTitle(primary, secondary) {
+    const merged = Array.isArray(primary) ? [...primary] : [];
+    const seenAppIds = new Set();
+    const seenTitles = new Set();
+
+    for (const giveaway of merged) {
+        const appId = extractAppIdFromString(giveaway?.url);
+        if (appId) seenAppIds.add(String(appId));
+        const title = sanitizeText(giveaway?.title || '').toLowerCase();
+        if (title) seenTitles.add(title);
+    }
+
+    for (const giveaway of Array.isArray(secondary) ? secondary : []) {
+        const appId = extractAppIdFromString(giveaway?.url);
+        const title = sanitizeText(giveaway?.title || '').toLowerCase();
+
+        if (appId && seenAppIds.has(String(appId))) continue;
+        if (!appId && title && seenTitles.has(title)) continue;
+
+        merged.push(giveaway);
+        if (appId) seenAppIds.add(String(appId));
+        if (title) seenTitles.add(title);
+    }
+
+    return merged;
 }
 
 function extractSteamStoreAppName(html, appId) {
@@ -698,6 +811,103 @@ async function fetchSteamStorePromosFallback() {
     }
 }
 
+async function checkSteamAppForFreeToKeep(appId) {
+    try {
+        const details = await steamHttpsGetJson(`${STEAM_APPDETAILS_BASE}${appId}&cc=US`);
+        const appData = details?.[appId];
+        if (!appData?.success || !appData?.data) return null;
+
+        const data = appData.data;
+        const po = data.price_overview;
+
+        // Ignore permanently free products and non-discounted products.
+        const isTemporaryFreeToKeep = Boolean(
+            po
+            && po.discount_percent === 100
+            && po.initial > 0
+            && po.final === 0
+            && !data.is_free
+        );
+        if (!isTemporaryFreeToKeep) return null;
+
+        // Exclude free weekends / temporary play events from free-to-keep list.
+        const hasFreeWeekendCategory = Array.isArray(data.categories)
+            && data.categories.some(c => c.id === 35);
+        const text = `${sanitizeText(data.short_description || '')} ${sanitizeText(data.detailed_description || '')}`.toLowerCase();
+        const looksLikePromoOnly = /free\s*weekend|play\s+(?:it\s+)?free\s+(?:this\s+)?weekend|free\s*trial|trial\s+period/.test(text);
+        if (hasFreeWeekendCategory || looksLikePromoOnly) return null;
+
+        let endDate = null;
+        if (Number.isFinite(Number(po?.discount_expiration)) && Number(po.discount_expiration) > 0) {
+            endDate = new Date(Number(po.discount_expiration) * 1000).toISOString();
+        }
+
+        return {
+            id: `steam_keep_${appId}`,
+            title: sanitizeText(data.name || `Steam App ${appId}`),
+            description: truncate(sanitizeText(data.short_description || ''), 350),
+            worth: `$${(Number(po.initial) / 100).toFixed(2)}`,
+            url: `https://store.steampowered.com/app/${appId}/`,
+            imageUrl: data.header_image || null,
+            instructions: 'Open the Steam store page and add this game to your library before the discount expires.',
+            publishedDate: null,
+            endDate,
+            type: 'Game',
+            platforms: 'Steam'
+        };
+    } catch {
+        return null;
+    }
+}
+
+async function fetchSteamStoreFreeToKeepFallback() {
+    try {
+        const search = await steamHttpsGetJson(
+            'https://store.steampowered.com/search/results/?specials=1&hidef2p=0&json=1&cc=US&l=en&count=120'
+        );
+
+        const items = Array.isArray(search?.items) ? search.items : [];
+        const seen = new Set();
+        const candidateAppIds = [];
+
+        for (const item of items) {
+            const possibleIds = [
+                String(item?.id || '').trim(),
+                extractAppIdFromString(item?.url),
+                extractAppIdFromString(item?.logo)
+            ].filter(Boolean);
+
+            for (const id of possibleIds) {
+                const normalized = String(id).trim();
+                if (!/^\d+$/.test(normalized)) continue;
+                if (seen.has(normalized)) continue;
+                seen.add(normalized);
+                candidateAppIds.push(normalized);
+            }
+        }
+
+        const checked = await mapWithConcurrency(
+            candidateAppIds.slice(0, STEAM_KEEP_CANDIDATE_LIMIT),
+            STEAM_KEEP_CONCURRENCY,
+            id => checkSteamAppForFreeToKeep(id)
+        );
+
+        const unique = [];
+        const seenTitles = new Set();
+        for (const giveaway of checked) {
+            if (!giveaway) continue;
+            const key = String(giveaway.title || '').toLowerCase();
+            if (!key || seenTitles.has(key)) continue;
+            seenTitles.add(key);
+            unique.push(giveaway);
+        }
+
+        return unique;
+    } catch {
+        return [];
+    }
+}
+
 async function mapWithConcurrency(items, concurrency, task) {
     if (!Array.isArray(items) || items.length === 0) return [];
 
@@ -810,12 +1020,38 @@ async function fetchSteamStorePromos() {
     }
 }
 
+async function fetchSteamDbFreeToKeep() {
+    try {
+        const html = await steamDbGetTextWithBypass(STEAMDB_UPCOMING_FREE_URL);
+        if (steamDbLooksBlocked(html)) {
+            return {
+                giveaways: [],
+                available: false,
+                reason: 'blocked'
+            };
+        }
+
+        return {
+            giveaways: parseSteamDbFreeToKeepGiveaways(html),
+            available: true,
+            reason: null
+        };
+    } catch (error) {
+        return {
+            giveaways: [],
+            available: false,
+            reason: error?.message ? String(error.message).slice(0, 160) : 'fetch_error'
+        };
+    }
+}
+
 class SteamFreeGamesAlertsManager {
     constructor() {
         this.client = null;
         this.interval = null;
         this.data = { guilds: {} };
         this.pollInFlight = false;
+        this._pollPromise = null;
         this._snapshotCache = null;
         this._snapshotCachedAt = 0;
         this._snapshotInFlight = null;
@@ -924,7 +1160,12 @@ class SteamFreeGamesAlertsManager {
         if (this._snapshotInFlight) {
             return this._snapshotInFlight;
         }
-        this._snapshotInFlight = this._doFetchSnapshot().then(result => {
+        this._snapshotInFlight = withTimeout(
+            this._doFetchSnapshot(),
+            SNAPSHOT_FETCH_TIMEOUT_MS,
+            'Steam snapshot fetch',
+            'STEAM_SNAPSHOT_TIMEOUT'
+        ).then(result => {
             this._snapshotCache = result;
             this._snapshotCachedAt = Date.now();
             this._snapshotInFlight = null;
@@ -951,7 +1192,22 @@ class SteamFreeGamesAlertsManager {
 
         // GamerPower temporary promos (games that will be removed from library after giveaway)
         const gpPromos = giveaways.filter(isTemporaryPromoGiveaway);
-        const freeToKeepGiveaways = giveaways.filter(giveaway => !isTemporaryPromoGiveaway(giveaway));
+        const gamerPowerFreeToKeep = giveaways.filter(giveaway => !isTemporaryPromoGiveaway(giveaway));
+        const steamDbFreeToKeepResult = await fetchSteamDbFreeToKeep();
+        const steamDbFreeToKeep = steamDbFreeToKeepResult.giveaways || [];
+        const steamStoreKeepFallback = steamDbFreeToKeepResult.available
+            ? []
+            : await fetchSteamStoreFreeToKeepFallback();
+
+        const freeToKeepGiveaways = mergeUniqueGiveawaysByAppOrTitle(
+            mergeUniqueGiveawaysByAppOrTitle(gamerPowerFreeToKeep, steamDbFreeToKeep),
+            steamStoreKeepFallback
+        )
+            .sort((left, right) => {
+                const leftEnd = new Date(left.endDate || 0).getTime();
+                const rightEnd = new Date(right.endDate || 0).getTime();
+                return leftEnd - rightEnd || left.title.localeCompare(right.title);
+            });
 
         // Steam store promos (100%-off paid games = free weekends / events)
         const steamStorePromos = await fetchSteamStorePromos();
@@ -968,7 +1224,13 @@ class SteamFreeGamesAlertsManager {
             fetchedAt: new Date().toISOString(),
             giveaways,
             freeToKeepGiveaways,
-            promoGiveaways
+            promoGiveaways,
+            sourceHealth: {
+                steamDbFreeToKeepAvailable: Boolean(steamDbFreeToKeepResult.available),
+                steamDbFreeToKeepReason: steamDbFreeToKeepResult.reason || null,
+                steamDbFreeToKeepCount: steamDbFreeToKeep.length,
+                steamStoreFreeToKeepFallbackCount: steamStoreKeepFallback.length
+            }
         };
     }
 
@@ -1001,11 +1263,41 @@ class SteamFreeGamesAlertsManager {
         }, 18000);
     }
 
-    async poll() {
-        if (this.pollInFlight) return;
-        this.pollInFlight = true;
+    async forceCheckNow(options = {}) {
+        // Bypass the short snapshot cache so manual checks always fetch fresh data.
+        this.invalidateSnapshotCache();
+
+        const timeoutMs = Number(options.timeoutMs) > 0
+            ? Number(options.timeoutMs)
+            : FORCE_CHECK_TIMEOUT_MS;
+
+        const pollPromise = this.poll();
 
         try {
+            return await withTimeout(pollPromise, timeoutMs, 'Steam force check', 'STEAM_FORCE_CHECK_TIMEOUT');
+        } catch (error) {
+            if (error?.code === 'STEAM_FORCE_CHECK_TIMEOUT') {
+                // Recovery path: allow future force checks if the previous run got stuck.
+                if (this._pollPromise === pollPromise) {
+                    this._pollPromise = null;
+                    this.pollInFlight = false;
+                }
+                if (this._snapshotInFlight) {
+                    this._snapshotInFlight = null;
+                }
+            }
+
+            throw error;
+        }
+    }
+
+    async poll() {
+        if (this._pollPromise) {
+            return this._pollPromise;
+        }
+
+        this.pollInFlight = true;
+        this._pollPromise = (async () => {
             const snapshot = await this.fetchSnapshot();
             const currentIds = snapshot.freeToKeepGiveaways.map(giveaway => giveaway.id);
             const currentPromoIds = snapshot.promoGiveaways.map(g => g.id);
@@ -1072,9 +1364,13 @@ class SteamFreeGamesAlertsManager {
             }
 
             await this.save();
-        } finally {
+            return snapshot;
+        })().finally(() => {
             this.pollInFlight = false;
-        }
+            this._pollPromise = null;
+        });
+
+        return this._pollPromise;
     }
 }
 

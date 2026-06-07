@@ -18,6 +18,25 @@
             <div class="page-header">
                 <h1><i class="fab fa-steam" style="color:var(--brand);margin-right:8px"></i>Steam Free-To-Keep Alerts</h1>
                 <p>Choose where to post newly detected <strong>free-to-keep Steam games</strong> for this server.</p>
+                <% const activePromoCount = Number(typeof promoCount === 'undefined' ? 0 : promoCount) || 0; %>
+                <% const sourceInfo = typeof sourceHealth === 'undefined' ? {} : (sourceHealth || {}); %>
+                <% if (sourceInfo.steamDbFreeToKeepAvailable === false) { %>
+                    <p style="margin-top:8px;color:#f4a318;background:rgba(244,163,24,0.12);border:1px solid rgba(244,163,24,0.35);border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        SteamDB free-to-keep source is currently unavailable.
+                        Showing fallback results instead.
+                        <% if ((sourceInfo.steamStoreFreeToKeepFallbackCount || 0) > 0) { %>
+                            Added <strong><%= sourceInfo.steamStoreFreeToKeepFallbackCount %></strong> fallback game<%= sourceInfo.steamStoreFreeToKeepFallbackCount === 1 ? '' : 's' %>.
+                        <% } %>
+                    </p>
+                <% } %>
+                <% if (activePromoCount > 0) { %>
+                    <p style="margin-top:8px;color:var(--text-secondary)">
+                        <i class="fas fa-info-circle"></i>
+                        <strong><%= activePromoCount %></strong> limited-time Steam promo game<%= activePromoCount === 1 ? '' : 's' %> are listed on
+                        <a href="/dashboard/<%= guild.id %>/steam-promos">Steam Promos</a>.
+                    </p>
+                <% } %>
             </div>
 
             <div class="stats-row">
@@ -67,6 +86,7 @@
 
                     <div class="form-actions" style="justify-content:flex-start">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Channel</button>
+                        <button type="button" class="btn btn-secondary" id="refreshSteamSourcesBtn"><i class="fas fa-rotate"></i> Refresh Sources Now</button>
                         <button type="button" class="btn btn-secondary" id="testSteamFreeGamesBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
                         <button type="button" class="btn btn-danger" id="clearSteamFreeGamesBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
                     </div>
@@ -120,8 +140,35 @@ const guildId = '<%= guild.id %>';
 const form = document.getElementById('steamFreeGamesForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
 const saveButton = form.querySelector('button[type="submit"]');
+const refreshButton = document.getElementById('refreshSteamSourcesBtn');
 const testButton = document.getElementById('testSteamFreeGamesBtn');
 const clearButton = document.getElementById('clearSteamFreeGamesBtn');
+
+refreshButton.addEventListener('click', async () => {
+    const original = refreshButton.innerHTML;
+    refreshButton.disabled = true;
+    refreshButton.innerHTML = '<span class="spinner"></span> Refreshing...';
+
+    try {
+        const response = await fetch(`/api/steam-free-games/${guildId}/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to refresh Steam sources');
+        }
+
+        dashboardUI.showToast(result.message || 'Steam sources refreshed.', 'success');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to refresh Steam sources.', 'error');
+    } finally {
+        refreshButton.disabled = false;
+        refreshButton.innerHTML = original;
+    }
+});
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();

@@ -4,7 +4,7 @@ const steamFreeGamesAlertsManager = require('../../utils/steamFreeGamesAlertsMan
 module.exports = {
     name: 'steamfreegames',
     description: 'Configure Steam free game giveaway alerts.',
-    usage: '!steamfreegames list\n!steamfreegames set #channel\n!steamfreegames remove\n!steamfreegames test [#channel]',
+    usage: '!steamfreegames list\n!steamfreegames set #channel\n!steamfreegames remove\n!steamfreegames test [#channel]\n!steamfreegames forcecheck',
     aliases: ['steamgifts', 'steamgiveaways', 'steamfreealerts'],
     category: 'admin',
     async execute(message, args) {
@@ -91,6 +91,27 @@ module.exports = {
             }
 
             return message.reply(`✅ Sent a test Steam free game alert to ${channel}.`);
+        }
+
+        if (subcommand === 'forcecheck' || subcommand === 'force' || subcommand === 'checknow') {
+            if (!config?.channelId) {
+                return message.reply('❌ Steam free game alerts are not enabled yet. Use `!steamfreegames set #channel` first.');
+            }
+
+            await message.reply('🔄 Running Steam free game force check now... (can take up to 90s)');
+
+            try {
+                const snapshot = await steamFreeGamesAlertsManager.forceCheckNow();
+                const total = snapshot?.freeToKeepGiveaways?.length || 0;
+                return message.channel.send(`✅ Force check complete. Tracking ${total} active free-to-keep Steam giveaway(s).`);
+            } catch (error) {
+                if (error?.code === 'STEAM_FORCE_CHECK_TIMEOUT') {
+                    return message.channel.send('⚠️ Force check timed out. The data source was too slow or unresponsive. Try again in a minute.');
+                }
+
+                console.error('Steam free games force check failed:', error);
+                return message.channel.send('❌ Force check failed due to an internal error. Check logs and try again.');
+            }
         }
 
         return message.reply(`❓ Unknown subcommand. Usage:\n\`\`\`\n${module.exports.usage}\n\`\`\``);
