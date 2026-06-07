@@ -222,6 +222,13 @@ img { max-width: 100%; }
 .card-subtitle { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 .card-actions { display: flex; gap: 8px; }
 
+/* ============ DASHBOARD TOOL GROUPS ============ */
+.dashboard-tool-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.dashboard-tool-group { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card-2); padding: 14px; }
+.dashboard-tool-group-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.dashboard-tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.dashboard-tool-link { justify-content: flex-start; padding: 12px 14px; }
+
 /* ============ TABLES ============ */
 .table-wrapper { overflow-x: auto; border-radius: var(--radius); }
 table { width: 100%; border-collapse: collapse; }
@@ -543,6 +550,7 @@ code { background: var(--bg-card-2); padding: 2px 6px; border-radius: 4px; font-
   .podium-item { flex: 0 0 90px; }
   .server-picker-stat { grid-column: span 6; }
   .server-picker-stat-wide { grid-column: span 12; }
+  .dashboard-tool-groups { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .stats-row { grid-template-columns: 1fr; }

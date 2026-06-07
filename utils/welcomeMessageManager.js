@@ -43,9 +43,9 @@ class WelcomeMessageManager {
             title: config.title || 'Welcome to {SERVER_NAME}!',
             description: config.description || 'Welcome {USER}, enjoy your stay!',
             color: config.color || '#0099ff',
-            includeAvatar: config.includeAvatar || true,
-            includeCount: config.includeCount || true,
-            dm: config.dm || false,
+            includeAvatar: config.includeAvatar !== undefined ? config.includeAvatar : true,
+            includeCount: config.includeCount !== undefined ? config.includeCount : true,
+            dm: config.dm !== undefined ? config.dm : false,
             dmMessage: config.dmMessage || 'Welcome to {SERVER_NAME}! Please read the rules.'
         };
         this.saveConfigs();
@@ -82,10 +82,16 @@ class WelcomeMessageManager {
         try {
             // Send channel message
             if (config.channelId) {
-                const channel = member.guild.channels.cache.get(config.channelId);
-                if (channel && channel.isTextBased()) {
+                const channel = member.guild.channels.cache.get(config.channelId)
+                    || await member.guild.channels.fetch(config.channelId).catch(() => null);
+
+                if (!channel) {
+                    console.warn(`Welcome message channel ${config.channelId} not found in guild ${member.guild.id}`);
+                } else if (!channel.isTextBased()) {
+                    console.warn(`Configured welcome channel ${config.channelId} is not text-based in guild ${member.guild.id}`);
+                } else {
                     const embed = this.createWelcomeEmbed(member, config);
-                    await channel.send({ embeds: [embed] }).catch(() => {});
+                    await channel.send({ embeds: [embed] });
                 }
             }
 
@@ -106,6 +112,13 @@ class WelcomeMessageManager {
      * @returns {EmbedBuilder} - Welcome embed
      */
     createWelcomeEmbed(member, config) {
+        const accountCreatedUnix = member?.user?.createdTimestamp
+            ? Math.floor(member.user.createdTimestamp / 1000)
+            : null;
+        const joinedUnix = member?.joinedTimestamp
+            ? Math.floor(member.joinedTimestamp / 1000)
+            : null;
+
         const embed = new EmbedBuilder()
             .setColor(config.color)
             .setTitle(this.replaceVariables(config.title, member))
@@ -119,6 +132,23 @@ class WelcomeMessageManager {
         if (config.includeCount) {
             embed.addFields(
                 { name: 'Member Count', value: `${member.guild.memberCount}`, inline: true }
+            );
+        }
+
+        if (config.includeUserInfo !== false) {
+            embed.addFields(
+                { name: 'User', value: `<@${member.id}>`, inline: true },
+                { name: 'User ID', value: member.id, inline: true },
+                {
+                    name: 'Account Created',
+                    value: accountCreatedUnix ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)` : 'Unknown',
+                    inline: false
+                },
+                {
+                    name: 'Joined Server',
+                    value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
+                    inline: false
+                }
             );
         }
 

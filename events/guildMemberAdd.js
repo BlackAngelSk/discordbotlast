@@ -200,10 +200,16 @@ module.exports = {
                 console.error('Error updating stats:', error);
             }
 
+            const welcomeEmbedConfig = client.welcomeMessageManager?.getWelcomeConfig(member.guild.id);
+            const hasEmbedWelcomeConfig = Boolean(
+                welcomeEmbedConfig?.enabled && welcomeEmbedConfig?.channelId
+            );
+
             // Send welcome message if enabled
-            if (settings.welcomeEnabled && settings.welcomeChannel) {
+            if (settings.welcomeEnabled && settings.welcomeChannel && !hasEmbedWelcomeConfig) {
                 // Try to get channel by ID first, then by name
-                let channel = member.guild.channels.cache.get(settings.welcomeChannel);
+                let channel = member.guild.channels.cache.get(settings.welcomeChannel)
+                    || await member.guild.channels.fetch(settings.welcomeChannel).catch(() => null);
                 if (!channel) {
                     channel = member.guild.channels.cache.find(
                         ch => ch.name === settings.welcomeChannel && ch.isTextBased()
@@ -217,8 +223,35 @@ module.exports = {
                         .replace('{username}', member.user.username)
                         .replace('{server}', member.guild.name)
                         .replace('{memberCount}', member.guild.memberCount.toString());
+                    const accountCreatedUnix = member?.user?.createdTimestamp
+                        ? Math.floor(member.user.createdTimestamp / 1000)
+                        : null;
+                    const joinedUnix = member?.joinedTimestamp
+                        ? Math.floor(member.joinedTimestamp / 1000)
+                        : null;
 
-                    await channel.send(welcomeMessage);
+                    const welcomeEmbed = new EmbedBuilder()
+                        .setColor(0x57f287)
+                        .setTitle(`Welcome to ${member.guild.name}`)
+                        .setDescription(welcomeMessage)
+                        .addFields(
+                            { name: 'User', value: `<@${member.id}>`, inline: true },
+                            { name: 'Member Count', value: `${member.guild.memberCount}`, inline: true },
+                            {
+                                name: 'Account Created',
+                                value: accountCreatedUnix ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)` : 'Unknown',
+                                inline: false
+                            },
+                            {
+                                name: 'Joined Server',
+                                value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
+                                inline: false
+                            }
+                        )
+                        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                        .setTimestamp();
+
+                    await channel.send({ embeds: [welcomeEmbed] });
                 } else {
                     console.log(`⚠️ Welcome channel not found or not text-based in guild ${member.guild.name}`);
                 }
@@ -239,7 +272,7 @@ module.exports = {
                 if (welcomeCardChannelId) {
                     const welcomeChannel = await client.channels.fetch(welcomeCardChannelId).catch(() => null);
                     
-                    if (welcomeChannel) {
+                    if (welcomeChannel && welcomeChannel.isTextBased()) {
                         const embed = new EmbedBuilder()
                             .setColor(0x5865f2)
                             .setTitle('👋 Welcome!')
@@ -249,11 +282,17 @@ module.exports = {
                                 { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
                             )
                             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                            .setImage(member.guild.iconURL({ dynamic: true }))
                             .setFooter({ text: 'Welcome to our community!' })
                             .setTimestamp();
 
+                        const guildIcon = member.guild.iconURL({ dynamic: true, size: 512 });
+                        if (guildIcon) {
+                            embed.setImage(guildIcon);
+                        }
+
                         await welcomeChannel.send({ embeds: [embed] });
+                    } else if (welcomeCardChannelId) {
+                        console.warn(`⚠️ Welcome card channel ${welcomeCardChannelId} not found or not text-based in guild ${member.guild.name}`);
                     }
                 }
             } catch (error) {

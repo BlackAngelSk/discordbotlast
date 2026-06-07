@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -12,6 +12,7 @@ module.exports = {
                 .addChannelOption(option =>
                     option.setName('channel')
                         .setDescription('Channel to send welcome messages')
+                        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
                         .setRequired(true)
                 )
                 .addStringOption(option =>
@@ -46,6 +47,13 @@ module.exports = {
 
         if (subcommand === 'setup') {
             const channel = interaction.options.getChannel('channel');
+            if (!channel || !channel.isTextBased()) {
+                return await interaction.reply({
+                    content: '❌ Please choose a text channel for welcome messages.',
+                    flags: 64
+                });
+            }
+
             const title = interaction.options.getString('title') || 'Welcome to {SERVER_NAME}!';
             const description = interaction.options.getString('description') || 'Welcome {USER}!';
 

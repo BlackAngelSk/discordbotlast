@@ -659,15 +659,64 @@ const collectSetupContextForGuild = async (guildId) => {
 
 const runDashboardTestAction = async ({ guildId, guild, member, type, client }) => {
     if (type === 'welcome') {
+        const welcomeMessageManager = client?.welcomeMessageManager;
+        const welcomeEmbedConfig = welcomeMessageManager?.getWelcomeConfig(guildId);
+
+        if (welcomeEmbedConfig?.enabled && welcomeEmbedConfig.channelId) {
+            const embedChannel = guild.channels.cache.get(welcomeEmbedConfig.channelId)
+                || await guild.channels.fetch(welcomeEmbedConfig.channelId).catch(() => null);
+
+            if (!embedChannel || !embedChannel.isTextBased()) {
+                throw new Error('Welcome embed channel is not available or not text-based.');
+            }
+
+            const embed = welcomeMessageManager.createWelcomeEmbed(member, welcomeEmbedConfig);
+            await embedChannel.send({
+                content: '🧪 Test welcome embed',
+                embeds: [embed]
+            });
+            return 'Sent welcome embed test successfully.';
+        }
+
         const settings = settingsManager.get(guildId);
         const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
-        if (!settings.welcomeEnabled || !channel) {
-            throw new Error('Welcome messages are not fully configured yet.');
+        if (!channel) {
+            throw new Error('Welcome channel is not configured or not available.');
         }
 
         const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
-        await channel.send(`🧪 Test welcome message\n${message}`);
-        return 'Sent welcome test successfully.';
+        const accountCreatedUnix = member?.user?.createdTimestamp
+            ? Math.floor(member.user.createdTimestamp / 1000)
+            : null;
+        const joinedUnix = member?.joinedTimestamp
+            ? Math.floor(member.joinedTimestamp / 1000)
+            : null;
+        const fallbackEmbed = new EmbedBuilder()
+            .setColor(0x57f287)
+            .setTitle(`🧪 Welcome Test for ${guild.name}`)
+            .setDescription(message)
+            .addFields(
+                { name: 'User', value: `<@${member.id}>`, inline: true },
+                { name: 'User ID', value: member.id, inline: true },
+                { name: 'Member Count', value: `${guild.memberCount}`, inline: true },
+                {
+                    name: 'Account Created',
+                    value: accountCreatedUnix ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)` : 'Unknown',
+                    inline: false
+                },
+                {
+                    name: 'Joined Server',
+                    value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
+                    inline: false
+                }
+            )
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+
+        await channel.send({ embeds: [fallbackEmbed] });
+        return settings.welcomeEnabled
+            ? 'Sent welcome embed test successfully.'
+            : 'Sent welcome embed test successfully. Note: welcome messages are currently disabled.';
     }
 
     if (type === 'leave') {

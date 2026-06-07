@@ -155,23 +155,46 @@
         <div class="card-header">
           <div><div class="card-title"><i class="fas fa-sparkles"></i> New Dashboard Tools</div><div class="card-subtitle">Quick access to the features you asked to add</div></div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
-          <a href="#minecraftStatusCard" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-cube"></i> Minecraft Status</a>
-          <a href="/dashboard/<%= guild.id %>/server-builder" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
-          <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-users-gear"></i> Community Center</a>
-          <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
-          <a href="/dashboard/<%= guild.id %>/epic-games" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-gift"></i> Epic Games Alerts</a>
-          <a href="/dashboard/<%= guild.id %>/steam-free-games" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fab fa-steam"></i> Steam Free Games</a>
-          <a href="/dashboard/<%= guild.id %>/steam-promos" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fab fa-steam"></i> Steam Promos</a>
-          <a href="/dashboard/<%= guild.id %>/steam-updates" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fab fa-steam"></i> Steam Updates</a>
-          <a href="/dashboard/<%= guild.id %>/telegram-sync" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fab fa-telegram"></i> Telegram Sync</a>
-          <a href="/dashboard/<%= guild.id %>/safety" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-user-shield"></i> Safety Center</a>
-          <a href="/dashboard/<%= guild.id %>/activity" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-clock-rotate-left"></i> Activity Center</a>
-          <a href="/dashboard/<%= guild.id %>/health" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-heart-pulse"></i> Bot Health</a>
-          <a href="/dashboard/<%= guild.id %>/permissions" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-user-lock"></i> Delegation</a>
-          <% if (isBotOwner) { %>
-            <a href="/dashboard/owner" class="btn btn-secondary" style="justify-content:flex-start;padding:14px 16px"><i class="fas fa-crown"></i> Bot Owner Settings</a>
-          <% } %>
+        <div class="dashboard-tool-groups">
+          <section class="dashboard-tool-group">
+            <h3 class="dashboard-tool-group-title"><i class="fas fa-compass"></i> Setup & Safety</h3>
+            <div class="dashboard-tool-grid">
+              <a href="#minecraftStatusCard" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-cube"></i> Minecraft Status</a>
+              <a href="/dashboard/<%= guild.id %>/server-builder" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
+              <a href="/dashboard/<%= guild.id %>/permissions" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-user-lock"></i> Delegation</a>
+              <a href="/dashboard/<%= guild.id %>/safety" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-user-shield"></i> Safety Center</a>
+            </div>
+          </section>
+
+          <section class="dashboard-tool-group">
+            <h3 class="dashboard-tool-group-title"><i class="fas fa-users"></i> Community & Voice</h3>
+            <div class="dashboard-tool-grid">
+              <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-users-gear"></i> Community Center</a>
+              <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
+              <a href="/dashboard/<%= guild.id %>/telegram-sync" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-telegram"></i> Telegram Sync</a>
+            </div>
+          </section>
+
+          <section class="dashboard-tool-group">
+            <h3 class="dashboard-tool-group-title"><i class="fas fa-bell"></i> Alerts & Tracking</h3>
+            <div class="dashboard-tool-grid">
+              <a href="/dashboard/<%= guild.id %>/epic-games" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-gift"></i> Epic Games Alerts</a>
+              <a href="/dashboard/<%= guild.id %>/steam-free-games" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Free Games</a>
+              <a href="/dashboard/<%= guild.id %>/steam-promos" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Promos</a>
+              <a href="/dashboard/<%= guild.id %>/steam-updates" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Updates</a>
+            </div>
+          </section>
+
+          <section class="dashboard-tool-group">
+            <h3 class="dashboard-tool-group-title"><i class="fas fa-chart-line"></i> Insights & Admin</h3>
+            <div class="dashboard-tool-grid">
+              <a href="/dashboard/<%= guild.id %>/activity" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-clock-rotate-left"></i> Activity Center</a>
+              <a href="/dashboard/<%= guild.id %>/health" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-heart-pulse"></i> Bot Health</a>
+              <% if (isBotOwner) { %>
+                <a href="/dashboard/owner" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-crown"></i> Bot Owner Settings</a>
+              <% } %>
+            </div>
+          </section>
         </div>
       </div>
 
