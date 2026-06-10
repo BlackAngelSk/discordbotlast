@@ -13,6 +13,8 @@ const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const YOUTUBE_QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1 hour
+const YOUTUBE_SEND_DEDUPE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const TWITCH_SEND_DEDUPE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function parseXmlText(xml, tag) {
     const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i'));
@@ -152,6 +154,45 @@ class LiveAlertsManager {
         this._youtubeFailureCount = {}; // Track consecutive 404 failures per channel
         this._youtubeFailureThreshold = 3; // Remove channel after N consecutive 404s
         this._youtubeUnresolvedIdentifierWarned = {}; // Track unresolved non-UC identifiers to avoid log spam
+        this._pollInProgress = false;
+        this._guildPollInProgress = new Set();
+        this._recentYouTubeSends = new Map();
+        this._recentTwitchSends = new Map();
+    }
+
+    _buildYouTubeSendKey(guildId, entry, item) {
+        const channelId = String(entry?.discordChannelId || '');
+        const videoId = String(item?.videoId || item?.id?.videoId || '').trim();
+        if (!guildId || !channelId || !videoId) return null;
+        return `yt:${guildId}:${channelId}:${videoId}`;
+    }
+
+    _buildTwitchSendKey(guildId, entry, stream) {
+        const channelId = String(entry?.channelId || '');
+        const streamId = String(stream?.id || '').trim();
+        const startedAt = String(stream?.started_at || '').trim();
+        const identity = streamId || `${String(entry?.username || '').toLowerCase()}:${startedAt}`;
+        if (!guildId || !channelId || !identity) return null;
+        return `tw:${guildId}:${channelId}:${identity}`;
+    }
+
+    _isDuplicateSend(cache, key, ttlMs) {
+        if (!key) return false;
+        const now = Date.now();
+
+        for (const [existingKey, timestamp] of cache.entries()) {
+            if (now - timestamp > ttlMs) {
+                cache.delete(existingKey);
+            }
+        }
+
+        const lastSentAt = cache.get(key);
+        if (lastSentAt && now - lastSentAt < ttlMs) {
+            return true;
+        }
+
+        cache.set(key, now);
+        return false;
     }
 
     async init(client) {
@@ -383,6 +424,12 @@ class LiveAlertsManager {
         if (!this._client) return;
         const channel = this._client.channels.cache.get(entry.channelId);
         if (!channel) return;
+
+        const twitchSendKey = this._buildTwitchSendKey(guildId, entry, stream);
+        if (this._isDuplicateSend(this._recentTwitchSends, twitchSendKey, TWITCH_SEND_DEDUPE_TTL_MS)) {
+            return;
+        }
+
         const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
         
         const viewerCount = stream.viewer_count?.toString() || '0';
@@ -675,6 +722,12 @@ class LiveAlertsManager {
         if (!this._client) return;
         const channel = this._client.channels.cache.get(entry.discordChannelId);
         if (!channel) return;
+
+        const youtubeSendKey = this._buildYouTubeSendKey(guildId, entry, item);
+        if (this._isDuplicateSend(this._recentYouTubeSends, youtubeSendKey, YOUTUBE_SEND_DEDUPE_TTL_MS)) {
+            return;
+        }
+
         const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
         
         const title = item.title || item.snippet?.title || 'New Video';
@@ -722,25 +775,42 @@ class LiveAlertsManager {
     // ── Polling ───────────────────────────────────────────────────────────────
     _startPolling() {
         if (this._interval) clearInterval(this._interval);
-        this._interval = setInterval(() => this._poll(), POLL_INTERVAL);
-        setTimeout(() => this._poll(), 10000);
+        this._interval = setInterval(() => this._poll().catch(() => {}), POLL_INTERVAL);
+        setTimeout(() => this._poll().catch(() => {}), 10000);
     }
 
     async _pollGuild(guildId) {
-        const config = this.data[guildId];
-        if (!config) return;
+        if (this._guildPollInProgress.has(guildId)) return;
 
-        for (const entry of (config.twitch || [])) {
-            await this._checkTwitch(entry, guildId);
+        this._guildPollInProgress.add(guildId);
+        const config = this.data[guildId];
+        if (!config) {
+            this._guildPollInProgress.delete(guildId);
+            return;
         }
-        for (const entry of (config.youtube || [])) {
-            await this._checkYouTube(entry, guildId);
+
+        try {
+            for (const entry of (config.twitch || [])) {
+                await this._checkTwitch(entry, guildId);
+            }
+            for (const entry of (config.youtube || [])) {
+                await this._checkYouTube(entry, guildId);
+            }
+        } finally {
+            this._guildPollInProgress.delete(guildId);
         }
     }
 
     async _poll() {
-        for (const guildId of Object.keys(this.data)) {
-            await this._pollGuild(guildId);
+        if (this._pollInProgress) return;
+        this._pollInProgress = true;
+
+        try {
+            for (const guildId of Object.keys(this.data)) {
+                await this._pollGuild(guildId);
+            }
+        } finally {
+            this._pollInProgress = false;
         }
     }
 }
