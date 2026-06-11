@@ -18,6 +18,17 @@
             <div class="page-header">
                 <h1><i class="fab fa-steam" style="color:#f4a318;margin-right:8px"></i>Steam Promo Game Alerts</h1>
                 <p>Get notified when Steam games are available <strong>free to play for a limited time</strong> — free weekends, trials, and temporary promos.</p>
+                <% const sourceInfo = typeof sourceHealth === 'undefined' ? {} : (sourceHealth || {}); %>
+                <% if (sourceInfo.steamDbPromoAvailable === false) { %>
+                    <p style="margin-top:8px;color:#f4a318;background:rgba(244,163,24,0.12);border:1px solid rgba(244,163,24,0.35);border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        SteamDB promo source is currently unavailable.
+                        Showing fallback Steam Store results instead.
+                        <% if ((sourceInfo.steamStorePromoFallbackCount || 0) > 0) { %>
+                            Detected <strong><%= sourceInfo.steamStorePromoFallbackCount %></strong> fallback promo game<%= sourceInfo.steamStorePromoFallbackCount === 1 ? '' : 's' %>.
+                        <% } %>
+                    </p>
+                <% } %>
             </div>
 
             <div class="stats-row">
@@ -62,6 +73,7 @@
 
                     <div class="form-actions" style="justify-content:flex-start">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Channel</button>
+                        <button type="button" class="btn btn-secondary" id="refreshSteamPromosBtn"><i class="fas fa-rotate"></i> Force Check Now</button>
                         <button type="button" class="btn btn-secondary" id="testSteamPromosBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
                         <button type="button" class="btn btn-danger" id="clearSteamPromosBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
                     </div>
@@ -117,8 +129,35 @@ const guildId = '<%= guild.id %>';
 const form = document.getElementById('steamPromosForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
 const saveButton = form.querySelector('button[type="submit"]');
+const refreshButton = document.getElementById('refreshSteamPromosBtn');
 const testButton = document.getElementById('testSteamPromosBtn');
 const clearButton = document.getElementById('clearSteamPromosBtn');
+
+refreshButton.addEventListener('click', async () => {
+    const original = refreshButton.innerHTML;
+    refreshButton.disabled = true;
+    refreshButton.innerHTML = '<span class="spinner"></span> Refreshing...';
+
+    try {
+        const response = await fetch(`/api/steam-promos/${guildId}/refresh`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to force check Steam promos');
+        }
+
+        dashboardUI.showToast(result.message || 'Steam promos force check completed.', 'success');
+        setTimeout(() => location.reload(), 700);
+    } catch (error) {
+        dashboardUI.showToast(error.message || 'Failed to force check Steam promos.', 'error');
+    } finally {
+        refreshButton.disabled = false;
+        refreshButton.innerHTML = original;
+    }
+});
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();

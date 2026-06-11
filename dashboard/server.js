@@ -3187,7 +3187,8 @@ class Dashboard {
                         channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
                     } : null,
                     promoGiveaways: snapshot?.promoGiveaways || [],
-                    freeGiveaways: snapshot?.freeToKeepGiveaways || []
+                    freeGiveaways: snapshot?.freeToKeepGiveaways || [],
+                    sourceHealth: snapshot?.sourceHealth || null
                 });
             } catch (error) {
                 console.error('Error fetching Steam promos:', error);
@@ -3272,6 +3273,37 @@ class Dashboard {
             } catch (error) {
                 console.error('Error sending Steam promo test alert:', error);
                 res.status(500).json({ success: false, error: error.message });
+            }
+        });
+
+        this.app.post('/api/steam-promos/:guildId/refresh', this.checkAuth, this.checkGuildAccess, async (req, res) => {
+            try {
+                const guildId = req.params.guildId;
+                const guild = this.client.guilds.cache.get(guildId);
+                if (!guild) {
+                    return res.status(404).json({ success: false, error: 'Guild not found' });
+                }
+
+                const snapshot = await steamFreeGamesAlertsManager.forceCheckNow();
+                const promoCount = snapshot?.promoGiveaways?.length || 0;
+                const freeCount = snapshot?.freeToKeepGiveaways?.length || 0;
+
+                return res.json({
+                    success: true,
+                    message: `Steam promo force check complete. ${promoCount} promo and ${freeCount} free-to-keep game(s) detected.`,
+                    counts: {
+                        promos: promoCount,
+                        freeToKeep: freeCount
+                    },
+                    sourceHealth: snapshot?.sourceHealth || null
+                });
+            } catch (error) {
+                if (error?.code === 'STEAM_FORCE_CHECK_TIMEOUT') {
+                    return res.status(504).json({ success: false, error: 'Force check timed out while waiting for Steam sources. Please try again.' });
+                }
+
+                console.error('Error forcing Steam promos refresh:', error);
+                return res.status(500).json({ success: false, error: error.message || 'Failed to force check Steam promos' });
             }
         });
 
@@ -4317,6 +4349,7 @@ class Dashboard {
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
                     promoGiveaways: snapshot?.promoGiveaways || [],
                     freeGiveaways: snapshot?.freeToKeepGiveaways || [],
+                    sourceHealth: snapshot?.sourceHealth || null,
                     currentPath: req.path,
                     user: req.user
                 });

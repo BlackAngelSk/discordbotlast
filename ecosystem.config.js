@@ -13,7 +13,8 @@ module.exports = {
       min_uptime: "10s",
       max_memory_restart: "900M",
       env: {
-        NODE_ENV: "production"
+        NODE_ENV: "production",
+        STEAMDB_COOKIE: ""
       }
     }
   ]

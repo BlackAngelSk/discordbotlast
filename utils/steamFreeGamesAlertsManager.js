@@ -14,8 +14,8 @@ const STEAMDB_COOKIE = String(process.env.STEAMDB_COOKIE || '').trim();
 const POLL_INTERVAL = 60 * 60 * 1000;
 const SNAPSHOT_FETCH_TIMEOUT_MS = 75 * 1000;
 const FORCE_CHECK_TIMEOUT_MS = 90 * 1000;
-const STEAM_PROMO_CANDIDATE_LIMIT = 48;
-const STEAM_PROMO_CONCURRENCY = 6;
+const STEAM_PROMO_CANDIDATE_LIMIT = 140;
+const STEAM_PROMO_CONCURRENCY = 8;
 const STEAM_KEEP_CANDIDATE_LIMIT = 80;
 const STEAM_KEEP_CONCURRENCY = 8;
 
@@ -496,40 +496,106 @@ function extractSteamDbPromoEndDate(block) {
         || null;
 }
 
+function resolveSteamDbPromoFromMarker(source, markerIndex) {
+    const lookBehind = 2600;
+    const lookAhead = 700;
+    const start = Math.max(0, Number(markerIndex || 0) - lookBehind);
+    const end = Math.min(String(source || '').length, Number(markerIndex || 0) + lookAhead);
+    const snippet = String(source || '').slice(start, end);
+
+    const anchorRegex = /<a[^>]+href="\/app\/(\d+)\/[^\"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    const anchors = [];
+    let match;
+    while ((match = anchorRegex.exec(snippet)) !== null) {
+        const appId = String(match[1] || '').trim();
+        const title = stripHtmlTags(match[2]);
+        const index = start + match.index;
+        if (!appId) continue;
+        anchors.push({ appId, title, index });
+    }
+
+    if (anchors.length === 0) return null;
+
+    // For SteamDB listings, the game link usually appears before the category badge.
+    const candidates = anchors.filter(anchor => {
+        if (anchor.index > Number(markerIndex || 0)) return false;
+        if (!anchor.title) return false;
+        return !/^play\s+for\s+free$/i.test(anchor.title);
+    });
+
+    if (candidates.length > 0) {
+        const chosen = candidates[candidates.length - 1];
+        return {
+            appId: chosen.appId,
+            title: chosen.title
+        };
+    }
+
+    // Fallback: pick the nearest anchor if no clean title candidate was found.
+    const fallback = anchors
+        .slice()
+        .sort((left, right) => Math.abs(left.index - Number(markerIndex || 0)) - Math.abs(right.index - Number(markerIndex || 0)))[0];
+
+    if (!fallback) return null;
+
+    return {
+        appId: fallback.appId,
+        title: fallback.title && !/^play\s+for\s+free$/i.test(fallback.title)
+            ? fallback.title
+            : null
+    };
+}
+
+function extractSteamDbRowOrWindow(source, markerIndex) {
+    const html = String(source || '');
+    const markerPos = Number(markerIndex || 0);
+    const rowStart = html.lastIndexOf('<tr', markerPos);
+    const rowEndClose = html.indexOf('</tr>', markerPos);
+
+    if (rowStart !== -1 && rowEndClose !== -1 && rowEndClose > rowStart) {
+        const rowEnd = Math.min(html.length, rowEndClose + 5);
+        return html.slice(rowStart, rowEnd);
+    }
+
+    const start = Math.max(0, markerPos - 1800);
+    const end = Math.min(html.length, markerPos + 1800);
+    return html.slice(start, end);
+}
+
 function parseSteamDbPlayForFreePromos(html) {
     const promos = [];
     const source = String(html || '');
 
     // Accept class order/spacing variations (e.g. "cat cat-play-for-free" or "cat-play-for-free cat").
     const markerRegex = /<[^>]*class=["'][^"']*\bcat-play-for-free\b[^"']*["'][^>]*>\s*play\s*for\s*free\s*<\/[^>]+>/gi;
-    const blocks = [];
+    const markerIndices = [];
     let markerMatch;
     while ((markerMatch = markerRegex.exec(source)) !== null) {
-        const markerIndex = markerMatch.index;
-        const rowStart = source.lastIndexOf('<tr', markerIndex);
-        const rowEndClose = source.indexOf('</tr>', markerIndex);
-
-        if (rowStart !== -1 && rowEndClose !== -1 && rowEndClose > rowStart) {
-            const rowEnd = Math.min(source.length, rowEndClose + 5);
-            blocks.push(source.slice(rowStart, rowEnd));
-            continue;
-        }
-
-        // Fallback for layout variants where rows are not obvious.
-        const start = Math.max(0, markerIndex - 1800);
-        const end = Math.min(source.length, markerIndex + 1800);
-        blocks.push(source.slice(start, end));
+        markerIndices.push(markerMatch.index);
     }
 
+    // Layout fallback: include any table row that explicitly contains Play For Free text.
+    const rowRegex = /<tr[\s\S]*?<\/tr>/gi;
+    let rowMatch;
+    while ((rowMatch = rowRegex.exec(source)) !== null) {
+        if (/play\s*for\s*free/i.test(rowMatch[0])) {
+            markerIndices.push(rowMatch.index);
+        }
+    }
+
+    const uniqueMarkerIndices = [...new Set(markerIndices)].sort((a, b) => a - b);
+
     const seenPromoIds = new Set();
-    for (const block of blocks) {
-        const appIdMatches = [...String(block || '').matchAll(/\/app\/(\d+)\//gi)];
-        const appId = appIdMatches.length > 0 ? appIdMatches[0][1] : extractAppIdFromString(block);
+    for (const markerIndex of uniqueMarkerIndices) {
+        const markerApp = resolveSteamDbPromoFromMarker(source, markerIndex);
+        const context = extractSteamDbRowOrWindow(source, markerIndex);
+        const contextMatches = [...String(context || '').matchAll(/\/app\/(\d+)\//gi)];
+        const appId = markerApp?.appId || (contextMatches.length > 0 ? contextMatches[0][1] : extractAppIdFromString(context));
         if (!appId) continue;
         if (seenPromoIds.has(appId)) continue;
         seenPromoIds.add(appId);
 
-        const title = extractSteamDbPromoTitle(block) || `Steam App ${appId}`;
+        const title = markerApp?.title || extractSteamDbPromoTitle(context) || `Steam App ${appId}`;
         promos.push({
             id: `steamdb_${appId}`,
             title,
@@ -539,7 +605,7 @@ function parseSteamDbPlayForFreePromos(html) {
             imageUrl: steamHeaderImageUrl(appId),
             instructions: 'Check the SteamDB upcoming free page and open the Steam store page while the Play For Free offer is active.',
             publishedDate: null,
-            endDate: extractSteamDbPromoEndDate(block),
+            endDate: extractSteamDbPromoEndDate(context),
             type: 'Game',
             platforms: 'Steam'
         });
@@ -739,10 +805,14 @@ function extractSteamStorePlayFreeEndDate(html) {
 async function checkSteamStoreAppForPlayFree(appId) {
     try {
         const html = await steamHttpsGetText(`https://store.steampowered.com/app/${appId}/?cc=US&l=en`);
-        const hasPlayFreeText = /play\s+for\s+free\s+until|play\s+for\s+free/i.test(html);
+        const hasStrongPlayEventText = /play\s+for\s+free\s+until|free\s+weekend|play\s+free\s+(?:now\s+)?until|free\s+access\s+(?:until|through|ends?)/i.test(html);
         const hasFreeButton = /id="freeGameBtn"|ShowAddFreeLicense\(/i.test(html);
+        const endDate = extractSteamStorePlayFreeEndDate(html);
 
-        if (!hasPlayFreeText || !hasFreeButton) return null;
+        // Require strong event signal plus either a free-play button or a detectable end window.
+        // This avoids classifying normal sale pages as limited-time play-for-free promos.
+        if (!hasStrongPlayEventText) return null;
+        if (!hasFreeButton && !endDate) return null;
 
         const title = extractSteamStoreAppName(html, appId);
         return {
@@ -754,7 +824,7 @@ async function checkSteamStoreAppForPlayFree(appId) {
             imageUrl: extractSteamStoreOgImage(html, appId),
             instructions: 'Open the Steam store page and click Play Game. Access is removed after the promotion ends unless purchased.',
             publishedDate: null,
-            endDate: extractSteamStorePlayFreeEndDate(html),
+            endDate,
             type: 'Game',
             platforms: 'Steam'
         };
@@ -763,36 +833,77 @@ async function checkSteamStoreAppForPlayFree(appId) {
     }
 }
 
+function extractSteamSearchCandidateIds(searchPayload, keywordPattern = null) {
+    const items = Array.isArray(searchPayload?.items) ? searchPayload.items : [];
+    const ids = [];
+    const pattern = keywordPattern instanceof RegExp ? keywordPattern : null;
+
+    for (const item of items) {
+        const name = sanitizeText(item?.name || item?.title || '');
+        if (pattern && !pattern.test(name)) continue;
+
+        const possibleIds = [
+            String(item?.id || '').trim(),
+            extractAppIdFromString(item?.url),
+            extractAppIdFromString(item?.logo),
+            extractAppIdFromString(item?.image)
+        ].filter(Boolean);
+
+        for (const id of possibleIds) {
+            const normalized = String(id).trim();
+            if (!/^\d+$/.test(normalized)) continue;
+            ids.push(normalized);
+        }
+    }
+
+    return ids;
+}
+
 async function fetchSteamStorePromosFallback() {
     try {
-        const search = await steamHttpsGetJson(
-            'https://store.steampowered.com/search/results/?specials=1&hidef2p=0&json=1&cc=US&l=en&count=120'
+        const queryUrls = [
+            'https://store.steampowered.com/search/results/?specials=1&hidef2p=0&json=1&cc=US&l=en&count=200',
+            'https://store.steampowered.com/search/results/?specials=1&category2=35&hidef2p=0&json=1&cc=US&l=en&count=200',
+            'https://store.steampowered.com/search/results/?specials=1&term=free+weekend&hidef2p=0&json=1&cc=US&l=en&count=200',
+            'https://store.steampowered.com/search/results/?specials=1&term=play+for+free&hidef2p=0&json=1&cc=US&l=en&count=200'
+        ];
+
+        const queryResults = await Promise.all(
+            queryUrls.map(async url => {
+                try {
+                    return await steamHttpsGetJson(url);
+                } catch {
+                    return null;
+                }
+            })
         );
 
-        const items = Array.isArray(search?.items) ? search.items : [];
+        const promoKeywordPattern = /(play\s*for\s*free|free\s*weekend|trial|weekend|free\s*access)/i;
+        const prioritized = [];
+        const general = [];
+
+        for (const result of queryResults) {
+            if (!result) continue;
+            prioritized.push(...extractSteamSearchCandidateIds(result, promoKeywordPattern));
+            general.push(...extractSteamSearchCandidateIds(result));
+        }
+
         const seen = new Set();
         const candidateAppIds = [];
-
-        for (const item of items) {
-            const possibleIds = [
-                String(item?.id || '').trim(),
-                extractAppIdFromString(item?.url),
-                extractAppIdFromString(item?.logo)
-            ].filter(Boolean);
-
-            for (const id of possibleIds) {
-                const normalized = String(id).trim();
-                if (!/^\d+$/.test(normalized)) continue;
-                if (seen.has(normalized)) continue;
-                seen.add(normalized);
-                candidateAppIds.push(normalized);
-            }
+        for (const id of [...prioritized, ...general]) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            candidateAppIds.push(id);
         }
 
         const checked = await mapWithConcurrency(
             candidateAppIds.slice(0, STEAM_PROMO_CANDIDATE_LIMIT),
             STEAM_PROMO_CONCURRENCY,
-            id => checkSteamStoreAppForPlayFree(id)
+            async id => {
+                const fromStorePage = await checkSteamStoreAppForPlayFree(id);
+                if (fromStorePage) return fromStorePage;
+                return checkSteamAppForFreeWeekend(id);
+            }
         );
 
         const promos = [];
@@ -1006,17 +1117,52 @@ async function fetchSteamStorePromos() {
     try {
         const html = await steamDbGetTextWithBypass(STEAMDB_UPCOMING_FREE_URL);
         if (steamDbLooksBlocked(html)) {
-            return fetchSteamStorePromosFallback();
+            const fallback = await fetchSteamStorePromosFallback();
+            return {
+                promos: fallback,
+                source: {
+                    steamDbPromoAvailable: false,
+                    steamDbPromoReason: 'blocked',
+                    steamDbPromoCount: 0,
+                    steamStorePromoFallbackCount: fallback.length
+                }
+            };
         }
 
         const steamDbPromos = parseSteamDbPlayForFreePromos(html);
-        if (steamDbPromos.length > 0) return steamDbPromos;
+        if (steamDbPromos.length > 0) {
+            return {
+                promos: steamDbPromos,
+                source: {
+                    steamDbPromoAvailable: true,
+                    steamDbPromoReason: null,
+                    steamDbPromoCount: steamDbPromos.length,
+                    steamStorePromoFallbackCount: 0
+                }
+            };
+        }
 
-        return fetchSteamStorePromosFallback();
+        const fallback = await fetchSteamStorePromosFallback();
+        return {
+            promos: fallback,
+            source: {
+                steamDbPromoAvailable: true,
+                steamDbPromoReason: 'empty',
+                steamDbPromoCount: 0,
+                steamStorePromoFallbackCount: fallback.length
+            }
+        };
     } catch (err) {
-        if (/HTTP 403/.test(String(err?.message || ''))) return [];
-        console.error('fetchSteamStorePromos error:', err.message);
-        return [];
+        const fallback = await fetchSteamStorePromosFallback().catch(() => []);
+        return {
+            promos: fallback,
+            source: {
+                steamDbPromoAvailable: false,
+                steamDbPromoReason: err?.message ? String(err.message).slice(0, 160) : 'fetch_error',
+                steamDbPromoCount: 0,
+                steamStorePromoFallbackCount: fallback.length
+            }
+        };
     }
 }
 
@@ -1210,7 +1356,10 @@ class SteamFreeGamesAlertsManager {
             });
 
         // Steam store promos (100%-off paid games = free weekends / events)
-        const steamStorePromos = await fetchSteamStorePromos();
+        const steamStorePromosResult = await fetchSteamStorePromos();
+        const steamStorePromos = Array.isArray(steamStorePromosResult?.promos)
+            ? steamStorePromosResult.promos
+            : [];
 
         // Promo stream includes both temporary GamerPower giveaways and Steam play-for-free events
         const promoGiveaways = [...gpPromos, ...steamStorePromos]
@@ -1229,7 +1378,11 @@ class SteamFreeGamesAlertsManager {
                 steamDbFreeToKeepAvailable: Boolean(steamDbFreeToKeepResult.available),
                 steamDbFreeToKeepReason: steamDbFreeToKeepResult.reason || null,
                 steamDbFreeToKeepCount: steamDbFreeToKeep.length,
-                steamStoreFreeToKeepFallbackCount: steamStoreKeepFallback.length
+                steamStoreFreeToKeepFallbackCount: steamStoreKeepFallback.length,
+                steamDbPromoAvailable: Boolean(steamStorePromosResult?.source?.steamDbPromoAvailable),
+                steamDbPromoReason: steamStorePromosResult?.source?.steamDbPromoReason || null,
+                steamDbPromoCount: Number(steamStorePromosResult?.source?.steamDbPromoCount || 0),
+                steamStorePromoFallbackCount: Number(steamStorePromosResult?.source?.steamStorePromoFallbackCount || 0)
             }
         };
     }
