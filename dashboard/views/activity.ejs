@@ -8,6 +8,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
+<%
+  const topCategory = Object.entries(serverAuditStats.byCategory || {}).sort((a, b) => b[1] - a[1])[0];
+  const criticalCount = Object.entries(serverAuditStats.bySeverity || {}).reduce((sum, entry) => sum + (entry[0] === 'critical' ? entry[1] : 0), 0);
+  const dashboardActionCount = dashboardAuditLogs.length;
+  const totalAuditCount = serverAuditStats.total || 0;
+%>
 <div class="app-layout">
   <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
@@ -16,17 +22,82 @@
 
     <main class="content">
       <div class="page-header">
-        <h1><i class="fas fa-clock-rotate-left" style="color:var(--brand);margin-right:8px"></i>Activity Center</h1>
-        <p>Dashboard actions and server audit history for <strong><%= guild.name %></strong></p>
+        <div class="page-header-badges">
+          <div class="page-header-badge"><i class="fas fa-browser"></i> <%= dashboardActionCount %> dashboard events</div>
+          <div class="page-header-badge"><i class="fas fa-scroll"></i> <%= totalAuditCount %> audit logs</div>
+          <div class="page-header-badge"><i class="fas fa-triangle-exclamation"></i> <%= criticalCount %> critical events</div>
+        </div>
+        <h1>Track what changed and who changed it</h1>
+        <p>Use Activity Center to watch both web dashboard actions and server-side audit events for <strong><%= guild.name %></strong>, without needing to dig through raw logs.</p>
       </div>
 
-      <% const topCategory = Object.entries(serverAuditStats.byCategory || {}).sort((a, b) => b[1] - a[1])[0]; %>
-      <% const criticalCount = Object.entries(serverAuditStats.bySeverity || {}).reduce((sum, entry) => sum + (entry[0] === 'critical' ? entry[1] : 0), 0); %>
+      <div class="dashboard-hero-grid">
+        <section class="dashboard-hero-card">
+          <h2>Signal overview</h2>
+          <p>This page combines recent dashboard operations with bot-recorded audit activity so you can distinguish configuration changes from server enforcement and moderation events.</p>
+          <div class="dashboard-hero-pills">
+            <div class="dashboard-hero-pill">
+              <strong><%= dashboardActionCount %></strong>
+              <span>Recent dashboard events</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= totalAuditCount %></strong>
+              <span>Audit entries in the last window</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= topCategory ? topCategory[0] : 'None' %></strong>
+              <span>Top audit category</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-hero-side-stack">
+          <section class="dashboard-hero-card">
+            <h3>What to watch</h3>
+            <div class="dashboard-glance-list">
+              <div class="dashboard-glance-item">
+                <strong><%= criticalCount %> critical entries</strong>
+                <span>Escalate these first if you are checking for abuse, major moderation actions, or broken automation.</span>
+              </div>
+              <div class="dashboard-glance-item">
+                <strong><%= topCategory ? `${topCategory[1]} ${topCategory[0]} event${topCategory[1] === 1 ? '' : 's'}` : 'No dominant category' %></strong>
+                <span>Use the category signal to see which system is changing most often right now.</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <div class="stats-row">
         <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Dashboard Actions</span><div class="stat-card-icon blue"><i class="fas fa-browser"></i></div></div><div class="stat-card-value"><%= dashboardAuditLogs.length %></div><div class="stat-card-change">Recent web dashboard events</div></div>
         <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Server Audit Logs</span><div class="stat-card-icon purple"><i class="fas fa-scroll"></i></div></div><div class="stat-card-value"><%= serverAuditStats.total || 0 %></div><div class="stat-card-change">Last 14 days</div></div>
         <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Top Category</span><div class="stat-card-icon orange"><i class="fas fa-layer-group"></i></div></div><div class="stat-card-value" style="font-size:20px"><%= topCategory ? topCategory[0] : 'None' %></div><div class="stat-card-change"><%= topCategory ? `${topCategory[1]} events` : 'No audit data' %></div></div>
         <div class="stat-card"><div class="stat-card-header"><span class="stat-card-label">Critical Events</span><div class="stat-card-icon red"><i class="fas fa-triangle-exclamation"></i></div></div><div class="stat-card-value"><%= criticalCount %></div><div class="stat-card-change">From server audit log</div></div>
+      </div>
+
+      <div class="dashboard-split-grid">
+        <section class="dashboard-hero-card">
+          <h3>Audit stream guide</h3>
+          <div class="dashboard-mini-grid">
+            <div class="dashboard-mini-card">
+              <strong>Dashboard activity</strong>
+              <span>Settings changes, setup actions, backups, and profile updates made through the web interface.</span>
+            </div>
+            <div class="dashboard-mini-card">
+              <strong>Server audit feed</strong>
+              <span>Bot-recorded actions from the guild itself, grouped by action, executor, and severity.</span>
+            </div>
+          </div>
+        </section>
+        <section class="dashboard-hero-card">
+          <h3>Operational note</h3>
+          <div class="dashboard-glance-list">
+            <div class="dashboard-glance-item">
+              <strong>Use both tables together</strong>
+              <span>If a dashboard change appears without related audit activity, the issue is probably configuration-only rather than user enforcement.</span>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div class="card">

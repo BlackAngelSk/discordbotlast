@@ -35,71 +35,75 @@
 
   <!-- Content -->
   <div class="server-picker-content">
-    <div class="server-picker-header">
+    <div class="server-picker-hero">
       <div>
-        <h1><i class="fas fa-th-large" style="color:var(--brand);margin-right:10px"></i>Your Servers</h1>
-        <p>Choose a server to manage its settings and configuration</p>
-      </div>
-      <div class="server-picker-summary-text">
-        <i class="fas fa-bolt"></i>
-        <span><%= totalCardCount %> dashboard destinations ready</span>
-      </div>
-    </div>
+        <div class="server-picker-header">
+          <div>
+            <div class="page-header-badges">
+              <div class="page-header-badge"><i class="fas fa-layer-group"></i> Unified dashboard shell</div>
+              <div class="page-header-badge"><i class="fas fa-rocket"></i> Faster entry into setup pages</div>
+            </div>
+            <h1>Your Servers</h1>
+            <p>Pick a server, jump into the right workspace, and move from overview to detailed configuration without digging through flat admin pages.</p>
+          </div>
+          <div class="server-picker-summary-text">
+            <i class="fas fa-bolt"></i>
+            <span><%= totalCardCount %> dashboard destinations ready</span>
+          </div>
+        </div>
 
-    <div class="server-picker-overview">
-      <div class="server-picker-stat">
-        <div class="server-picker-stat-icon"><i class="fas fa-server"></i></div>
-        <div>
-          <div class="server-picker-stat-value"><%= manageableGuildCount %></div>
-          <div class="server-picker-stat-label">Manageable servers</div>
+        <div class="server-picker-overview">
+          <div class="server-picker-stat">
+            <div class="server-picker-stat-icon"><i class="fas fa-server"></i></div>
+            <div>
+              <div class="server-picker-stat-value"><%= manageableGuildCount %></div>
+              <div class="server-picker-stat-label">Manageable servers</div>
+            </div>
+          </div>
+          <div class="server-picker-stat">
+            <div class="server-picker-stat-icon"><i class="fas fa-shield-halved"></i></div>
+            <div>
+              <div class="server-picker-stat-value"><%= ownerToolCount %></div>
+              <div class="server-picker-stat-label">Owner-only pages</div>
+            </div>
+          </div>
+          <div class="server-picker-stat server-picker-stat-wide">
+            <div class="server-picker-stat-icon"><i class="fas fa-compass"></i></div>
+            <div>
+              <div class="server-picker-stat-value">Fast jump</div>
+              <div class="server-picker-stat-label">Use search and filters below to narrow large server lists and land directly in the workspace you need.</div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="server-picker-stat">
-        <div class="server-picker-stat-icon"><i class="fas fa-shield-halved"></i></div>
-        <div>
-          <div class="server-picker-stat-value"><%= ownerToolCount %></div>
-          <div class="server-picker-stat-label">Owner-only pages</div>
-        </div>
-      </div>
-      <div class="server-picker-stat server-picker-stat-wide">
-        <div class="server-picker-stat-icon"><i class="fas fa-compass"></i></div>
-        <div>
-          <div class="server-picker-stat-value">Fast jump</div>
-          <div class="server-picker-stat-label">Use search or the quick filters below to narrow large server lists.</div>
-        </div>
-      </div>
-    </div>
 
-    <div class="card" style="margin-bottom:22px">
-      <div class="card-header">
-        <div>
-          <div class="card-title"><i class="fas fa-compass"></i> Dashboard Map</div>
-          <div class="card-subtitle">Most of the new tools are inside each server dashboard after you click a server.</div>
+      <aside class="server-picker-sidecard">
+        <h2><i class="fas fa-compass" style="color:var(--brand);margin-right:8px"></i>Dashboard Map</h2>
+        <p>Most of the advanced tools now live inside each server dashboard. Start with Settings, then branch into the focused feature pages.</p>
+        <div class="server-picker-map-grid">
+          <div class="server-picker-map-item">
+            <strong>Activity Center</strong>
+            <span>Review audit events and recent dashboard actions.</span>
+          </div>
+          <div class="server-picker-map-item">
+            <strong>Delegation</strong>
+            <span>Grant dashboard access without handing out full admin.</span>
+          </div>
+          <div class="server-picker-map-item">
+            <strong>Quick Tests</strong>
+            <span>Run validation for welcome, leave, logs, and suggestions.</span>
+          </div>
+          <div class="server-picker-map-item">
+            <strong>Community Editing</strong>
+            <span>Maintain posted role and community messages in place.</span>
+          </div>
         </div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px">
-        <div style="padding:14px 16px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
-          <div style="font-weight:700;color:var(--text-1);margin-bottom:4px"><i class="fas fa-clock-rotate-left" style="color:var(--brand);margin-right:8px"></i>Activity Center</div>
-          <div style="font-size:12px;color:var(--text-2)">Dashboard actions and server audit history</div>
-        </div>
-        <div style="padding:14px 16px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
-          <div style="font-weight:700;color:var(--text-1);margin-bottom:4px"><i class="fas fa-user-lock" style="color:var(--brand);margin-right:8px"></i>Delegation</div>
-          <div style="font-size:12px;color:var(--text-2)">Give dashboard access to selected roles without full admin</div>
-        </div>
-        <div style="padding:14px 16px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
-          <div style="font-weight:700;color:var(--text-1);margin-bottom:4px"><i class="fas fa-vial" style="color:var(--brand);margin-right:8px"></i>Quick Tests</div>
-          <div style="font-size:12px;color:var(--text-2)">Test welcome, leave, logging, and suggestion channels from Settings</div>
-        </div>
-        <div style="padding:14px 16px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
-          <div style="font-weight:700;color:var(--text-1);margin-bottom:4px"><i class="fas fa-pen" style="color:var(--brand);margin-right:8px"></i>Community Editing</div>
-          <div style="font-size:12px;color:var(--text-2)">Edit posted reaction-role messages instead of deleting them</div>
-        </div>
-      </div>
-      <% if (isBotOwner) { %>
-        <div class="form-hint">Bot owner tools live in <strong>Bot Owner Settings</strong>. Server tools live inside each selected server.</div>
-      <% } else { %>
-        <div class="form-hint">All of these tools appear after you open a server card below.</div>
-      <% } %>
+        <% if (isBotOwner) { %>
+          <div class="form-hint">Bot owner tools live in <strong>Bot Owner Settings</strong>. Server tools stay inside each selected server.</div>
+        <% } else { %>
+          <div class="form-hint">Open a server card below to reach the full setup workspace.</div>
+        <% } %>
+      </aside>
     </div>
 
     <!-- Search -->
@@ -140,6 +144,10 @@
           </div>
           <div class="server-card-name">Bot Owner Settings</div>
           <div class="server-card-meta"><i class="fas fa-shield"></i> Global bot controls</div>
+          <div class="server-card-footer">
+            <span class="badge badge-yellow"><i class="fas fa-crown"></i> Owner tools</span>
+            <span class="server-card-linktext">Open workspace</span>
+          </div>
         </a>
       <% } %>
       <% if (guilds.length === 0) { %>
@@ -162,7 +170,7 @@
             <% } %>
             <div class="server-card-name"><%= guild.name %></div>
             <div class="server-card-meta"><i class="fas fa-arrow-right"></i> Manage server</div>
-            <div style="margin-top:8px;font-size:12px;color:var(--text-2)">
+            <div style="margin-top:10px;font-size:12px;color:var(--text-2)">
               <span class="badge <%= Number(guild.setupScore || 0) >= 80 ? 'badge-green' : Number(guild.setupScore || 0) >= 40 ? 'badge-yellow' : 'badge-red' %>">
                 <i class="fas fa-list-check"></i>
                 Setup <%= Number(guild.setupScore || 0) %>%
@@ -170,6 +178,10 @@
               <% if (Number(guild.setupTotalCount || 0) > 0) { %>
                 <span style="margin-left:6px"><%= Number(guild.setupCompletedCount || 0) %>/<%= Number(guild.setupTotalCount || 0) %></span>
               <% } %>
+            </div>
+            <div class="server-card-footer">
+              <span class="badge badge-brand"><i class="fas fa-sliders"></i> Settings + tools</span>
+              <span class="server-card-linktext">Open workspace</span>
             </div>
           </a>
         <% }); %>

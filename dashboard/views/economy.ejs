@@ -8,6 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
+<%
+    const leaderboardCount = leaderboard.length;
+    const topEntry = leaderboard[0] || null;
+    const averageBalance = leaderboardCount > 0 ? formatNumber(Math.round(leaderboard.reduce((a,b) => a + (b.balance || 0), 0) / leaderboardCount)) : 0;
+    const highestLevel = leaderboardCount > 0 ? Math.max(...leaderboard.map(u => u.level || 0)) : 0;
+%>
 <div class="app-layout">
     <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
@@ -16,29 +22,71 @@
 
         <main class="content">
             <div class="page-header">
-                <h1><i class="fas fa-coins" style="color:var(--brand);margin-right:8px"></i>Economy Leaderboard</h1>
-                <p>Top earners and season leaderboard controls for <strong><%= guild.name %></strong></p>
+                <div class="page-header-badges">
+                    <div class="page-header-badge"><i class="fas fa-users"></i> <%= leaderboardCount %> economy profiles</div>
+                    <div class="page-header-badge"><i class="fas fa-calendar-days"></i> <%= currentSeasonName || 'No active season' %></div>
+                    <div class="page-header-badge"><i class="fas fa-eye"></i> <%= seasonLeaderboardPreview.mode === 'live' ? 'Live' : 'Sample' %> preview</div>
+                </div>
+                <h1>Run the server economy from one page</h1>
+                <p>Track top earners, scan the state of the current season, and manage the posted season leaderboard for <strong><%= guild.name %></strong> without losing the bigger picture.</p>
+            </div>
+
+            <div class="dashboard-hero-grid">
+                <section class="dashboard-hero-card">
+                    <h2>Economy overview</h2>
+                    <p>This page combines leaderboard health with season leaderboard publishing controls so you can manage both progression and presentation from the same workspace.</p>
+                    <div class="dashboard-hero-pills">
+                        <div class="dashboard-hero-pill">
+                            <strong><%= leaderboardCount %></strong>
+                            <span>Tracked economy users</span>
+                        </div>
+                        <div class="dashboard-hero-pill">
+                            <strong><%= formatNumber(topEntry?.balance || 0) %></strong>
+                            <span>Top balance<% if (topEntry) { %> by <%= topEntry.username %><% } %></span>
+                        </div>
+                        <div class="dashboard-hero-pill">
+                            <strong><%= currentSeason ? (currentSeason.totalPlayers || 0) : 0 %></strong>
+                            <span>Players in the current season</span>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dashboard-hero-side-stack">
+                    <section class="dashboard-hero-card">
+                        <h3>Quick read</h3>
+                        <div class="dashboard-glance-list">
+                            <div class="dashboard-glance-item">
+                                <strong>Average balance: <%= averageBalance %></strong>
+                                <span>Use this as a rough economy density check before reviewing the full leaderboard.</span>
+                            </div>
+                            <div class="dashboard-glance-item">
+                                <strong>Highest level: Lv <%= highestLevel %></strong>
+                                <span>Gives you a fast view of how far progression has advanced in this guild.</span>
+                            </div>
+                        </div>
+                    </section>
+                </div>
             </div>
 
             <div class="stats-row">
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Total Users</span><div class="stat-card-icon blue"><i class="fas fa-users"></i></div></div>
-                    <div class="stat-card-value"><%= leaderboard.length %></div>
+                    <div class="stat-card-value"><%= leaderboardCount %></div>
                     <div class="stat-card-change"><i class="fas fa-database"></i> Economy profiles</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Top Balance</span><div class="stat-card-icon yellow"><i class="fas fa-crown"></i></div></div>
-                    <div class="stat-card-value"><%= formatNumber(leaderboard[0]?.balance || 0) %></div>
-                    <div class="stat-card-change"><i class="fas fa-coins"></i> <% if(leaderboard[0]) { %><%= leaderboard[0].username %><% } else { %>Nobody yet<% } %></div>
+                    <div class="stat-card-value"><%= formatNumber(topEntry?.balance || 0) %></div>
+                    <div class="stat-card-change"><i class="fas fa-coins"></i> <% if(topEntry) { %><%= topEntry.username %><% } else { %>Nobody yet<% } %></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Avg Balance</span><div class="stat-card-icon purple"><i class="fas fa-chart-simple"></i></div></div>
-                    <div class="stat-card-value"><%= leaderboard.length > 0 ? formatNumber(Math.round(leaderboard.reduce((a,b) => a+(b.balance||0),0)/leaderboard.length)) : 0 %></div>
+                    <div class="stat-card-value"><%= averageBalance %></div>
                     <div class="stat-card-change"><i class="fas fa-coins"></i> Per user</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Top Level</span><div class="stat-card-icon orange"><i class="fas fa-star"></i></div></div>
-                    <div class="stat-card-value">Lv <%= leaderboard.length > 0 ? Math.max(...leaderboard.map(u=>u.level||0)) : 0 %></div>
+                    <div class="stat-card-value">Lv <%= highestLevel %></div>
                     <div class="stat-card-change"><i class="fas fa-star"></i> Highest rank</div>
                 </div>
                 <div class="stat-card">
@@ -53,7 +101,7 @@
                 </div>
             </div>
 
-            <div class="card" style="margin-bottom:20px">
+            <div class="card">
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-trophy"></i> Season Leaderboard Settings</div>
@@ -70,6 +118,17 @@
                     <span><i class="fas fa-hashtag"></i> Channel: <strong id="seasonChannelValue"><%= seasonLeaderboardConfig.channelId ? `#${(channels.find(channel => channel.id === seasonLeaderboardConfig.channelId) || {}).name || 'Unknown'}` : 'Not set' %></strong></span>
                     <span><i class="fas fa-clock"></i> Interval: <strong id="seasonIntervalValue"><%= seasonLeaderboardConfig.updateIntervalMinutes %> min</strong></span>
                     <span><i class="fas fa-users"></i> Players: <strong id="seasonPlayersValue"><%= currentSeason ? (currentSeason.totalPlayers || 0) : 0 %></strong></span>
+                </div>
+
+                <div class="dashboard-mini-grid" style="margin-bottom:16px">
+                    <div class="dashboard-mini-card">
+                        <strong>Publishing controls</strong>
+                        <span>Choose the destination channel, update cadence, and who can manually force leaderboard refreshes.</span>
+                    </div>
+                    <div class="dashboard-mini-card">
+                        <strong>Preview and appearance</strong>
+                        <span>Adjust the embed structure, color coding, and visible sections before posting updates publicly.</span>
+                    </div>
                 </div>
 
                 <form id="seasonLeaderboardForm">

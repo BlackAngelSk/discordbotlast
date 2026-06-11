@@ -8,54 +8,121 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
+<%
+  const warningCount = warnings ? warnings.length : 0;
+  const banCount = bans ? bans.length : 0;
+  const kickCount = kicks ? kicks.length : 0;
+  const timeoutCount = timeouts ? timeouts.length : 0;
+  const totalActions = warningCount + banCount + kickCount + timeoutCount;
+%>
 <div class="app-layout">
   <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
   <div class="main-wrapper">
     <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Moderation' }) %>
     <main class="content">
       <div class="page-header">
-        <h1><i class="fas fa-shield-halved" style="color:var(--brand);margin-right:8px"></i>Moderation Panel</h1>
-        <p>Manage warnings, bans and enforcement for <strong><%= guild.name %></strong></p>
+        <div class="page-header-badges">
+          <div class="page-header-badge"><i class="fas fa-scroll"></i> <%= totalActions %> stored records</div>
+          <div class="page-header-badge"><i class="fas fa-triangle-exclamation"></i> <%= warningCount %> warnings</div>
+          <div class="page-header-badge"><i class="fas fa-ban"></i> <%= banCount %> bans</div>
+        </div>
+        <h1>Run enforcement and review moderation history</h1>
+        <p>Moderation now surfaces the live enforcement picture for <strong><%= guild.name %></strong> first, then lets you add warnings and audit historical actions without bouncing between tabs blindly.</p>
       </div>
+
+      <div class="dashboard-hero-grid">
+        <section class="dashboard-hero-card">
+          <h2>Enforcement snapshot</h2>
+          <p>Review warning, ban, kick, and timeout volume before you take action so you can judge whether the issue is isolated or part of a wider pattern.</p>
+          <div class="dashboard-hero-pills">
+            <div class="dashboard-hero-pill">
+              <strong><%= warningCount %></strong>
+              <span>Warnings on record</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= banCount %></strong>
+              <span>Banned users tracked</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= timeoutCount %></strong>
+              <span>Timeout entries logged</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="dashboard-hero-side-stack">
+          <section class="dashboard-hero-card">
+            <h3>Quick note</h3>
+            <div class="dashboard-glance-list">
+              <div class="dashboard-glance-item">
+                <strong><%= totalActions %> total moderation records</strong>
+                <span>Use this page for direct warning management, then use the tables for cleanup, reversals, and deeper review.</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
       <div class="stats-row">
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Warnings</span><div class="stat-card-icon yellow"><i class="fas fa-triangle-exclamation"></i></div></div>
-          <div class="stat-card-value"><%= warnings ? warnings.length : 0 %></div>
+          <div class="stat-card-value"><%= warningCount %></div>
           <div class="stat-card-change"><i class="fas fa-scroll"></i> Active warnings</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Bans</span><div class="stat-card-icon red"><i class="fas fa-ban"></i></div></div>
-          <div class="stat-card-value"><%= bans ? bans.length : 0 %></div>
+          <div class="stat-card-value"><%= banCount %></div>
           <div class="stat-card-change"><i class="fas fa-gavel"></i> Banned users</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Kicks</span><div class="stat-card-icon orange"><i class="fas fa-person-walking-arrow-right"></i></div></div>
-          <div class="stat-card-value"><%= kicks ? kicks.length : 0 %></div>
+          <div class="stat-card-value"><%= kickCount %></div>
           <div class="stat-card-change"><i class="fas fa-door-open"></i> Kick records</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Timeouts</span><div class="stat-card-icon purple"><i class="fas fa-clock"></i></div></div>
-          <div class="stat-card-value"><%= timeouts ? timeouts.length : 0 %></div>
+          <div class="stat-card-value"><%= timeoutCount %></div>
           <div class="stat-card-change"><i class="fas fa-hourglass"></i> Timeout records</div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">
-          <div><div class="card-title"><i class="fas fa-plus"></i> Add Warning</div><div class="card-subtitle">Manually warn a user</div></div>
-        </div>
-        <form id="addWarningForm">
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">User ID</label>
-              <input type="text" class="form-control" name="userId" placeholder="123456789012345678" required>
+      <div class="moderation-action-grid">
+        <div class="card mb-0">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-plus"></i> Add Warning</div><div class="card-subtitle">Manually warn a user when you need a dashboard-side enforcement record.</div></div>
+          </div>
+          <form id="addWarningForm">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">User ID</label>
+                <input type="text" class="form-control" name="userId" placeholder="123456789012345678" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Reason</label>
+                <input type="text" class="form-control" name="reason" placeholder="Enter warning reason" required>
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">Reason</label>
-              <input type="text" class="form-control" name="reason" placeholder="Enter warning reason" required>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-triangle-exclamation"></i> Add Warning</button>
+          </form>
+        </div>
+        <aside class="card mb-0">
+          <div class="card-header">
+            <div><div class="card-title"><i class="fas fa-compass"></i> Workflow</div><div class="card-subtitle">Use the tables below to review and reverse enforcement actions.</div></div>
+          </div>
+          <div class="moderation-aside-list">
+            <div class="moderation-aside-item">
+              <strong>Warnings</strong>
+              <span>Searchable and removable directly from the dashboard.</span>
+            </div>
+            <div class="moderation-aside-item">
+              <strong>Bans</strong>
+              <span>Review existing bans and unban users without switching tools.</span>
+            </div>
+            <div class="moderation-aside-item">
+              <strong>Kicks and timeouts</strong>
+              <span>Use these records for a quick historical read before escalating action.</span>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary"><i class="fas fa-triangle-exclamation"></i> Add Warning</button>
-        </form>
+        </aside>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title"><i class="fas fa-gavel"></i> Moderation Records</div></div>
@@ -66,7 +133,7 @@
           <button class="tab-btn" data-tab="timeouts"><i class="fas fa-clock"></i> Timeouts</button>
         </div>
         <div class="tab-panel active" id="tab-warnings">
-          <div style="margin-bottom:12px"><input type="text" class="form-control" placeholder="Search warnings..." oninput="filterTable('warningsTbl', this.value)" style="max-width:360px"></div>
+          <div class="dashboard-search-row"><input type="text" class="form-control" placeholder="Search warnings..." oninput="filterTable('warningsTbl', this.value)"></div>
           <div class="table-wrapper">
             <table id="warningsTbl">
               <thead><tr><th>User</th><th>User ID</th><th>Reason</th><th>Moderator</th><th>Date</th><th>Actions</th></tr></thead>
@@ -90,7 +157,7 @@
           </div>
         </div>
         <div class="tab-panel" id="tab-bans">
-          <div style="margin-bottom:12px"><input type="text" class="form-control" placeholder="Search bans..." oninput="filterTable('bansTbl', this.value)" style="max-width:360px"></div>
+          <div class="dashboard-search-row"><input type="text" class="form-control" placeholder="Search bans..." oninput="filterTable('bansTbl', this.value)"></div>
           <div class="table-wrapper">
             <table id="bansTbl">
               <thead><tr><th>User</th><th>User ID</th><th>Reason</th><th>Moderator</th><th>Date</th><th>Actions</th></tr></thead>

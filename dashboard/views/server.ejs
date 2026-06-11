@@ -8,6 +8,12 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
 <body>
+<%
+  const setupRemainingCount = Math.max((setupChecklist?.length || 0) - (setupCompletedCount || 0), 0);
+  const channelCount = Array.isArray(channels) ? channels.length : 0;
+  const roleCount = Array.isArray(roles) ? roles.length : 0;
+  const featuredStatusLabel = setupRemainingCount === 0 ? 'Setup complete' : `${setupRemainingCount} setup step${setupRemainingCount === 1 ? '' : 's'} left`;
+%>
 <div class="app-layout">
   <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
@@ -16,8 +22,69 @@
 
     <main class="content">
       <div class="page-header">
-        <h1><i class="fas fa-cog" style="color:var(--brand);margin-right:8px"></i>Server Settings</h1>
-        <p>Configure the bot for <strong><%= guild.name %></strong></p>
+        <div class="page-header-badges">
+          <div class="page-header-badge"><i class="fas fa-server"></i> <%= guild.name %></div>
+          <div class="page-header-badge"><i class="fas fa-list-check"></i> <%= setupProgressPercent %>% setup ready</div>
+          <div class="page-header-badge"><i class="fas fa-satellite-dish"></i> <%= liveAlertsCount %> live alert<%= liveAlertsCount === 1 ? '' : 's' %></div>
+        </div>
+        <h1>Build the server workspace around your bot</h1>
+        <p>Everything important for <strong><%= guild.name %></strong> now starts here: setup progress, quick fixes, public profile sharing, backups, and the core server configuration surface.</p>
+      </div>
+
+      <div class="dashboard-hero-grid">
+        <section class="dashboard-hero-card">
+          <h2>Command deck</h2>
+          <p>Use this page as the main operating surface for setup, backup, sharing, and the core bot systems that affect the whole server.</p>
+          <div class="dashboard-hero-pills">
+            <div class="dashboard-hero-pill">
+              <strong><%= guild.memberCount %></strong>
+              <span>Members in this server</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= channelCount %></strong>
+              <span>Available channels</span>
+            </div>
+            <div class="dashboard-hero-pill">
+              <strong><%= roleCount %></strong>
+              <span>Roles ready to map</span>
+            </div>
+          </div>
+          <div class="dashboard-hero-actions">
+            <a href="#setup-assistant-card" class="btn btn-primary"><i class="fas fa-list-check"></i> Continue setup</a>
+            <a href="#settingsForm" class="btn btn-secondary"><i class="fas fa-sliders"></i> Edit core settings</a>
+            <a href="#backup-restore-card" class="btn btn-secondary"><i class="fas fa-floppy-disk"></i> Backup or clone</a>
+          </div>
+        </section>
+
+        <div class="dashboard-hero-side-stack">
+          <section class="dashboard-hero-card">
+            <h3>Readiness snapshot</h3>
+            <div class="dashboard-glance-list">
+              <div class="dashboard-glance-item">
+                <strong><%= featuredStatusLabel %></strong>
+                <span><%= setupCompletedCount %> of <%= setupChecklist.length %> guided setup tasks completed.</span>
+              </div>
+              <div class="dashboard-glance-item">
+                <strong><%= activeTickets %> open support ticket<%= activeTickets === 1 ? '' : 's' %></strong>
+                <span>Use this to judge whether support flows and logging need attention.</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="dashboard-hero-card">
+            <h3>Jump points</h3>
+            <div class="dashboard-glance-list">
+              <div class="dashboard-glance-item">
+                <strong>Public profile and share link</strong>
+                <span>Show off your community with a branded public page.</span>
+              </div>
+              <div class="dashboard-glance-item">
+                <strong>Minecraft, live alerts, backups</strong>
+                <span>High-touch features are surfaced earlier so they are easier to reach.</span>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
 
       <div class="stats-row">
@@ -28,12 +95,12 @@
         </div>
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Text Channels</span><div class="stat-card-icon purple"><i class="fas fa-hashtag"></i></div></div>
-          <div class="stat-card-value"><%= channels.length %></div>
+          <div class="stat-card-value"><%= channelCount %></div>
           <div class="stat-card-change"><i class="fas fa-hashtag"></i> Available</div>
         </div>
         <div class="stat-card">
           <div class="stat-card-header"><span class="stat-card-label">Roles</span><div class="stat-card-icon orange"><i class="fas fa-tag"></i></div></div>
-          <div class="stat-card-value"><%= roles.length %></div>
+          <div class="stat-card-value"><%= roleCount %></div>
           <div class="stat-card-change"><i class="fas fa-tag"></i> Configured</div>
         </div>
         <div class="stat-card">
@@ -48,90 +115,101 @@
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div class="card dashboard-section-nav">
+        <div class="dashboard-section-nav-title"><i class="fas fa-compass"></i> Jump To Section</div>
+        <div class="dashboard-section-nav-links">
+          <a href="#setup-assistant-card" class="btn btn-secondary btn-sm"><i class="fas fa-list-check"></i> Setup</a>
+          <a href="#backup-restore-card" class="btn btn-secondary btn-sm"><i class="fas fa-floppy-disk"></i> Backup</a>
+          <a href="#profile-share-card" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> Profile Share</a>
+          <a href="#minecraftStatusCard" class="btn btn-secondary btn-sm"><i class="fas fa-cube"></i> Minecraft</a>
+          <a href="#settingsForm" class="btn btn-secondary btn-sm"><i class="fas fa-sliders"></i> Core Settings</a>
+        </div>
+      </div>
+
+      <div class="card dashboard-section-card" id="setup-assistant-card">
+        <div class="card-header dashboard-card-header-wrap">
           <div>
             <div class="card-title"><i class="fas fa-list-check"></i> Setup Assistant</div>
             <div class="card-subtitle">Complete these steps to finish bot setup from the dashboard.</div>
           </div>
-          <div style="min-width:240px;flex:1;max-width:360px;margin-left:auto">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:6px">
+          <div class="setup-progress-panel">
+            <div class="setup-progress-header">
               <span>Progress</span>
-              <strong style="color:var(--text-1)"><%= setupCompletedCount %>/<%= setupChecklist.length %> completed</strong>
+              <strong class="setup-progress-strong"><%= setupCompletedCount %>/<%= setupChecklist.length %> completed</strong>
             </div>
-            <div style="height:10px;border-radius:999px;background:var(--bg-card-2);border:1px solid var(--border);overflow:hidden">
+            <div class="setup-progress-track">
               <div id="setupProgressBarFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--green));"></div>
             </div>
-            <div style="font-size:12px;color:var(--text-2);margin-top:6px"><%= setupProgressPercent %>% ready</div>
+            <div class="setup-progress-footnote"><%= setupProgressPercent %>% ready</div>
           </div>
         </div>
 
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+        <div class="setup-checklist-grid">
           <% setupChecklist.forEach(item => { %>
-            <a href="<%= item.href %>" style="text-decoration:none;padding:14px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-card-2);display:block">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:6px">
-                <div style="font-weight:700;color:var(--text-1)"><i class="fas <%= item.icon %>" style="color:var(--brand);margin-right:8px"></i><%= item.title %></div>
+            <a href="<%= item.href %>" class="setup-checklist-item">
+              <div class="setup-checklist-row">
+                <div class="setup-checklist-title"><i class="fas <%= item.icon %>"></i><%= item.title %></div>
                 <% if (item.done) { %>
                   <span class="badge badge-green"><i class="fas fa-check"></i> Ready</span>
                 <% } else { %>
                   <span class="badge badge-yellow"><i class="fas fa-clock"></i> Needed</span>
                 <% } %>
               </div>
-              <div style="font-size:12px;color:var(--text-2)"><%= item.description %></div>
+              <div class="setup-checklist-description"><%= item.description %></div>
             </a>
           <% }) %>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px">
+      <div class="card dashboard-section-card" id="setup-actions-card">
         <div class="card-header">
           <div>
             <div class="card-title"><i class="fas fa-wand-magic-sparkles"></i> Setup Actions</div>
             <div class="card-subtitle">Use one-click setup to auto-create categories/channels, then check permissions and run full tests.</div>
           </div>
         </div>
-        <div class="quick-action-row" style="margin-bottom:14px">
+        <div class="quick-action-row setup-action-row">
           <button type="button" class="btn btn-primary" id="autoSetupBtn"><i class="fas fa-wand-magic-sparkles"></i> Auto Setup</button>
           <button type="button" class="btn btn-secondary" id="setupPermissionCheckBtn"><i class="fas fa-shield-check"></i> Check Permissions</button>
           <button type="button" class="btn btn-secondary" id="setupRunAllTestsBtn"><i class="fas fa-vials"></i> Run All Tests</button>
           <button type="button" class="btn btn-ghost" id="refreshSetupHistoryBtn"><i class="fas fa-rotate"></i> Refresh History</button>
         </div>
 
-        <div id="setupPermissionResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:12px"></div>
-        <div id="setupBatchTestResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:12px"></div>
+        <div id="setupPermissionResult" class="dashboard-note-panel" hidden></div>
+        <div id="setupBatchTestResult" class="dashboard-note-panel" hidden></div>
 
-        <div style="font-size:12px;color:var(--text-2);margin-bottom:8px">Setup history</div>
-        <div id="setupHistoryList" style="display:flex;flex-direction:column;gap:8px">
+        <div class="setup-history-title">Setup history</div>
+        <div id="setupHistoryList" class="setup-history-list">
           <% if (setupHistory && setupHistory.length > 0) { %>
             <% setupHistory.forEach(entry => { %>
-              <div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card-2)">
-                <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px">
-                  <strong style="color:var(--text-1)"><%= entry.action %></strong>
-                  <span style="font-size:12px;color:var(--text-3)"><%= new Date(entry.timestamp).toLocaleString() %></span>
+              <div class="setup-history-item">
+                <div class="setup-history-item-head">
+                  <strong><%= entry.action %></strong>
+                  <span><%= new Date(entry.timestamp).toLocaleString() %></span>
                 </div>
-                <div style="font-size:12px;color:var(--text-2)">By <strong><%= entry.username %></strong></div>
+                <div class="setup-history-item-user">By <strong><%= entry.username %></strong></div>
               </div>
             <% }) %>
           <% } else { %>
-            <div style="padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-3)">No setup history yet.</div>
+            <div class="setup-history-empty">No setup history yet.</div>
           <% } %>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px">
+      <div class="card dashboard-section-card" id="backup-restore-card">
         <div class="card-header">
           <div>
             <div class="card-title"><i class="fas fa-floppy-disk"></i> Backup & Restore</div>
             <div class="card-subtitle">Export this server's dashboard config or paste a previous backup to restore it.</div>
           </div>
         </div>
-        <div class="quick-action-row" style="margin-bottom:14px">
+        <div class="quick-action-row setup-action-row">
           <button type="button" class="btn btn-primary" id="exportBackupBtn"><i class="fas fa-download"></i> Export Backup</button>
           <button type="button" class="btn btn-secondary" id="restoreBackupBtn"><i class="fas fa-upload"></i> Restore Backup</button>
         </div>
-        <div class="form-group" style="margin-bottom:14px">
+        <div class="form-group clone-source-group">
           <label class="form-label" for="cloneSourceGuildId">Clone From Another Server</label>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <div class="clone-source-row">
             <select class="form-control" id="cloneSourceGuildId" style="min-width:260px;flex:1 1 260px">
               <option value="">Choose source server</option>
               <% (cloneSourceGuilds || []).forEach(sourceGuild => { %>
@@ -148,10 +226,10 @@
           <textarea class="form-control" id="backupJsonInput" rows="10" placeholder='{"version":1,"settings":{...}}'></textarea>
           <div class="form-hint">Restore accepts a backup generated from this dashboard. It will re-apply all settings it can match in the current server.</div>
         </div>
-        <div id="backupRestoreResult" hidden style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2)"></div>
+        <div id="backupRestoreResult" class="dashboard-note-panel" hidden></div>
       </div>
 
-      <div class="card" style="margin-bottom:20px">
+      <div class="card dashboard-section-card" id="dashboard-tools-card">
         <div class="card-header">
           <div><div class="card-title"><i class="fas fa-sparkles"></i> New Dashboard Tools</div><div class="card-subtitle">Quick access to the features you asked to add</div></div>
         </div>
@@ -198,8 +276,8 @@
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header" style="align-items:flex-start;gap:14px;flex-wrap:wrap">
+      <div class="card dashboard-section-card" id="profile-share-card">
+        <div class="card-header dashboard-card-header-wrap">
           <div>
             <div class="card-title"><i class="fas fa-id-card"></i> Server Profile Share</div>
             <div class="card-subtitle">Create a public server profile page, share it, and edit the content directly from the dashboard.</div>
@@ -208,7 +286,7 @@
         </div>
 
         <form id="serverProfileForm">
-          <div class="toggle-group" style="margin-bottom:16px">
+          <div class="toggle-group profile-toggle-group">
             <div class="toggle-info"><h4>Public Share Page</h4><p>When enabled, anyone with the link can view this server profile page.</p></div>
             <label class="toggle-switch"><input type="checkbox" id="serverProfileEnabled" name="enabled" <%= serverProfile.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
           </div>
@@ -218,9 +296,9 @@
               <label class="form-label" for="serverProfileTitle">Profile Title</label>
               <input type="text" class="form-control" id="serverProfileTitle" name="title" maxlength="80" value="<%= serverProfile.title %>" placeholder="Your server title">
             </div>
-            <div class="form-group" style="max-width:180px">
+            <div class="form-group profile-color-group">
               <label class="form-label" for="serverProfileAccentColor">Accent Color</label>
-              <input type="color" class="form-control" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>" style="min-height:48px;padding:6px 8px">
+              <input type="color" class="form-control profile-color-input" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>">
             </div>
           </div>
 
@@ -256,29 +334,29 @@
             <div class="toggle-info"><h4>Show Channel Count</h4><p>Display text channel count on the public profile.</p></div>
             <label class="toggle-switch"><input type="checkbox" id="serverProfileShowChannelCount" name="showChannelCount" <%= serverProfile.showChannelCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
           </div>
-          <div class="toggle-group" style="margin-bottom:16px">
+          <div class="toggle-group profile-toggle-group">
             <div class="toggle-info"><h4>Show Role Count</h4><p>Display role count on the public profile.</p></div>
             <label class="toggle-switch"><input type="checkbox" id="serverProfileShowRoleCount" name="showRoleCount" <%= serverProfile.showRoleCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
           </div>
 
-          <div style="border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);padding:16px;margin-bottom:16px">
-            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-              <strong style="color:var(--text-1)">Live Preview</strong>
+          <div class="server-profile-preview-panel">
+            <div class="server-profile-preview-head">
+              <strong>Live Preview</strong>
               <span id="serverProfilePreviewStatus" class="badge badge-yellow"><i class="fas fa-eye-slash"></i> Private</span>
             </div>
-            <div id="serverProfilePreviewCard" style="border:1px solid var(--border);border-left:4px solid <%= serverProfile.accentColor %>;border-radius:var(--radius);background:var(--bg-card);padding:18px">
-              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+            <div id="serverProfilePreviewCard" class="server-profile-preview-card">
+              <div class="server-profile-preview-top">
                 <% if (guild.iconURL()) { %>
-                  <img src="<%= guild.iconURL({ size: 128 }) %>" alt="<%= guild.name %> icon" style="width:72px;height:72px;border-radius:18px;object-fit:cover;border:1px solid var(--border)">
+                  <img src="<%= guild.iconURL({ size: 128 }) %>" alt="<%= guild.name %> icon" class="server-profile-preview-icon">
                 <% } %>
                 <div>
-                  <div id="serverProfilePreviewTitle" style="font-size:24px;font-weight:800;color:var(--text-1);line-height:1.2"><%= serverProfile.title %></div>
-                  <div id="serverProfilePreviewSummary" style="color:var(--text-2);margin-top:6px"><%= serverProfile.summary %></div>
+                  <div id="serverProfilePreviewTitle" class="server-profile-preview-title"><%= serverProfile.title %></div>
+                  <div id="serverProfilePreviewSummary" class="server-profile-preview-summary"><%= serverProfile.summary %></div>
                 </div>
               </div>
-              <div id="serverProfilePreviewStats" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
-              <div id="serverProfilePreviewDescription" style="color:var(--text-1);line-height:1.6;white-space:pre-line"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
-              <div id="serverProfilePreviewInviteWrap" style="margin-top:16px;<%= serverProfile.inviteUrl ? '' : 'display:none' %>">
+              <div id="serverProfilePreviewStats" class="server-profile-preview-stats"></div>
+              <div id="serverProfilePreviewDescription" class="server-profile-preview-description"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
+              <div id="serverProfilePreviewInviteWrap" class="server-profile-preview-invite" <%= serverProfile.inviteUrl ? '' : 'hidden' %>>
                 <a id="serverProfilePreviewInvite" href="<%= serverProfile.inviteUrl || '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fas fa-user-plus"></i> Join Server</a>
               </div>
             </div>
@@ -292,17 +370,17 @@
         </form>
       </div>
 
-      <div class="card" id="minecraftStatusCard" style="margin-bottom:20px">
+      <div class="card dashboard-section-card" id="minecraftStatusCard">
         <div class="card-header">
           <div><div class="card-title"><i class="fas fa-cube"></i> Minecraft Server Status</div><div class="card-subtitle">Check a server now, or post one live embed in Discord and keep it updated automatically</div></div>
         </div>
-        <div class="form-row">
+          <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="minecraftHostInput">Server Address</label>
             <input type="text" class="form-control" id="minecraftHostInput" placeholder="play.example.net" value="<%= minecraftStatusConfig?.host || '' %>">
             <div class="form-hint">Enter a host or paste <code>host:port</code>.</div>
           </div>
-          <div class="form-group" style="max-width:180px">
+          <div class="form-group minecraft-port-group">
             <label class="form-label" for="minecraftPortInput">Port</label>
             <input type="number" class="form-control" id="minecraftPortInput" min="1" max="65535" placeholder="25565" value="<%= minecraftStatusConfig?.port || '' %>">
             <div class="form-hint">Optional. Defaults to the server's standard port.</div>
@@ -319,29 +397,29 @@
             </select>
             <div class="form-hint">The bot will send one status embed here and edit that same message on each refresh.</div>
           </div>
-          <div class="form-group" style="max-width:220px">
+          <div class="form-group minecraft-interval-group">
             <label class="form-label" for="minecraftIntervalInput">Update Interval</label>
             <input type="number" class="form-control" id="minecraftIntervalInput" min="<%= minecraftDefaults.minIntervalMinutes %>" max="<%= minecraftDefaults.maxIntervalMinutes %>" value="<%= minecraftDefaults.intervalMinutes %>">
             <div class="form-hint">Allowed range: <%= minecraftDefaults.minIntervalMinutes %>-<%= minecraftDefaults.maxIntervalMinutes %> minutes.</div>
           </div>
         </div>
-        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);margin-bottom:16px">
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+        <div class="minecraft-summary-panel">
+          <div class="minecraft-summary-grid">
             <div>
-              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Live Embed</div>
-              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.enabled ? 'Enabled' : 'Disabled' %></div>
+              <div class="minecraft-summary-label">Live Embed</div>
+              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.enabled ? 'Enabled' : 'Disabled' %></div>
             </div>
             <div>
-              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Channel</div>
-              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.channelId ? `#${guild.channels.cache.get(minecraftStatusConfig.channelId)?.name || minecraftStatusConfig.channelId}` : 'Not set' %></div>
+              <div class="minecraft-summary-label">Channel</div>
+              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.channelId ? `#${guild.channels.cache.get(minecraftStatusConfig.channelId)?.name || minecraftStatusConfig.channelId}` : 'Not set' %></div>
             </div>
             <div>
-              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Last Check</div>
-              <div style="font-weight:700;color:var(--text-1)"><%= minecraftStatusConfig?.lastCheckedAt ? new Date(minecraftStatusConfig.lastCheckedAt).toLocaleString() : 'Not yet' %></div>
+              <div class="minecraft-summary-label">Last Check</div>
+              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.lastCheckedAt ? new Date(minecraftStatusConfig.lastCheckedAt).toLocaleString() : 'Not yet' %></div>
             </div>
             <div>
-              <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Message</div>
-              <div style="font-weight:700;color:var(--text-1)">
+              <div class="minecraft-summary-label">Message</div>
+              <div class="minecraft-summary-value">
                 <% if (minecraftStatusConfig?.messageId && minecraftStatusConfig?.channelId) { %>
                   <a href="https://discord.com/channels/<%= guild.id %>/<%= minecraftStatusConfig.channelId %>/<%= minecraftStatusConfig.messageId %>" target="_blank" rel="noopener noreferrer">Open live message</a>
                 <% } else { %>
@@ -351,10 +429,10 @@
             </div>
           </div>
           <% if (minecraftStatusConfig?.lastError) { %>
-            <div class="form-hint" style="margin-top:10px;color:var(--yellow)"><i class="fas fa-triangle-exclamation"></i> Last update issue: <%= minecraftStatusConfig.lastError %></div>
+            <div class="form-hint minecraft-error-hint"><i class="fas fa-triangle-exclamation"></i> Last update issue: <%= minecraftStatusConfig.lastError %></div>
           <% } %>
         </div>
-        <div class="quick-action-row" style="margin-bottom:0">
+        <div class="quick-action-row minecraft-action-row">
           <button type="button" class="btn btn-secondary" id="checkMinecraftStatusBtn"><i class="fas fa-signal"></i> Check Server</button>
           <button type="button" class="btn btn-primary" id="saveMinecraftLiveBtn"><i class="fas fa-paper-plane"></i> Send Live Embed</button>
           <button type="button" class="btn btn-danger" id="disableMinecraftLiveBtn"><i class="fas fa-stop"></i> Disable Auto Updates</button>
@@ -565,6 +643,15 @@
   </div>
 </div>
 
+<script type="application/json" id="serverProfileData"><%- JSON.stringify(serverProfile) %></script>
+<script type="application/json" id="cloneSourceGuildsData"><%- JSON.stringify(cloneSourceGuilds || []) %></script>
+<script type="application/json" id="serverProfileDefaultsData"><%- JSON.stringify({
+  title: guild.name,
+  memberCount: guild.memberCount || 0,
+  channelCount,
+  roleCount
+}) %></script>
+
 <%- include('partials/dashboard-common-scripts') %>
 <script>
 const guildId = '<%= guild.id %>';
@@ -606,13 +693,14 @@ const serverProfilePreviewInviteWrap = document.getElementById('serverProfilePre
 const serverProfilePreviewInvite = document.getElementById('serverProfilePreviewInvite');
 const serverProfilePreviewStats = document.getElementById('serverProfilePreviewStats');
 const serverProfilePreviewStatus = document.getElementById('serverProfilePreviewStatus');
-const initialServerProfile = <%- JSON.stringify(serverProfile) %>;
-const initialCloneSourceGuilds = <%- JSON.stringify(cloneSourceGuilds || []) %>;
-const serverProfileDefaultTitle = <%- JSON.stringify(guild.name) %>;
+const initialServerProfile = JSON.parse(document.getElementById('serverProfileData').textContent);
+const initialCloneSourceGuilds = JSON.parse(document.getElementById('cloneSourceGuildsData').textContent);
+const serverProfileDefaults = JSON.parse(document.getElementById('serverProfileDefaultsData').textContent);
+const serverProfileDefaultTitle = serverProfileDefaults.title;
 const serverProfileGuildStats = {
-  memberCount: <%= guild.memberCount || 0 %>,
-  channelCount: <%= channels.length %>,
-  roleCount: <%= roles.length %>
+  memberCount: serverProfileDefaults.memberCount,
+  channelCount: serverProfileDefaults.channelCount,
+  roleCount: serverProfileDefaults.roleCount
 };
 if (setupProgressBarFill) {
   const safeSetupProgress = Math.max(0, Math.min(100, setupProgressPercent));
@@ -697,19 +785,19 @@ function closeModal() { document.getElementById('resetModal').classList.remove('
 function renderSetupHistoryEntries(entries) {
   if (!setupHistoryList) return;
   if (!Array.isArray(entries) || entries.length === 0) {
-    setupHistoryList.innerHTML = '<div style="padding:10px 12px;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-3)">No setup history yet.</div>';
+    setupHistoryList.innerHTML = '<div class="setup-history-empty">No setup history yet.</div>';
     return;
   }
 
   setupHistoryList.innerHTML = entries.map((entry) => {
     const timestamp = entry?.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown time';
     return `
-      <div style="padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card-2)">
-        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px">
-          <strong style="color:var(--text-1)">${escapeHtml(entry?.action || 'Unknown action')}</strong>
-          <span style="font-size:12px;color:var(--text-3)">${escapeHtml(timestamp)}</span>
+      <div class="setup-history-item">
+        <div class="setup-history-item-head">
+          <strong>${escapeHtml(entry?.action || 'Unknown action')}</strong>
+          <span>${escapeHtml(timestamp)}</span>
         </div>
-        <div style="font-size:12px;color:var(--text-2)">By <strong>${escapeHtml(entry?.username || 'Unknown')}</strong></div>
+        <div class="setup-history-item-user">By <strong>${escapeHtml(entry?.username || 'Unknown')}</strong></div>
       </div>
     `;
   }).join('');
@@ -778,16 +866,16 @@ function renderServerProfilePreview() {
   serverProfilePreviewSummary.textContent = summary;
   serverProfilePreviewDescription.textContent = description;
   serverProfilePreviewStats.innerHTML = stats.map((item) => `
-    <div style="padding:8px 12px;border:1px solid var(--border);border-radius:999px;background:var(--bg-card-2);font-size:13px;color:var(--text-1)">
+    <div class="server-profile-stat-chip">
       <strong>${escapeHtml(String(item.value))}</strong> ${escapeHtml(item.label)}
     </div>
   `).join('');
 
   if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl)) {
-    serverProfilePreviewInviteWrap.style.display = '';
+    serverProfilePreviewInviteWrap.hidden = false;
     serverProfilePreviewInvite.href = inviteUrl;
   } else {
-    serverProfilePreviewInviteWrap.style.display = 'none';
+    serverProfilePreviewInviteWrap.hidden = true;
     serverProfilePreviewInvite.href = '#';
   }
 

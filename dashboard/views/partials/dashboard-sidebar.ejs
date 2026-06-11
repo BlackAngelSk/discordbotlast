@@ -5,6 +5,7 @@ const isActive = (path) => activePath === path ? ' active' : '';
 %>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
+    <div class="sidebar-eyebrow">Control Center</div>
     <a href="/dashboard" class="sidebar-back"><i class="fas fa-arrow-left"></i> All Servers</a>
     <div class="sidebar-guild">
       <% if (guild.icon) { %>
@@ -12,7 +13,13 @@ const isActive = (path) => activePath === path ? ' active' : '';
       <% } else { %>
         <div class="sidebar-guild-icon-default"><%= guild.name.charAt(0) %></div>
       <% } %>
-      <div class="sidebar-guild-info"><h3><%= guild.name %></h3><span><%= guild.memberCount %> members</span></div>
+      <div class="sidebar-guild-info">
+        <h3><%= guild.name %></h3>
+        <span><%= guild.memberCount %> members</span>
+        <div class="sidebar-guild-meta">
+          <span class="badge badge-brand"><i class="fas fa-circle"></i> Live dashboard</span>
+        </div>
+      </div>
     </div>
   </div>
   <nav class="sidebar-nav">
@@ -48,6 +55,12 @@ const isActive = (path) => activePath === path ? ' active' : '';
     <div class="sidebar-section-label">Global</div>
     <a href="/global-leaderboard" class="sidebar-link<%= isActive('/global-leaderboard') %>"><i class="fas fa-globe"></i> Global Leaderboard</a>
   </nav>
-  <div class="sidebar-footer"><a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a></div>
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-card">
+      <strong>Server workspace</strong>
+      <span>Use the overview pages first, then drill into feature sections when you need detailed setup.</span>
+    </div>
+    <a href="/logout" class="sidebar-link danger"><i class="fas fa-sign-out-alt"></i> Logout</a>
+  </div>
 </aside>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
