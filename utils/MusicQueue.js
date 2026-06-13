@@ -70,13 +70,26 @@ class MusicQueue {
         
         this.connection.on('stateChange', async (_, newState) => {
             if (newState.status === VoiceConnectionStatus.Disconnected) {
+                const trackedConnection = this.connection;
+                if (!trackedConnection) {
+                    return;
+                }
+
                 try {
                     await Promise.race([
-                        entersState(this.connection, VoiceConnectionStatus.Signalling, 5_000),
-                        entersState(this.connection, VoiceConnectionStatus.Connecting, 5_000),
+                        entersState(trackedConnection, VoiceConnectionStatus.Signalling, 5_000),
+                        entersState(trackedConnection, VoiceConnectionStatus.Connecting, 5_000),
                     ]);
                 } catch (error) {
-                    console.error('❌ Connection lost, cleaning up...');
+                    const isExpectedTeardown = this.isShuttingDown
+                        || this.connection !== trackedConnection
+                        || trackedConnection.state.status === VoiceConnectionStatus.Destroyed;
+
+                    if (isExpectedTeardown) {
+                        return;
+                    }
+
+                    console.warn('⚠️ Connection lost, cleaning up...');
                     this.destroyConnectionSafely();
                 }
             } else if (newState.status === VoiceConnectionStatus.Destroyed) {
