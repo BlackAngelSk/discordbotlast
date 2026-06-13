@@ -26,9 +26,14 @@ class MusicQueue {
         this.ffmpegProcess = null;
         this.ffmpegPath = null;
         this.isShuttingDown = false;
+        this.suppressNextIdleAdvance = false;
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔄 Player entered Idle state');
+            if (this.suppressNextIdleAdvance) {
+                this.suppressNextIdleAdvance = false;
+                return;
+            }
             if (this.isShuttingDown) {
                 this.isShuttingDown = false;
                 return;
@@ -111,6 +116,26 @@ class MusicQueue {
 
         connection.destroy();
         return true;
+    }
+
+    classifyYtDlpError(stderrText = '') {
+        if (!stderrText) {
+            return null;
+        }
+
+        if (stderrText.includes('Sign in to confirm your age')) {
+            return 'This video is age-restricted and cannot be played by the bot.';
+        }
+
+        if (stderrText.includes('This video is unavailable') || stderrText.includes('Video unavailable')) {
+            return 'This video is unavailable.';
+        }
+
+        if (stderrText.includes('Private video')) {
+            return 'This video is private.';
+        }
+
+        return null;
     }
 
     addSong(song) {
@@ -198,10 +223,53 @@ class MusicQueue {
                 return;
             }
 
+            let playbackFailureHandled = false;
+            let ytdlpStderr = '';
+
             const { createAudioResource, StreamType } = require('@discordjs/voice');
             const { spawn, spawnSync } = require('child_process');
             const path = require('path');
             const fs = require('fs');
+
+            const handleStreamFailure = (rawError) => {
+                if (playbackFailureHandled || this.isShuttingDown) {
+                    return;
+                }
+
+                playbackFailureHandled = true;
+                const friendlyError = this.classifyYtDlpError(rawError);
+
+                if (friendlyError) {
+                    console.error(`❌ Skipping "${song.title}": ${friendlyError}`);
+                } else {
+                    console.error('❌ yt-dlp stream failed:', rawError || 'Unknown stream error');
+                }
+
+                this.suppressNextIdleAdvance = true;
+
+                try {
+                    this.player.stop();
+                } catch (_) {}
+
+                if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
+                    try {
+                        this.ffmpegProcess.stdin.end();
+                    } catch (_) {}
+                }
+
+                setTimeout(() => {
+                    if (this.ffmpegProcess) {
+                        try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
+                        this.ffmpegProcess = null;
+                    }
+                    if (this.ytdlpProcess) {
+                        try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
+                        this.ytdlpProcess = null;
+                    }
+                }, 100);
+
+                this.playNext();
+            };
 
             // Resolve FFmpeg path once to avoid blocking event loop each song
             if (!this.ffmpegPath) {
@@ -329,17 +397,33 @@ class MusicQueue {
 
             // Error handling
             ytdlpProcess.on('error', (err) => {
-                console.error('❌ yt-dlp error:', err);
-                this.playNext();
+                handleStreamFailure(err.message || String(err));
             });
 
             ffmpegProcess.on('error', (err) => {
                 console.error('❌ FFmpeg error:', err);
-                this.playNext();
+                if (!playbackFailureHandled) {
+                    this.playNext();
+                }
             });
 
             ytdlpProcess.stderr.on('data', (data) => {
-                console.error('yt-dlp stderr:', data.toString());
+                const stderrChunk = data.toString();
+                ytdlpStderr += stderrChunk;
+
+                const friendlyError = this.classifyYtDlpError(ytdlpStderr);
+                if (friendlyError) {
+                    handleStreamFailure(ytdlpStderr);
+                    return;
+                }
+
+                console.error('yt-dlp stderr:', stderrChunk);
+            });
+
+            ytdlpProcess.on('close', (code) => {
+                if (code !== 0) {
+                    handleStreamFailure(ytdlpStderr || `yt-dlp exited with code ${code}`);
+                }
             });
 
             // Create audio resource from FFmpeg output
