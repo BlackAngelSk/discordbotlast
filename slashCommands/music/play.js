@@ -5,6 +5,7 @@ const https = require('https');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
 const achievementManager = require('../../utils/achievementManager');
+const { searchYouTube } = require('../../utils/youtubeSearch');
 const { parseDuration } = require('../../utils/helpers');
 
 const createMusicControls = (disabled = false) => {
@@ -277,8 +278,7 @@ async function handleYouTubePlaylist(url, queue, interaction) {
 
 async function handleYouTubeSearch(query, queue, interaction) {
     try {
-        // Use play-dl to search
-        const searchResults = await play.search(query, { limit: 1 });
+        const searchResults = await searchYouTube(query, { limit: 1 });
         
         if (!searchResults || searchResults.length === 0) {
             return interaction.editReply('❌ No results found!');

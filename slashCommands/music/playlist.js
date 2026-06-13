@@ -8,6 +8,7 @@ const { joinVoiceChannel } = require('@discordjs/voice');
 const play = require('play-dl');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
+const { searchYouTube } = require('../../utils/youtubeSearch');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -393,7 +394,7 @@ async function resolveSongFromQuery(query, requesterTag) {
             };
         }
 
-        const results = await play.search(query, { limit: 1 });
+        const results = await searchYouTube(query, { limit: 1 });
         if (!results || !results.length) {
             return null;
         }

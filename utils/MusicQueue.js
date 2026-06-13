@@ -25,9 +25,14 @@ class MusicQueue {
         this.stay247 = false; // 24/7 mode — never auto-disconnect
         this.ffmpegProcess = null;
         this.ffmpegPath = null;
+        this.isShuttingDown = false;
 
         this.player.on(AudioPlayerStatus.Idle, () => {
             console.log('🔄 Player entered Idle state');
+            if (this.isShuttingDown) {
+                this.isShuttingDown = false;
+                return;
+            }
             this.playNext();
         });
 
@@ -50,9 +55,7 @@ class MusicQueue {
             console.log('✅ Connection is ready');
         } catch (error) {
             console.error('❌ Connection failed to become ready:', error);
-            this.connection.destroy();
-            const queues = require('./queues');
-            queues.delete(this.guildId);
+            this.destroyConnectionSafely();
             throw new Error('Failed to establish voice connection');
         }
         
@@ -69,25 +72,45 @@ class MusicQueue {
                     ]);
                 } catch (error) {
                     console.error('❌ Connection lost, cleaning up...');
-                    this.connection.destroy();
-                    const queues = require('./queues');
-                    queues.delete(this.guildId);
+                    this.destroyConnectionSafely();
                 }
             } else if (newState.status === VoiceConnectionStatus.Destroyed) {
+                this.connection = null;
                 this.stop();
             } else if (!this.readyLock && (newState.status === VoiceConnectionStatus.Connecting || newState.status === VoiceConnectionStatus.Signalling)) {
                 this.readyLock = true;
                 try {
                     await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
                 } catch {
-                    if (this.connection.state.status !== VoiceConnectionStatus.Destroyed) {
-                        this.connection.destroy();
-                    }
+                    this.destroyConnectionSafely();
                 } finally {
                     this.readyLock = false;
                 }
             }
         });
+    }
+
+    clearDisconnectTimer() {
+        if (this.disconnectTimer) {
+            clearTimeout(this.disconnectTimer);
+            this.disconnectTimer = null;
+        }
+    }
+
+    destroyConnectionSafely() {
+        const connection = this.connection;
+        this.connection = null;
+        this.clearDisconnectTimer();
+
+        const queues = require('./queues');
+        queues.delete(this.guildId);
+
+        if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
+            return false;
+        }
+
+        connection.destroy();
+        return true;
     }
 
     addSong(song) {
@@ -144,15 +167,8 @@ class MusicQueue {
             console.log('⏱️ Setting 15 second disconnect timer');
             this.disconnectTimer = setTimeout(() => {
                 if (this.connection && !this.isPlaying && this.songs.length === 0) {
-                    try {
-                        this.connection.destroy();
-                        const queues = require('./queues');
-                        queues.delete(this.guildId);
+                    if (this.destroyConnectionSafely()) {
                         console.log(`⏱️ Auto-disconnected from voice channel in guild ${this.guildId}`);
-                    } catch (error) {
-                        // Connection already destroyed, just clean up
-                        const queues = require('./queues');
-                        queues.delete(this.guildId);
                     }
                 }
             }, 15000);
@@ -162,8 +178,7 @@ class MusicQueue {
         // Clear disconnect timer if we're playing again
         if (this.disconnectTimer) {
             console.log('⏱️ Clearing disconnect timer');
-            clearTimeout(this.disconnectTimer);
-            this.disconnectTimer = null;
+            this.clearDisconnectTimer();
         }
 
         this.currentSong = this.songs.shift();
@@ -402,6 +417,8 @@ class MusicQueue {
     }
 
     stop() {
+        this.isShuttingDown = true;
+        this.clearDisconnectTimer();
         this.songs = [];
         
         // Stop the player first

@@ -5,6 +5,7 @@ const https = require('https');
 const MusicQueue = require('../../utils/MusicQueue');
 const queues = require('../../utils/queues');
 const achievementManager = require('../../utils/achievementManager');
+const { searchYouTube } = require('../../utils/youtubeSearch');
 const { parseDuration, formatDuration } = require('../../utils/helpers');
 
 module.exports = {
@@ -276,8 +277,7 @@ module.exports = {
                     return message.reply('❌ Invalid YouTube URL!');
                 }
             } else {
-                // Search using play-dl
-                const searchResults = await play.search(query, { limit: 1 });
+                const searchResults = await searchYouTube(query, { limit: 1 });
                 
                 if (!searchResults || searchResults.length === 0) {
                     return message.reply('❌ No results found!');
