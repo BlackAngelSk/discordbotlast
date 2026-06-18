@@ -237,6 +237,95 @@ class InputValidator {
     }
 
     /**
+     * Parse a natural-language duration string.
+     * Supports: "in 10 minutes", "2 hours", "1h 30m", "1 day", "in 1 hour 30 minutes"
+     * Units: second(s)/s, minute(s)/m, hour(s)/h, day(s)/d, week(s)/w
+     * @param {string} input - Natural-language duration string
+     * @returns {object} - { valid: boolean, value: number (ms), error: string }
+     */
+    static parseNaturalDuration(input) {
+        if (!input) {
+            return { valid: false, error: 'Duration is required' };
+        }
+
+        const MIN_MS = 1000;
+        const MAX_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+        let str = String(input).trim().toLowerCase();
+        // Tolerate a leading "in " keyword, e.g. "in 10 minutes"
+        str = str.replace(/^in\s+/, '');
+
+        const unitMap = {
+            s: 1000,
+            sec: 1000,
+            secs: 1000,
+            second: 1000,
+            seconds: 1000,
+            m: 60 * 1000,
+            min: 60 * 1000,
+            mins: 60 * 1000,
+            minute: 60 * 1000,
+            minutes: 60 * 1000,
+            h: 60 * 60 * 1000,
+            hr: 60 * 60 * 1000,
+            hrs: 60 * 60 * 1000,
+            hour: 60 * 60 * 1000,
+            hours: 60 * 60 * 1000,
+            d: 24 * 60 * 60 * 1000,
+            day: 24 * 60 * 60 * 1000,
+            days: 24 * 60 * 60 * 1000,
+            w: 7 * 24 * 60 * 60 * 1000,
+            wk: 7 * 24 * 60 * 60 * 1000,
+            week: 7 * 24 * 60 * 60 * 1000,
+            weeks: 7 * 24 * 60 * 60 * 1000
+        };
+
+        // Match repeating groups of "<number> <unit>" (unit is alphabetic, possibly the strict Nm form too)
+        const tokenRegex = /(\d+)\s*([a-z]+)/g;
+        let totalMs = 0;
+        let matchedAny = false;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = tokenRegex.exec(str)) !== null) {
+            matchedAny = true;
+            // Ensure no garbage between matches (allow whitespace and commas/and)
+            const between = str.slice(lastIndex, match.index);
+            if (between && !/^[\s,]*and\s*$/i.test(between) && !/^[\s,]*$/.test(between)) {
+                return { valid: false, error: `Invalid duration text near "${between.trim()}"` };
+            }
+            const num = parseInt(match[1], 10);
+            const unit = match[2];
+            const mult = unitMap[unit];
+            if (!mult) {
+                return { valid: false, error: `Unknown time unit "${unit}" (use seconds, minutes, hours, days, weeks)` };
+            }
+            totalMs += num * mult;
+            lastIndex = tokenRegex.lastIndex;
+        }
+
+        // Reject trailing garbage after the last matched token
+        const trailing = str.slice(lastIndex);
+        if (trailing && !/^[\s,]*$/.test(trailing)) {
+            return { valid: false, error: `Invalid duration text near "${trailing.trim()}"` };
+        }
+
+        if (!matchedAny || totalMs <= 0) {
+            return { valid: false, error: 'Invalid duration format (e.g. "10 minutes", "2 hours", "1 day")' };
+        }
+
+        if (totalMs < MIN_MS) {
+            return { valid: false, error: 'Duration must be at least 1 second' };
+        }
+
+        if (totalMs > MAX_MS) {
+            return { valid: false, error: 'Duration cannot exceed 1 week' };
+        }
+
+        return { valid: true, value: totalMs };
+    }
+
+    /**
      * Sanitize text to prevent injection
      * @param {string} input - Text to sanitize
      * @returns {string} - Sanitized text
