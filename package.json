@@ -13,7 +13,8 @@
     "slots:sim": "node scripts/simulate-slots-rtp.js",
     "test:slots": "node scripts/test-slots-logic.js",
     "test:steam-dates": "node scripts/test-steam-update-dates.js",
-    "test": "node tests/run-all.js"
+    "test": "node tests/run-all.js",
+    "test:mongo": "node test-mongo-connect.js"
   },
   "keywords": [
     "discord",

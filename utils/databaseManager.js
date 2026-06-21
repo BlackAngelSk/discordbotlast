@@ -245,18 +245,28 @@ class DatabaseManager {
                     console.log('ℹ️ Mongo auto-sync is set to manual mode. Use /mongodb-sync run whenever you want to push updates.');
                 }
             } catch (error) {
+                console.warn('═══════════════════════════════════════════════════');
+                console.warn('   ❌ MongoDB Connection Failed');
+                console.warn('═══════════════════════════════════════════════════');
+                console.warn(`   Error: ${error.message}`);
+                console.warn(`   URI: ${this.getEnvString('MONGODB_URI', '(not set)').replace(/\/\/([^:]+):([^@]+)@/, '//$1:****@')}`);
+                console.warn(`   DEV_MODE: ${this.devMode ? 'ENABLED (forces JSON storage)' : 'disabled'}`);
+                console.warn(`   MONGODB_FORCE_IPV4: ${this.getEnvBoolean('MONGODB_FORCE_IPV4', false)}`);
+
                 // One automatic retry path for common TLS handshake failures
                 if (this.isTlsHandshakeError(error?.message) && !this.getEnvBoolean('MONGODB_FORCE_IPV4', false)) {
                     try {
                         const { MongoClient } = require('mongodb');
                         const retryOptions = { ...this.buildMongoClientOptions(), family: 4 };
-                        console.warn('⚠️ MongoDB TLS handshake failed. Retrying once with IPv4...');
+                        console.warn('   ⏳ Retrying once with IPv4 only...');
 
                         this.mongoClient = new MongoClient(process.env.MONGODB_URI, retryOptions);
                         await this.mongoClient.connect();
                         this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
                         this.useDB = 'mongodb';
+                        console.warn('═══════════════════════════════════════════════════');
                         console.log('✅ MongoDB connected successfully on IPv4 retry!');
+                        console.log('   💡 Tip: Add MONGODB_FORCE_IPV4=true to .env to skip the IPv4 retry on future starts.');
 
                         if (this.syncSettings.startupSync) {
                             await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
@@ -273,8 +283,10 @@ class DatabaseManager {
                     }
                 }
 
-                console.warn('⚠️ MongoDB connection failed, falling back to JSON:', error.message);
-                console.warn('💡 MongoDB hint:', this.getMongoConnectionHint(error.message));
+                console.warn(`   💡 Cause: ${this.getMongoConnectionHint(error.message)}`);
+                console.warn('   🔧 Run "node test-mongo-connect.js" for detailed diagnostics.');
+                console.warn('   📖 See MONGODB.md for setup instructions.');
+                console.warn('═══════════════════════════════════════════════════');
                 this.useDB = 'json';
             }
         }
