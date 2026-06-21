@@ -78,6 +78,7 @@ const {
 } = require('./setupManager');
 
 const { runDashboardTestAction } = require('./testActions');
+const { registerPublicApiRoutes } = require('./api/routes');
 
 const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');
 const DASHBOARD_AUDIT_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
@@ -874,6 +875,9 @@ class Dashboard {
     setupRoutes() {
         // Import the advanced dashboard routes
         dashboardRoutes(this.app, this.client, this.checkAuth, this.checkGuildAccess);
+
+        // ── Public REST API v1 ──────────────────────────────────────────────
+        registerPublicApiRoutes(this.app, this.client);
 
         // ── Health endpoint ───────────────────────────────────────────────────
         this.app.get('/health', (req, res) => {
