@@ -27,8 +27,7 @@ module.exports = {
 
             const userData = economyManager.getUserData(message.guildId, user.id);
             const oldBalance = userData.balance;
-            userData.balance = amount;
-            await economyManager.save();
+            await economyManager.setBalance(message.guildId, user.id, amount);
 
             const embed = new EmbedBuilder()
                 .setColor(0x5865f2)

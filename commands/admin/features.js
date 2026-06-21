@@ -74,7 +74,7 @@ module.exports = {
             const settings = settingsManager.get(guildId);
             if (!settings.features) settings.features = {};
             settings.features[featureName] = sub === 'enable';
-            settingsManager.save();
+            await settingsManager.save();
 
             const state = sub === 'enable' ? '✅ Enabled' : '❌ Disabled';
             return message.reply(`${state} feature **${featureName}** — ${FEATURES[featureName]}`);

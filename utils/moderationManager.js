@@ -77,9 +77,9 @@ class ModerationManager {
         return true;
     }
 
-    setModLogChannel(guildId, channelId) {
+    async setModLogChannel(guildId, channelId) {
         this.data.modLogs[guildId] = channelId;
-        this.save();
+        await this.save();
     }
 
     getModLogChannel(guildId) {
@@ -167,20 +167,20 @@ class ModerationManager {
         return { violation: false };
     }
 
-    addBadWord(guildId, word) {
+    async addBadWord(guildId, word) {
         if (!this.data.automod[guildId]) {
             this.data.automod[guildId] = this.getAutomodSettings(guildId);
         }
         if (!this.data.automod[guildId].badWords.includes(word)) {
             this.data.automod[guildId].badWords.push(word);
-            this.save();
+            await this.save();
         }
     }
 
-    removeBadWord(guildId, word) {
+    async removeBadWord(guildId, word) {
         if (this.data.automod[guildId]) {
             this.data.automod[guildId].badWords = this.data.automod[guildId].badWords.filter(w => w !== word);
-            this.save();
+            await this.save();
         }
     }
 }

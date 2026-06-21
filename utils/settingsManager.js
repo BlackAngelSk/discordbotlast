@@ -147,7 +147,7 @@ class SettingsManager {
             }
 
             await fs.writeFile(SETTINGS_FILE, JSON.stringify(obj, null, 2));
-            await this.persistAllToDatabase();
+            // persistAllToDatabase is called separately when needed (e.g., on specific guild updates)
         } catch (error) {
             console.error('Error saving settings:', error);
         }
@@ -165,6 +165,7 @@ class SettingsManager {
         settings[key] = value;
         this.settings.set(guildId, this.normalizeGuildSettings(settings));
         await this.save();
+        await this.persistGuildToDatabase(guildId);
     }
 
     async setMultiple(guildId, updates) {
@@ -172,6 +173,7 @@ class SettingsManager {
         Object.assign(settings, updates);
         this.settings.set(guildId, this.normalizeGuildSettings(settings));
         await this.save();
+        await this.persistGuildToDatabase(guildId);
     }
 
     getPrefixes(guildId) {

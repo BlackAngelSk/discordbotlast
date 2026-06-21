@@ -39,7 +39,7 @@ module.exports = {
             settings.bumpReminderEnabled = true;
             settings.bumpReminderChannel = channel.id;
             settings.bumpReminderRole = role?.id || null;
-            settingsManager.save();
+            await settingsManager.save();
 
             const embed = new EmbedBuilder()
                 .setColor(0x57f287)
@@ -52,7 +52,7 @@ module.exports = {
         // ── disable ───────────────────────────────────────────────────────────
         if (sub === 'disable' || sub === 'off') {
             settings.bumpReminderEnabled = false;
-            settingsManager.save();
+            await settingsManager.save();
             return message.reply('✅ Bump reminder disabled.');
         }
 

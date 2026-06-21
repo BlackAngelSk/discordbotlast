@@ -161,6 +161,7 @@ class EconomyManager {
     }
 
     async addMoney(guildId, userId, amount) {
+        if (!Number.isFinite(amount)) return this.getUserData(guildId, userId).balance;
         const userData = this.getUserData(guildId, userId);
         userData.balance += amount;
         await this.save();
@@ -168,6 +169,7 @@ class EconomyManager {
     }
 
     async removeMoney(guildId, userId, amount) {
+        if (!Number.isFinite(amount) || amount <= 0) return false;
         const userData = this.getUserData(guildId, userId);
         if (userData.balance < amount) return false;
         userData.balance -= amount;
@@ -184,8 +186,9 @@ class EconomyManager {
         // Calculate level (xp = level^2 * 100)
         const newLevel = calculateLevelFromXP(userData.xp);
         const leveledUp = newLevel > oldLevel;
-        userData.level = newLevel;
-        userData.highestLevelReached = Math.min(MAX_LEVEL, Math.max(userData.highestLevelReached || 1, newLevel));
+        // Never allow level to decrease — use the higher of stored vs calculated
+        userData.level = Math.max(userData.level, newLevel);
+        userData.highestLevelReached = Math.min(MAX_LEVEL, Math.max(userData.highestLevelReached || 1, userData.level));
         
         await this.save();
         return { leveledUp, level: newLevel };
@@ -313,6 +316,7 @@ class EconomyManager {
     }
 
     async addBalance(guildId, userId, amount) {
+        if (!Number.isFinite(amount)) return this.getUserData(guildId, userId).balance;
         const userData = this.getUserData(guildId, userId);
         userData.balance += amount;
         await this.save();
@@ -320,6 +324,7 @@ class EconomyManager {
     }
 
     async removeBalance(guildId, userId, amount) {
+        if (!Number.isFinite(amount) || amount <= 0) return this.getUserData(guildId, userId).balance;
         const userData = this.getUserData(guildId, userId);
         userData.balance = Math.max(0, userData.balance - amount);
         await this.save();
@@ -327,6 +332,7 @@ class EconomyManager {
     }
 
     async setBalance(guildId, userId, amount) {
+        if (!Number.isFinite(amount) || amount < 0) return this.getUserData(guildId, userId).balance;
         const userData = this.getUserData(guildId, userId);
         userData.balance = amount;
         await this.save();
