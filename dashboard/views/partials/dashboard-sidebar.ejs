@@ -17,7 +17,7 @@ const isActive = (path) => activePath === path ? ' active' : '';
         <h3><%= guild.name %></h3>
         <span><%= guild.memberCount %> members</span>
         <div class="sidebar-guild-meta">
-          <span class="badge badge-brand"><i class="fas fa-circle"></i> Live dashboard</span>
+          <span class="badge badge-brand"><i class="fas fa-circle" style="font-size:7px"></i> Live dashboard</span>
         </div>
       </div>
     </div>
@@ -28,10 +28,12 @@ const isActive = (path) => activePath === path ? ' active' : '';
     <a href="<%= `${dashboardBasePath}/activity` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/activity`) %>"><i class="fas fa-clock-rotate-left"></i> Activity</a>
     <a href="<%= `${dashboardBasePath}/analytics` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/analytics`) %>"><i class="fas fa-chart-line"></i> Analytics</a>
 
-    <div class="sidebar-section-label">Setup</div>
+    <div class="sidebar-section-label">Setup & Security</div>
     <a href="<%= `${dashboardBasePath}/server-builder` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/server-builder`) %>"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
     <a href="<%= `${dashboardBasePath}/permissions` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/permissions`) %>"><i class="fas fa-user-lock"></i> Delegation</a>
     <a href="<%= `${dashboardBasePath}/safety` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/safety`) %>"><i class="fas fa-user-shield"></i> Safety Center</a>
+    <a href="<%= `${dashboardBasePath}/moderation` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/moderation`) %>"><i class="fas fa-shield-halved"></i> Moderation</a>
+    <a href="<%= `${dashboardBasePath}/automod` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/automod`) %>"><i class="fas fa-robot"></i> Auto-Mod</a>
 
     <div class="sidebar-section-label">Features</div>
     <a href="<%= `${dashboardBasePath}/economy` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/economy`) %>"><i class="fas fa-coins"></i> Economy</a>
@@ -40,17 +42,12 @@ const isActive = (path) => activePath === path ? ' active' : '';
     <a href="<%= `${dashboardBasePath}/community` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/community`) %>"><i class="fas fa-users-gear"></i> Community</a>
     <a href="<%= `${dashboardBasePath}/voice-tools` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/voice-tools`) %>"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
 
-    <div class="sidebar-section-label">Alerts</div>
+    <div class="sidebar-section-label">Alerts & Integrations</div>
     <a href="<%= `${dashboardBasePath}/live-alerts` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/live-alerts`) %>"><i class="fas fa-satellite-dish"></i> Live Alerts</a>
     <a href="<%= `${dashboardBasePath}/epic-games` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/epic-games`) %>"><i class="fas fa-gift"></i> Epic Games</a>
-    <a href="<%= `${dashboardBasePath}/steam-free-games` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/steam-free-games`) %>"><i class="fab fa-steam"></i> Steam Free Games</a>
-    <a href="<%= `${dashboardBasePath}/steam-promos` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/steam-promos`) %>"><i class="fab fa-steam"></i> Steam Promos</a>
+    <a href="<%= `${dashboardBasePath}/steam-free-games` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/steam-free-games`) %>"><i class="fab fa-steam"></i> Steam Deals</a>
     <a href="<%= `${dashboardBasePath}/steam-updates` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/steam-updates`) %>"><i class="fab fa-steam"></i> Steam Updates</a>
-    <a href="<%= `${dashboardBasePath}/telegram-sync` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/telegram-sync`) %>"><i class="fab fa-telegram"></i> Telegram Sync</a>
-
-    <div class="sidebar-section-label">Moderation</div>
-    <a href="<%= `${dashboardBasePath}/moderation` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/moderation`) %>"><i class="fas fa-shield-halved"></i> Moderation</a>
-    <a href="<%= `${dashboardBasePath}/automod` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/automod`) %>"><i class="fas fa-robot"></i> Auto-Mod</a>
+    <a href="<%= `${dashboardBasePath}/telegram-sync` %>" class="sidebar-link<%= isActive(`${dashboardBasePath}/telegram-sync`) %>"><i class="fab fa-telegram"></i> Telegram</a>
 
     <div class="sidebar-section-label">Global</div>
     <a href="/global-leaderboard" class="sidebar-link<%= isActive('/global-leaderboard') %>"><i class="fas fa-globe"></i> Global Leaderboard</a>

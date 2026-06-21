@@ -9,10 +9,9 @@
 </head>
 <body>
 <%
-  const setupRemainingCount = Math.max((setupChecklist?.length || 0) - (setupCompletedCount || 0), 0);
   const channelCount = Array.isArray(channels) ? channels.length : 0;
   const roleCount = Array.isArray(roles) ? roles.length : 0;
-  const featuredStatusLabel = setupRemainingCount === 0 ? 'Setup complete' : `${setupRemainingCount} setup step${setupRemainingCount === 1 ? '' : 's'} left`;
+  const pendingCount = (setupChecklist?.length || 0) - (setupCompletedCount || 0);
 %>
 <div class="app-layout">
   <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
@@ -21,536 +20,112 @@
     <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Server Settings' }) %>
 
     <main class="content">
-      <div class="page-header">
-        <div class="page-header-badges">
-          <div class="page-header-badge"><i class="fas fa-server"></i> <%= guild.name %></div>
-          <div class="page-header-badge"><i class="fas fa-list-check"></i> <%= setupProgressPercent %>% setup ready</div>
-          <div class="page-header-badge"><i class="fas fa-satellite-dish"></i> <%= liveAlertsCount %> live alert<%= liveAlertsCount === 1 ? '' : 's' %></div>
+      <!-- Compact Header -->
+      <div class="settings-compact-header">
+        <div class="settings-compact-icon"><i class="fas fa-cog"></i></div>
+        <div class="settings-compact-info">
+          <h1><%= guild.name %></h1>
+          <p><%= pendingCount > 0 ? `${pendingCount} setup step${pendingCount === 1 ? '' : 's'} remaining` : 'All setup steps completed' %></p>
         </div>
-        <h1>Build the server workspace around your bot</h1>
-        <p>Everything important for <strong><%= guild.name %></strong> now starts here: setup progress, quick fixes, public profile sharing, backups, and the core server configuration surface.</p>
-      </div>
-
-      <div class="dashboard-hero-grid">
-        <section class="dashboard-hero-card">
-          <h2>Command deck</h2>
-          <p>Use this page as the main operating surface for setup, backup, sharing, and the core bot systems that affect the whole server.</p>
-          <div class="dashboard-hero-pills">
-            <div class="dashboard-hero-pill">
-              <strong><%= guild.memberCount %></strong>
-              <span>Members in this server</span>
-            </div>
-            <div class="dashboard-hero-pill">
-              <strong><%= channelCount %></strong>
-              <span>Available channels</span>
-            </div>
-            <div class="dashboard-hero-pill">
-              <strong><%= roleCount %></strong>
-              <span>Roles ready to map</span>
-            </div>
-          </div>
-          <div class="dashboard-hero-actions">
-            <a href="#setup-assistant-card" class="btn btn-primary"><i class="fas fa-list-check"></i> Continue setup</a>
-            <a href="#settingsForm" class="btn btn-secondary"><i class="fas fa-sliders"></i> Edit core settings</a>
-            <a href="#backup-restore-card" class="btn btn-secondary"><i class="fas fa-floppy-disk"></i> Backup or clone</a>
-          </div>
-        </section>
-
-        <div class="dashboard-hero-side-stack">
-          <section class="dashboard-hero-card">
-            <h3>Readiness snapshot</h3>
-            <div class="dashboard-glance-list">
-              <div class="dashboard-glance-item">
-                <strong><%= featuredStatusLabel %></strong>
-                <span><%= setupCompletedCount %> of <%= setupChecklist.length %> guided setup tasks completed.</span>
-              </div>
-              <div class="dashboard-glance-item">
-                <strong><%= activeTickets %> open support ticket<%= activeTickets === 1 ? '' : 's' %></strong>
-                <span>Use this to judge whether support flows and logging need attention.</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="dashboard-hero-card">
-            <h3>Jump points</h3>
-            <div class="dashboard-glance-list">
-              <div class="dashboard-glance-item">
-                <strong>Public profile and share link</strong>
-                <span>Show off your community with a branded public page.</span>
-              </div>
-              <div class="dashboard-glance-item">
-                <strong>Minecraft, live alerts, backups</strong>
-                <span>High-touch features are surfaced earlier so they are easier to reach.</span>
-              </div>
-            </div>
-          </section>
+        <div class="settings-compact-stats">
+          <div class="settings-compact-stat"><i class="fas fa-users"></i> <strong><%= guild.memberCount %></strong> Members</div>
+          <div class="settings-compact-stat"><i class="fas fa-hashtag"></i> <strong><%= channelCount %></strong> Channels</div>
+          <div class="settings-compact-stat"><i class="fas fa-tag"></i> <strong><%= roleCount %></strong> Roles</div>
+          <div class="settings-compact-stat"><i class="fas fa-ticket"></i> <strong><%= activeTickets %></strong> Tickets</div>
         </div>
       </div>
 
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-card-header"><span class="stat-card-label">Members</span><div class="stat-card-icon blue"><i class="fas fa-users"></i></div></div>
-          <div class="stat-card-value"><%= guild.memberCount %></div>
-          <div class="stat-card-change"><i class="fas fa-server"></i> Active server</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-header"><span class="stat-card-label">Text Channels</span><div class="stat-card-icon purple"><i class="fas fa-hashtag"></i></div></div>
-          <div class="stat-card-value"><%= channelCount %></div>
-          <div class="stat-card-change"><i class="fas fa-hashtag"></i> Available</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-header"><span class="stat-card-label">Roles</span><div class="stat-card-icon orange"><i class="fas fa-tag"></i></div></div>
-          <div class="stat-card-value"><%= roleCount %></div>
-          <div class="stat-card-change"><i class="fas fa-tag"></i> Configured</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-header"><span class="stat-card-label">Open Tickets</span><div class="stat-card-icon yellow"><i class="fas fa-ticket"></i></div></div>
-          <div class="stat-card-value"><%= activeTickets %></div>
-          <div class="stat-card-change"><i class="fas fa-ticket"></i> Support tickets</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card-header"><span class="stat-card-label">Live Alerts</span><div class="stat-card-icon red"><i class="fas fa-satellite-dish"></i></div></div>
-          <div class="stat-card-value"><%= liveAlertsCount %></div>
-          <div class="stat-card-change"><i class="fas fa-bell"></i> Twitch and YouTube</div>
-        </div>
+      <!-- Tab Navigation -->
+      <div class="settings-tabs" id="settingsTabs">
+        <button class="settings-tab active" data-tab="overview"><i class="fas fa-list-check"></i> Overview <span class="tab-badge"><%= setupCompletedCount %>/<%= setupChecklist.length %></span></button>
+        <button class="settings-tab" data-tab="core"><i class="fas fa-sliders"></i> Core Settings</button>
+        <button class="settings-tab" data-tab="profile"><i class="fas fa-id-card"></i> Server Profile <span class="tab-badge"><%= serverProfile.enabled ? 'Public' : 'Private' %></span></button>
+        <button class="settings-tab" data-tab="minecraft"><i class="fas fa-cube"></i> Minecraft</button>
+        <button class="settings-tab" data-tab="backup"><i class="fas fa-floppy-disk"></i> Backup</button>
       </div>
 
-      <div class="card dashboard-section-nav">
-        <div class="dashboard-section-nav-title"><i class="fas fa-compass"></i> Jump To Section</div>
-        <div class="dashboard-section-nav-links">
-          <a href="#setup-assistant-card" class="btn btn-secondary btn-sm"><i class="fas fa-list-check"></i> Setup</a>
-          <a href="#backup-restore-card" class="btn btn-secondary btn-sm"><i class="fas fa-floppy-disk"></i> Backup</a>
-          <a href="#profile-share-card" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> Profile Share</a>
-          <a href="#minecraftStatusCard" class="btn btn-secondary btn-sm"><i class="fas fa-cube"></i> Minecraft</a>
-          <a href="#settingsForm" class="btn btn-secondary btn-sm"><i class="fas fa-sliders"></i> Core Settings</a>
-        </div>
-      </div>
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- TAB: Overview -->
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="settings-tab-panel active" id="tab-overview">
 
-      <div class="card dashboard-section-card" id="setup-assistant-card">
-        <div class="card-header dashboard-card-header-wrap">
-          <div>
-            <div class="card-title"><i class="fas fa-list-check"></i> Setup Assistant</div>
-            <div class="card-subtitle">Complete these steps to finish bot setup from the dashboard.</div>
-          </div>
-          <div class="setup-progress-panel">
-            <div class="setup-progress-header">
-              <span>Progress</span>
-              <strong class="setup-progress-strong"><%= setupCompletedCount %>/<%= setupChecklist.length %> completed</strong>
+        <!-- Setup Checklist -->
+        <div class="card">
+          <div class="card-header dashboard-card-header-wrap">
+            <div>
+              <div class="card-title"><i class="fas fa-list-check"></i> Setup Checklist</div>
+              <div class="card-subtitle">Complete these steps to finish bot configuration.</div>
             </div>
-            <div class="setup-progress-track">
-              <div id="setupProgressBarFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--green));"></div>
-            </div>
-            <div class="setup-progress-footnote"><%= setupProgressPercent %>% ready</div>
-          </div>
-        </div>
-
-        <div class="setup-checklist-grid">
-          <% setupChecklist.forEach(item => { %>
-            <a href="<%= item.href %>" class="setup-checklist-item">
-              <div class="setup-checklist-row">
-                <div class="setup-checklist-title"><i class="fas <%= item.icon %>"></i><%= item.title %></div>
-                <% if (item.done) { %>
-                  <span class="badge badge-green"><i class="fas fa-check"></i> Ready</span>
-                <% } else { %>
-                  <span class="badge badge-yellow"><i class="fas fa-clock"></i> Needed</span>
-                <% } %>
+            <div class="setup-progress-panel">
+              <div class="setup-progress-header">
+                <span>Progress</span>
+                <strong class="setup-progress-strong"><%= setupCompletedCount %>/<%= setupChecklist.length %></strong>
               </div>
-              <div class="setup-checklist-description"><%= item.description %></div>
-            </a>
-          <% }) %>
-        </div>
-      </div>
-
-      <div class="card dashboard-section-card" id="setup-actions-card">
-        <div class="card-header">
-          <div>
-            <div class="card-title"><i class="fas fa-wand-magic-sparkles"></i> Setup Actions</div>
-            <div class="card-subtitle">Use one-click setup to auto-create categories/channels, then check permissions and run full tests.</div>
+              <div class="setup-progress-track">
+                <div id="setupProgressBarFill" style="height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--green));"></div>
+              </div>
+              <div class="setup-progress-footnote"><%= setupProgressPercent %>% ready</div>
+            </div>
           </div>
-        </div>
-        <div class="quick-action-row setup-action-row">
-          <button type="button" class="btn btn-primary" id="autoSetupBtn"><i class="fas fa-wand-magic-sparkles"></i> Auto Setup</button>
-          <button type="button" class="btn btn-secondary" id="setupPermissionCheckBtn"><i class="fas fa-shield-check"></i> Check Permissions</button>
-          <button type="button" class="btn btn-secondary" id="setupRunAllTestsBtn"><i class="fas fa-vials"></i> Run All Tests</button>
-          <button type="button" class="btn btn-ghost" id="refreshSetupHistoryBtn"><i class="fas fa-rotate"></i> Refresh History</button>
-        </div>
-
-        <div id="setupPermissionResult" class="dashboard-note-panel" hidden></div>
-        <div id="setupBatchTestResult" class="dashboard-note-panel" hidden></div>
-
-        <div class="setup-history-title">Setup history</div>
-        <div id="setupHistoryList" class="setup-history-list">
-          <% if (setupHistory && setupHistory.length > 0) { %>
-            <% setupHistory.forEach(entry => { %>
-              <div class="setup-history-item">
-                <div class="setup-history-item-head">
-                  <strong><%= entry.action %></strong>
-                  <span><%= new Date(entry.timestamp).toLocaleString() %></span>
+          <div class="setup-checklist-grid">
+            <% setupChecklist.forEach(item => { %>
+              <a href="<%= item.href %>" class="setup-checklist-item">
+                <div class="setup-checklist-row">
+                  <div class="setup-checklist-title"><i class="fas <%= item.icon %>"></i><%= item.title %></div>
+                  <% if (item.done) { %>
+                    <span class="badge badge-green"><i class="fas fa-check"></i> Done</span>
+                  <% } else { %>
+                    <span class="badge badge-yellow"><i class="fas fa-clock"></i> Pending</span>
+                  <% } %>
                 </div>
-                <div class="setup-history-item-user">By <strong><%= entry.username %></strong></div>
-              </div>
+                <div class="setup-checklist-description"><%= item.description %></div>
+              </a>
             <% }) %>
-          <% } else { %>
-            <div class="setup-history-empty">No setup history yet.</div>
-          <% } %>
-        </div>
-      </div>
-
-      <div class="card dashboard-section-card" id="backup-restore-card">
-        <div class="card-header">
-          <div>
-            <div class="card-title"><i class="fas fa-floppy-disk"></i> Backup & Restore</div>
-            <div class="card-subtitle">Export this server's dashboard config or paste a previous backup to restore it.</div>
           </div>
         </div>
-        <div class="quick-action-row setup-action-row">
-          <button type="button" class="btn btn-primary" id="exportBackupBtn"><i class="fas fa-download"></i> Export Backup</button>
-          <button type="button" class="btn btn-secondary" id="restoreBackupBtn"><i class="fas fa-upload"></i> Restore Backup</button>
-        </div>
-        <div class="form-group clone-source-group">
-          <label class="form-label" for="cloneSourceGuildId">Clone From Another Server</label>
-          <div class="clone-source-row">
-            <select class="form-control" id="cloneSourceGuildId" style="min-width:260px;flex:1 1 260px">
-              <option value="">Choose source server</option>
-              <% (cloneSourceGuilds || []).forEach(sourceGuild => { %>
-                <option value="<%= sourceGuild.id %>"><%= sourceGuild.name %></option>
-              <% }) %>
-            </select>
-            <button type="button" class="btn btn-secondary" id="refreshCloneSourcesBtn"><i class="fas fa-rotate"></i> Refresh</button>
-            <button type="button" class="btn btn-primary" id="cloneServerConfigBtn"><i class="fas fa-clone"></i> Clone Setup</button>
-          </div>
-          <div class="form-hint">Copies dashboard setup from another server where you have Administrator access. Channel and role references are mapped by ID/name when possible.</div>
-        </div>
-        <div class="form-group">
-          <label class="form-label" for="backupJsonInput">Paste backup JSON</label>
-          <textarea class="form-control" id="backupJsonInput" rows="10" placeholder='{"version":1,"settings":{...}}'></textarea>
-          <div class="form-hint">Restore accepts a backup generated from this dashboard. It will re-apply all settings it can match in the current server.</div>
-        </div>
-        <div id="backupRestoreResult" class="dashboard-note-panel" hidden></div>
-      </div>
 
-      <div class="card dashboard-section-card" id="dashboard-tools-card">
-        <div class="card-header">
-          <div><div class="card-title"><i class="fas fa-sparkles"></i> New Dashboard Tools</div><div class="card-subtitle">Quick access to the features you asked to add</div></div>
-        </div>
-        <div class="dashboard-tool-groups">
-          <section class="dashboard-tool-group">
-            <h3 class="dashboard-tool-group-title"><i class="fas fa-compass"></i> Setup & Safety</h3>
-            <div class="dashboard-tool-grid">
-              <a href="#minecraftStatusCard" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-cube"></i> Minecraft Status</a>
-              <a href="/dashboard/<%= guild.id %>/server-builder" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-screwdriver-wrench"></i> Server Builder</a>
-              <a href="/dashboard/<%= guild.id %>/permissions" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-user-lock"></i> Delegation</a>
-              <a href="/dashboard/<%= guild.id %>/safety" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-user-shield"></i> Safety Center</a>
-            </div>
-          </section>
-
-          <section class="dashboard-tool-group">
-            <h3 class="dashboard-tool-group-title"><i class="fas fa-users"></i> Community & Voice</h3>
-            <div class="dashboard-tool-grid">
-              <a href="/dashboard/<%= guild.id %>/community" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-users-gear"></i> Community Center</a>
-              <a href="/dashboard/<%= guild.id %>/voice-tools" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-microphone-lines"></i> Voice Tools</a>
-              <a href="/dashboard/<%= guild.id %>/telegram-sync" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-telegram"></i> Telegram Sync</a>
-            </div>
-          </section>
-
-          <section class="dashboard-tool-group">
-            <h3 class="dashboard-tool-group-title"><i class="fas fa-bell"></i> Alerts & Tracking</h3>
-            <div class="dashboard-tool-grid">
-              <a href="/dashboard/<%= guild.id %>/epic-games" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-gift"></i> Epic Games Alerts</a>
-              <a href="/dashboard/<%= guild.id %>/steam-free-games" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Free Games</a>
-              <a href="/dashboard/<%= guild.id %>/steam-promos" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Promos</a>
-              <a href="/dashboard/<%= guild.id %>/steam-updates" class="btn btn-secondary dashboard-tool-link"><i class="fab fa-steam"></i> Steam Updates</a>
-            </div>
-          </section>
-
-          <section class="dashboard-tool-group">
-            <h3 class="dashboard-tool-group-title"><i class="fas fa-chart-line"></i> Insights & Admin</h3>
-            <div class="dashboard-tool-grid">
-              <a href="/dashboard/<%= guild.id %>/activity" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-clock-rotate-left"></i> Activity Center</a>
-              <a href="/dashboard/<%= guild.id %>/health" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-heart-pulse"></i> Bot Health</a>
-              <% if (isBotOwner) { %>
-                <a href="/dashboard/owner" class="btn btn-secondary dashboard-tool-link"><i class="fas fa-crown"></i> Bot Owner Settings</a>
-              <% } %>
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div class="card dashboard-section-card" id="profile-share-card">
-        <div class="card-header dashboard-card-header-wrap">
-          <div>
-            <div class="card-title"><i class="fas fa-id-card"></i> Server Profile Share</div>
-            <div class="card-subtitle">Create a public server profile page, share it, and edit the content directly from the dashboard.</div>
-          </div>
-          <div class="badge <%= serverProfile.enabled ? 'badge-green' : 'badge-yellow' %>"><i class="fas <%= serverProfile.enabled ? 'fa-earth-europe' : 'fa-eye-slash' %>"></i> <%= serverProfile.enabled ? 'Public' : 'Private' %></div>
-        </div>
-
-        <form id="serverProfileForm">
-          <div class="toggle-group profile-toggle-group">
-            <div class="toggle-info"><h4>Public Share Page</h4><p>When enabled, anyone with the link can view this server profile page.</p></div>
-            <label class="toggle-switch"><input type="checkbox" id="serverProfileEnabled" name="enabled" <%= serverProfile.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="serverProfileTitle">Profile Title</label>
-              <input type="text" class="form-control" id="serverProfileTitle" name="title" maxlength="80" value="<%= serverProfile.title %>" placeholder="Your server title">
-            </div>
-            <div class="form-group profile-color-group">
-              <label class="form-label" for="serverProfileAccentColor">Accent Color</label>
-              <input type="color" class="form-control profile-color-input" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>">
+        <!-- Setup Actions -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="fas fa-wand-magic-sparkles"></i> Setup Actions</div>
+              <div class="card-subtitle">Auto-create channels, check permissions, and run validation tests.</div>
             </div>
           </div>
-
-          <div class="form-group">
-            <label class="form-label" for="serverProfileSummary">Short Summary</label>
-            <textarea class="form-control" id="serverProfileSummary" name="summary" rows="2" maxlength="180" placeholder="One-line summary for your server"><%= serverProfile.summary %></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="serverProfileDescription">Editor</label>
-            <textarea class="form-control" id="serverProfileDescription" name="description" rows="6" maxlength="1200" placeholder="Describe your server, events, rules, and what new members should expect."><%= serverProfile.description %></textarea>
-            <div class="form-hint">This text appears on the public server profile page. Line breaks are preserved.</div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="serverProfileInviteUrl">Discord Invite URL</label>
-              <input type="url" class="form-control" id="serverProfileInviteUrl" name="inviteUrl" value="<%= serverProfile.inviteUrl %>" placeholder="https://discord.gg/yourinvite">
-              <div class="form-hint">Optional. Only Discord invite links are accepted.</div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="serverProfileShareUrl">Share Link</label>
-              <input type="text" class="form-control" id="serverProfileShareUrl" value="<%= serverProfileShareUrl %>" readonly>
-              <div class="form-hint">Share this link after you enable the public profile.</div>
-            </div>
-          </div>
-
-          <div class="toggle-group">
-            <div class="toggle-info"><h4>Show Member Count</h4><p>Display member count on the public profile.</p></div>
-            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowMemberCount" name="showMemberCount" <%= serverProfile.showMemberCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-          <div class="toggle-group">
-            <div class="toggle-info"><h4>Show Channel Count</h4><p>Display text channel count on the public profile.</p></div>
-            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowChannelCount" name="showChannelCount" <%= serverProfile.showChannelCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-          <div class="toggle-group profile-toggle-group">
-            <div class="toggle-info"><h4>Show Role Count</h4><p>Display role count on the public profile.</p></div>
-            <label class="toggle-switch"><input type="checkbox" id="serverProfileShowRoleCount" name="showRoleCount" <%= serverProfile.showRoleCount ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-
-          <div class="server-profile-preview-panel">
-            <div class="server-profile-preview-head">
-              <strong>Live Preview</strong>
-              <span id="serverProfilePreviewStatus" class="badge badge-yellow"><i class="fas fa-eye-slash"></i> Private</span>
-            </div>
-            <div id="serverProfilePreviewCard" class="server-profile-preview-card">
-              <div class="server-profile-preview-top">
-                <% if (guild.iconURL()) { %>
-                  <img src="<%= guild.iconURL({ size: 128 }) %>" alt="<%= guild.name %> icon" class="server-profile-preview-icon">
-                <% } %>
-                <div>
-                  <div id="serverProfilePreviewTitle" class="server-profile-preview-title"><%= serverProfile.title %></div>
-                  <div id="serverProfilePreviewSummary" class="server-profile-preview-summary"><%= serverProfile.summary %></div>
-                </div>
-              </div>
-              <div id="serverProfilePreviewStats" class="server-profile-preview-stats"></div>
-              <div id="serverProfilePreviewDescription" class="server-profile-preview-description"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
-              <div id="serverProfilePreviewInviteWrap" class="server-profile-preview-invite" <%= serverProfile.inviteUrl ? '' : 'hidden' %>>
-                <a id="serverProfilePreviewInvite" href="<%= serverProfile.inviteUrl || '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fas fa-user-plus"></i> Join Server</a>
-              </div>
-            </div>
-          </div>
-
           <div class="quick-action-row">
-            <button type="submit" class="btn btn-primary" id="saveServerProfileBtn"><i class="fas fa-save"></i> Save Profile</button>
-            <button type="button" class="btn btn-secondary" id="copyServerProfileLinkBtn"><i class="fas fa-link"></i> Copy Share Link</button>
-            <a href="<%= serverProfileShareUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-ghost" id="openServerProfileBtn"><i class="fas fa-arrow-up-right-from-square"></i> Open Public Page</a>
+            <button type="button" class="btn btn-primary" id="autoSetupBtn"><i class="fas fa-wand-magic-sparkles"></i> Auto Setup</button>
+            <button type="button" class="btn btn-secondary" id="setupPermissionCheckBtn"><i class="fas fa-shield-check"></i> Check Permissions</button>
+            <button type="button" class="btn btn-secondary" id="setupRunAllTestsBtn"><i class="fas fa-vials"></i> Run All Tests</button>
+            <button type="button" class="btn btn-ghost" id="refreshSetupHistoryBtn"><i class="fas fa-rotate"></i> Refresh History</button>
           </div>
-        </form>
-      </div>
-
-      <div class="card dashboard-section-card" id="minecraftStatusCard">
-        <div class="card-header">
-          <div><div class="card-title"><i class="fas fa-cube"></i> Minecraft Server Status</div><div class="card-subtitle">Check a server now, or post one live embed in Discord and keep it updated automatically</div></div>
-        </div>
-          <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="minecraftHostInput">Server Address</label>
-            <input type="text" class="form-control" id="minecraftHostInput" placeholder="play.example.net" value="<%= minecraftStatusConfig?.host || '' %>">
-            <div class="form-hint">Enter a host or paste <code>host:port</code>.</div>
-          </div>
-          <div class="form-group minecraft-port-group">
-            <label class="form-label" for="minecraftPortInput">Port</label>
-            <input type="number" class="form-control" id="minecraftPortInput" min="1" max="65535" placeholder="25565" value="<%= minecraftStatusConfig?.port || '' %>">
-            <div class="form-hint">Optional. Defaults to the server's standard port.</div>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label" for="minecraftLiveChannel">Discord Channel</label>
-            <select class="form-control" id="minecraftLiveChannel">
-              <option value="">Select channel</option>
-              <% channels.forEach(channel => { %>
-                <option value="<%= channel.id %>" <%= minecraftStatusConfig?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
-              <% }) %>
-            </select>
-            <div class="form-hint">The bot will send one status embed here and edit that same message on each refresh.</div>
-          </div>
-          <div class="form-group minecraft-interval-group">
-            <label class="form-label" for="minecraftIntervalInput">Update Interval</label>
-            <input type="number" class="form-control" id="minecraftIntervalInput" min="<%= minecraftDefaults.minIntervalMinutes %>" max="<%= minecraftDefaults.maxIntervalMinutes %>" value="<%= minecraftDefaults.intervalMinutes %>">
-            <div class="form-hint">Allowed range: <%= minecraftDefaults.minIntervalMinutes %>-<%= minecraftDefaults.maxIntervalMinutes %> minutes.</div>
-          </div>
-        </div>
-        <div class="minecraft-summary-panel">
-          <div class="minecraft-summary-grid">
-            <div>
-              <div class="minecraft-summary-label">Live Embed</div>
-              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.enabled ? 'Enabled' : 'Disabled' %></div>
-            </div>
-            <div>
-              <div class="minecraft-summary-label">Channel</div>
-              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.channelId ? `#${guild.channels.cache.get(minecraftStatusConfig.channelId)?.name || minecraftStatusConfig.channelId}` : 'Not set' %></div>
-            </div>
-            <div>
-              <div class="minecraft-summary-label">Last Check</div>
-              <div class="minecraft-summary-value"><%= minecraftStatusConfig?.lastCheckedAt ? new Date(minecraftStatusConfig.lastCheckedAt).toLocaleString() : 'Not yet' %></div>
-            </div>
-            <div>
-              <div class="minecraft-summary-label">Message</div>
-              <div class="minecraft-summary-value">
-                <% if (minecraftStatusConfig?.messageId && minecraftStatusConfig?.channelId) { %>
-                  <a href="https://discord.com/channels/<%= guild.id %>/<%= minecraftStatusConfig.channelId %>/<%= minecraftStatusConfig.messageId %>" target="_blank" rel="noopener noreferrer">Open live message</a>
-                <% } else { %>
-                  Not sent yet
-                <% } %>
-              </div>
-            </div>
-          </div>
-          <% if (minecraftStatusConfig?.lastError) { %>
-            <div class="form-hint minecraft-error-hint"><i class="fas fa-triangle-exclamation"></i> Last update issue: <%= minecraftStatusConfig.lastError %></div>
-          <% } %>
-        </div>
-        <div class="quick-action-row minecraft-action-row">
-          <button type="button" class="btn btn-secondary" id="checkMinecraftStatusBtn"><i class="fas fa-signal"></i> Check Server</button>
-          <button type="button" class="btn btn-primary" id="saveMinecraftLiveBtn"><i class="fas fa-paper-plane"></i> Send Live Embed</button>
-          <button type="button" class="btn btn-danger" id="disableMinecraftLiveBtn"><i class="fas fa-stop"></i> Disable Auto Updates</button>
-        </div>
-        <div id="minecraftStatusResult" hidden style="margin-top:16px"></div>
-      </div>
-
-      <form id="settingsForm">
-
-        <!-- Basic Settings -->
-        <div class="card">
-          <div class="card-header">
-            <div><div class="card-title"><i class="fas fa-sliders"></i> Basic Settings</div><div class="card-subtitle">Core bot configuration</div></div>
-          </div>
-          <div class="form-section">
-            <div class="form-section-title"><i class="fas fa-terminal"></i> Command Prefixes</div>
-            <div id="prefixContainer" class="prefix-list">
-              <% settings.prefixes.forEach((prefix, index) => { %>
-                <div class="prefix-item">
-                  <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" placeholder="!">
-                  <button type="button" class="btn btn-danger btn-sm prefix-remove-btn"><i class="fas fa-trash"></i></button>
+          <div id="setupPermissionResult" class="dashboard-note-panel" hidden></div>
+          <div id="setupBatchTestResult" class="dashboard-note-panel" hidden></div>
+          <div class="setup-history-title">Setup history</div>
+          <div id="setupHistoryList" class="setup-history-list">
+            <% if (setupHistory && setupHistory.length > 0) { %>
+              <% setupHistory.forEach(entry => { %>
+                <div class="setup-history-item">
+                  <div class="setup-history-item-head">
+                    <strong><%= entry.action %></strong>
+                    <span><%= new Date(entry.timestamp).toLocaleString() %></span>
+                  </div>
+                  <div class="setup-history-item-user">By <strong><%= entry.username %></strong></div>
                 </div>
-              <% }); %>
-            </div>
-            <button type="button" class="btn btn-secondary btn-sm" id="addPrefixBtn" style="margin-top:6px"><i class="fas fa-plus"></i> Add Prefix</button>
-            <div class="form-hint">Up to 5 prefixes. All will trigger bot commands.</div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">DJ Role</label>
-              <select class="form-control" name="djRole">
-                <% roles.forEach(role => { %>
-                  <option value="<%= role.name %>" <%= settings.djRole === role.name ? 'selected' : '' %>><%= role.name %></option>
-                <% }); %>
-              </select>
-              <div class="form-hint">Required for DJ commands (skip, pause, stop)</div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Auto Role</label>
-              <select class="form-control" name="autoRole">
-                <option value="">None</option>
-                <% roles.forEach(role => { %>
-                  <option value="<%= role.name %>" <%= settings.autoRole === role.name ? 'selected' : '' %>><%= role.name %></option>
-                <% }); %>
-              </select>
-              <div class="form-hint">Automatically assigned to new members</div>
-            </div>
+              <% }) %>
+            <% } else { %>
+              <div class="setup-history-empty">No setup history yet.</div>
+            <% } %>
           </div>
         </div>
 
-        <!-- Welcome Messages -->
+        <!-- Quick Tests -->
         <div class="card">
           <div class="card-header">
-            <div><div class="card-title"><i class="fas fa-hand-wave"></i> Welcome Messages</div><div class="card-subtitle">Greet new members when they join</div></div>
-            <label class="toggle-switch"><input type="checkbox" name="welcomeEnabled" <%= settings.welcomeEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Welcome Channel</label>
-              <select class="form-control" name="welcomeChannel">
-                <option value="">Select Channel</option>
-                <% channels.forEach(c => { %>
-                  <option value="<%= c.name %>" <%= settings.welcomeChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
-                <% }); %>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Welcome Message</label>
-              <textarea class="form-control" name="welcomeMessage" rows="3"><%= settings.welcomeMessage %></textarea>
-              <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
+            <div>
+              <div class="card-title"><i class="fas fa-flask-vial"></i> Quick Tests</div>
+              <div class="card-subtitle">Send safe test messages to verify channels are working.</div>
             </div>
           </div>
-          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="welcome"><i class="fas fa-flask"></i> Send Test Welcome</button></div>
-        </div>
-
-        <!-- Leave Messages -->
-        <div class="card">
-          <div class="card-header">
-            <div><div class="card-title"><i class="fas fa-door-open"></i> Leave Messages</div><div class="card-subtitle">Notify when members leave</div></div>
-            <label class="toggle-switch"><input type="checkbox" name="leaveEnabled" <%= settings.leaveEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Leave Channel</label>
-              <select class="form-control" name="leaveChannel">
-                <option value="">Select Channel</option>
-                <% channels.forEach(c => { %>
-                  <option value="<%= c.name %>" <%= settings.leaveChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
-                <% }); %>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Leave Message</label>
-              <textarea class="form-control" name="leaveMessage" rows="3"><%= settings.leaveMessage %></textarea>
-              <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
-            </div>
-          </div>
-          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="leave"><i class="fas fa-flask"></i> Send Test Leave</button></div>
-        </div>
-
-        <!-- Logging -->
-        <div class="card">
-          <div class="card-header"><div><div class="card-title"><i class="fas fa-scroll"></i> Server Logging</div><div class="card-subtitle">Audit log for server events</div></div></div>
-          <div class="form-group">
-            <label class="form-label">Logging Channel</label>
-            <select class="form-control" name="loggingChannel" style="max-width:380px">
-              <option value="">Disable Logging</option>
-              <% channels.forEach(c => { %>
-                <option value="<%= c.id %>" <%= loggingChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
-              <% }); %>
-            </select>
-            <div class="form-hint">Logs message edits/deletes, member joins/leaves, role changes, channel events</div>
-          </div>
-          <div class="quick-action-row"><button type="button" class="btn btn-secondary btn-sm dashboard-test-btn" data-test-type="logging"><i class="fas fa-flask"></i> Send Test Log</button></div>
-        </div>
-
-        <div class="card">
-          <div class="card-header"><div><div class="card-title"><i class="fas fa-vial"></i> Quick Tests</div><div class="card-subtitle">Send safe test messages to verify key channels before your members do.</div></div></div>
           <div class="quick-action-row">
             <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="welcome"><i class="fas fa-hand-wave"></i> Welcome</button>
             <button type="button" class="btn btn-secondary dashboard-test-btn" data-test-type="leave"><i class="fas fa-door-open"></i> Leave</button>
@@ -561,10 +136,11 @@
 
         <!-- Invite Analytics -->
         <div class="card">
-          <div class="card-header"><div><div class="card-title"><i class="fas fa-user-plus"></i> Invite Analytics</div><div class="card-subtitle">Track who invites new members</div></div></div>
-          <div style="margin-bottom:14px;padding:12px;background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius)">
-            <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Available commands:</div>
-            <div style="display:flex;flex-wrap:wrap;gap:6px"><code>!invites</code><code>!invitestats</code><code>/invites</code><code>/invitestats</code></div>
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="fas fa-user-plus"></i> Invite Analytics</div>
+              <div class="card-subtitle">Track who invites new members — <code>/invites</code> <code>/invitestats</code></div>
+            </div>
           </div>
           <% if (topInviters && topInviters.length > 0) { %>
             <div class="table-wrapper"><table>
@@ -583,46 +159,364 @@
             <div class="table-empty"><i class="fas fa-link-slash"></i>No invite data yet</div>
           <% } %>
         </div>
+      </div>
 
-        <!-- Auto-Mod Quick Settings -->
-        <div class="card">
-          <div class="card-header">
-            <div><div class="card-title"><i class="fas fa-robot"></i> Auto-Moderation</div><div class="card-subtitle">Quick toggles — <a href="/dashboard/<%= guild.id %>/automod">Full configuration</a></div></div>
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- TAB: Core Settings -->
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="settings-tab-panel" id="tab-core">
+        <form id="settingsForm">
+
+          <!-- Command Prefixes -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-terminal"></i> Command Prefixes</div>
+                <div class="card-subtitle">Up to 5 prefixes. All will trigger bot commands.</div>
+              </div>
+            </div>
+            <div id="prefixContainer" class="prefix-list">
+              <% settings.prefixes.forEach((prefix, index) => { %>
+                <div class="prefix-item">
+                  <input type="text" class="prefix-input" value="<%= prefix %>" maxlength="5" placeholder="!">
+                  <button type="button" class="btn btn-danger btn-sm prefix-remove-btn"><i class="fas fa-trash"></i></button>
+                </div>
+              <% }); %>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" id="addPrefixBtn"><i class="fas fa-plus"></i> Add Prefix</button>
           </div>
-          <div class="toggle-group">
-            <div class="toggle-info"><h4>Enable Auto-Moderation</h4><p>Master switch for all auto-mod rules</p></div>
-            <label class="toggle-switch"><input type="checkbox" name="autoModEnabled" <%= modSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+
+          <!-- Roles -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-tag"></i> Role Assignments</div>
+                <div class="card-subtitle">Assign roles for music DJ and auto-assignment.</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">DJ Role</label>
+                <select class="form-control" name="djRole">
+                  <% roles.forEach(role => { %>
+                    <option value="<%= role.name %>" <%= settings.djRole === role.name ? 'selected' : '' %>><%= role.name %></option>
+                  <% }); %>
+                </select>
+                <div class="form-hint">Required for DJ commands (skip, pause, stop)</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Auto Role</label>
+                <select class="form-control" name="autoRole">
+                  <option value="">None</option>
+                  <% roles.forEach(role => { %>
+                    <option value="<%= role.name %>" <%= settings.autoRole === role.name ? 'selected' : '' %>><%= role.name %></option>
+                  <% }); %>
+                </select>
+                <div class="form-hint">Automatically assigned to new members</div>
+              </div>
+            </div>
           </div>
-          <div class="toggle-group">
-            <div class="toggle-info"><h4>Anti-Spam</h4><p>Timeout users sending 5+ messages in 5 seconds</p></div>
-            <label class="toggle-switch"><input type="checkbox" name="antiSpam" <%= modSettings.antiSpam ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+
+          <!-- Welcome Messages -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-hand-wave"></i> Welcome Messages</div>
+                <div class="card-subtitle">Greet new members when they join</div>
+              </div>
+              <label class="toggle-switch"><input type="checkbox" name="welcomeEnabled" <%= settings.welcomeEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Welcome Channel</label>
+                <select class="form-control" name="welcomeChannel">
+                  <option value="">Select Channel</option>
+                  <% channels.forEach(c => { %>
+                    <option value="<%= c.name %>" <%= settings.welcomeChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Welcome Message</label>
+                <textarea class="form-control" name="welcomeMessage" rows="3"><%= settings.welcomeMessage %></textarea>
+                <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
+              </div>
+            </div>
           </div>
-          <div class="toggle-group">
-            <div class="toggle-info"><h4>Anti-Invite Links</h4><p>Block Discord invite links (discord.gg/...)</p></div>
-            <label class="toggle-switch"><input type="checkbox" name="antiInvite" <%= modSettings.antiInvite ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+
+          <!-- Leave Messages -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-door-open"></i> Leave Messages</div>
+                <div class="card-subtitle">Notify when members leave</div>
+              </div>
+              <label class="toggle-switch"><input type="checkbox" name="leaveEnabled" <%= settings.leaveEnabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Leave Channel</label>
+                <select class="form-control" name="leaveChannel">
+                  <option value="">Select Channel</option>
+                  <% channels.forEach(c => { %>
+                    <option value="<%= c.name %>" <%= settings.leaveChannel === c.name ? 'selected' : '' %>>#<%= c.name %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Leave Message</label>
+                <textarea class="form-control" name="leaveMessage" rows="3"><%= settings.leaveMessage %></textarea>
+                <div class="form-hint">Use <code>{user}</code> for username, <code>{server}</code> for server name</div>
+              </div>
+            </div>
           </div>
-          <div class="form-row" style="margin-top:14px">
+
+          <!-- Logging -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-scroll"></i> Server Logging</div>
+                <div class="card-subtitle">Audit log for message edits, deletes, member events, etc.</div>
+              </div>
+            </div>
             <div class="form-group">
-              <label class="form-label">Mod Log Channel</label>
-              <select class="form-control" name="modLogChannel">
-                <option value="">None</option>
+              <label class="form-label">Logging Channel</label>
+              <select class="form-control" name="loggingChannel" style="max-width:380px">
+                <option value="">Disable Logging</option>
                 <% channels.forEach(c => { %>
-                  <option value="<%= c.id %>" <%= modLogChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
+                  <option value="<%= c.id %>" <%= loggingChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
                 <% }); %>
               </select>
             </div>
-            <div class="form-group">
-              <label class="form-label">Max Mentions per Message</label>
-              <input type="number" class="form-control" name="maxMentions" value="<%= modSettings.maxMentions || 5 %>" min="1" max="50">
+          </div>
+
+          <!-- Auto-Mod Quick Settings -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-robot"></i> Auto-Moderation</div>
+                <div class="card-subtitle">Quick toggles — <a href="/dashboard/<%= guild.id %>/automod">Full configuration</a></div>
+              </div>
+            </div>
+            <div class="toggle-group">
+              <div class="toggle-info"><h4>Enable Auto-Moderation</h4><p>Master switch for all auto-mod rules</p></div>
+              <label class="toggle-switch"><input type="checkbox" name="autoModEnabled" <%= modSettings.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-group">
+              <div class="toggle-info"><h4>Anti-Spam</h4><p>Timeout users sending 5+ messages in 5 seconds</p></div>
+              <label class="toggle-switch"><input type="checkbox" name="antiSpam" <%= modSettings.antiSpam ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-group">
+              <div class="toggle-info"><h4>Anti-Invite Links</h4><p>Block Discord invite links (discord.gg/...)</p></div>
+              <label class="toggle-switch"><input type="checkbox" name="antiInvite" <%= modSettings.antiInvite ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="form-row" style="margin-top:14px">
+              <div class="form-group">
+                <label class="form-label">Mod Log Channel</label>
+                <select class="form-control" name="modLogChannel">
+                  <option value="">None</option>
+                  <% channels.forEach(c => { %>
+                    <option value="<%= c.id %>" <%= modLogChannel === c.id ? 'selected' : '' %>>#<%= c.name %></option>
+                  <% }); %>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Max Mentions per Message</label>
+                <input type="number" class="form-control" name="maxMentions" value="<%= modSettings.maxMentions || 5 %>" min="1" max="50">
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="form-actions">
-          <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Changes</button>
-          <button type="button" class="btn btn-danger" id="resetBtn"><i class="fas fa-rotate-left"></i> Reset Defaults</button>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save"></i> Save Changes</button>
+            <button type="button" class="btn btn-danger" id="resetBtn"><i class="fas fa-rotate-left"></i> Reset Defaults</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- TAB: Server Profile -->
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="settings-tab-panel" id="tab-profile">
+        <div class="card">
+          <div class="card-header dashboard-card-header-wrap">
+            <div>
+              <div class="card-title"><i class="fas fa-id-card"></i> Public Server Profile</div>
+              <div class="card-subtitle">Create a shareable page for your server.</div>
+            </div>
+            <div class="badge <%= serverProfile.enabled ? 'badge-green' : 'badge-yellow' %>"><i class="fas <%= serverProfile.enabled ? 'fa-earth-europe' : 'fa-eye-slash' %>"></i> <%= serverProfile.enabled ? 'Public' : 'Private' %></div>
+          </div>
+
+          <form id="serverProfileForm">
+            <div class="toggle-group profile-toggle-group">
+              <div class="toggle-info"><h4>Public Share Page</h4><p>When enabled, anyone with the link can view this server profile.</p></div>
+              <label class="toggle-switch"><input type="checkbox" id="serverProfileEnabled" name="enabled" <%= serverProfile.enabled ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="serverProfileTitle">Profile Title</label>
+                <input type="text" class="form-control" id="serverProfileTitle" name="title" maxlength="80" value="<%= serverProfile.title %>" placeholder="Your server title">
+              </div>
+              <div class="form-group profile-color-group">
+                <label class="form-label" for="serverProfileAccentColor">Accent Color</label>
+                <input type="color" class="form-control profile-color-input" id="serverProfileAccentColor" name="accentColor" value="<%= serverProfile.accentColor %>">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="serverProfileSummary">Short Summary</label>
+              <textarea class="form-control" id="serverProfileSummary" name="summary" rows="2" maxlength="180" placeholder="One-line summary for your server"><%= serverProfile.summary %></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="serverProfileDescription">Description</label>
+              <textarea class="form-control" id="serverProfileDescription" name="description" rows="5" maxlength="1200" placeholder="Describe your server, events, rules, and what new members should expect."><%= serverProfile.description %></textarea>
+              <div class="form-hint">Appears on the public profile page. Line breaks are preserved.</div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="serverProfileInviteUrl">Discord Invite URL</label>
+                <input type="url" class="form-control" id="serverProfileInviteUrl" name="inviteUrl" value="<%= serverProfile.inviteUrl %>" placeholder="https://discord.gg/yourinvite">
+                <div class="form-hint">Optional. Only Discord invite links are accepted.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="serverProfileShareUrl">Share Link</label>
+                <input type="text" class="form-control" id="serverProfileShareUrl" value="<%= serverProfileShareUrl %>" readonly>
+              </div>
+            </div>
+
+            <div class="toggle-group"><div class="toggle-info"><h4>Show Member Count</h4></div><label class="toggle-switch"><input type="checkbox" id="serverProfileShowMemberCount" name="showMemberCount" <%= serverProfile.showMemberCount ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+            <div class="toggle-group"><div class="toggle-info"><h4>Show Channel Count</h4></div><label class="toggle-switch"><input type="checkbox" id="serverProfileShowChannelCount" name="showChannelCount" <%= serverProfile.showChannelCount ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+            <div class="toggle-group"><div class="toggle-info"><h4>Show Role Count</h4></div><label class="toggle-switch"><input type="checkbox" id="serverProfileShowRoleCount" name="showRoleCount" <%= serverProfile.showRoleCount ? 'checked' : '' %>><span class="toggle-slider"></span></label></div>
+
+            <div class="server-profile-preview-panel">
+              <div class="server-profile-preview-head">
+                <strong>Live Preview</strong>
+                <span id="serverProfilePreviewStatus" class="badge badge-yellow"><i class="fas fa-eye-slash"></i> Private</span>
+              </div>
+              <div id="serverProfilePreviewCard" class="server-profile-preview-card">
+                <div class="server-profile-preview-top">
+                  <% if (guild.iconURL()) { %>
+                    <img src="<%= guild.iconURL({ size: 128 }) %>" alt="" class="server-profile-preview-icon">
+                  <% } %>
+                  <div>
+                    <div id="serverProfilePreviewTitle" class="server-profile-preview-title"><%= serverProfile.title %></div>
+                    <div id="serverProfilePreviewSummary" class="server-profile-preview-summary"><%= serverProfile.summary %></div>
+                  </div>
+                </div>
+                <div id="serverProfilePreviewStats" class="server-profile-preview-stats"></div>
+                <div id="serverProfilePreviewDescription" class="server-profile-preview-description"><%= serverProfile.description || 'Your profile description will appear here.' %></div>
+                <div id="serverProfilePreviewInviteWrap" class="server-profile-preview-invite" <%= serverProfile.inviteUrl ? '' : 'hidden' %>>
+                  <a id="serverProfilePreviewInvite" href="<%= serverProfile.inviteUrl || '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-primary"><i class="fas fa-user-plus"></i> Join Server</a>
+                </div>
+              </div>
+            </div>
+
+            <div class="quick-action-row">
+              <button type="submit" class="btn btn-primary" id="saveServerProfileBtn"><i class="fas fa-save"></i> Save Profile</button>
+              <button type="button" class="btn btn-secondary" id="copyServerProfileLinkBtn"><i class="fas fa-link"></i> Copy Share Link</button>
+              <a href="<%= serverProfileShareUrl %>" target="_blank" rel="noopener noreferrer" class="btn btn-ghost"><i class="fas fa-arrow-up-right-from-square"></i> Open Public Page</a>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- TAB: Minecraft -->
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="settings-tab-panel" id="tab-minecraft">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="fas fa-cube"></i> Minecraft Server Status</div>
+              <div class="card-subtitle">Check a server, or post a live embed in Discord that auto-updates.</div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="minecraftHostInput">Server Address</label>
+              <input type="text" class="form-control" id="minecraftHostInput" placeholder="play.example.net" value="<%= minecraftStatusConfig?.host || '' %>">
+              <div class="form-hint">Enter a host or paste <code>host:port</code>.</div>
+            </div>
+            <div class="form-group minecraft-port-group">
+              <label class="form-label" for="minecraftPortInput">Port</label>
+              <input type="number" class="form-control" id="minecraftPortInput" min="1" max="65535" placeholder="25565" value="<%= minecraftStatusConfig?.port || '' %>">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="minecraftLiveChannel">Discord Channel</label>
+              <select class="form-control" id="minecraftLiveChannel">
+                <option value="">Select channel</option>
+                <% channels.forEach(channel => { %>
+                  <option value="<%= channel.id %>" <%= minecraftStatusConfig?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="form-group minecraft-interval-group">
+              <label class="form-label" for="minecraftIntervalInput">Update Interval (min)</label>
+              <input type="number" class="form-control" id="minecraftIntervalInput" min="<%= minecraftDefaults.minIntervalMinutes %>" max="<%= minecraftDefaults.maxIntervalMinutes %>" value="<%= minecraftDefaults.intervalMinutes %>">
+            </div>
+          </div>
+          <div class="minecraft-summary-panel">
+            <div class="minecraft-summary-grid">
+              <div><div class="minecraft-summary-label">Live Embed</div><div class="minecraft-summary-value"><%= minecraftStatusConfig?.enabled ? 'Enabled' : 'Disabled' %></div></div>
+              <div><div class="minecraft-summary-label">Channel</div><div class="minecraft-summary-value"><%= minecraftStatusConfig?.channelId ? `#${guild.channels.cache.get(minecraftStatusConfig.channelId)?.name || minecraftStatusConfig.channelId}` : 'Not set' %></div></div>
+              <div><div class="minecraft-summary-label">Last Check</div><div class="minecraft-summary-value"><%= minecraftStatusConfig?.lastCheckedAt ? new Date(minecraftStatusConfig.lastCheckedAt).toLocaleString() : 'Not yet' %></div></div>
+              <div><div class="minecraft-summary-label">Message</div><div class="minecraft-summary-value"><% if (minecraftStatusConfig?.messageId && minecraftStatusConfig?.channelId) { %><a href="https://discord.com/channels/<%= guild.id %>/<%= minecraftStatusConfig.channelId %>/<%= minecraftStatusConfig.messageId %>" target="_blank" rel="noopener noreferrer">Open live message</a><% } else { %>Not sent yet<% } %></div></div>
+            </div>
+            <% if (minecraftStatusConfig?.lastError) { %>
+              <div class="form-hint minecraft-error-hint"><i class="fas fa-triangle-exclamation"></i> Last issue: <%= minecraftStatusConfig.lastError %></div>
+            <% } %>
+          </div>
+          <div class="quick-action-row">
+            <button type="button" class="btn btn-secondary" id="checkMinecraftStatusBtn"><i class="fas fa-signal"></i> Check Server</button>
+            <button type="button" class="btn btn-primary" id="saveMinecraftLiveBtn"><i class="fas fa-paper-plane"></i> Send Live Embed</button>
+            <button type="button" class="btn btn-danger" id="disableMinecraftLiveBtn"><i class="fas fa-stop"></i> Disable Auto Updates</button>
+          </div>
+          <div id="minecraftStatusResult" hidden style="margin-top:16px"></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <!-- TAB: Backup -->
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="settings-tab-panel" id="tab-backup">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title"><i class="fas fa-floppy-disk"></i> Backup & Restore</div>
+              <div class="card-subtitle">Export this server's config or paste a backup to restore it.</div>
+            </div>
+          </div>
+          <div class="quick-action-row">
+            <button type="button" class="btn btn-primary" id="exportBackupBtn"><i class="fas fa-download"></i> Export Backup</button>
+            <button type="button" class="btn btn-secondary" id="restoreBackupBtn"><i class="fas fa-upload"></i> Restore Backup</button>
+          </div>
+          <div class="form-group clone-source-group" style="margin-top:16px">
+            <label class="form-label" for="cloneSourceGuildId">Clone From Another Server</label>
+            <div class="clone-source-row">
+              <select class="form-control" id="cloneSourceGuildId" style="min-width:260px;flex:1 1 260px">
+                <option value="">Choose source server</option>
+                <% (cloneSourceGuilds || []).forEach(sourceGuild => { %>
+                  <option value="<%= sourceGuild.id %>"><%= sourceGuild.name %></option>
+                <% }) %>
+              </select>
+              <button type="button" class="btn btn-secondary" id="refreshCloneSourcesBtn"><i class="fas fa-rotate"></i> Refresh</button>
+              <button type="button" class="btn btn-primary" id="cloneServerConfigBtn"><i class="fas fa-clone"></i> Clone Setup</button>
+            </div>
+            <div class="form-hint">Copies dashboard setup from another server where you have Administrator access.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="backupJsonInput">Paste Backup JSON</label>
+            <textarea class="form-control" id="backupJsonInput" rows="8" placeholder='{"version":1,"settings":{...}}'></textarea>
+          </div>
+          <div id="backupRestoreResult" class="dashboard-note-panel" hidden></div>
+        </div>
+      </div>
+
     </main>
   </div>
 </div>
@@ -645,67 +539,32 @@
 
 <script type="application/json" id="serverProfileData"><%- JSON.stringify(serverProfile) %></script>
 <script type="application/json" id="cloneSourceGuildsData"><%- JSON.stringify(cloneSourceGuilds || []) %></script>
-<script type="application/json" id="serverProfileDefaultsData"><%- JSON.stringify({
-  title: guild.name,
-  memberCount: guild.memberCount || 0,
-  channelCount,
-  roleCount
-}) %></script>
+<script type="application/json" id="serverProfileDefaultsData"><%- JSON.stringify({ title: guild.name, memberCount: guild.memberCount || 0, channelCount, roleCount }) %></script>
 
 <%- include('partials/dashboard-common-scripts') %>
 <script>
 const guildId = '<%= guild.id %>';
 const setupProgressPercent = Number('<%= setupProgressPercent %>') || 0;
 const minecraftStorageKey = `dashboard.minecraftStatus.${guildId}`;
+
+// ── Tab switching ──
+document.querySelectorAll('.settings-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.settings-tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    const panel = document.getElementById('tab-' + tab.dataset.tab);
+    if (panel) panel.classList.add('active');
+  });
+});
+
+// ── Setup progress bar ──
 const setupProgressBarFill = document.getElementById('setupProgressBarFill');
-const autoSetupBtn = document.getElementById('autoSetupBtn');
-const setupPermissionCheckBtn = document.getElementById('setupPermissionCheckBtn');
-const setupRunAllTestsBtn = document.getElementById('setupRunAllTestsBtn');
-const refreshSetupHistoryBtn = document.getElementById('refreshSetupHistoryBtn');
-const exportBackupBtn = document.getElementById('exportBackupBtn');
-const restoreBackupBtn = document.getElementById('restoreBackupBtn');
-const backupJsonInput = document.getElementById('backupJsonInput');
-const backupRestoreResult = document.getElementById('backupRestoreResult');
-const cloneSourceGuildIdInput = document.getElementById('cloneSourceGuildId');
-const refreshCloneSourcesBtn = document.getElementById('refreshCloneSourcesBtn');
-const cloneServerConfigBtn = document.getElementById('cloneServerConfigBtn');
-const setupPermissionResult = document.getElementById('setupPermissionResult');
-const setupBatchTestResult = document.getElementById('setupBatchTestResult');
-const setupHistoryList = document.getElementById('setupHistoryList');
-const serverProfileForm = document.getElementById('serverProfileForm');
-const saveServerProfileBtn = document.getElementById('saveServerProfileBtn');
-const copyServerProfileLinkBtn = document.getElementById('copyServerProfileLinkBtn');
-const serverProfileShareUrlInput = document.getElementById('serverProfileShareUrl');
-const serverProfileEnabledInput = document.getElementById('serverProfileEnabled');
-const serverProfileTitleInput = document.getElementById('serverProfileTitle');
-const serverProfileSummaryInput = document.getElementById('serverProfileSummary');
-const serverProfileDescriptionInput = document.getElementById('serverProfileDescription');
-const serverProfileInviteUrlInput = document.getElementById('serverProfileInviteUrl');
-const serverProfileAccentColorInput = document.getElementById('serverProfileAccentColor');
-const serverProfileShowMemberCountInput = document.getElementById('serverProfileShowMemberCount');
-const serverProfileShowChannelCountInput = document.getElementById('serverProfileShowChannelCount');
-const serverProfileShowRoleCountInput = document.getElementById('serverProfileShowRoleCount');
-const serverProfilePreviewCard = document.getElementById('serverProfilePreviewCard');
-const serverProfilePreviewTitle = document.getElementById('serverProfilePreviewTitle');
-const serverProfilePreviewSummary = document.getElementById('serverProfilePreviewSummary');
-const serverProfilePreviewDescription = document.getElementById('serverProfilePreviewDescription');
-const serverProfilePreviewInviteWrap = document.getElementById('serverProfilePreviewInviteWrap');
-const serverProfilePreviewInvite = document.getElementById('serverProfilePreviewInvite');
-const serverProfilePreviewStats = document.getElementById('serverProfilePreviewStats');
-const serverProfilePreviewStatus = document.getElementById('serverProfilePreviewStatus');
-const initialServerProfile = JSON.parse(document.getElementById('serverProfileData').textContent);
-const initialCloneSourceGuilds = JSON.parse(document.getElementById('cloneSourceGuildsData').textContent);
-const serverProfileDefaults = JSON.parse(document.getElementById('serverProfileDefaultsData').textContent);
-const serverProfileDefaultTitle = serverProfileDefaults.title;
-const serverProfileGuildStats = {
-  memberCount: serverProfileDefaults.memberCount,
-  channelCount: serverProfileDefaults.channelCount,
-  roleCount: serverProfileDefaults.roleCount
-};
 if (setupProgressBarFill) {
-  const safeSetupProgress = Math.max(0, Math.min(100, setupProgressPercent));
-  setupProgressBarFill.style.width = `${safeSetupProgress}%`;
+  setupProgressBarFill.style.width = `${Math.max(0, Math.min(100, setupProgressPercent))}%`;
 }
+
+// ── Toast helper ──
 function toast(msg, type = 'success') {
   const c = document.getElementById('toasts');
   const t = document.createElement('div');
@@ -716,226 +575,31 @@ function toast(msg, type = 'success') {
   setTimeout(() => t.remove(), 3200);
 }
 function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
+  return String(value ?? '').replaceAll('&','&').replaceAll('<','<').replaceAll('>','>').replaceAll('"','"').replaceAll("'",'&#39;');
 }
-function renderMinecraftStatus(status) {
-  const result = document.getElementById('minecraftStatusResult');
-  const online = status?.online === true;
-  const badgeColor = online ? 'var(--green)' : 'var(--red)';
-  const badgeLabel = online ? 'Online' : 'Offline';
-  const resolvedAddress = [status?.hostname || status?.requestedHost, status?.port].filter(Boolean).join(':');
-  const playerSummary = online
-    ? `${status?.playersOnline ?? 0} / ${status?.playersMax ?? 0}`
-    : 'Unavailable';
-  const sessionSummary = online
-    ? (status?.playerSessionText || 'No active sessions')
-    : 'Unavailable';
 
-  result.hidden = false;
-  result.innerHTML = `
-    <div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2)">
-      <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px">
-        <div>
-          <div style="font-size:18px;font-weight:700;color:var(--text-1);margin-bottom:6px">${escapeHtml(resolvedAddress || status?.requestedHost || 'Minecraft Server')}</div>
-          <div style="font-size:13px;color:var(--text-2)">${escapeHtml(status?.ip || 'IP hidden or unresolved')}</div>
-        </div>
-        <div style="padding:6px 12px;border-radius:999px;background:${badgeColor};color:#fff;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.06em">${badgeLabel}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:${status?.motd ? '14px' : '0'}">
-        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
-          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Players</div>
-          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(playerSummary)}</div>
-        </div>
-        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
-          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Version</div>
-          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.version || 'Unknown')}</div>
-        </div>
-        <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)">
-          <div style="font-size:12px;color:var(--text-2);margin-bottom:4px">Software</div>
-          <div style="font-size:20px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.software || 'Unknown')}</div>
-        </div>
-      </div>
-      <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card);margin-bottom:${status?.motd ? '14px' : '0'}">
-        <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Player session time</div>
-        <div style="color:var(--text-1);line-height:1.5;white-space:pre-line">${escapeHtml(sessionSummary)}</div>
-      </div>
-      ${status?.motd ? `<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)"><div style="font-size:12px;color:var(--text-2);margin-bottom:6px">Message of the day</div><div style="color:var(--text-1);line-height:1.5">${escapeHtml(status.motd)}</div></div>` : ''}
-    </div>
-  `;
-}
-function addPrefix() {
+// ── Prefix management ──
+document.getElementById('addPrefixBtn').addEventListener('click', () => {
   const c = document.getElementById('prefixContainer');
   if (c.children.length >= 5) { toast('Maximum 5 prefixes', 'error'); return; }
   const d = document.createElement('div');
   d.className = 'prefix-item';
   d.innerHTML = '<input type="text" class="prefix-input" maxlength="5" placeholder="!"><button type="button" class="btn btn-danger btn-sm prefix-remove-btn"><i class="fas fa-trash"></i></button>';
   c.appendChild(d);
-}
-function removePrefix(btn) {
-  const c = document.getElementById('prefixContainer');
-  if (c.children.length <= 1) { toast('Need at least one prefix', 'error'); return; }
-  btn.closest('.prefix-item').remove();
-}
-function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
-function renderSetupHistoryEntries(entries) {
-  if (!setupHistoryList) return;
-  if (!Array.isArray(entries) || entries.length === 0) {
-    setupHistoryList.innerHTML = '<div class="setup-history-empty">No setup history yet.</div>';
-    return;
-  }
-
-  setupHistoryList.innerHTML = entries.map((entry) => {
-    const timestamp = entry?.timestamp ? new Date(entry.timestamp).toLocaleString() : 'Unknown time';
-    return `
-      <div class="setup-history-item">
-        <div class="setup-history-item-head">
-          <strong>${escapeHtml(entry?.action || 'Unknown action')}</strong>
-          <span>${escapeHtml(timestamp)}</span>
-        </div>
-        <div class="setup-history-item-user">By <strong>${escapeHtml(entry?.username || 'Unknown')}</strong></div>
-      </div>
-    `;
-  }).join('');
-}
-async function refreshSetupHistory() {
-  try {
-    const response = await fetch(`/api/settings/${guildId}/setup/history?limit=20`);
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Failed to load setup history.');
-    }
-    renderSetupHistoryEntries(payload.entries || []);
-  } catch (error) {
-    toast(error.message || 'Failed to load setup history.', 'error');
-  }
-}
-function showBackupRestoreResult(message, kind = 'info') {
-  if (!backupRestoreResult) return;
-  const colors = { success: 'var(--green)', error: 'var(--red)', warning: 'var(--yellow)', info: 'var(--brand)' };
-  backupRestoreResult.hidden = false;
-  backupRestoreResult.innerHTML = `<strong style="color:${colors[kind] || 'var(--brand)'}">${escapeHtml(message)}</strong>`;
-}
-function renderCloneSourceOptions(guilds) {
-  if (!cloneSourceGuildIdInput) return;
-  const selected = cloneSourceGuildIdInput.value;
-  const list = Array.isArray(guilds) ? guilds : [];
-  cloneSourceGuildIdInput.innerHTML = ['<option value="">Choose source server</option>']
-    .concat(list.map((guild) => `<option value="${escapeHtml(guild.id)}">${escapeHtml(guild.name || guild.id)}</option>`))
-    .join('');
-
-  if (selected && list.some((guild) => String(guild.id) === String(selected))) {
-    cloneSourceGuildIdInput.value = selected;
-  }
-}
-async function refreshCloneSources() {
-  try {
-    const response = await fetch(`/api/settings/${guildId}/clone-sources`);
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Failed to load source servers.');
-    }
-    renderCloneSourceOptions(payload.guilds || []);
-  } catch (error) {
-    toast(error.message || 'Failed to load source servers.', 'error');
-  }
-}
-
-renderCloneSourceOptions(initialCloneSourceGuilds);
-function renderServerProfilePreview() {
-  if (!serverProfilePreviewCard) return;
-
-  const title = serverProfileTitleInput.value.trim() || initialServerProfile.title || serverProfileDefaultTitle;
-  const summary = serverProfileSummaryInput.value.trim() || 'Shared from the dashboard.';
-  const description = serverProfileDescriptionInput.value.trim() || 'Your profile description will appear here.';
-  const inviteUrl = serverProfileInviteUrlInput.value.trim();
-  const accentColor = serverProfileAccentColorInput.value || '#5865F2';
-  const enabled = serverProfileEnabledInput.checked;
-  const stats = [];
-
-  if (serverProfileShowMemberCountInput.checked) stats.push({ label: 'Members', value: serverProfileGuildStats.memberCount });
-  if (serverProfileShowChannelCountInput.checked) stats.push({ label: 'Channels', value: serverProfileGuildStats.channelCount });
-  if (serverProfileShowRoleCountInput.checked) stats.push({ label: 'Roles', value: serverProfileGuildStats.roleCount });
-
-  serverProfilePreviewCard.style.borderLeftColor = accentColor;
-  serverProfilePreviewTitle.textContent = title;
-  serverProfilePreviewSummary.textContent = summary;
-  serverProfilePreviewDescription.textContent = description;
-  serverProfilePreviewStats.innerHTML = stats.map((item) => `
-    <div class="server-profile-stat-chip">
-      <strong>${escapeHtml(String(item.value))}</strong> ${escapeHtml(item.label)}
-    </div>
-  `).join('');
-
-  if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl)) {
-    serverProfilePreviewInviteWrap.hidden = false;
-    serverProfilePreviewInvite.href = inviteUrl;
-  } else {
-    serverProfilePreviewInviteWrap.hidden = true;
-    serverProfilePreviewInvite.href = '#';
-  }
-
-  serverProfilePreviewStatus.className = `badge ${enabled ? 'badge-green' : 'badge-yellow'}`;
-  serverProfilePreviewStatus.innerHTML = enabled
-    ? '<i class="fas fa-earth-europe"></i> Public'
-    : '<i class="fas fa-eye-slash"></i> Private';
-}
-const minecraftHostInput = document.getElementById('minecraftHostInput');
-const minecraftPortInput = document.getElementById('minecraftPortInput');
-const minecraftLiveChannel = document.getElementById('minecraftLiveChannel');
-const minecraftIntervalInput = document.getElementById('minecraftIntervalInput');
-const minecraftDefaultInterval = Number(minecraftIntervalInput.defaultValue || minecraftIntervalInput.value || 5);
-const minecraftCheckButton = document.getElementById('checkMinecraftStatusBtn');
-const saveMinecraftLiveButton = document.getElementById('saveMinecraftLiveBtn');
-const disableMinecraftLiveButton = document.getElementById('disableMinecraftLiveBtn');
-const savedMinecraftTarget = (() => {
-  try {
-    return JSON.parse(localStorage.getItem(minecraftStorageKey) || '{}');
-  } catch {
-    return {};
-  }
-})();
-if (!minecraftHostInput.value && savedMinecraftTarget.host) minecraftHostInput.value = savedMinecraftTarget.host;
-if (!minecraftPortInput.value && savedMinecraftTarget.port) minecraftPortInput.value = savedMinecraftTarget.port;
-if (!minecraftLiveChannel.value && savedMinecraftTarget.channelId) minecraftLiveChannel.value = savedMinecraftTarget.channelId;
-if (!minecraftIntervalInput.value && savedMinecraftTarget.intervalMinutes) minecraftIntervalInput.value = savedMinecraftTarget.intervalMinutes;
-if (!minecraftIntervalInput.value) minecraftIntervalInput.value = minecraftDefaultInterval;
-function persistMinecraftSettings() {
-  localStorage.setItem(minecraftStorageKey, JSON.stringify({
-    host: minecraftHostInput.value.trim(),
-    port: minecraftPortInput.value.trim(),
-    channelId: minecraftLiveChannel.value,
-    intervalMinutes: minecraftIntervalInput.value.trim()
-  }));
-}
-[
-  serverProfileEnabledInput,
-  serverProfileTitleInput,
-  serverProfileSummaryInput,
-  serverProfileDescriptionInput,
-  serverProfileInviteUrlInput,
-  serverProfileAccentColorInput,
-  serverProfileShowMemberCountInput,
-  serverProfileShowChannelCountInput,
-  serverProfileShowRoleCountInput
-].filter(Boolean).forEach((element) => {
-  element.addEventListener('input', renderServerProfilePreview);
-  element.addEventListener('change', renderServerProfilePreview);
 });
-renderServerProfilePreview();
-document.getElementById('addPrefixBtn').addEventListener('click', addPrefix);
-document.getElementById('closeResetModalBtn').addEventListener('click', closeModal);
-document.getElementById('cancelResetModalBtn').addEventListener('click', closeModal);
 document.getElementById('prefixContainer').addEventListener('click', event => {
   const button = event.target.closest('.prefix-remove-btn');
   if (!button) return;
-  removePrefix(button);
+  const c = document.getElementById('prefixContainer');
+  if (c.children.length <= 1) { toast('Need at least one prefix', 'error'); return; }
+  button.closest('.prefix-item').remove();
 });
+
+// ── Reset modal ──
+function closeModal() { document.getElementById('resetModal').classList.remove('active'); }
 document.getElementById('resetBtn').addEventListener('click', () => document.getElementById('resetModal').classList.add('active'));
+document.getElementById('closeResetModalBtn').addEventListener('click', closeModal);
+document.getElementById('cancelResetModalBtn').addEventListener('click', closeModal);
 document.getElementById('confirmReset').addEventListener('click', async () => {
   closeModal();
   try {
@@ -945,111 +609,8 @@ document.getElementById('confirmReset').addEventListener('click', async () => {
     else toast('Error: ' + j.error, 'error');
   } catch (e) { toast('Failed: ' + e.message, 'error'); }
 });
-minecraftCheckButton.addEventListener('click', async () => {
-  const host = minecraftHostInput.value.trim();
-  const port = minecraftPortInput.value.trim();
-  if (!host) {
-    toast('Enter a Minecraft server address first.', 'error');
-    minecraftHostInput.focus();
-    return;
-  }
 
-  const original = minecraftCheckButton.innerHTML;
-  minecraftCheckButton.disabled = true;
-  minecraftCheckButton.innerHTML = '<span class="spinner"></span> Checking...';
-
-  try {
-    persistMinecraftSettings();
-    const response = await fetch(`/api/settings/${guildId}/minecraft-status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, port })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Minecraft status lookup failed.');
-    }
-
-    renderMinecraftStatus(payload.status || {});
-    toast(payload.status?.online ? 'Minecraft server is online.' : 'Minecraft server appears to be offline.', payload.status?.online ? 'success' : 'warning');
-  } catch (error) {
-    toast(error.message || 'Minecraft status lookup failed.', 'error');
-  } finally {
-    minecraftCheckButton.disabled = false;
-    minecraftCheckButton.innerHTML = original;
-  }
-});
-saveMinecraftLiveButton.addEventListener('click', async () => {
-  const host = minecraftHostInput.value.trim();
-  const port = minecraftPortInput.value.trim();
-  const channelId = minecraftLiveChannel.value;
-  const intervalMinutes = minecraftIntervalInput.value.trim() || String(minecraftDefaultInterval);
-
-  if (!host) {
-    toast('Enter a Minecraft server address first.', 'error');
-    minecraftHostInput.focus();
-    return;
-  }
-
-  if (!channelId) {
-    toast('Choose a Discord channel for the live embed.', 'error');
-    minecraftLiveChannel.focus();
-    return;
-  }
-
-  const original = saveMinecraftLiveButton.innerHTML;
-  saveMinecraftLiveButton.disabled = true;
-  saveMinecraftLiveButton.innerHTML = '<span class="spinner"></span> Sending...';
-
-  try {
-    persistMinecraftSettings();
-    const response = await fetch(`/api/settings/${guildId}/minecraft-status/live`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ host, port, channelId, intervalMinutes })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Failed to send live Minecraft embed.');
-    }
-
-    toast(payload.message || 'Live Minecraft embed configured.', 'success');
-    setTimeout(() => location.reload(), 700);
-  } catch (error) {
-    toast(error.message || 'Failed to send live Minecraft embed.', 'error');
-  } finally {
-    saveMinecraftLiveButton.disabled = false;
-    saveMinecraftLiveButton.innerHTML = original;
-  }
-});
-disableMinecraftLiveButton.addEventListener('click', async () => {
-  if (!confirm('Disable Minecraft auto-updates for this server?')) {
-    return;
-  }
-
-  const original = disableMinecraftLiveButton.innerHTML;
-  disableMinecraftLiveButton.disabled = true;
-  disableMinecraftLiveButton.innerHTML = '<span class="spinner"></span> Disabling...';
-
-  try {
-    const response = await fetch(`/api/settings/${guildId}/minecraft-status/live`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Failed to disable Minecraft auto-updates.');
-    }
-
-    toast(payload.message || 'Minecraft auto-updates disabled.', 'success');
-    setTimeout(() => location.reload(), 700);
-  } catch (error) {
-    toast(error.message || 'Failed to disable Minecraft auto-updates.', 'error');
-  } finally {
-    disableMinecraftLiveButton.disabled = false;
-    disableMinecraftLiveButton.innerHTML = original;
-  }
-});
+// ── Settings form save ──
 document.getElementById('settingsForm').addEventListener('submit', async e => {
   e.preventDefault();
   const btn = e.submitter;
@@ -1062,10 +623,10 @@ document.getElementById('settingsForm').addEventListener('submit', async e => {
   if (!prefixes.length) { toast('Need at least one prefix', 'error'); btn.innerHTML = orig; btn.disabled = false; return; }
   data.prefixes = prefixes;
   for (const [k, v] of fd.entries()) {
-    if (['welcomeEnabled', 'leaveEnabled', 'autoModEnabled', 'antiSpam', 'antiInvite', 'emojiOnly'].includes(k)) data[k] = true;
+    if (['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite','emojiOnly'].includes(k)) data[k] = true;
     else data[k] = v;
   }
-  ['welcomeEnabled', 'leaveEnabled', 'autoModEnabled', 'antiSpam', 'antiInvite'].forEach(k => { if (!fd.has(k)) data[k] = false; });
+  ['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite'].forEach(k => { if (!fd.has(k)) data[k] = false; });
   try {
     const r = await fetch(`/api/settings/${guildId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     const j = await r.json();
@@ -1074,283 +635,191 @@ document.getElementById('settingsForm').addEventListener('submit', async e => {
   } catch (err) { toast('Failed to save: ' + err.message, 'error'); }
   finally { btn.innerHTML = orig; btn.disabled = false; }
 });
+
+// ── Test buttons ──
 document.querySelectorAll('.dashboard-test-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
     const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Testing...';
     try {
-      const r = await fetch(`/api/settings/${guildId}/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: btn.dataset.testType })
-      });
+      const r = await fetch(`/api/settings/${guildId}/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: btn.dataset.testType }) });
       const j = await r.json();
-      if (j.success) toast(j.message || 'Test sent successfully', 'success');
+      if (j.success) toast(j.message || 'Test sent', 'success');
       else toast(j.error || 'Test failed', 'error');
-    } catch (error) {
-      toast('Failed: ' + error.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = original;
-    }
+    } catch (error) { toast('Failed: ' + error.message, 'error'); }
+    finally { btn.disabled = false; btn.innerHTML = original; }
   });
 });
 
-autoSetupBtn?.addEventListener('click', async () => {
-  if (!confirm('Apply recommended setup defaults for this server?')) {
-    return;
-  }
+// ── Setup actions ──
+function renderSetupHistoryEntries(entries) {
+  const el = document.getElementById('setupHistoryList');
+  if (!el) return;
+  if (!Array.isArray(entries) || entries.length === 0) { el.innerHTML = '<div class="setup-history-empty">No setup history yet.</div>'; return; }
+  el.innerHTML = entries.map(e => `<div class="setup-history-item"><div class="setup-history-item-head"><strong>${escapeHtml(e?.action||'')}</strong><span>${e?.timestamp ? new Date(e.timestamp).toLocaleString() : ''}</span></div><div class="setup-history-item-user">By <strong>${escapeHtml(e?.username||'')}</strong></div></div>`).join('');
+}
+async function refreshSetupHistory() {
+  try { const r = await fetch(`/api/settings/${guildId}/setup/history?limit=20`); const p = await r.json(); if (p.success) renderSetupHistoryEntries(p.entries || []); } catch {}
+}
+document.getElementById('refreshSetupHistoryBtn')?.addEventListener('click', refreshSetupHistory);
 
-  const original = autoSetupBtn.innerHTML;
-  autoSetupBtn.disabled = true;
-  autoSetupBtn.innerHTML = '<span class="spinner"></span> Applying...';
+document.getElementById('autoSetupBtn')?.addEventListener('click', async () => {
+  if (!confirm('Apply recommended setup defaults?')) return;
+  const btn = document.getElementById('autoSetupBtn');
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Applying...';
+  try { const r = await fetch(`/api/settings/${guildId}/setup/auto`, { method: 'POST' }); const p = await r.json(); if (p.success) { toast(p.message || 'Done', 'success'); await refreshSetupHistory(); setTimeout(() => location.reload(), 900); } else throw new Error(p.error); }
+  catch (e) { toast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+document.getElementById('setupPermissionCheckBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('setupPermissionCheckBtn');
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Checking...';
   try {
-    const response = await fetch(`/api/settings/${guildId}/setup/auto`, { method: 'POST' });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Auto setup failed.');
-    }
-
-    toast(payload.message || 'Auto setup completed.', 'success');
+    const r = await fetch(`/api/settings/${guildId}/setup/permissions`); const p = await r.json();
+    const el = document.getElementById('setupPermissionResult'); el.hidden = false;
+    const color = p.status === 'ok' ? 'var(--green)' : p.status === 'warning' ? 'var(--yellow)' : 'var(--red)';
+    el.innerHTML = `<strong style="color:${color}">${escapeHtml(p.summary||'Done')}</strong><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px;margin-top:8px">${(p.checks||[]).map(c => `<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)"><div style="font-weight:700;color:var(--text-1);margin-bottom:4px">${escapeHtml(c.label)}</div><div style="font-size:12px;color:${c.ok?'var(--green)':'var(--red)'}">${c.ok?'OK':'Missing: '+escapeHtml((c.missing||[]).join(', '))}</div></div>`).join('')}</div>`;
     await refreshSetupHistory();
-    setTimeout(() => location.reload(), 900);
-  } catch (error) {
-    toast(error.message || 'Auto setup failed.', 'error');
-  } finally {
-    autoSetupBtn.disabled = false;
-    autoSetupBtn.innerHTML = original;
-  }
+  } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
 });
 
-setupPermissionCheckBtn?.addEventListener('click', async () => {
-  const original = setupPermissionCheckBtn.innerHTML;
-  setupPermissionCheckBtn.disabled = true;
-  setupPermissionCheckBtn.innerHTML = '<span class="spinner"></span> Checking...';
+document.getElementById('setupRunAllTestsBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('setupRunAllTestsBtn');
+  const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Testing...';
   try {
-    const response = await fetch(`/api/settings/${guildId}/setup/permissions`);
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Permission check failed.');
-    }
-
-    setupPermissionResult.hidden = false;
-    const statusColor = payload.status === 'ok' ? 'var(--green)' : (payload.status === 'warning' ? 'var(--yellow)' : 'var(--red)');
-    setupPermissionResult.innerHTML = `
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
-        <strong style="color:${statusColor}">${escapeHtml(payload.summary || 'Permission check complete')}</strong>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px">
-        ${(payload.checks || []).map((check) => `
-          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
-            <div style="font-weight:700;color:var(--text-1);margin-bottom:4px">${escapeHtml(check.label || 'Check')}</div>
-            <div style="font-size:12px;color:${check.ok ? 'var(--green)' : 'var(--red)'}">${check.ok ? 'OK' : `Missing: ${escapeHtml((check.missing || []).join(', '))}`}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
+    const r = await fetch(`/api/settings/${guildId}/test-all`, { method: 'POST' }); const p = await r.json();
+    const el = document.getElementById('setupBatchTestResult'); el.hidden = false;
+    el.innerHTML = `<strong>${escapeHtml(p.message||'Done')}</strong><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:8px">${(p.passed||[]).map(i => `<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)"><div style="font-size:12px;color:var(--green)">Passed: ${escapeHtml(i.type)}</div></div>`).join('')}${(p.failed||[]).map(i => `<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)"><div style="font-size:12px;color:var(--red)">Failed: ${escapeHtml(i.type)} — ${escapeHtml(i.error)}</div></div>`).join('')}</div>`;
+    toast(p.failed?.length ? `Completed with ${p.failed.length} failure(s)` : 'All tests passed', p.failed?.length ? 'warning' : 'success');
     await refreshSetupHistory();
-  } catch (error) {
-    toast(error.message || 'Permission check failed.', 'error');
-  } finally {
-    setupPermissionCheckBtn.disabled = false;
-    setupPermissionCheckBtn.innerHTML = original;
-  }
+  } catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
 });
 
-setupRunAllTestsBtn?.addEventListener('click', async () => {
-  const original = setupRunAllTestsBtn.innerHTML;
-  setupRunAllTestsBtn.disabled = true;
-  setupRunAllTestsBtn.innerHTML = '<span class="spinner"></span> Testing...';
+// ── Server Profile ──
+const initialServerProfile = JSON.parse(document.getElementById('serverProfileData').textContent);
+const serverProfileDefaults = JSON.parse(document.getElementById('serverProfileDefaultsData').textContent);
+const serverProfileGuildStats = { memberCount: serverProfileDefaults.memberCount, channelCount: serverProfileDefaults.channelCount, roleCount: serverProfileDefaults.roleCount };
+const pe = id => document.getElementById(id);
+function renderServerProfilePreview() {
+  const card = pe('serverProfilePreviewCard'); if (!card) return;
+  const title = pe('serverProfileTitle')?.value?.trim() || initialServerProfile.title || serverProfileDefaults.title;
+  const summary = pe('serverProfileSummary')?.value?.trim() || 'Shared from the dashboard.';
+  const desc = pe('serverProfileDescription')?.value?.trim() || 'Your profile description will appear here.';
+  const invite = pe('serverProfileInviteUrl')?.value?.trim() || '';
+  const color = pe('serverProfileAccentColor')?.value || '#5865F2';
+  const enabled = pe('serverProfileEnabled')?.checked;
+  const stats = [];
+  if (pe('serverProfileShowMemberCount')?.checked) stats.push({ l: 'Members', v: serverProfileGuildStats.memberCount });
+  if (pe('serverProfileShowChannelCount')?.checked) stats.push({ l: 'Channels', v: serverProfileGuildStats.channelCount });
+  if (pe('serverProfileShowRoleCount')?.checked) stats.push({ l: 'Roles', v: serverProfileGuildStats.roleCount });
+  card.style.borderLeftColor = color;
+  pe('serverProfilePreviewTitle').textContent = title;
+  pe('serverProfilePreviewSummary').textContent = summary;
+  pe('serverProfilePreviewDescription').textContent = desc;
+  pe('serverProfilePreviewStats').innerHTML = stats.map(s => `<div class="server-profile-stat-chip"><strong>${escapeHtml(String(s.v))}</strong> ${escapeHtml(s.l)}</div>`).join('');
+  const inviteWrap = pe('serverProfilePreviewInviteWrap');
+  if (/^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(invite)) { inviteWrap.hidden = false; pe('serverProfilePreviewInvite').href = invite; } else { inviteWrap.hidden = true; }
+  const status = pe('serverProfilePreviewStatus');
+  status.className = `badge ${enabled ? 'badge-green' : 'badge-yellow'}`;
+  status.innerHTML = enabled ? '<i class="fas fa-earth-europe"></i> Public' : '<i class="fas fa-eye-slash"></i> Private';
+}
+['serverProfileEnabled','serverProfileTitle','serverProfileSummary','serverProfileDescription','serverProfileInviteUrl','serverProfileAccentColor','serverProfileShowMemberCount','serverProfileShowChannelCount','serverProfileShowRoleCount'].forEach(id => { const el = pe(id); if (el) { el.addEventListener('input', renderServerProfilePreview); el.addEventListener('change', renderServerProfilePreview); } });
+renderServerProfilePreview();
+pe('copyServerProfileLinkBtn')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(pe('serverProfileShareUrl').value); toast('Link copied.', 'success'); } catch { pe('serverProfileShareUrl').select(); document.execCommand('copy'); toast('Link copied.', 'success'); } });
+pe('serverProfileForm')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = pe('saveServerProfileBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Saving...';
   try {
-    const response = await fetch(`/api/settings/${guildId}/test-all`, { method: 'POST' });
-    const payload = await response.json();
-    if (!response.ok || (!payload.success && !payload.passed)) {
-      throw new Error(payload.error || 'Batch test failed.');
-    }
-
-    setupBatchTestResult.hidden = false;
-    setupBatchTestResult.innerHTML = `
-      <div style="font-weight:700;color:var(--text-1);margin-bottom:8px">${escapeHtml(payload.message || 'Test run complete')}</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
-        ${(payload.passed || []).map((item) => `
-          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
-            <div style="font-size:12px;color:var(--green)">Passed: ${escapeHtml(item.type)}</div>
-          </div>
-        `).join('')}
-        ${(payload.failed || []).map((item) => `
-          <div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card)">
-            <div style="font-size:12px;color:var(--red)">Failed: ${escapeHtml(item.type)} - ${escapeHtml(item.error)}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    if (Array.isArray(payload.failed) && payload.failed.length > 0) {
-      toast(`Completed with ${payload.failed.length} failed test(s).`, 'warning');
-    } else {
-      toast('All setup tests passed.', 'success');
-    }
-    await refreshSetupHistory();
-  } catch (error) {
-    toast(error.message || 'Batch test failed.', 'error');
-  } finally {
-    setupRunAllTestsBtn.disabled = false;
-    setupRunAllTestsBtn.innerHTML = original;
-  }
-});
-
-refreshSetupHistoryBtn?.addEventListener('click', refreshSetupHistory);
-refreshCloneSourcesBtn?.addEventListener('click', refreshCloneSources);
-
-exportBackupBtn?.addEventListener('click', async () => {
-  const original = exportBackupBtn.innerHTML;
-  exportBackupBtn.disabled = true;
-  exportBackupBtn.innerHTML = '<span class="spinner"></span> Exporting...';
-  try {
-    const response = await fetch(`/api/settings/${guildId}/backup`);
-    const payload = await response.json();
-    if (!response.ok || !payload || payload.success === false) {
-      throw new Error(payload.error || 'Backup export failed.');
-    }
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${guildId}-backup.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    showBackupRestoreResult('Backup exported successfully.', 'success');
-    await refreshSetupHistory();
-  } catch (error) {
-    showBackupRestoreResult(error.message || 'Backup export failed.', 'error');
-  } finally {
-    exportBackupBtn.disabled = false;
-    exportBackupBtn.innerHTML = original;
-  }
-});
-
-restoreBackupBtn?.addEventListener('click', async () => {
-  const original = restoreBackupBtn.innerHTML;
-  restoreBackupBtn.disabled = true;
-  restoreBackupBtn.innerHTML = '<span class="spinner"></span> Restoring...';
-  try {
-    const raw = backupJsonInput?.value?.trim();
-    if (!raw) {
-      throw new Error('Paste backup JSON first.');
-    }
-
-    const parsed = JSON.parse(raw);
-    const response = await fetch(`/api/settings/${guildId}/restore`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ backup: parsed })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Backup restore failed.');
-    }
-
-    showBackupRestoreResult(payload.message || 'Backup restored successfully.', 'success');
-    await refreshSetupHistory();
-    setTimeout(() => location.reload(), 900);
-  } catch (error) {
-    showBackupRestoreResult(error.message || 'Backup restore failed.', 'error');
-  } finally {
-    restoreBackupBtn.disabled = false;
-    restoreBackupBtn.innerHTML = original;
-  }
-});
-
-cloneServerConfigBtn?.addEventListener('click', async () => {
-  const sourceGuildId = String(cloneSourceGuildIdInput?.value || '').trim();
-  if (!sourceGuildId) {
-    showBackupRestoreResult('Choose a source server first.', 'warning');
-    return;
-  }
-
-  if (!confirm('Clone setup from selected server? This will overwrite matching settings in this server.')) {
-    return;
-  }
-
-  const original = cloneServerConfigBtn.innerHTML;
-  cloneServerConfigBtn.disabled = true;
-  cloneServerConfigBtn.innerHTML = '<span class="spinner"></span> Cloning...';
-  try {
-    const response = await fetch(`/api/settings/${guildId}/clone`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sourceGuildId })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Clone failed.');
-    }
-
-    const appliedCount = Array.isArray(payload.applied) ? payload.applied.length : 0;
-    showBackupRestoreResult(`${payload.message || 'Clone completed.'} Applied ${appliedCount} section(s).`, 'success');
-    toast('Server setup cloned.', 'success');
-    await refreshSetupHistory();
-    setTimeout(() => location.reload(), 900);
-  } catch (error) {
-    showBackupRestoreResult(error.message || 'Clone failed.', 'error');
-  } finally {
-    cloneServerConfigBtn.disabled = false;
-    cloneServerConfigBtn.innerHTML = original;
-  }
-});
-
-copyServerProfileLinkBtn?.addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(serverProfileShareUrlInput.value);
-    toast('Share link copied.', 'success');
-  } catch (error) {
-    serverProfileShareUrlInput.select();
-    document.execCommand('copy');
-    toast('Share link copied.', 'success');
-  }
-});
-
-serverProfileForm?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const original = saveServerProfileBtn.innerHTML;
-  saveServerProfileBtn.disabled = true;
-  saveServerProfileBtn.innerHTML = '<span class="spinner"></span> Saving...';
-
-  try {
-    const response = await fetch(`/api/server-profile/${guildId}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        enabled: serverProfileEnabledInput.checked,
-        title: serverProfileTitleInput.value,
-        summary: serverProfileSummaryInput.value,
-        description: serverProfileDescriptionInput.value,
-        inviteUrl: serverProfileInviteUrlInput.value,
-        accentColor: serverProfileAccentColorInput.value,
-        showMemberCount: serverProfileShowMemberCountInput.checked,
-        showChannelCount: serverProfileShowChannelCountInput.checked,
-        showRoleCount: serverProfileShowRoleCountInput.checked
-      })
-    });
-    const payload = await response.json();
-    if (!response.ok || !payload.success) {
-      throw new Error(payload.error || 'Failed to save server profile.');
-    }
-
-    if (payload.shareUrl) {
-      serverProfileShareUrlInput.value = payload.shareUrl;
-    }
-    toast(payload.profile?.enabled ? 'Server profile saved and public link is active.' : 'Server profile saved.', 'success');
+    const r = await fetch(`/api/server-profile/${guildId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: pe('serverProfileEnabled').checked, title: pe('serverProfileTitle').value, summary: pe('serverProfileSummary').value, description: pe('serverProfileDescription').value, inviteUrl: pe('serverProfileInviteUrl').value, accentColor: pe('serverProfileAccentColor').value, showMemberCount: pe('serverProfileShowMemberCount').checked, showChannelCount: pe('serverProfileShowChannelCount').checked, showRoleCount: pe('serverProfileShowRoleCount').checked }) });
+    const p = await r.json(); if (!p.success) throw new Error(p.error);
+    if (p.shareUrl) pe('serverProfileShareUrl').value = p.shareUrl;
+    toast(p.profile?.enabled ? 'Profile saved and public.' : 'Profile saved.', 'success');
     renderServerProfilePreview();
-  } catch (error) {
-    toast(error.message || 'Failed to save server profile.', 'error');
-  } finally {
-    saveServerProfileBtn.disabled = false;
-    saveServerProfileBtn.innerHTML = original;
-  }
+  } catch (e) { toast(e.message || 'Failed', 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+// ── Minecraft ──
+function renderMinecraftStatus(status) {
+  const result = document.getElementById('minecraftStatusResult');
+  const online = status?.online === true;
+  const badgeColor = online ? 'var(--green)' : 'var(--red)';
+  const resolvedAddress = [status?.hostname || status?.requestedHost, status?.port].filter(Boolean).join(':');
+  const playerSummary = online ? `${status?.playersOnline ?? 0} / ${status?.playersMax ?? 0}` : 'Unavailable';
+  result.hidden = false;
+  result.innerHTML = `<div style="padding:16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2)"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px"><div><div style="font-size:18px;font-weight:700;color:var(--text-1)">${escapeHtml(resolvedAddress || status?.requestedHost || 'Server')}</div><div style="font-size:13px;color:var(--text-2)">${escapeHtml(status?.ip || '')}</div></div><div style="padding:6px 12px;border-radius:999px;background:${badgeColor};color:#fff;font-weight:700;font-size:12px;text-transform:uppercase">${online ? 'Online' : 'Offline'}</div></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px"><div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)"><div style="font-size:11px;color:var(--text-2);margin-bottom:4px">Players</div><div style="font-size:18px;font-weight:700;color:var(--text-1)">${escapeHtml(playerSummary)}</div></div><div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card)"><div style="font-size:11px;color:var(--text-2);margin-bottom:4px">Version</div><div style="font-size:18px;font-weight:700;color:var(--text-1)">${escapeHtml(status?.version || 'Unknown')}</div></div></div></div>`;
+}
+const minecraftHostInput = document.getElementById('minecraftHostInput');
+const minecraftPortInput = document.getElementById('minecraftPortInput');
+const minecraftLiveChannel = document.getElementById('minecraftLiveChannel');
+const minecraftIntervalInput = document.getElementById('minecraftIntervalInput');
+const minecraftDefaultInterval = Number(minecraftIntervalInput?.defaultValue || minecraftIntervalInput?.value || 5);
+function persistMinecraftSettings() { try { localStorage.setItem(minecraftStorageKey, JSON.stringify({ host: minecraftHostInput.value.trim(), port: minecraftPortInput.value.trim(), channelId: minecraftLiveChannel.value, intervalMinutes: minecraftIntervalInput.value.trim() })); } catch {} }
+try { const saved = JSON.parse(localStorage.getItem(minecraftStorageKey) || '{}'); if (!minecraftHostInput.value && saved.host) minecraftHostInput.value = saved.host; if (!minecraftPortInput.value && saved.port) minecraftPortInput.value = saved.port; if (!minecraftLiveChannel.value && saved.channelId) minecraftLiveChannel.value = saved.channelId; if (!minecraftIntervalInput.value && saved.intervalMinutes) minecraftIntervalInput.value = saved.intervalMinutes; } catch {}
+if (!minecraftIntervalInput.value) minecraftIntervalInput.value = minecraftDefaultInterval;
+
+document.getElementById('checkMinecraftStatusBtn')?.addEventListener('click', async () => {
+  const host = minecraftHostInput.value.trim();
+  if (!host) { toast('Enter a server address.', 'error'); minecraftHostInput.focus(); return; }
+  const btn = document.getElementById('checkMinecraftStatusBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Checking...';
+  try { persistMinecraftSettings(); const r = await fetch(`/api/settings/${guildId}/minecraft-status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, port: minecraftPortInput.value.trim() }) }); const p = await r.json(); if (!p.success) throw new Error(p.error); renderMinecraftStatus(p.status || {}); toast(p.status?.online ? 'Server is online.' : 'Server appears offline.', p.status?.online ? 'success' : 'warning'); }
+  catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+document.getElementById('saveMinecraftLiveBtn')?.addEventListener('click', async () => {
+  const host = minecraftHostInput.value.trim(); const channelId = minecraftLiveChannel.value;
+  if (!host) { toast('Enter a server address.', 'error'); return; }
+  if (!channelId) { toast('Choose a Discord channel.', 'error'); return; }
+  const btn = document.getElementById('saveMinecraftLiveBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Sending...';
+  try { persistMinecraftSettings(); const r = await fetch(`/api/settings/${guildId}/minecraft-status/live`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host, port: minecraftPortInput.value.trim(), channelId, intervalMinutes: minecraftIntervalInput.value.trim() || String(minecraftDefaultInterval) }) }); const p = await r.json(); if (!p.success) throw new Error(p.error); toast(p.message || 'Done', 'success'); setTimeout(() => location.reload(), 700); }
+  catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+document.getElementById('disableMinecraftLiveBtn')?.addEventListener('click', async () => {
+  if (!confirm('Disable Minecraft auto-updates?')) return;
+  const btn = document.getElementById('disableMinecraftLiveBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Disabling...';
+  try { const r = await fetch(`/api/settings/${guildId}/minecraft-status/live`, { method: 'DELETE' }); const p = await r.json(); if (!p.success) throw new Error(p.error); toast(p.message || 'Disabled', 'success'); setTimeout(() => location.reload(), 700); }
+  catch (e) { toast(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+// ── Backup & Clone ──
+const backupRestoreResult = document.getElementById('backupRestoreResult');
+function showBackupResult(msg, kind = 'info') { if (!backupRestoreResult) return; const colors = { success: 'var(--green)', error: 'var(--red)', warning: 'var(--yellow)', info: 'var(--brand)' }; backupRestoreResult.hidden = false; backupRestoreResult.innerHTML = `<strong style="color:${colors[kind]||'var(--brand)'}">${escapeHtml(msg)}</strong>`; }
+function renderCloneSourceOptions(guilds) { const sel = document.getElementById('cloneSourceGuildId'); if (!sel) return; const v = sel.value; sel.innerHTML = '<option value="">Choose source server</option>' + (Array.isArray(guilds)?guilds:[]).map(g => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name||g.id)}</option>`).join(''); if (v && guilds.some(g => String(g.id)===String(v))) sel.value = v; }
+renderCloneSourceOptions(JSON.parse(document.getElementById('cloneSourceGuildsData').textContent));
+document.getElementById('refreshCloneSourcesBtn')?.addEventListener('click', async () => { try { const r = await fetch(`/api/settings/${guildId}/clone-sources`); const p = await r.json(); if (p.success) renderCloneSourceOptions(p.guilds || []); } catch (e) { toast(e.message, 'error'); } });
+
+document.getElementById('exportBackupBtn')?.addEventListener('click', async () => {
+  const btn = document.getElementById('exportBackupBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Exporting...';
+  try { const r = await fetch(`/api/settings/${guildId}/backup`); const p = await r.json(); if (!p || p.success === false) throw new Error(p.error || 'Failed'); const blob = new Blob([JSON.stringify(p, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${guildId}-backup.json`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showBackupResult('Backup exported.', 'success'); }
+  catch (e) { showBackupResult(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+document.getElementById('restoreBackupBtn')?.addEventListener('click', async () => {
+  const raw = document.getElementById('backupJsonInput')?.value?.trim();
+  if (!raw) { showBackupResult('Paste backup JSON first.', 'warning'); return; }
+  const btn = document.getElementById('restoreBackupBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Restoring...';
+  try { const parsed = JSON.parse(raw); const r = await fetch(`/api/settings/${guildId}/restore`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backup: parsed }) }); const p = await r.json(); if (!p.success) throw new Error(p.error); showBackupResult(p.message || 'Restored.', 'success'); setTimeout(() => location.reload(), 900); }
+  catch (e) { showBackupResult(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
+});
+
+document.getElementById('cloneServerConfigBtn')?.addEventListener('click', async () => {
+  const sourceId = String(document.getElementById('cloneSourceGuildId')?.value || '').trim();
+  if (!sourceId) { showBackupResult('Choose a source server.', 'warning'); return; }
+  if (!confirm('Clone setup from selected server? This overwrites matching settings.')) return;
+  const btn = document.getElementById('cloneServerConfigBtn'); const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Cloning...';
+  try { const r = await fetch(`/api/settings/${guildId}/clone`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceGuildId: sourceId }) }); const p = await r.json(); if (!p.success) throw new Error(p.error); showBackupResult(`${p.message||'Done'} Applied ${Array.isArray(p.applied)?p.applied.length:0} section(s).`, 'success'); setTimeout(() => location.reload(), 900); }
+  catch (e) { showBackupResult(e.message, 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = orig; }
 });
 </script>
 </body>

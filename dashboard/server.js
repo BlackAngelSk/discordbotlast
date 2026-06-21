@@ -43,77 +43,48 @@ const seasonLeaderboardGames = Array.isArray(seasonLeaderboardManager.SEASON_LEA
     ? seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES
     : [];
 
-const withTimeout = (promise, ms) => new Promise((resolve) => {
-    const parsedMs = Number(ms);
-    const timeoutMs = Number.isFinite(parsedMs) ? Math.max(1, parsedMs) : 3000;
-    const timer = setTimeout(() => resolve(null), timeoutMs);
-    promise
-        .then(result => {
-            clearTimeout(timer);
-            resolve(result);
-        })
-        .catch(() => {
-            clearTimeout(timer);
-            resolve(null);
-        });
-});
+// ── Imported from modular dashboard helpers ──────────────────────────────────
+const {
+    withTimeout,
+    resolveGuildUsername,
+    resolveGlobalUsername,
+    readJsonFile,
+    normalizeTextInput,
+    normalizeBooleanInput,
+    normalizeHexColorInput,
+    normalizeEmbedPreviewColor,
+    parseDashboardBoolean,
+    resolveStoredTextChannel,
+    replaceMemberTemplateTokens,
+    findChannelByIdOrName,
+    findRoleByIdOrName,
+    sanitizeBackupName,
+    ensureDashboardBackupsDir,
+    applyPreviewTemplate
+} = require('./helpers');
 
-const resolveGuildUsername = async (guild, userId) => {
-    if (!guild) return `Unknown (${userId})`;
-    const cached = guild.members?.cache?.get(userId);
-    if (cached) return cached.user?.username || `Unknown (${userId})`;
-    const member = await withTimeout(guild.members.fetch(userId).catch(() => null), 3000);
-    return member ? member.user.username : `Unknown (${userId})`;
-};
+const {
+    logDashboardAudit,
+    readDashboardAuditEntries,
+    readJsonFile: _readJsonFileUnused
+} = require('./audit');
 
-const resolveGlobalUsername = async (client, userId) => {
-    const cached = client.users?.cache?.get(userId);
-    if (cached) return cached.username || `Unknown (${userId})`;
-    const user = await withTimeout(client.users.fetch(userId).catch(() => null), 3000);
-    return user ? user.username : `Unknown (${userId})`;
-};
+const {
+    normalizeServerProfile,
+    buildSetupChecklist,
+    summarizeSetupProgress,
+    collectSetupContextForGuild,
+    getUserAdminGuildsInBot
+} = require('./setupManager');
+
+const { runDashboardTestAction } = require('./testActions');
 
 const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');
 const DASHBOARD_AUDIT_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
 const BOT_UPDATE_STATE_FILE = path.join(__dirname, '..', 'data', 'botUpdateState.json');
 const DASHBOARD_BACKUPS_DIR = path.join(__dirname, '..', 'data', 'backups', 'dashboard');
 
-let dashboardAuditWriteQueue = Promise.resolve();
-
-const readJsonFile = (filePath, fallback) => {
-    try {
-        if (!fs.existsSync(filePath)) return fallback;
-        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch {
-        return fallback;
-    }
-};
-
-const queueDashboardAuditEntry = (entry) => {
-    dashboardAuditWriteQueue = dashboardAuditWriteQueue
-        .then(async () => {
-            let logs = [];
-
-            try {
-                const content = await fs.promises.readFile(DASHBOARD_AUDIT_FILE, 'utf8');
-                logs = JSON.parse(content);
-            } catch (error) {
-                if (error.code !== 'ENOENT') {
-                    throw error;
-                }
-            }
-
-            logs.push(entry);
-            if (logs.length > 500) {
-                logs = logs.slice(-500);
-            }
-
-            await fs.promises.writeFile(DASHBOARD_AUDIT_FILE, JSON.stringify(logs, null, 2));
-        })
-        .catch((error) => {
-            console.error('Dashboard audit log error:', error.message);
-        });
-};
+// audit functions are imported from ./audit above
 
 const DASHBOARD_SECTION_LABELS = {
     settings: 'Server Settings',
@@ -160,21 +131,6 @@ const inferDashboardSectionKey = (requestPath) => {
     return null;
 };
 
-const resolveStoredTextChannel = (guild, storedValue) => {
-    const normalizedValue = String(storedValue || '').trim();
-    if (!guild || !normalizedValue) return null;
-
-    return guild.channels.cache.get(normalizedValue)
-        || guild.channels.cache.find((channel) => channel.type === 0 && channel.name === normalizedValue)
-        || null;
-};
-
-const replaceMemberTemplateTokens = (template, member, guild) => {
-    return String(template || '')
-        .replaceAll('{user}', member ? `<@${member.id}>` : 'Test User')
-        .replaceAll('{server}', guild?.name || 'Server');
-};
-
 const readRecentErrorEntries = (limit = 20) => {
     try {
         const logsDirectory = path.join(__dirname, '..', 'logs');
@@ -201,104 +157,6 @@ const readRecentErrorEntries = (limit = 20) => {
         console.error('Failed to read recent error entries:', error);
         return [];
     }
-};
-
-const readDashboardAuditEntries = ({ guildId = null, limit = 50 } = {}) => {
-    const entries = readJsonFile(DASHBOARD_AUDIT_FILE, []);
-    return entries
-        .filter((entry) => !guildId || !entry.guildId || entry.guildId === guildId)
-        .sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp))
-        .slice(0, limit);
-};
-
-const normalizeEmbedPreviewColor = (colorValue) => {
-    const parsed = Number(colorValue);
-    const safeValue = Number.isFinite(parsed) ? parsed : 0x5865F2;
-    return `#${safeValue.toString(16).padStart(6, '0')}`;
-};
-
-const normalizeHexColorInput = (value, fallback = '#5865F2') => {
-    const normalized = String(value || '').trim();
-    const candidate = normalized.startsWith('#') ? normalized.slice(1) : normalized;
-    if (!candidate) return fallback;
-    if (!/^[0-9A-Fa-f]{6}$/.test(candidate)) return fallback;
-    return `#${candidate.toUpperCase()}`;
-};
-
-const normalizeTextInput = (value, fallback, maxLength = 256) => {
-    const trimmed = String(value ?? '').trim();
-    if (!trimmed) return String(fallback || '');
-    return trimmed.slice(0, maxLength);
-};
-
-const normalizeBooleanInput = (value, fallback = false) => {
-    if (typeof value === 'boolean') return value;
-    if (value === 'true' || value === '1' || value === 1) return true;
-    if (value === 'false' || value === '0' || value === 0) return false;
-    return fallback;
-};
-
-const normalizeServerProfile = (profile = {}, guild = null) => {
-    const inviteUrl = String(profile.inviteUrl || '').trim();
-    const safeInviteUrl = /^https:\/\/(discord\.gg|discord\.com\/invite)\//i.test(inviteUrl) ? inviteUrl : '';
-
-    return {
-        enabled: Boolean(profile.enabled),
-        title: normalizeTextInput(profile.title, guild?.name || 'Server', 80),
-        summary: normalizeTextInput(profile.summary, guild?.description || 'Shared from the dashboard.', 180),
-        description: normalizeTextInput(profile.description, '', 1200),
-        inviteUrl: safeInviteUrl,
-        accentColor: normalizeHexColorInput(profile.accentColor, '#5865F2'),
-        showMemberCount: profile.showMemberCount !== false,
-        showChannelCount: profile.showChannelCount !== false,
-        showRoleCount: profile.showRoleCount !== false
-    };
-};
-
-const ensureDashboardBackupsDir = async () => {
-    await fs.promises.mkdir(DASHBOARD_BACKUPS_DIR, { recursive: true });
-};
-
-const sanitizeBackupName = (value) => String(value || '')
-    .replace(/[^a-zA-Z0-9._-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80) || 'backup';
-
-const findChannelByIdOrName = (guild, channelRef) => {
-    const normalized = String(channelRef || '').trim();
-    if (!guild || !normalized) return null;
-    return guild.channels.cache.get(normalized)
-        || guild.channels.cache.find((channel) => String(channel.name || '').toLowerCase() === normalized.toLowerCase())
-        || null;
-};
-
-const findRoleByIdOrName = (guild, roleRef) => {
-    const normalized = String(roleRef || '').trim();
-    if (!guild || !normalized) return null;
-    return guild.roles.cache.get(normalized)
-        || guild.roles.cache.find((role) => String(role.name || '').toLowerCase() === normalized.toLowerCase())
-        || null;
-};
-
-const getUserAdminGuildsInBot = (user, client, excludeGuildId = null) => {
-    const adminPermission = PermissionFlagsBits.Administrator;
-    const allGuilds = Array.isArray(user?.guilds) ? user.guilds : [];
-
-    return allGuilds.filter((guild) => {
-        if (!guild || !guild.id) return false;
-        if (excludeGuildId && guild.id === excludeGuildId) return false;
-        if (!client.guilds.cache.has(guild.id)) return false;
-
-        try {
-            return (BigInt(guild.permissions) & adminPermission) === adminPermission;
-        } catch {
-            return false;
-        }
-    }).map((guild) => ({
-        id: guild.id,
-        name: guild.name,
-        icon: guild.icon || null
-    }));
 };
 
 const buildServerBackupPayload = async (guildId, client) => {
@@ -538,254 +396,6 @@ const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
 
     return { applied };
 };
-
-const parseDashboardBoolean = (value) => value === true || value === 'true' || value === 'on' || value === '1' || value === 1;
-
-const buildSetupChecklist = ({ guildId, settings, modSettings, modLogChannel, loggingChannel, suggestionSettings, ticketSettings, raidSettings, voiceSettings, tempVoiceHubChannelId, liveAlertsCount }) => {
-    return [
-        {
-            title: 'Welcome + Leave Messages',
-            description: 'Enable onboarding and leave notifications with a channel.',
-            done: Boolean((settings.welcomeEnabled && settings.welcomeChannel) || (settings.leaveEnabled && settings.leaveChannel)),
-            href: `/dashboard/${guildId}`,
-            icon: 'fa-hand-wave'
-        },
-        {
-            title: 'Server Logging',
-            description: 'Choose a logging channel to capture server events.',
-            done: Boolean(loggingChannel),
-            href: `/dashboard/${guildId}`,
-            icon: 'fa-scroll'
-        },
-        {
-            title: 'Auto-Moderation',
-            description: 'Turn on auto-mod and set your moderation log channel.',
-            done: Boolean(modSettings.enabled && modLogChannel),
-            href: `/dashboard/${guildId}/automod`,
-            icon: 'fa-robot'
-        },
-        {
-            title: 'Suggestions',
-            description: 'Enable suggestion center and select a suggestion channel.',
-            done: Boolean(suggestionSettings.enabled && suggestionSettings.channelId),
-            href: `/dashboard/${guildId}/community`,
-            icon: 'fa-lightbulb'
-        },
-        {
-            title: 'Voice Tools',
-            description: 'Set a temp voice hub or enable voice rewards.',
-            done: Boolean(tempVoiceHubChannelId || voiceSettings.enabled),
-            href: `/dashboard/${guildId}/voice-tools`,
-            icon: 'fa-microphone-lines'
-        },
-        {
-            title: 'Support Tickets',
-            description: 'Enable tickets and set at least one ticket destination.',
-            done: Boolean(ticketSettings.enabled && (ticketSettings.categoryId || ticketSettings.logsChannelId)),
-            href: `/dashboard/${guildId}/commands`,
-            icon: 'fa-ticket'
-        },
-        {
-            title: 'Safety Center',
-            description: 'Configure raid protection or starboard settings.',
-            done: Boolean(raidSettings.enabled || settings.starboardChannel),
-            href: `/dashboard/${guildId}/safety`,
-            icon: 'fa-user-shield'
-        },
-        {
-            title: 'Live Alerts',
-            description: 'Add at least one Twitch or YouTube alert.',
-            done: Boolean(liveAlertsCount > 0),
-            href: `/dashboard/${guildId}/live-alerts`,
-            icon: 'fa-satellite-dish'
-        }
-    ];
-};
-
-const summarizeSetupProgress = (setupChecklist = []) => {
-    const setupCompletedCount = setupChecklist.filter((item) => item.done).length;
-    const setupProgressPercent = setupChecklist.length
-        ? Math.round((setupCompletedCount / setupChecklist.length) * 100)
-        : 0;
-
-    return {
-        setupCompletedCount,
-        setupProgressPercent
-    };
-};
-
-const collectSetupContextForGuild = async (guildId) => {
-    const settings = settingsManager.get(guildId);
-    const modSettings = moderationManager.getAutomodSettings(guildId);
-    const modLogChannel = moderationManager.getModLogChannel(guildId);
-    const loggingChannel = await loggingManager.getLoggingChannel(guildId);
-    const suggestionSettings = suggestionManager.getSettings(guildId);
-    const ticketSettings = ticketManager.getSettings(guildId);
-    const raidSettings = raidProtectionManager.getSettings(guildId);
-    const voiceSettings = voiceRewardsManager.getSettings(guildId);
-    const tempVoiceHubChannelId = tempVoiceManager.getHub(guildId);
-    const liveAlerts = liveAlertsManager.getAlerts(guildId);
-    const liveAlertsCount = (liveAlerts.twitch?.length || 0) + (liveAlerts.youtube?.length || 0);
-
-    const setupChecklist = buildSetupChecklist({
-        guildId,
-        settings,
-        modSettings,
-        modLogChannel,
-        loggingChannel,
-        suggestionSettings,
-        ticketSettings,
-        raidSettings,
-        voiceSettings,
-        tempVoiceHubChannelId,
-        liveAlertsCount
-    });
-
-    return {
-        settings,
-        modSettings,
-        modLogChannel,
-        loggingChannel,
-        suggestionSettings,
-        ticketSettings,
-        raidSettings,
-        voiceSettings,
-        tempVoiceHubChannelId,
-        liveAlertsCount,
-        setupChecklist,
-        ...summarizeSetupProgress(setupChecklist)
-    };
-};
-
-const runDashboardTestAction = async ({ guildId, guild, member, type, client }) => {
-    if (type === 'welcome') {
-        const welcomeMessageManager = client?.welcomeMessageManager;
-        const welcomeEmbedConfig = welcomeMessageManager?.getWelcomeConfig(guildId);
-
-        if (welcomeEmbedConfig?.enabled && welcomeEmbedConfig.channelId) {
-            const embedChannel = guild.channels.cache.get(welcomeEmbedConfig.channelId)
-                || await guild.channels.fetch(welcomeEmbedConfig.channelId).catch(() => null);
-
-            if (!embedChannel || !embedChannel.isTextBased()) {
-                throw new Error('Welcome embed channel is not available or not text-based.');
-            }
-
-            const embed = welcomeMessageManager.createWelcomeEmbed(member, welcomeEmbedConfig);
-            await embedChannel.send({
-                content: '🧪 Test welcome embed',
-                embeds: [embed]
-            });
-            return 'Sent welcome embed test successfully.';
-        }
-
-        const settings = settingsManager.get(guildId);
-        const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
-        if (!channel) {
-            throw new Error('Welcome channel is not configured or not available.');
-        }
-
-        const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
-        const accountCreatedUnix = member?.user?.createdTimestamp
-            ? Math.floor(member.user.createdTimestamp / 1000)
-            : null;
-        const joinedUnix = member?.joinedTimestamp
-            ? Math.floor(member.joinedTimestamp / 1000)
-            : null;
-        const fallbackEmbed = new EmbedBuilder()
-            .setColor(0x57f287)
-            .setTitle(`🧪 Welcome Test for ${guild.name}`)
-            .setDescription(message)
-            .addFields(
-                { name: 'User', value: `<@${member.id}>`, inline: true },
-                { name: 'User ID', value: member.id, inline: true },
-                { name: 'Member Count', value: `${guild.memberCount}`, inline: true },
-                {
-                    name: 'Account Created',
-                    value: accountCreatedUnix ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)` : 'Unknown',
-                    inline: false
-                },
-                {
-                    name: 'Joined Server',
-                    value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
-                    inline: false
-                }
-            )
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .setTimestamp();
-
-        await channel.send({ embeds: [fallbackEmbed] });
-        return settings.welcomeEnabled
-            ? 'Sent welcome embed test successfully.'
-            : 'Sent welcome embed test successfully. Note: welcome messages are currently disabled.';
-    }
-
-    if (type === 'leave') {
-        const settings = settingsManager.get(guildId);
-        const channel = resolveStoredTextChannel(guild, settings.leaveChannel);
-        if (!settings.leaveEnabled || !channel) {
-            throw new Error('Leave messages are not fully configured yet.');
-        }
-
-        const message = replaceMemberTemplateTokens(settings.leaveMessage, member, guild);
-        await channel.send(`🧪 Test leave message\n${message}`);
-        return 'Sent leave test successfully.';
-    }
-
-    if (type === 'logging') {
-        const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
-        if (!loggingChannelId) {
-            throw new Error('No logging channel is configured.');
-        }
-
-        const embed = new EmbedBuilder()
-            .setColor(0x5865F2)
-            .setTitle('🧪 Logging Channel Test')
-            .setDescription('This is a test log entry from the dashboard.')
-            .addFields(
-                { name: 'Triggered By', value: `${member.user.tag}`, inline: true },
-                { name: 'Server', value: guild.name, inline: true }
-            )
-            .setTimestamp();
-
-        await loggingManager.sendLog(guildId, embed, client);
-        return 'Sent logging test successfully.';
-    }
-
-    if (type === 'suggestions') {
-        const suggestionSettings = suggestionManager.getSettings(guildId);
-        const channel = suggestionSettings.channelId ? guild.channels.cache.get(suggestionSettings.channelId) : null;
-        if (!suggestionSettings.enabled || !channel || !channel.isTextBased()) {
-            throw new Error('Suggestions are not fully configured yet.');
-        }
-
-        const staffMention = suggestionSettings.staffRoleId ? `<@&${suggestionSettings.staffRoleId}>` : 'No staff role configured';
-        await channel.send({
-            embeds: [
-                new EmbedBuilder()
-                    .setColor(0x57F287)
-                    .setTitle('🧪 Suggestion System Test')
-                    .setDescription('This is a dashboard test message for the suggestion channel.')
-                    .addFields(
-                        { name: 'Voting Enabled', value: suggestionSettings.votingEnabled ? 'Yes' : 'No', inline: true },
-                        { name: 'Auto Thread', value: suggestionSettings.autoThread ? 'Yes' : 'No', inline: true },
-                        { name: 'Staff Role', value: staffMention, inline: false }
-                    )
-                    .setTimestamp()
-            ]
-        });
-
-        return 'Sent suggestions test successfully.';
-    }
-
-    throw new Error('Unknown test action.');
-};
-
-const applyPreviewTemplate = (template, context = {}) => String(template || '').replace(/\{(\w+)\}/g, (match, token) => {
-    if (!Object.prototype.hasOwnProperty.call(context, token)) {
-        return match;
-    }
-    return String(context[token] ?? '');
-});
 
 const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) => {
     const defaultAppearance = typeof seasonLeaderboardManager.getDefaultAppearance === 'function'
@@ -1042,18 +652,6 @@ const buildSeasonLeaderboardPreviewPayload = async (guildId, client, configOverr
         currentSeasonName,
         embeds: embeds.map(serializeEmbedPreview)
     };
-};
-
-const logDashboardAudit = (req, action, details = {}) => {
-    queueDashboardAuditEntry({
-        timestamp: new Date().toISOString(),
-        userId: req.user?.id || 'unknown',
-        username: req.user?.username || 'unknown',
-        guildId: req.params?.guildId || details.guildId || null,
-        action,
-        details,
-        ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
-    });
 };
 
 const collectDashboardCommands = (client, guildId) => {

@@ -7,74 +7,11 @@ const economyManager = require('../utils/economyManager');
 const moderationManager = require('../utils/moderationManager');
 const analyticsManager = require('../utils/analyticsManager');
 const { formatNumber } = require('../utils/helpers');
+const { logDashboardAudit: auditLog, readDashboardAuditEntries } = require('./audit');
+const { resolveGuildUsername } = require('./helpers');
 const fs = require('fs');
 const path = require('path');
-
 const AUDIT_LOG_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');
-let auditWriteQueue = Promise.resolve();
-
-function queueAuditWrite(entry) {
-    auditWriteQueue = auditWriteQueue
-        .then(async () => {
-            let logs = [];
-
-            try {
-                const content = await fs.promises.readFile(AUDIT_LOG_FILE, 'utf8');
-                logs = JSON.parse(content);
-            } catch (error) {
-                if (error.code !== 'ENOENT') {
-                    throw error;
-                }
-            }
-
-            logs.push(entry);
-            if (logs.length > 500) logs = logs.slice(-500);
-            await fs.promises.writeFile(AUDIT_LOG_FILE, JSON.stringify(logs, null, 2));
-        })
-        .catch((err) => {
-            console.error('Dashboard audit log error:', err.message);
-        });
-}
-
-function auditLog(req, action, details = {}) {
-    try {
-        const entry = {
-            timestamp: new Date().toISOString(),
-            userId: req.user?.id || 'unknown',
-            username: req.user?.username || 'unknown',
-            guildId: req.params?.guildId || details.guildId || null,
-            action,
-            details,
-            ip: req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null
-        };
-        queueAuditWrite(entry);
-    } catch (err) {
-        console.error('Dashboard audit log error:', err.message);
-    }
-}
-
-const withTimeout = (promise, ms) => new Promise((resolve) => {
-    const parsedMs = Number(ms);
-    const timeoutMs = Number.isFinite(parsedMs) ? Math.max(1, parsedMs) : 3000;
-    const timer = setTimeout(() => resolve(null), timeoutMs);
-    promise
-        .then(result => {
-            clearTimeout(timer);
-            resolve(result);
-        })
-        .catch(() => {
-            clearTimeout(timer);
-            resolve(null);
-        });
-});
-
-const resolveGuildUsername = async (guild, userId) => {
-    if (!guild) return `Unknown (${userId})`;
-    const cached = guild.members?.cache?.get(userId);
-    if (cached) return cached.user?.username || `Unknown (${userId})`;
-    const member = await withTimeout(guild.members.fetch(userId).catch(() => null), 3000);
-    return member ? member.user.username : `Unknown (${userId})`;
-};
 
 module.exports = function(app, client, checkAuth, checkGuildAccess) {
 
@@ -315,12 +252,8 @@ module.exports = function(app, client, checkAuth, checkGuildAccess) {
     app.get('/api/:guildId/audit-log', checkAuth, checkGuildAccess, (req, res) => {
         try {
             const { guildId } = req.params;
-            let logs = [];
-            if (fs.existsSync(AUDIT_LOG_FILE)) {
-                logs = JSON.parse(fs.readFileSync(AUDIT_LOG_FILE, 'utf8'));
-            }
-            const guildLogs = logs.filter(e => !e.guildId || e.guildId === guildId);
-            res.json({ logs: guildLogs.slice(-100).reverse() });
+            const entries = readDashboardAuditEntries({ guildId, limit: 100 });
+            res.json({ logs: entries });
         } catch (err) {
             res.status(500).json({ error: err.message });
         }

@@ -4,33 +4,71 @@
   }
 
   function applyTheme(theme) {
-    const nextTheme = theme === 'light' ? 'light' : 'dark';
+    var nextTheme = theme === 'light' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', nextTheme);
-    const toggle = getThemeToggle();
-    if (toggle) {
-      toggle.innerHTML = nextTheme === 'dark'
-        ? '<i class="fas fa-sun"></i>'
-        : '<i class="fas fa-moon"></i>';
-    }
+
+    // Update active state on theme switcher buttons
+    document.querySelectorAll('.theme-switch-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.theme === nextTheme);
+    });
+
+    // Also update old dropdown items if they exist
+    document.querySelectorAll('.theme-dropdown-item').forEach(function (item) {
+      item.classList.toggle('active', item.dataset.theme === nextTheme);
+    });
+
     return nextTheme;
   }
 
   function initThemeToggle() {
-    const toggle = getThemeToggle();
-    const savedTheme = localStorage.getItem('theme') || 'dark';
+    var savedTheme = localStorage.getItem('theme') || 'dark';
     applyTheme(savedTheme);
 
-    if (!toggle || toggle.dataset.bound === 'true') {
-      return;
+    // Handle theme switcher button clicks
+    document.querySelectorAll('.theme-switch-btn').forEach(function (btn) {
+      if (btn.dataset.bound === 'true') return;
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', function () {
+        var theme = btn.dataset.theme || 'dark';
+        applyTheme(theme);
+        localStorage.setItem('theme', theme);
+      });
+    });
+
+    // Handle old dropdown button (fallback)
+    var toggle = getThemeToggle();
+    if (toggle && toggle.dataset.bound !== 'true' && toggle.classList.contains('theme-selector-btn')) {
+      toggle.dataset.bound = 'true';
+      toggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var dropdown = document.getElementById('themeDropdown');
+        if (dropdown) {
+          dropdown.classList.toggle('open');
+        }
+      });
     }
 
-    toggle.dataset.bound = 'true';
-    toggle.addEventListener('click', function () {
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      applyTheme(nextTheme);
-      localStorage.setItem('theme', nextTheme);
+    // Handle old dropdown items (fallback)
+    document.querySelectorAll('.theme-dropdown-item').forEach(function (item) {
+      if (item.dataset.bound === 'true') return;
+      item.dataset.bound = 'true';
+      item.addEventListener('click', function () {
+        var theme = item.dataset.theme || 'dark';
+        applyTheme(theme);
+        localStorage.setItem('theme', theme);
+        var dropdown = document.getElementById('themeDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      });
     });
+
+    // Close dropdown when clicking outside (fallback)
+    if (!document._themeDropdownCloseBound) {
+      document._themeDropdownCloseBound = true;
+      document.addEventListener('click', function () {
+        var dropdown = document.getElementById('themeDropdown');
+        if (dropdown) dropdown.classList.remove('open');
+      });
+    }
   }
 
   function initMobileSidebar() {

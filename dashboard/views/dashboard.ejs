@@ -23,7 +23,10 @@
         Discord Bot
       </a>
       <div class="landing-nav-links">
-        <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+        <div class="theme-switcher" id="themeSwitcher">
+          <button class="theme-switch-btn active" data-theme="dark" title="Dark mode"><i class="fas fa-moon"></i></button>
+          <button class="theme-switch-btn" data-theme="light" title="Light mode"><i class="fas fa-sun"></i></button>
+        </div>
         <div class="topbar-user">
           <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
           <span class="topbar-user-name"><%= user.username %></span>
@@ -200,17 +203,17 @@
 </div>
 
 <script>
-  const saved = localStorage.getItem('theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', saved);
-  const btn = document.getElementById('themeToggle');
-  btn.innerHTML = saved === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-  btn.addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme');
-    const next = cur === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    btn.innerHTML = next === 'dark' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
-  });
+  (function() {
+    var saved = localStorage.getItem('theme') || 'dark';
+    function applyPickerTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      document.querySelectorAll('.theme-switch-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.theme === theme); });
+    }
+    applyPickerTheme(saved);
+    document.querySelectorAll('.theme-switch-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { applyPickerTheme(btn.dataset.theme); localStorage.setItem('theme', btn.dataset.theme); });
+    });
+  })();
 
   const searchInput = document.getElementById('serverSearch');
   const cards = Array.from(document.querySelectorAll('.server-card'));

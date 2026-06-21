@@ -5,7 +5,7 @@ const resolvedTopbarSubtitle = typeof topbarSubtitle === 'string' && topbarSubti
 %>
 <header class="topbar">
   <div class="topbar-left">
-    <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+    <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
     <div class="topbar-meta">
       <div class="topbar-kicker">Discord Bot Dashboard</div>
       <div class="topbar-title"><%= topbarTitle %></div>
@@ -14,10 +14,32 @@ const resolvedTopbarSubtitle = typeof topbarSubtitle === 'string' && topbarSubti
   </div>
   <div class="topbar-right">
     <div class="page-header-badge"><i class="fas fa-signal"></i> Live config</div>
-    <button class="icon-btn" id="themeToggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+    <div class="theme-switcher" id="themeSwitcher">
+      <button class="theme-switch-btn active" data-theme="dark" id="themeDarkBtn" title="Dark mode"><i class="fas fa-moon"></i></button>
+      <button class="theme-switch-btn" data-theme="light" id="themeLightBtn" title="Light mode"><i class="fas fa-sun"></i></button>
+    </div>
     <div class="topbar-user">
       <img src="https://cdn.discordapp.com/avatars/<%= user.id %>/<%= user.avatar %>.png" alt="Avatar" onerror="this.src='https://cdn.discordapp.com/embed/avatars/0.png'">
       <span class="topbar-user-name"><%= user.username %></span>
     </div>
   </div>
 </header>
+<script>
+(function(){
+  function applyTopTheme(theme){
+    document.documentElement.setAttribute('data-theme', theme);
+    document.querySelectorAll('.theme-switch-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.theme === theme); });
+  }
+  var saved = localStorage.getItem('theme') || 'dark';
+  applyTopTheme(saved);
+  document.querySelectorAll('.theme-switch-btn').forEach(function(btn){
+    if(btn._bound) return;
+    btn._bound = true;
+    btn.addEventListener('click',function(){
+      var t = btn.dataset.theme || 'dark';
+      applyTopTheme(t);
+      localStorage.setItem('theme', t);
+    });
+  });
+})();
+</script>
