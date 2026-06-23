@@ -77,6 +77,19 @@ class SlashCommandHandler {
     }
 
     async handleInteraction(interaction) {
+        // Handle autocomplete interactions
+        if (interaction.isAutocomplete()) {
+            const command = this.commands.get(interaction.commandName);
+            if (command && typeof command.autocomplete === 'function') {
+                try {
+                    await command.autocomplete(interaction);
+                } catch (error) {
+                    console.error(`Autocomplete error for ${interaction.commandName}:`, error);
+                }
+            }
+            return;
+        }
+
         if (!interaction.isChatInputCommand()) return;
 
         const command = this.commands.get(interaction.commandName);

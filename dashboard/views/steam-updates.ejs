@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= guild.name %> — Steam Updates</title>
+    <title><%= guild.name %> — Game Updates</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
@@ -17,7 +17,7 @@
         <main class="content">
             <div class="page-header">
                 <h1><i class="fas fa-gamepad" style="color:var(--brand);margin-right:8px"></i>Game Update Alerts</h1>
-                <p>Pick a channel and choose which games this server should watch for updates. Supports Steam games, Minecraft, League of Legends, osu!, Valorant, Final Fantasy XIV, World of Warcraft, Path of Exile, Fortnite, Helldivers 2, and Diablo IV.</p>
+                <p>Pick a channel and choose which games this server should watch for updates. Supports Steam games, Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, Path of Exile, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, Counter-Strike 2, Dota 2, Valheim, Rust, and PUBG.</p>
             </div>
 
             <div class="stats-row">
@@ -35,7 +35,7 @@
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Tracked Games</span><div class="stat-card-icon purple"><i class="fas fa-gamepad"></i></div></div>
                     <div class="stat-card-value"><%= previews.length %></div>
-                    <div class="stat-card-change"><i class="fas fa-list"></i> Up to 20 tracked sources</div>
+                    <div class="stat-card-change"><i class="fas fa-list"></i> Up to 25 tracked sources</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Last Checked</span><div class="stat-card-icon orange"><i class="fas fa-clock"></i></div></div>
@@ -48,7 +48,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
-                        <div class="card-subtitle">Save the channel, search Steam games by name, or add built-in games: Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, Path of Exile, Fortnite, Helldivers 2, or Diablo IV.</div>
+                        <div class="card-subtitle">Save the channel, search Steam games by name, or add built-in games: Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, PoE, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, CS2, Dota 2, Valheim, Rust, or PUBG.</div>
                     </div>
                 </div>
 
@@ -57,7 +57,7 @@
                         <div class="form-group" style="width:100%">
                             <label class="checkbox-wrap" style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:0">
                                 <input type="checkbox" id="steamUpdatesEnabled" name="enabled" <%= config?.enabled === false ? '' : 'checked' %>>
-                                <span>Enable Steam update alerts for this server</span>
+                                <span>Enable game update alerts for this server</span>
                             </label>
                             <div class="form-hint">When disabled, your tracked games stay saved but the bot will not post alerts.</div>
                         </div>
@@ -87,6 +87,14 @@
 
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
+                            <label class="form-label">Quick Add Games</label>
+                            <div id="quickAddGames" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+                            <div class="form-hint">Click a game to quickly add it. These are popular pre-configured games.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group" style="width:100%">
                             <label class="form-label">Selected Games</label>
                             <div id="selectedSteamGames" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px"></div>
                             <div class="form-hint">Remove any game you no longer want to monitor before saving.</div>
@@ -96,8 +104,8 @@
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
                             <label class="form-label">Advanced Input</label>
-                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;https://store.steampowered.com/app/578080/"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
-                            <div class="form-hint">Use Steam app IDs, Steam store URLs, or game names: minecraft, osu, lol, valorant, ffxiv, wow, poe, fortnite, helldivers2, diablo.</div>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;overwatch&#10;apex&#10;cs2&#10;dota2&#10;valheim&#10;rust&#10;pubg"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <div class="form-hint">Use Steam app IDs, Steam store URLs, or game names listed above.</div>
                         </div>
                     </div>
 
@@ -125,10 +133,12 @@
                                     <img src="<%= game.imageUrl %>" alt="<%= game.name %>" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
                                 <% } %>
                                 <div class="card-title" style="margin-bottom:8px"><%= game.name %></div>
-                                <div class="form-hint" style="margin-bottom:10px"><%= game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : game.provider === 'league' || game.sourceId === 'league' ? 'Source: lol' : `App ID: ${game.appId}` %></div>
+                                <div class="form-hint" style="margin-bottom:10px"><%= game.provider === 'steam' ? `App ID: ${game.appId}` : `Source: ${game.provider}` %></div>
                                 <% if (game.latestArticle) { %>
                                     <div style="font-weight:600;margin-bottom:8px"><%= game.latestArticle.title %></div>
-                                    <div class="form-hint" style="margin-bottom:10px">Published <%= formatDateLabel(game.latestArticle.date, { fallbackLabel: 'Not available' }) %></div>
+                                    <% if (game.latestArticle.version) { %>
+                                        <div class="form-hint" style="margin-bottom:4px">Version: <%= game.latestArticle.version %></div>
+                                    <% } %>
                                     <div style="margin-bottom:12px;line-height:1.6;white-space:pre-wrap;font-size:0.95em;color:var(--text-secondary);font-family:'Courier New', monospace;padding:10px;background:var(--bg-card-hover);border-radius:8px;border-left:3px solid var(--brand)"><%= game.formattedSummary || 'Latest update preview available.' %></div>
                                     <div style="display:flex;gap:10px;flex-wrap:wrap">
                                         <a href="<%= game.latestArticle.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-newspaper"></i> Open Changelog</a>
@@ -161,94 +171,38 @@
 <script>
 const guildId = '<%= guild.id %>';
 const initialTrackedGames = JSON.parse(document.getElementById('initialTrackedGamesData')?.textContent || '[]');
+
+// All special sources supported by the backend
 const specialSourceDefaults = {
-    minecraft: {
-        sourceId: 'minecraft',
-        provider: 'minecraft',
-        name: 'Minecraft',
-        tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/key-art/Homepage_Gameplay-Trailer_MC-OV-logo-300x300.png',
-        imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg',
-        storeUrl: 'https://www.minecraft.net/en-us/updates/'
-    },
-    osu: {
-        sourceId: 'osu',
-        provider: 'osu',
-        name: 'osu!',
-        tinyImage: 'https://osu.ppy.sh/favicon-32x32.png',
-        imageUrl: 'https://osu.ppy.sh/favicon-32x32.png',
-        storeUrl: 'https://osu.ppy.sh/home/changelog/lazer'
-    },
-    league: {
-        sourceId: 'league',
-        provider: 'league',
-        name: 'League of Legends',
-        tinyImage: 'https://www.leagueoflegends.com/static/favicon/10f498b01d7f8c6.ico',
-        imageUrl: 'https://www.leagueoflegends.com/static/open-graph/lol.jpg',
-        storeUrl: 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/'
-    },
-    valorant: {
-        sourceId: 'valorant',
-        provider: 'valorant',
-        name: 'Valorant',
-        tinyImage: 'https://www.valorantpc.com/favicon.ico',
-        imageUrl: 'https://images.contentstack.io/v3/assets/bltfe521ce715202d33/blt28c73a46e28bd2e1/62f88e90e6d4dd0c88b70e84/VALORANT_2022_E4A_TeaserKeyArt_16x9_02.jpg',
-        storeUrl: 'https://playvalorant.com/en-us/news/'
-    },
-    ffxiv: {
-        sourceId: 'ffxiv',
-        provider: 'ffxiv',
-        name: 'Final Fantasy XIV',
-        tinyImage: 'https://na.finalfantasyxiv.com/favicon.ico',
-        imageUrl: 'https://na.finalfantasyxiv.com/pr/dl/news/m_header_lodestone.jpg',
-        storeUrl: 'https://na.finalfantasyxiv.com/lodestone/news/'
-    },
-    wow: {
-        sourceId: 'wow',
-        provider: 'wow',
-        name: 'World of Warcraft',
-        tinyImage: 'https://us.battle.net/favicon.ico',
-        imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p3/P3DV54SA3XCK1522711097119.jpg',
-        storeUrl: 'https://us.battle.net/news/en-us/wow/'
-    },
-    poe: {
-        sourceId: 'poe',
-        provider: 'poe',
-        name: 'Path of Exile',
-        tinyImage: 'https://www.pathofexile.com/favicon.ico',
-        imageUrl: 'https://www.pathofexile.com/image/news/PathOfExile2Launch.jpg',
-        storeUrl: 'https://www.pathofexile.com/en/news'
-    },
-    fortnite: {
-        sourceId: 'fortnite',
-        provider: 'fortnite',
-        name: 'Fortnite',
-        tinyImage: 'https://www.fortnite.com/favicon.ico',
-        imageUrl: 'https://www.fortnite.com/etc.clientlibs/fortnite/clientlibs/main/resources/images/default-social.jpg',
-        storeUrl: 'https://www.fortnite.com/?lang=en-US'
-    },
-    helldivers2: {
-        sourceId: 'helldivers2',
-        provider: 'helldivers2',
-        name: 'Helldivers 2',
-        tinyImage: 'https://www.helldivers.com/favicon.ico',
-        imageUrl: 'https://www.helldivers.com/site-assets/images/social-share.jpg',
-        storeUrl: 'https://www.helldivers.com/'
-    },
-    diablo: {
-        sourceId: 'diablo',
-        provider: 'diablo',
-        name: 'Diablo IV',
-        tinyImage: 'https://diablo4.blizzard.com/favicon.ico',
-        imageUrl: 'https://diablo4.blizzard.com/en-us/media/diablo4-com-social-share.jpg',
-        storeUrl: 'https://diablo4.blizzard.com/en-us/news/'
-    }
+    minecraft: { sourceId: 'minecraft', provider: 'minecraft', name: 'Minecraft', tinyImage: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg', imageUrl: 'https://www.minecraft.net/content/dam/minecraftnet/games/minecraft/screenshots/MCV_SummerDrop2026_BPS_Mar31_Editorial_1920x1080.jpg', storeUrl: 'https://www.minecraft.net/en-us/updates/' },
+    osu: { sourceId: 'osu', provider: 'osu', name: 'osu!', tinyImage: 'https://osu.ppy.sh/favicon-32x32.png', imageUrl: 'https://osu.ppy.sh/favicon-32x32.png', storeUrl: 'https://osu.ppy.sh/home/changelog/lazer' },
+    league: { sourceId: 'league', provider: 'league', name: 'League of Legends', tinyImage: 'https://www.leagueoflegends.com/static/favicon/10f498b01d7f8c6.ico', imageUrl: 'https://www.leagueoflegends.com/static/open-graph/lol.jpg', storeUrl: 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/' },
+    valorant: { sourceId: 'valorant', provider: 'valorant', name: 'Valorant', tinyImage: 'https://www.valorantpc.com/favicon.ico', imageUrl: 'https://images.contentstack.io/v3/assets/bltfe521ce715202d33/blt28c73a46e28bd2e1/62f88e90e6d4dd0c88b70e84/VALORANT_2022_E4A_TeaserKeyArt_16x9_02.jpg', storeUrl: 'https://playvalorant.com/en-us/news/' },
+    ffxiv: { sourceId: 'ffxiv', provider: 'ffxiv', name: 'Final Fantasy XIV', tinyImage: 'https://na.finalfantasyxiv.com/favicon.ico', imageUrl: 'https://na.finalfantasyxiv.com/pr/dl/news/m_header_lodestone.jpg', storeUrl: 'https://na.finalfantasyxiv.com/lodestone/news/' },
+    wow: { sourceId: 'wow', provider: 'wow', name: 'World of Warcraft', tinyImage: 'https://us.battle.net/favicon.ico', imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p3/P3DV54SA3XCK1522711097119.jpg', storeUrl: 'https://us.battle.net/news/en-us/wow/' },
+    poe: { sourceId: 'poe', provider: 'poe', name: 'Path of Exile', tinyImage: 'https://www.pathofexile.com/favicon.ico', imageUrl: 'https://www.pathofexile.com/image/news/PathOfExile2Launch.jpg', storeUrl: 'https://www.pathofexile.com/en/news' },
+    fortnite: { sourceId: 'fortnite', provider: 'fortnite', name: 'Fortnite', tinyImage: 'https://www.fortnite.com/favicon.ico', imageUrl: 'https://www.fortnite.com/etc.clientlibs/fortnite/clientlibs/main/resources/images/default-social.jpg', storeUrl: 'https://www.fortnite.com/?lang=en-US' },
+    helldivers2: { sourceId: 'helldivers2', provider: 'helldivers2', name: 'Helldivers 2', tinyImage: 'https://www.helldivers.com/favicon.ico', imageUrl: 'https://www.helldivers.com/site-assets/images/social-share.jpg', storeUrl: 'https://www.helldivers.com/' },
+    diablo: { sourceId: 'diablo', provider: 'diablo', name: 'Diablo IV', tinyImage: 'https://diablo4.blizzard.com/favicon.ico', imageUrl: 'https://diablo4.blizzard.com/en-us/media/diablo4-com-social-share.jpg', storeUrl: 'https://diablo4.blizzard.com/en-us/news/' },
+    overwatch: { sourceId: 'overwatch', provider: 'overwatch', name: 'Overwatch 2', tinyImage: 'https://overwatch.blizzard.com/favicon.ico', imageUrl: 'https://bnetcms-a.akamaihd.net/cms/page_media/p6/BNet_OWW_default_1920x1080.jpg', storeUrl: 'https://overwatch.blizzard.com/en-us/news/' },
+    apex: { sourceId: 'apex', provider: 'apex', name: 'Apex Legends', tinyImage: 'https://www.ea.com/favicon.ico', imageUrl: 'https://media.contentstack.io/v3/assets/bltd34497824181d87f/blt9504a5e07a6c3e9e/63eaab15f3e6236259a15c6f/apex-og-og.jpg', storeUrl: 'https://www.ea.com/games/apex-legends/news' },
+    cs2: { sourceId: 'cs2', provider: 'cs2', name: 'Counter-Strike 2', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/730/69f7ebe2735c18a8d24157e54194b7118a080830.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/730/header.jpg', storeUrl: 'https://store.steampowered.com/app/730/', appId: '730' },
+    dota2: { sourceId: 'dota2', provider: 'dota2', name: 'Dota 2', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/570/dota2.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/570/header.jpg', storeUrl: 'https://store.steampowered.com/app/570/', appId: '570' },
+    valheim: { sourceId: 'valheim', provider: 'valheim', name: 'Valheim', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/892970/1858e4290b10b0ed3b2aebab25b9c9467b171ea5.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/892970/header.jpg', storeUrl: 'https://store.steampowered.com/app/892970/', appId: '892970' },
+    rust: { sourceId: 'rust', provider: 'rust', name: 'Rust', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/252490/693d6ce6e05760932c2fc8b275f37eff21169b7d.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/252490/header.jpg', storeUrl: 'https://store.steampowered.com/app/252490/', appId: '252490' },
+    pubg: { sourceId: 'pubg', provider: 'pubg', name: 'PUBG: BATTLEGROUNDS', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/578080/b78f78c0fd2e56d23a05513187204e9d56d1e572.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/578080/header.jpg', storeUrl: 'https://store.steampowered.com/app/578080/', appId: '578080' }
 };
+
+// All source keys for the advanced textarea input
+const allSourceKeys = ['minecraft','osu','lol','valorant','ffxiv','wow','poe','fortnite','helldivers2','diablo','overwatch','apex','cs2','dota2','valheim','rust','pubg'];
+
 const form = document.getElementById('steamUpdatesForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
 const gamesInput = form.querySelector('textarea[name="games"]');
 const searchInput = document.getElementById('steamGameSearch');
 const searchResults = document.getElementById('steamSearchResults');
 const selectedGamesContainer = document.getElementById('selectedSteamGames');
+const quickAddContainer = document.getElementById('quickAddGames');
 const saveButton = form.querySelector('button[type="submit"]');
 const testButton = document.getElementById('testSteamUpdatesBtn');
 const clearButton = document.getElementById('clearSteamUpdatesBtn');
@@ -258,24 +212,32 @@ let searchAbortController = null;
 let searchTimer = null;
 
 function escapeHtml(value) {
+    const AMP = String.fromCharCode(38);
+    const LT = String.fromCharCode(60);
+    const GT = String.fromCharCode(62);
+    const DQ = String.fromCharCode(34);
+    const SQ = String.fromCharCode(39);
     return String(value || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+        .split(AMP).join(AMP + 'amp;')
+        .split(LT).join(AMP + 'lt;')
+        .split(GT).join(AMP + 'gt;')
+        .split(DQ).join(AMP + 'quot;')
+        .split(SQ).join(AMP + '#39;');
+}
+
+function getGameDisplaySource(game) {
+    if (game.provider === 'steam' && game.appId) return `App ID: ${game.appId}`;
+    return `Source: ${game.provider || game.sourceId || 'steam'}`;
 }
 
 function syncGamesTextarea() {
     const values = Array.from(selectedGames.values())
         .map((game) => {
-            if (game.provider === 'minecraft' || game.sourceId === 'minecraft') return 'minecraft';
-            if (game.provider === 'osu' || game.sourceId === 'osu') return 'osu';
-            if (game.provider === 'league' || game.sourceId === 'league') return 'lol';
+            const key = game.sourceId || game.provider;
+            if (specialSourceDefaults[key]) return key;
             return game.appId;
         })
         .filter(Boolean);
-
     gamesInput.value = values.join('\n');
 }
 
@@ -287,14 +249,8 @@ function buildGamesPayload() {
 
     const mergedEntries = new Map();
     for (const game of selectedGames.values()) {
-        const entryValue = game.provider === 'minecraft' || game.sourceId === 'minecraft'
-            ? 'minecraft'
-            : game.provider === 'osu' || game.sourceId === 'osu'
-                ? 'osu'
-                : game.provider === 'league' || game.sourceId === 'league'
-                    ? 'lol'
-                : String(game.appId || '').trim();
-
+        const key = game.sourceId || game.provider;
+        const entryValue = specialSourceDefaults[key] ? key : String(game.appId || '').trim();
         if (!entryValue) continue;
         mergedEntries.set(entryValue, entryValue);
     }
@@ -323,7 +279,7 @@ function renderSelectedGames() {
                 ${game.tinyImage || game.imageUrl ? `<img src="${escapeHtml(game.tinyImage || game.imageUrl)}" alt="${escapeHtml(game.name)}" style="width:64px;height:64px;object-fit:cover;border-radius:10px">` : ''}
                 <div style="flex:1;min-width:0">
                     <div class="card-title" style="margin-bottom:6px">${escapeHtml(game.name)}</div>
-                    <div class="form-hint">${escapeHtml(game.provider === 'minecraft' || game.sourceId === 'minecraft' ? 'Source: minecraft' : game.provider === 'osu' || game.sourceId === 'osu' ? 'Source: osu' : game.provider === 'league' || game.sourceId === 'league' ? 'Source: lol' : `App ID: ${game.appId}`)}</div>
+                    <div class="form-hint">${escapeHtml(getGameDisplaySource(game))}</div>
                 </div>
                 <button type="button" class="btn btn-danger btn-sm" data-remove-game-key="${escapeHtml(game.sourceId || game.appId)}"><i class="fas fa-trash"></i></button>
             </div>
@@ -335,40 +291,37 @@ function renderSelectedGames() {
 
 function addSelectedGame(game) {
     if (!game) return;
-
     const gameKey = String(game.sourceId || game.appId || '').trim();
     if (!gameKey) return;
     if (selectedGames.has(gameKey)) return;
-    if (selectedGames.size >= 20) {
-        dashboardUI.showToast('You can track up to 20 game sources per server.', 'error');
+    if (selectedGames.size >= 25) {
+        dashboardUI.showToast('You can track up to 25 game sources per server.', 'error');
         return;
     }
     selectedGames.set(gameKey, game);
     renderSelectedGames();
 }
 
+function renderQuickAddButtons() {
+    const quickGames = ['minecraft','lol','osu','valorant','cs2','dota2','fortnite','wow','ffxiv','poe','diablo','overwatch','apex','helldivers2','valheim','rust','pubg'];
+    quickAddContainer.innerHTML = quickGames.map(key => {
+        const def = specialSourceDefaults[key];
+        if (!def || selectedGames.has(key)) return '';
+        return `<button type="button" class="btn btn-secondary btn-sm" data-quick-add="${key}" style="font-size:0.85em;padding:6px 12px">${escapeHtml(def.name)}</button>`;
+    }).join('');
+}
+
 function parseManualInput() {
     const lines = gamesInput.value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean);
     for (const entry of lines) {
-        const normalizedEntry = entry.toLowerCase();
-        if (normalizedEntry === 'minecraft' || normalizedEntry === 'mc') {
-            if (!selectedGames.has('minecraft')) {
-                selectedGames.set('minecraft', { ...specialSourceDefaults.minecraft });
-            }
-            continue;
-        }
+        const normalizedEntry = entry.toLowerCase().replace(/\s+/g, '');
 
-        if (normalizedEntry === 'osu' || normalizedEntry === 'osu!') {
-            if (!selectedGames.has('osu')) {
-                selectedGames.set('osu', { ...specialSourceDefaults.osu });
-            }
-            continue;
-        }
-
-        if (normalizedEntry === 'league' || normalizedEntry === 'leagueoflegends' || normalizedEntry === 'lol') {
-            if (!selectedGames.has('league')) {
-                selectedGames.set('league', { ...specialSourceDefaults.league });
-            }
+        // Check all special sources
+        const specialDef = Object.values(specialSourceDefaults).find(def =>
+            def.sourceId === normalizedEntry || def.provider === normalizedEntry
+        );
+        if (specialDef && !selectedGames.has(specialDef.sourceId)) {
+            selectedGames.set(specialDef.sourceId, { ...specialDef });
             continue;
         }
 
@@ -391,6 +344,8 @@ for (const game of initialTrackedGames) {
     if (!gameKey) continue;
     selectedGames.set(gameKey, specialSourceDefaults[gameKey] ? { ...specialSourceDefaults[gameKey], ...game } : game);
 }
+
+renderQuickAddButtons();
 
 function renderSearchResults(results) {
     if (!Array.isArray(results) || results.length === 0) {
@@ -416,21 +371,14 @@ async function runSteamSearch() {
         return;
     }
 
-    if (searchAbortController) {
-        searchAbortController.abort();
-    }
-
+    if (searchAbortController) searchAbortController.abort();
     searchAbortController = new AbortController();
     searchResults.innerHTML = '<div class="table-empty" style="padding:16px 12px"><span class="spinner"></span> Searching Steam...</div>';
 
     try {
-        const response = await fetch(`/api/steam-updates/${guildId}/search?query=${encodeURIComponent(query)}`, {
-            signal: searchAbortController.signal
-        });
+        const response = await fetch(`/api/steam-updates/${guildId}/search?query=${encodeURIComponent(query)}`, { signal: searchAbortController.signal });
         const result = await response.json();
-        if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Steam search failed');
-        }
+        if (!response.ok || !result.success) throw new Error(result.error || 'Steam search failed');
         renderSearchResults(result.results || []);
     } catch (error) {
         if (error.name === 'AbortError') return;
@@ -438,19 +386,20 @@ async function runSteamSearch() {
     }
 }
 
-searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSteamSearch, 250);
-});
+searchInput.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(runSteamSearch, 250); });
 
 searchResults.addEventListener('click', (event) => {
     const button = event.target.closest('[data-add-game]');
     if (!button) return;
-    try {
-        addSelectedGame(JSON.parse(button.dataset.addGame));
-    } catch {
-        dashboardUI.showToast('Failed to add Steam game from search result.', 'error');
-    }
+    try { addSelectedGame(JSON.parse(button.dataset.addGame)); } catch { dashboardUI.showToast('Failed to add Steam game from search result.', 'error'); }
+});
+
+quickAddContainer.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-quick-add]');
+    if (!button) return;
+    const key = button.dataset.quickAdd;
+    const def = specialSourceDefaults[key];
+    if (def) addSelectedGame({ ...def });
 });
 
 selectedGamesContainer.addEventListener('click', (event) => {
@@ -458,90 +407,49 @@ selectedGamesContainer.addEventListener('click', (event) => {
     if (!button) return;
     selectedGames.delete(button.dataset.removeGameKey);
     renderSelectedGames();
+    renderQuickAddButtons();
 });
 
-if (selectedGames.size === 0) {
-    parseManualInput();
-} else {
-    renderSelectedGames();
-}
+if (selectedGames.size === 0) { parseManualInput(); } else { renderSelectedGames(); }
 
 form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const original = saveButton.innerHTML;
     saveButton.disabled = true;
     saveButton.innerHTML = '<span class="spinner"></span> Saving...';
-
     try {
-        const response = await fetch(`/api/steam-updates/${guildId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId: channelSelect.value || null, games: buildGamesPayload(), enabled: enabledToggle.checked })
-        });
+        const response = await fetch(`/api/steam-updates/${guildId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelId: channelSelect.value || null, games: buildGamesPayload(), enabled: enabledToggle.checked }) });
         const result = await response.json();
-        if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to save Steam update settings');
-        }
-        dashboardUI.showToast(result.message || 'Steam update settings saved.', 'success');
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to save');
+        dashboardUI.showToast(result.message || 'Game update settings saved.', 'success');
         setTimeout(() => location.reload(), 600);
-    } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to save Steam update settings.', 'error');
-    } finally {
-        saveButton.disabled = false;
-        saveButton.innerHTML = original;
-    }
+    } catch (error) { dashboardUI.showToast(error.message || 'Failed to save.', 'error'); } finally { saveButton.disabled = false; saveButton.innerHTML = original; }
 });
 
 testButton.addEventListener('click', async () => {
     const original = testButton.innerHTML;
     testButton.disabled = true;
     testButton.innerHTML = '<span class="spinner"></span> Sending...';
-
     try {
-        const response = await fetch(`/api/steam-updates/${guildId}/test`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId: channelSelect.value || null })
-        });
+        const response = await fetch(`/api/steam-updates/${guildId}/test`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channelId: channelSelect.value || null }) });
         const result = await response.json();
-        if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to send Steam test alert');
-        }
-        dashboardUI.showToast(result.message || 'Steam test alert sent.', 'success');
-    } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to send Steam test alert.', 'error');
-    } finally {
-        testButton.disabled = false;
-        testButton.innerHTML = original;
-    }
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to send test');
+        dashboardUI.showToast(result.message || 'Test alert sent.', 'success');
+    } catch (error) { dashboardUI.showToast(error.message || 'Failed to send test.', 'error'); } finally { testButton.disabled = false; testButton.innerHTML = original; }
 });
 
 clearButton.addEventListener('click', async () => {
-    if (!confirm('Disable Steam update alerts for this server?')) {
-        return;
-    }
-
+    if (!confirm('Disable game update alerts for this server?')) return;
     const original = clearButton.innerHTML;
     clearButton.disabled = true;
     clearButton.innerHTML = '<span class="spinner"></span> Removing...';
-
     try {
-        const response = await fetch(`/api/steam-updates/${guildId}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-        });
+        const response = await fetch(`/api/steam-updates/${guildId}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
         const result = await response.json();
-        if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to disable Steam updates');
-        }
-        dashboardUI.showToast('Steam updates disabled.', 'success');
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to disable');
+        dashboardUI.showToast('Game updates disabled.', 'success');
         setTimeout(() => location.reload(), 500);
-    } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to disable Steam updates.', 'error');
-    } finally {
-        clearButton.disabled = false;
-        clearButton.innerHTML = original;
-    }
+    } catch (error) { dashboardUI.showToast(error.message || 'Failed to disable.', 'error'); } finally { clearButton.disabled = false; clearButton.innerHTML = original; }
 });
 </script>
 </body>

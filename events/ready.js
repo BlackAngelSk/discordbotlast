@@ -160,5 +160,16 @@ module.exports = {
                 console.error('Error starting stat channels:', error);
             }
         }, 22000);
+
+        // Start crypto tracker polling
+        setTimeout(async () => {
+            try {
+                const cryptoTrackerManager = require('../utils/cryptoTrackerManager');
+                await cryptoTrackerManager.init(readyClient);
+                console.log('✅ Crypto tracker polling started');
+            } catch (error) {
+                console.error('Error starting crypto tracker:', error);
+            }
+        }, 23000);
     }
 };
