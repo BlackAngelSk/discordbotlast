@@ -3,8 +3,8 @@ const steamGameUpdatesManager = require('../../utils/steamGameUpdatesManager');
 
 module.exports = {
     name: 'steamupdates',
-    description: 'Configure game update and changelog alerts for Steam, Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, PoE, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, CS2, Dota 2, Valheim, Rust, and PUBG.',
-    usage: '!steamupdates list\n!steamupdates search <steam game name>\n!steamupdates set #channel <appId|storeUrl|minecraft|lol|osu|valorant|cs2|dota2|wow|ffxiv|fortnite|diablo|overwatch|apex|helldivers2|poe|valheim|rust|pubg, ...>\n!steamupdates remove\n!steamupdates test [#channel]',
+    description: 'Configure game update and changelog alerts for Steam, Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, PoE, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, CS2, Dota 2, Valheim, Rust, PUBG, and GPU drivers (NVIDIA, AMD, Intel).',
+    usage: '!steamupdates list\n!steamupdates search <steam game name>\n!steamupdates set #channel <appId|storeUrl|minecraft|lol|osu|valorant|cs2|dota2|wow|ffxiv|fortnite|diablo|overwatch|apex|helldivers2|poe|valheim|rust|pubg|nvidia|amd|intel, ...>\n!steamupdates remove\n!steamupdates test [#channel]',
     aliases: ['steamupdate', 'steamalerts', 'steamgames'],
     category: 'admin',
     async execute(message, args) {
@@ -82,7 +82,7 @@ module.exports = {
         if (subcommand === 'set') {
             const channel = message.mentions.channels.first() || message.guild.channels.cache.get(args[1]);
             if (!channel) {
-                    return message.reply('❌ Mention a valid text channel, for example `!steamupdates set #game-updates 730, minecraft, lol, cs2, valorant`.');
+                    return message.reply('❌ Mention a valid text channel, for example `!steamupdates set #game-updates 730, minecraft, lol, nvidia, amd`.');
             }
 
             if (!channel.isTextBased()) {
@@ -96,7 +96,7 @@ module.exports = {
 
             const rawGames = args.slice(2).join(' ').trim();
             if (!rawGames) {
-                return message.reply('❌ Add at least one Steam app ID, store URL, or game name (`minecraft`, `lol`, `osu`, `cs2`, `dota2`, `valorant`, `wow`, `ffxiv`, `poe`, `fortnite`, `helldivers2`, `diablo`, `overwatch`, `apex`, `valheim`, `rust`, `pubg`) after the channel.');
+                return message.reply('❌ Add at least one Steam app ID, store URL, or game name (`minecraft`, `lol`, `osu`, `cs2`, `dota2`, `valorant`, `wow`, `ffxiv`, `poe`, `fortnite`, `helldivers2`, `diablo`, `overwatch`, `apex`, `valheim`, `rust`, `pubg`, `nvidia`, `amd`, `intel`) after the channel.');
             }
 
             const result = await steamGameUpdatesManager.updateGuildConfig(message.guild.id, channel.id, rawGames);

@@ -29,10 +29,22 @@ const DOTA2_NEWS_URL = 'https://www.dota2.com/news';
 const VALHEIM_NEWS_URL = 'https://www.valheimgame.com/news';
 const RUST_NEWS_URL = 'https://rust.facepunch.com/news';
 const PUBG_NEWS_URL = 'https://www.pubg.com/en/news';
+const NVIDIA_DRIVERS_URL = 'https://www.nvidia.com/en-us/geforce/drivers/';
+const NVIDIA_BLOG_URL = 'https://www.nvidia.com/en-us/geforce/news/';
+const AMD_DRIVERS_URL = 'https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN.html';
+const AMD_NEWS_URL = 'https://www.amd.com/en/news.html';
+const INTEL_DRIVERS_URL = 'https://www.intel.com/content/www/us/en/download/center/home.html';
+const INTEL_NEWS_URL = 'https://www.intel.com/content/www/us/en/newsroom.html';
 
 const POLL_INTERVAL = 15 * 60 * 1000;
 const MAX_TRACKED_GAMES = 25;
 const REQUEST_TIMEOUT = 20000;
+const FETCH_RETRY_ATTEMPTS = 2;
+const FETCH_RETRY_DELAY_MS = 2000;
+const DRIVER_FETCH_TIMEOUT_MS = 30000;
+const PROVIDER_FAIL_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown after persistent failures
+const providerFailCooldowns = new Map(); // module-level: providerKey -> lastFailTimestamp
+const providerOngoingFetches = new Map(); // module-level: providerKey -> Promise (dedup concurrent calls)
 const REQUEST_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0; +https://discord.com)'
 };
@@ -212,6 +224,36 @@ const SPECIAL_TRACKED_SOURCES = {
         color: 0xf5a623,
         providerLabel: 'PUBG',
         appId: '578080'
+    },
+    nvidia: {
+        aliases: ['nvidia', 'nvidia drivers', 'geforce', 'nvidia driver', 'nvidia gpu'],
+        sourceId: 'nvidia',
+        name: 'NVIDIA GPU Drivers',
+        imageUrl: 'https://www.nvidia.com/content/dam/en-zz/Solutions/geforce/ada/geforce-ada-40series-og-1200x630.jpg',
+        tinyImage: 'https://www.nvidia.com/favicon.ico',
+        storeUrl: NVIDIA_BLOG_URL,
+        color: 0x76b900,
+        providerLabel: 'NVIDIA'
+    },
+    amd: {
+        aliases: ['amd', 'amd drivers', 'radeon', 'amd driver', 'amd gpu', 'amd adrenaline'],
+        sourceId: 'amd',
+        name: 'AMD GPU Drivers',
+        imageUrl: 'https://www.amd.com/system/files/2023-11/AMD-Radeon-Feature-Image.jpg',
+        tinyImage: 'https://www.amd.com/favicon.ico',
+        storeUrl: AMD_NEWS_URL,
+        color: 0xed1c24,
+        providerLabel: 'AMD'
+    },
+    intel: {
+        aliases: ['intel', 'intel drivers', 'intel gpu', 'intel arc', 'intel driver'],
+        sourceId: 'intel',
+        name: 'Intel GPU Drivers',
+        imageUrl: 'https://www.intel.com/content/dam/www/central-libraries/us/en/images/intel-arc-a-series-graphics-card.jpg.rendition.intel.web.1648.927.jpg',
+        tinyImage: 'https://www.intel.com/favicon.ico',
+        storeUrl: INTEL_NEWS_URL,
+        color: 0x0071c5,
+        providerLabel: 'Intel'
     }
 };
 
@@ -266,6 +308,27 @@ function httpsGetJson(url, options) {
 
 function httpsGetText(url, options) {
     return httpsGet(url, { ...options, responseType: 'text' });
+}
+
+/**
+ * Fetch text with retry on transient errors (timeout, ECONNRESET, etc.).
+ */
+async function httpsGetTextWithRetry(url, options, attempts = FETCH_RETRY_ATTEMPTS) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+            return await httpsGetText(url, options);
+        } catch (error) {
+            lastError = error;
+            const message = String(error?.message || '').toLowerCase();
+            const isTransient = /timeout|timed out|econnreset|socket hang up|etimedout|enotfound/i.test(message);
+            if (attempt >= attempts || !isTransient) {
+                throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, FETCH_RETRY_DELAY_MS * attempt));
+        }
+    }
+    throw lastError;
 }
 
 function stripHtml(value) {
@@ -1358,6 +1421,204 @@ async function fetchApexUpdates() {
 }
 
 /**
+ * Extract driver version numbers from text (e.g. "555.85", "v32.0.101.5768").
+ */
+function extractDriverVersion(text) {
+    const cleaned = sanitizeText(String(text || ''));
+    // Match patterns like "555.85", "v32.0.101.5768", "Radeon Software 24.5.1"
+    const match = cleaned.match(/(?:v(?:ersion)?\s*)?(\d{1,3}\.\d{1,3}(?:\.\d{1,5}){0,2})/i);
+    return match?.[1] || null;
+}
+
+/**
+ * Fetch latest NVIDIA GPU driver updates from the GeForce news/blog page.
+ */
+async function fetchNvidiaUpdates() {
+    try {
+        const html = await httpsGetText(NVIDIA_BLOG_URL);
+        const source = SPECIAL_TRACKED_SOURCES.nvidia;
+
+        // Look for driver-related articles in the blog listing
+        const driverPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gis;
+        const candidates = [];
+        const seen = new Set();
+        let match;
+
+        while ((match = driverPattern.exec(html)) !== null) {
+            const href = decodeEntities(match[1]);
+            const text = sanitizeText(match[2]);
+            const combined = `${href} ${text}`.toLowerCase();
+
+            if (!href || seen.has(href)) continue;
+            if (!/driver|geforce|game\s*ready|hotfix|studio/i.test(combined)) continue;
+            if (/\/zh-tw\//i.test(href)) continue;
+
+            const resolvedUrl = resolveAbsoluteUrl(NVIDIA_BLOG_URL, href);
+            if (!resolvedUrl) continue;
+
+            seen.add(href);
+            candidates.push({
+                url: resolvedUrl,
+                title: text.trim().slice(0, 200),
+                score: 0
+            });
+        }
+
+        // Also look for version patterns in page text
+        const versionBlocks = html.match(/(?:GeForce|Game Ready|Studio)\s+Driver\s+v?(\d+\.\d+)/gi) || [];
+        const latestVersion = extractDriverVersion(versionBlocks[0]) || null;
+
+        // Prefer article links with driver content
+        let bestCandidate = null;
+        const articleUrl = extractPreferredArticleUrl(html, NVIDIA_BLOG_URL, {
+            hrefPatterns: [/\/geforce\/news\//i, /driver/i, /game-ready/i, /hotfix/i, /studio/i],
+            textPatterns: [/driver/i, /game.ready/i, /hotfix/i, /geforce/i],
+            excludePatterns: [/forum|account|support|privacy|terms|download\/center/i]
+        });
+
+        if (articleUrl && articleUrl !== NVIDIA_BLOG_URL) {
+            bestCandidate = { url: articleUrl, title: '' };
+        } else if (candidates.length > 0) {
+            bestCandidate = candidates[0];
+        }
+
+        const title = bestCandidate?.title || (latestVersion ? `NVIDIA GeForce Driver ${latestVersion} Available` : 'NVIDIA GeForce Driver Update');
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
+        return [{
+            key: buildProviderUpdateKey('nvidia', { url: bestCandidate?.url || NVIDIA_BLOG_URL, title, date: publishedAt }),
+            provider: 'nvidia',
+            providerLabel: 'NVIDIA',
+            gameName: source.name,
+            title: truncate(title, 256),
+            summary: latestVersion
+                ? `NVIDIA GeForce Game Ready Driver version ${latestVersion} is now available. Check the release notes for supported GPUs and fixes.`
+                : 'A new NVIDIA GeForce driver update is available. Check the release notes for supported GPUs and fixes.',
+            sections: latestVersion ? [{ title: 'Driver Info', items: [`Version: ${latestVersion}`] }] : [],
+            version: latestVersion,
+            url: bestCandidate?.url || NVIDIA_DRIVERS_URL,
+            date: publishedAt || Date.now(),
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage,
+            color: source.color,
+            storeUrl: NVIDIA_DRIVERS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching NVIDIA driver updates:', error);
+        return [];
+    }
+}
+
+/**
+ * Fetch latest AMD GPU driver updates from the AMD drivers page.
+ */
+async function fetchAmdUpdates() {
+    try {
+        let html;
+        try {
+            html = await httpsGetTextWithRetry(AMD_DRIVERS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
+        } catch {
+            // Fallback to AMD news page if release notes page times out
+            html = await httpsGetTextWithRetry(AMD_NEWS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
+        }
+        const source = SPECIAL_TRACKED_SOURCES.amd;
+
+        // Extract version from the driver release notes page
+        const versionMatch = html.match(/(?:Adrenalin|Radeon|AMD)\s+(?:Software\s+)?(?:Edition\s+)?(?:WHQL\s+)?v?(\d{2}\.\d{1,2}\.\d{1,2})/i);
+        const version = versionMatch?.[1] || extractDriverVersion(html) || null;
+
+        const title = extractMetaContent(html, 'og:title') || (version ? `AMD Radeon Software Adrenalin ${version}` : 'AMD Radeon Driver Update');
+        const summary = truncate(
+            extractMetaContent(html, 'og:description') || (version
+                ? `AMD Radeon Software Adrenalin Edition version ${version} is now available. This update includes optimizations, bug fixes, and support for the latest titles.`
+                : 'A new AMD Radeon driver update is available. Check the release notes for supported hardware and fixes.'),
+            280
+        );
+        const imageUrl = extractMetaContent(html, 'og:image') || source.imageUrl;
+
+        const changelogUrl = extractPreferredArticleUrl(html, AMD_DRIVERS_URL, {
+            hrefPatterns: [/\/release-notes\//i, /driver/i, /adrenalin/i],
+            textPatterns: [/release/i, /driver/i, /adrenalin/i],
+            excludePatterns: [/shop|buy|account|support|privacy|terms/i]
+        });
+
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
+        return [{
+            key: buildProviderUpdateKey('amd', { url: changelogUrl, title, date: publishedAt }),
+            provider: 'amd',
+            providerLabel: 'AMD',
+            gameName: source.name,
+            title: truncate(title, 256),
+            summary,
+            sections: version ? [{ title: 'Driver Info', items: [`Version: ${version}`, 'AMD Radeon Software Adrenalin Edition'] }] : [],
+            version,
+            url: changelogUrl,
+            date: publishedAt || Date.now(),
+            imageUrl,
+            tinyImage: source.tinyImage,
+            color: source.color,
+            storeUrl: AMD_DRIVERS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching AMD driver updates:', error.message || error);
+        throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
+    }
+}
+
+/**
+ * Fetch latest Intel GPU driver updates from the Intel newsroom page.
+ */
+async function fetchIntelUpdates() {
+    try {
+        const html = await httpsGetText(INTEL_NEWS_URL);
+        const source = SPECIAL_TRACKED_SOURCES.intel;
+
+        // Look for graphics driver related news
+        const articleUrl = extractPreferredArticleUrl(html, INTEL_NEWS_URL, {
+            hrefPatterns: [/\/news\//i, /graphics/i, /driver/i, /arc/i, /gpu/i],
+            textPatterns: [/driver/i, /graphics/i, /arc/i, /gpu/i, /xe/i],
+            excludePatterns: [/shop|buy|account|support|privacy|terms|career/i]
+        });
+
+        // Try to find version info on the driver download page
+        let version = null;
+        try {
+            const driverHtml = await httpsGetText(INTEL_DRIVERS_URL);
+            const versionMatch = driverHtml.match(/(\d{2,4}\.\d{1,4}\.\d{1,5}\.\d{1,5})/);
+            version = versionMatch?.[1] || null;
+        } catch {
+            // Driver page may not be accessible, that's okay
+        }
+
+        const title = extractMetaContent(html, 'og:title') || (version ? `Intel Graphics Driver ${version}` : 'Intel GPU Driver Update');
+        const publishedAt = extractMetaContent(html, 'article:published_time') || extractMetaContent(html, 'og:updated_time') || null;
+
+        return [{
+            key: buildProviderUpdateKey('intel', { url: articleUrl || INTEL_NEWS_URL, title, date: publishedAt }),
+            provider: 'intel',
+            providerLabel: 'Intel',
+            gameName: source.name,
+            title: truncate(title, 256),
+            summary: version
+                ? `Intel Graphics Driver version ${version} is now available with performance optimizations and bug fixes for Intel Arc and Intel Xe GPUs.`
+                : 'A new Intel GPU driver update is available. Check the release notes for supported hardware and game optimizations.',
+            sections: version ? [{ title: 'Driver Info', items: [`Version: ${version}`, 'Intel Arc / Intel Xe Graphics'] }] : [],
+            version,
+            url: articleUrl || INTEL_DRIVERS_URL,
+            date: publishedAt || Date.now(),
+            imageUrl: source.imageUrl,
+            tinyImage: source.tinyImage,
+            color: source.color,
+            storeUrl: INTEL_DRIVERS_URL
+        }];
+    } catch (error) {
+        console.error('Error fetching Intel driver updates:', error);
+        return [];
+    }
+}
+
+/**
  * Lookup table for special provider update fetchers.
  * Replaces the long if-else chain in fetchUpdatesForGame.
  */
@@ -1373,7 +1634,10 @@ const SPECIAL_PROVIDER_FETCHERS = {
     helldivers2: fetchHelldivers2Updates,
     diablo: fetchDiabloUpdates,
     overwatch: fetchOverwatchUpdates,
-    apex: fetchApexUpdates
+    apex: fetchApexUpdates,
+    nvidia: fetchNvidiaUpdates,
+    amd: fetchAmdUpdates,
+    intel: fetchIntelUpdates
 };
 
 class SteamGameUpdatesManager {
@@ -1382,6 +1646,7 @@ class SteamGameUpdatesManager {
         this.interval = null;
         this.data = { guilds: {} };
         this.pollInFlight = false;
+        this.providerFailCooldowns = new Map(); // providerKey -> lastFailTimestamp
     }
 
     async init(client) {
@@ -1531,7 +1796,22 @@ class SteamGameUpdatesManager {
 
         const fetcher = SPECIAL_PROVIDER_FETCHERS[game.provider];
         if (fetcher) {
-            return fetcher();
+            const providerKey = game.provider || game.sourceId;
+            const lastFail = providerFailCooldowns.get(providerKey) || 0;
+            if (lastFail > 0 && (Date.now() - lastFail) < PROVIDER_FAIL_COOLDOWN_MS) {
+                // Provider is in cooldown due to persistent failures; skip silently
+                return [];
+            }
+
+            try {
+                const result = await fetcher();
+                // Success — clear any cooldown
+                providerFailCooldowns.delete(providerKey);
+                return result;
+            } catch (error) {
+                providerFailCooldowns.set(providerKey, Date.now());
+                throw error;
+            }
         }
 
         // Steam games with known appId in SPECIAL_TRACKED_SOURCES (cs2, dota2, etc.)

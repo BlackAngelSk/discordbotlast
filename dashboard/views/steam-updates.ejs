@@ -17,7 +17,7 @@
         <main class="content">
             <div class="page-header">
                 <h1><i class="fas fa-gamepad" style="color:var(--brand);margin-right:8px"></i>Game Update Alerts</h1>
-                <p>Pick a channel and choose which games this server should watch for updates. Supports Steam games, Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, Path of Exile, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, Counter-Strike 2, Dota 2, Valheim, Rust, and PUBG.</p>
+                <p>Pick a channel and choose which games this server should watch for updates. Supports Steam games, Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, Path of Exile, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, Counter-Strike 2, Dota 2, Valheim, Rust, PUBG, and GPU drivers (NVIDIA, AMD, Intel).</p>
             </div>
 
             <div class="stats-row">
@@ -48,7 +48,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-sliders"></i> Dashboard Setup</div>
-                        <div class="card-subtitle">Save the channel, search Steam games by name, or add built-in games: Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, PoE, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, CS2, Dota 2, Valheim, Rust, or PUBG.</div>
+                        <div class="card-subtitle">Save the channel, search Steam games by name, or add built-in games: Minecraft, League of Legends, osu!, Valorant, FFXIV, WoW, PoE, Fortnite, Helldivers 2, Diablo IV, Overwatch 2, Apex Legends, CS2, Dota 2, Valheim, Rust, PUBG, NVIDIA, AMD, or Intel.</div>
                     </div>
                 </div>
 
@@ -104,7 +104,7 @@
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
                             <label class="form-label">Advanced Input</label>
-                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;overwatch&#10;apex&#10;cs2&#10;dota2&#10;valheim&#10;rust&#10;pubg"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;overwatch&#10;apex&#10;cs2&#10;dota2&#10;valheim&#10;rust&#10;pubg&#10;nvidia&#10;amd&#10;intel"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
                             <div class="form-hint">Use Steam app IDs, Steam store URLs, or game names listed above.</div>
                         </div>
                     </div>
@@ -190,11 +190,14 @@ const specialSourceDefaults = {
     dota2: { sourceId: 'dota2', provider: 'dota2', name: 'Dota 2', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/570/dota2.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/570/header.jpg', storeUrl: 'https://store.steampowered.com/app/570/', appId: '570' },
     valheim: { sourceId: 'valheim', provider: 'valheim', name: 'Valheim', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/892970/1858e4290b10b0ed3b2aebab25b9c9467b171ea5.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/892970/header.jpg', storeUrl: 'https://store.steampowered.com/app/892970/', appId: '892970' },
     rust: { sourceId: 'rust', provider: 'rust', name: 'Rust', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/252490/693d6ce6e05760932c2fc8b275f37eff21169b7d.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/252490/header.jpg', storeUrl: 'https://store.steampowered.com/app/252490/', appId: '252490' },
-    pubg: { sourceId: 'pubg', provider: 'pubg', name: 'PUBG: BATTLEGROUNDS', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/578080/b78f78c0fd2e56d23a05513187204e9d56d1e572.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/578080/header.jpg', storeUrl: 'https://store.steampowered.com/app/578080/', appId: '578080' }
+    pubg: { sourceId: 'pubg', provider: 'pubg', name: 'PUBG: BATTLEGROUNDS', tinyImage: 'https://cdn.akamai.steamstatic.com/steamcommunity/public/images/apps/578080/b78f78c0fd2e56d23a05513187204e9d56d1e572.jpg', imageUrl: 'https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/578080/header.jpg', storeUrl: 'https://store.steampowered.com/app/578080/', appId: '578080' },
+    nvidia: { sourceId: 'nvidia', provider: 'nvidia', name: 'NVIDIA GPU Drivers', tinyImage: 'https://www.nvidia.com/favicon.ico', imageUrl: 'https://www.nvidia.com/content/dam/en-zz/Solutions/geforce/ada/geforce-ada-40series-og-1200x630.jpg', storeUrl: 'https://www.nvidia.com/en-us/geforce/news/' },
+    amd: { sourceId: 'amd', provider: 'amd', name: 'AMD GPU Drivers', tinyImage: 'https://www.amd.com/favicon.ico', imageUrl: 'https://www.amd.com/system/files/2023-11/AMD-Radeon-Feature-Image.jpg', storeUrl: 'https://www.amd.com/en/news.html' },
+    intel: { sourceId: 'intel', provider: 'intel', name: 'Intel GPU Drivers', tinyImage: 'https://www.intel.com/favicon.ico', imageUrl: 'https://www.intel.com/content/dam/www/central-libraries/us/en/images/intel-arc-a-series-graphics-card.jpg.rendition.intel.web.1648.927.jpg', storeUrl: 'https://www.intel.com/content/www/us/en/newsroom.html' }
 };
 
 // All source keys for the advanced textarea input
-const allSourceKeys = ['minecraft','osu','lol','valorant','ffxiv','wow','poe','fortnite','helldivers2','diablo','overwatch','apex','cs2','dota2','valheim','rust','pubg'];
+const allSourceKeys = ['minecraft','osu','lol','valorant','ffxiv','wow','poe','fortnite','helldivers2','diablo','overwatch','apex','cs2','dota2','valheim','rust','pubg','nvidia','amd','intel'];
 
 const form = document.getElementById('steamUpdatesForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
@@ -303,7 +306,7 @@ function addSelectedGame(game) {
 }
 
 function renderQuickAddButtons() {
-    const quickGames = ['minecraft','lol','osu','valorant','cs2','dota2','fortnite','wow','ffxiv','poe','diablo','overwatch','apex','helldivers2','valheim','rust','pubg'];
+    const quickGames = ['minecraft','lol','osu','valorant','cs2','dota2','fortnite','wow','ffxiv','poe','diablo','overwatch','apex','helldivers2','valheim','rust','pubg','nvidia','amd','intel'];
     quickAddContainer.innerHTML = quickGames.map(key => {
         const def = specialSourceDefaults[key];
         if (!def || selectedGames.has(key)) return '';

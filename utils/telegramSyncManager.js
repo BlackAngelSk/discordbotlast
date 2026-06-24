@@ -715,7 +715,26 @@ class TelegramSyncManager {
         }
     }
 
+    async _deleteWebhook() {
+        const token = this.getBotToken();
+        if (!token) return;
+
+        try {
+            const url = `https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`;
+            const response = await httpsRequestJson(url, { method: 'GET', timeoutMs: 10000 });
+            if (!response.ok) {
+                console.warn('[Telegram Sync] deleteWebhook response not ok:', response.description);
+            }
+        } catch (error) {
+            console.warn('[Telegram Sync] Could not clear webhook:', error.message);
+        }
+    }
+
     async _primeOffset() {
+        // Clear any existing webhook and drop pending updates to avoid conflicts
+        // with other bot instances that may have been polling or had a webhook set.
+        await this._deleteWebhook();
+
         try {
             const updates = await this._fetchUpdates({ timeout: 0, limit: 1, offset: -1 });
             if (Array.isArray(updates) && updates.length > 0) {
