@@ -1646,7 +1646,6 @@ class SteamGameUpdatesManager {
         this.interval = null;
         this.data = { guilds: {} };
         this.pollInFlight = false;
-        this.providerFailCooldowns = new Map(); // providerKey -> lastFailTimestamp
     }
 
     async init(client) {
@@ -1803,15 +1802,26 @@ class SteamGameUpdatesManager {
                 return [];
             }
 
-            try {
-                const result = await fetcher();
-                // Success — clear any cooldown
-                providerFailCooldowns.delete(providerKey);
-                return result;
-            } catch (error) {
-                providerFailCooldowns.set(providerKey, Date.now());
-                throw error;
+            // Deduplicate concurrent fetches for the same provider
+            if (providerOngoingFetches.has(providerKey)) {
+                return providerOngoingFetches.get(providerKey);
             }
+
+            const fetchPromise = (async () => {
+                try {
+                    const result = await fetcher();
+                    providerFailCooldowns.delete(providerKey);
+                    return result;
+                } catch (error) {
+                    providerFailCooldowns.set(providerKey, Date.now());
+                    throw error;
+                } finally {
+                    providerOngoingFetches.delete(providerKey);
+                }
+            })();
+
+            providerOngoingFetches.set(providerKey, fetchPromise);
+            return fetchPromise;
         }
 
         // Steam games with known appId in SPECIAL_TRACKED_SOURCES (cs2, dota2, etc.)
