@@ -235,10 +235,7 @@ class DatabaseManager {
                 this.db = this.mongoClient.db(process.env.MONGODB_DBNAME || 'discord-bot');
                 console.log('✅ MongoDB connected successfully!');
 
-                if (this.syncSettings.startupSync) {
-                    await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
-                }
-
+                // Startup sync is deferred to deferredStartupSync() to speed up boot
                 if (this.autoSyncEnabled) {
                     this.startAutoSync();
                 } else {
@@ -268,10 +265,7 @@ class DatabaseManager {
                         console.log('✅ MongoDB connected successfully on IPv4 retry!');
                         console.log('   💡 Tip: Add MONGODB_FORCE_IPV4=true to .env to skip the IPv4 retry on future starts.');
 
-                        if (this.syncSettings.startupSync) {
-                            await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
-                        }
-
+                        // Startup sync is deferred to deferredStartupSync() to speed up boot
                         if (this.autoSyncEnabled) {
                             this.startAutoSync();
                         } else {
@@ -289,6 +283,24 @@ class DatabaseManager {
                 console.warn('═══════════════════════════════════════════════════');
                 this.useDB = 'json';
             }
+        }
+    }
+
+    async deferredStartupSync() {
+        if (!this.syncSettings.startupSync || this.useDB !== 'mongodb' || !this.db) {
+            return;
+        }
+
+        try {
+            console.log('🔄 Running deferred startup sync to MongoDB...');
+            const result = await this.syncAllJsonToMongo({ force: true, reason: 'startup' });
+            if (result.syncedCount > 0) {
+                console.log(`✅ Deferred startup sync completed: ${result.syncedCount} collection(s) synced in ${result.durationMs}ms`);
+            } else {
+                console.log(`✅ Deferred startup sync completed: no changes needed (${result.durationMs}ms)`);
+            }
+        } catch (error) {
+            console.warn('⚠️ Deferred startup sync failed:', error.message);
         }
     }
 

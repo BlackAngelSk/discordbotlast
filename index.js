@@ -119,55 +119,57 @@ const EventHandler = require('./utils/eventHandler');
 const SlashCommandHandler = require('./utils/slashCommandHandler');
 const settingsManager = require('./utils/settingsManager');
 const languageManager = require('./utils/languageManager');
-const economyManager = require('./utils/economyManager');
-const moderationManager = require('./utils/moderationManager');
-const gameStatsManager = require('./utils/gameStatsManager');
-const statsManager = require('./utils/statsManager');
-const reactionRoleManager = require('./utils/reactionRoleManager');
-const starboardManager = require('./utils/starboardManager');
-const customCommandManager = require('./utils/customCommandManager');
-const ticketManager = require('./utils/ticketManager');
-const relationshipManager = require('./utils/relationshipManager');
-const achievementManager = require('./utils/achievementManager');
 const databaseManager = require('./utils/databaseManager');
-const analyticsManager = require('./utils/analyticsManager');
-const musicPlaylistManager = require('./utils/musicPlaylistManager');
-const enhancedAIManager = require('./utils/enhancedAIManager');
-const levelRewardsManager = require('./utils/levelRewardsManager');
-const suggestionManager = require('./utils/suggestionManager');
-const shopManager = require('./utils/shopManager');
-const afkManager = require('./utils/afkManager');
-const voiceRewardsManager = require('./utils/voiceRewardsManager');
-const raidProtectionManager = require('./utils/raidProtectionManager');
-const scheduledMessagesManager = require('./utils/scheduledMessagesManager');
-const birthdayManager = require('./utils/birthdayManager');
-const { minecraftStatusManager } = require('./utils/minecraftStatusManager');
-const customRoleShop = require('./utils/customRoleShop');
-const activityTracker = require('./utils/activityTracker');
-const serverMilestones = require('./utils/serverMilestones');
-const seasonManager = require('./utils/seasonManager');
-const seasonLeaderboardManager = require('./utils/seasonLeaderboardManager');
 const commandPermissionsManager = require('./utils/commandPermissionsManager');
 const { dashboardPermissionsManager } = require('./utils/dashboardPermissionsManager');
-const Dashboard = require('./dashboard/server');
-const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 const { isDevModeEnabled } = require('./utils/devMode');
+const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
 const { notifyOwnerIfUpdated } = require('./utils/updateNotifier');
-const autoUpdateManager = require('./utils/autoUpdateManager');
 
-// New system managers
-const ErrorHandler = require('./utils/errorHandler');
-const CooldownManager = require('./utils/cooldownManager');
-const RateLimiter = require('./utils/rateLimiter');
-const ShutdownManager = require('./utils/shutdownManager');
-const InputValidator = require('./utils/inputValidator');
-const Logger = require('./utils/logger');
-const UptimeMonitor = require('./utils/uptimeMonitor');
-const AutoBackup = require('./utils/autoBackup');
-const AuditLog = require('./utils/auditLog');
-const WelcomeMessageManager = require('./utils/welcomeMessageManager');
-const ReminderManager = require('./utils/reminderManager');
-const RoleTemplateManager = require('./utils/roleTemplateManager');
+// ── Lazy-loaded managers (loaded on demand, not at startup) ──────────────────
+let economyManager, moderationManager, gameStatsManager, statsManager;
+let reactionRoleManager, starboardManager, customCommandManager, ticketManager;
+let relationshipManager, achievementManager, analyticsManager;
+let musicPlaylistManager, enhancedAIManager, levelRewardsManager;
+let suggestionManager, shopManager, afkManager, voiceRewardsManager;
+let raidProtectionManager, scheduledMessagesManager, birthdayManager;
+let customRoleShop, activityTracker, serverMilestones, seasonManager;
+let seasonLeaderboardManager, autoUpdateManager;
+let Dashboard; // Lazy-loaded only when DASHBOARD_ENABLED=true
+
+function lazyLoadManager(name) {
+    if (name === 'economyManager') return (economyManager = economyManager || require('./utils/economyManager'));
+    if (name === 'moderationManager') return (moderationManager = moderationManager || require('./utils/moderationManager'));
+    if (name === 'gameStatsManager') return (gameStatsManager = gameStatsManager || require('./utils/gameStatsManager'));
+    if (name === 'statsManager') return (statsManager = statsManager || require('./utils/statsManager'));
+    if (name === 'reactionRoleManager') return (reactionRoleManager = reactionRoleManager || require('./utils/reactionRoleManager'));
+    if (name === 'starboardManager') return (starboardManager = starboardManager || require('./utils/starboardManager'));
+    if (name === 'customCommandManager') return (customCommandManager = customCommandManager || require('./utils/customCommandManager'));
+    if (name === 'ticketManager') return (ticketManager = ticketManager || require('./utils/ticketManager'));
+    if (name === 'relationshipManager') return (relationshipManager = relationshipManager || require('./utils/relationshipManager'));
+    if (name === 'achievementManager') return (achievementManager = achievementManager || require('./utils/achievementManager'));
+    if (name === 'analyticsManager') return (analyticsManager = analyticsManager || require('./utils/analyticsManager'));
+    if (name === 'musicPlaylistManager') return (musicPlaylistManager = musicPlaylistManager || require('./utils/musicPlaylistManager'));
+    if (name === 'enhancedAIManager') return (enhancedAIManager = enhancedAIManager || require('./utils/enhancedAIManager'));
+    if (name === 'levelRewardsManager') return (levelRewardsManager = levelRewardsManager || require('./utils/levelRewardsManager'));
+    if (name === 'suggestionManager') return (suggestionManager = suggestionManager || require('./utils/suggestionManager'));
+    if (name === 'shopManager') return (shopManager = shopManager || require('./utils/shopManager'));
+    if (name === 'afkManager') return (afkManager = afkManager || require('./utils/afkManager'));
+    if (name === 'voiceRewardsManager') return (voiceRewardsManager = voiceRewardsManager || require('./utils/voiceRewardsManager'));
+    if (name === 'raidProtectionManager') return (raidProtectionManager = raidProtectionManager || require('./utils/raidProtectionManager'));
+    if (name === 'scheduledMessagesManager') return (scheduledMessagesManager = scheduledMessagesManager || require('./utils/scheduledMessagesManager'));
+    if (name === 'birthdayManager') return (birthdayManager = birthdayManager || require('./utils/birthdayManager'));
+    if (name === 'customRoleShop') return (customRoleShop = customRoleShop || require('./utils/customRoleShop'));
+    if (name === 'activityTracker') return (activityTracker = activityTracker || require('./utils/activityTracker'));
+    if (name === 'serverMilestones') return (serverMilestones = serverMilestones || require('./utils/serverMilestones'));
+    if (name === 'seasonManager') return (seasonManager = seasonManager || require('./utils/seasonManager'));
+    if (name === 'seasonLeaderboardManager') return (seasonLeaderboardManager = seasonLeaderboardManager || require('./utils/seasonLeaderboardManager'));
+    if (name === 'autoUpdateManager') return (autoUpdateManager = autoUpdateManager || require('./utils/autoUpdateManager'));
+}
+
+// Expose lazy loader globally for other modules that need managers at runtime
+const clientLazyLoader = lazyLoadManager;
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Create a new Discord client instance
 const client = new Client({
@@ -217,19 +219,33 @@ const slashCommandHandler = new SlashCommandHandler(client);
 client.commandHandler = commandHandler;
 client.slashCommandHandler = slashCommandHandler;
 
-// Initialize new systems
+// Initialize new system managers (lightweight, no I/O)
+const ErrorHandler = require('./utils/errorHandler');
+const CooldownManager = require('./utils/cooldownManager');
+const RateLimiter = require('./utils/rateLimiter');
+const ShutdownManager = require('./utils/shutdownManager');
+const InputValidator = require('./utils/inputValidator');
+const Logger = require('./utils/logger');
+const UptimeMonitor = require('./utils/uptimeMonitor');
+const AuditLog = require('./utils/auditLog');
+const WelcomeMessageManager = require('./utils/welcomeMessageManager');
+const ReminderManager = require('./utils/reminderManager');
+const RoleTemplateManager = require('./utils/roleTemplateManager');
+
 const errorHandler = new ErrorHandler(client);
 const cooldownManager = new CooldownManager();
 const rateLimiter = new RateLimiter({ maxRequests: 5, windowMs: 60000 });
 const shutdownManager = new ShutdownManager(client);
 const logger = new Logger(client);
 const uptimeMonitor = new UptimeMonitor(client);
-const autoBackup = new AutoBackup();
 const auditLog = new AuditLog();
 const welcomeMessageManager = new WelcomeMessageManager();
 const reminderManager = new ReminderManager(client);
 const roleTemplateManager = new RoleTemplateManager();
 const devModeEnabled = isDevModeEnabled();
+
+// AutoBackup is deferred — constructed after handlers load to avoid sync I/O at startup
+let autoBackup = null;
 
 // Attach to client for global access
 client.errorHandler = errorHandler;
@@ -244,73 +260,103 @@ client.roleTemplateManager = roleTemplateManager;
 client.InputValidator = InputValidator;
 client.queues = require('./utils/queues'); // shared music queue Map used by all music commands
 
+// ── Helper for timed init steps ──────────────────────────────────────────────
+const runInitStep = async (label, initFn) => {
+    const timerLabel = `⏱️ Init: ${label}`;
+    console.time(timerLabel);
+    await initFn();
+    console.timeEnd(timerLabel);
+    console.log(`✅ ${label} initialized!`);
+};
+
 // Load all commands and events
 async function loadHandlers() {
     try {
         console.time('⏱️ Total startup init');
 
-        const runInitStep = async (label, initFn) => {
-            const timerLabel = `⏱️ Init: ${label}`;
-            console.time(timerLabel);
-            await initFn();
-            console.timeEnd(timerLabel);
-            console.log(`✅ ${label} initialized!`);
-        };
-
-        // Initialize database first
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 1: Database connection (must be first, blocks everything)
+        // ═══════════════════════════════════════════════════════════════════════
         await runInitStep('Database manager', () => databaseManager.init());
 
-        // Core managers (parallel)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 2: Tier 1 managers — critical path, must complete before login
+        // These are needed for prefix command handling and core bot functionality
+        // ═══════════════════════════════════════════════════════════════════════
         await Promise.all([
             runInitStep('Settings manager', () => settingsManager.init()),
             runInitStep('Language manager', () => languageManager.init()),
-            runInitStep('Economy manager', () => economyManager.init()),
-            runInitStep('Moderation manager', () => moderationManager.init()),
             runInitStep('Command permissions manager', () => commandPermissionsManager.init()),
             runInitStep('Dashboard permissions manager', () => dashboardPermissionsManager.init()),
-            runInitStep('Game stats manager', () => gameStatsManager.init()),
-            runInitStep('Stats manager', () => statsManager.init()),
-            runInitStep('Level rewards manager', () => levelRewardsManager.init()),
-            runInitStep('Suggestion manager', () => suggestionManager.init()),
-            runInitStep('Shop manager', () => shopManager.init()),
-            runInitStep('AFK manager', () => afkManager.init()),
-            runInitStep('Voice rewards manager', () => voiceRewardsManager.init()),
-            runInitStep('Raid protection manager', () => raidProtectionManager.init()),
-            runInitStep('Birthday manager', () => birthdayManager.init()),
-            runInitStep('Minecraft status manager', () => minecraftStatusManager.init(client)),
-            runInitStep('Achievement manager', () => achievementManager.init()),
-            runInitStep('Scheduled messages manager', () => scheduledMessagesManager.init(client)),
-            runInitStep('Custom role shop', () => customRoleShop.init()),
-            runInitStep('Activity tracker', () => activityTracker.init()),
-            runInitStep('Server milestones', () => serverMilestones.init()),
-            runInitStep('Season manager', () => seasonManager.init()),
-            runInitStep('Season leaderboard manager', () => seasonLeaderboardManager.init()),
-            runInitStep('Reaction role manager', () => reactionRoleManager.init()),
-            runInitStep('Starboard manager', () => starboardManager.init()),
-            runInitStep('Custom command manager', () => customCommandManager.init()),
-            runInitStep('Ticket manager', () => ticketManager.init()),
-            runInitStep('Relationship manager', () => relationshipManager.init()),
-            runInitStep('Analytics manager', () => analyticsManager.init()),
-            runInitStep('Music playlist manager', () => musicPlaylistManager.init()),
-            runInitStep('Enhanced AI manager', () => enhancedAIManager.init())
         ]);
 
-        await runInitStep('Command handler', () => commandHandler.loadCommands());
-        await runInitStep('Event handler', () => eventHandler.loadEvents());
-        await runInitStep('Slash command handler', () => slashCommandHandler.loadSlashCommands());
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 3: Load handlers in parallel (commands + events + slash commands)
+        // ═══════════════════════════════════════════════════════════════════════
+        await Promise.all([
+            runInitStep('Command handler', () => commandHandler.loadCommands()),
+            runInitStep('Event handler', () => eventHandler.loadEvents()),
+            runInitStep('Slash command handler', () => slashCommandHandler.loadSlashCommands()),
+        ]);
 
-        // Initialize new systems
-        logger.success('All new system managers initialized');
-        autoBackup.createBackup('startup');
-        logger.info('System startup backup created');
+        // ═══════════════════════════════════════════════════════════════════════
+        // Phase 4: Deferred AutoBackup construction (avoids sync I/O at startup)
+        // ═══════════════════════════════════════════════════════════════════════
+        const AutoBackup = require('./utils/autoBackup');
+        autoBackup = new AutoBackup();
+        client.autoBackup = autoBackup;
 
         console.timeEnd('⏱️ Total startup init');
-        console.log('✅ All handlers loaded successfully!');
+        console.log('✅ Core handlers loaded successfully!');
+        console.log('ℹ️ Non-critical managers will initialize after login (background).');
     } catch (error) {
         console.error('❌ Error loading handlers:', error);
         errorHandler.logError('STARTUP_ERROR', error);
         process.exit(1);
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 5: Tier 2 managers — initialize AFTER login, in background
+// These are non-critical and shouldn't block the bot from being ready
+// ═══════════════════════════════════════════════════════════════════════════════
+async function initTier2Managers() {
+    console.time('⏱️ Tier 2 managers init');
+    
+    const { minecraftStatusManager } = require('./utils/minecraftStatusManager');
+
+    await Promise.all([
+        runInitStep('Economy manager', () => lazyLoadManager('economyManager').init()),
+        runInitStep('Moderation manager', () => lazyLoadManager('moderationManager').init()),
+        runInitStep('Game stats manager', () => lazyLoadManager('gameStatsManager').init()),
+        runInitStep('Stats manager', () => lazyLoadManager('statsManager').init()),
+        runInitStep('Level rewards manager', () => lazyLoadManager('levelRewardsManager').init()),
+        runInitStep('Suggestion manager', () => lazyLoadManager('suggestionManager').init()),
+        runInitStep('Shop manager', () => lazyLoadManager('shopManager').init()),
+        runInitStep('AFK manager', () => lazyLoadManager('afkManager').init()),
+        runInitStep('Voice rewards manager', () => lazyLoadManager('voiceRewardsManager').init()),
+        runInitStep('Raid protection manager', () => lazyLoadManager('raidProtectionManager').init()),
+        runInitStep('Birthday manager', () => lazyLoadManager('birthdayManager').init()),
+        runInitStep('Minecraft status manager', () => minecraftStatusManager.init(client)),
+        runInitStep('Achievement manager', () => lazyLoadManager('achievementManager').init()),
+        runInitStep('Scheduled messages manager', () => lazyLoadManager('scheduledMessagesManager').init(client)),
+        runInitStep('Custom role shop', () => lazyLoadManager('customRoleShop').init()),
+        runInitStep('Activity tracker', () => lazyLoadManager('activityTracker').init()),
+        runInitStep('Server milestones', () => lazyLoadManager('serverMilestones').init()),
+        runInitStep('Season manager', () => lazyLoadManager('seasonManager').init()),
+        runInitStep('Season leaderboard manager', () => lazyLoadManager('seasonLeaderboardManager').init()),
+        runInitStep('Reaction role manager', () => lazyLoadManager('reactionRoleManager').init()),
+        runInitStep('Starboard manager', () => lazyLoadManager('starboardManager').init()),
+        runInitStep('Custom command manager', () => lazyLoadManager('customCommandManager').init()),
+        runInitStep('Ticket manager', () => lazyLoadManager('ticketManager').init()),
+        runInitStep('Relationship manager', () => lazyLoadManager('relationshipManager').init()),
+        runInitStep('Analytics manager', () => lazyLoadManager('analyticsManager').init()),
+        runInitStep('Music playlist manager', () => lazyLoadManager('musicPlaylistManager').init()),
+        runInitStep('Enhanced AI manager', () => lazyLoadManager('enhancedAIManager').init()),
+    ]);
+
+    console.timeEnd('⏱️ Tier 2 managers init');
+    logger.success('All tier 2 managers initialized');
 }
 
 // Load handlers before logging in
@@ -327,9 +373,11 @@ shutdownManager.onShutdown(async () => {
     logger.info('Running pre-shutdown cleanup tasks');
     
     // Create final backup
-    const backup = autoBackup.createBackup('shutdown');
-    if (backup) {
-        logger.info('Final shutdown backup created', { backup: backup.name });
+    if (autoBackup) {
+        const backup = autoBackup.createBackup('shutdown');
+        if (backup) {
+            logger.info('Final shutdown backup created', { backup: backup.name });
+        }
     }
 
     await databaseManager.close();
@@ -346,7 +394,6 @@ loadHandlers().then(() => {
     }
 
     // Handle messages for commands
-
     client.on(Events.MessageCreate, async (message) => {
         await commandHandler.handleCommand(message);
     });
@@ -368,38 +415,54 @@ loadHandlers().then(() => {
         setTimeout(async () => {
             console.log(`✅ Bot startup coordinator running as ${client.user.tag}`);
 
-            try {
-                await notifyOwnerIfUpdated(client);
-            } catch (error) {
+            // ── Tier 2 managers: initialize in background (don't block ready) ──
+            initTier2Managers().catch(err => {
+                console.error('Error initializing tier 2 managers:', err);
+            });
+
+            // ── Deferred MongoDB startup sync ──
+            databaseManager.deferredStartupSync().catch(err => {
+                console.error('Error in deferred startup sync:', err);
+            });
+
+            // ── Non-critical ready tasks (don't block each other) ──
+            
+            // Update notification (fire and forget)
+            notifyOwnerIfUpdated(client).catch(error => {
                 console.error('Error sending update notification DM:', error);
+            });
+
+            // Auto updater (fire and forget)
+            const aum = lazyLoadManager('autoUpdateManager');
+            if (aum && aum.start) {
+                aum.start().catch(error => {
+                    console.error('Error starting auto updater:', error);
+                });
             }
 
-            try {
-                await autoUpdateManager.start();
-            } catch (error) {
-                console.error('Error starting auto updater:', error);
+            // Migrate usernames in existing seasons (fire and forget — no longer blocks)
+            const sm = lazyLoadManager('seasonManager');
+            if (sm && sm.migrateUsernames) {
+                sm.migrateUsernames(client).then(migrated => {
+                    if (migrated > 0) {
+                        console.log(`✅ Migrated ${migrated} usernames in seasons`);
+                    }
+                }).catch(error => {
+                    console.error('Error migrating season usernames:', error);
+                });
             }
 
-            // Migrate usernames in existing seasons
-            try {
-                const migrated = await seasonManager.migrateUsernames(client);
-                if (migrated > 0) {
-                    console.log(`✅ Migrated ${migrated} usernames in seasons`);
-                }
-            } catch (error) {
-                console.error('Error migrating season usernames:', error);
-            }
-
-            // Register slash commands
-            try {
-                await slashCommandHandler.registerCommands();
+            // Register slash commands (fire and forget — no longer blocks)
+            slashCommandHandler.registerCommands().then(() => {
                 console.log('✅ Slash commands registered');
-            } catch (error) {
+            }).catch(error => {
                 console.error('Error registering slash commands:', error);
-            }
+            });
 
+            // Dashboard (only if enabled)
             if (process.env.DASHBOARD_ENABLED === 'true') {
                 try {
+                    Dashboard = Dashboard || require('./dashboard/server');
                     const dashboard = new Dashboard(client);
                     dashboard.start();
                 } catch (error) {
@@ -434,7 +497,8 @@ loadHandlers().then(() => {
                     
                     quarterlySeasonCheckRunning = true;
                     try {
-                        await seasonManager.autoCreateQuarterlySeasons(client, client.user.id);
+                        const sm2 = lazyLoadManager('seasonManager');
+                        await sm2.autoCreateQuarterlySeasons(client, client.user.id);
                         lastQuarterlySeasonCheck = now;
                     } catch (error) {
                         console.error('Error in quarterly season check:', error);
@@ -444,14 +508,12 @@ loadHandlers().then(() => {
                 }, 6 * 60 * 60 * 1000); // 6 hours
             }
 
-            // Initial update
+            // Initial update (fire and forget)
             if (!devModeEnabled && !seasonLeaderboardTaskRunning) {
                 seasonLeaderboardTaskRunning = true;
-                try {
-                    await updateSeasonLeaderboards(client);
-                } finally {
+                updateSeasonLeaderboards(client).finally(() => {
                     seasonLeaderboardTaskRunning = false;
-                }
+                });
             }
         }, 0);
     };
@@ -469,7 +531,12 @@ async function updateSeasonLeaderboards(client) {
     }
 
     try {
-        const guildConfigs = seasonLeaderboardManager.config;
+        const slm = lazyLoadManager('seasonLeaderboardManager');
+        const sm = lazyLoadManager('seasonManager');
+        const em = lazyLoadManager('economyManager');
+        const gsm = lazyLoadManager('gameStatsManager');
+
+        const guildConfigs = slm.config;
         let schedulerStateChanged = false;
 
         for (const guildId in guildConfigs) {
@@ -482,15 +549,15 @@ async function updateSeasonLeaderboards(client) {
             const channel = guild.channels.cache.get(config.channelId) || await guild.channels.fetch(config.channelId).catch(() => null);
             if (!channel || !channel.isTextBased()) continue;
 
-            const seasonName = seasonManager.getCurrentSeason(guildId);
+            const seasonName = sm.getCurrentSeason(guildId);
             if (!seasonName) continue;
 
-            const cfg = seasonLeaderboardManager.getGuildConfig(guildId);
+            const cfg = slm.getGuildConfig(guildId);
             if (!cfg.enabled) continue;
             const now = Date.now();
             const intervalMs = (cfg.updateIntervalMinutes || 15) * 60 * 1000;
             let nextAutoUpdateAt = Number(cfg.nextAutoUpdateAt) || 0;
-            const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
+            const existingMessageId = slm.getLeaderboardMessage(guildId);
             const inMemoryLastAutoUpdate = Number(seasonLeaderboardLastRunByGuild.get(guildId)) || 0;
 
             // Handle bad host clock / future timestamps so updates don't get stuck forever
@@ -529,7 +596,7 @@ async function updateSeasonLeaderboards(client) {
             if (!nextAutoUpdateAt && existingMessageId) {
                 try {
                     const existingMessage = await withTimeout(
-                        seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId),
+                        slm.findLeaderboardMessage(channel, guildId, existingMessageId),
                         5000
                     );
                     const lastMessageUpdateAt = Number(existingMessage?.editedTimestamp || existingMessage?.createdTimestamp) || 0;
@@ -558,26 +625,26 @@ async function updateSeasonLeaderboards(client) {
             }
 
             // Refresh season stats from live economy/game data
-            await seasonManager.refreshSeasonStats(
+            await sm.refreshSeasonStats(
                 guildId,
                 seasonName,
                 (userId) => ({
                     username: guild.members.cache.get(userId)?.user.username || 'Unknown User',
-                    balance: economyManager.getUserData(guildId, userId).balance,
-                    xp: economyManager.getUserData(guildId, userId).xp,
-                    level: economyManager.getUserData(guildId, userId).level,
-                    seasonalCoins: economyManager.getUserData(guildId, userId).seasonalCoins,
-                    gambling: gameStatsManager.getStats(userId)
+                    balance: em.getUserData(guildId, userId).balance,
+                    xp: em.getUserData(guildId, userId).xp,
+                    level: em.getUserData(guildId, userId).level,
+                    seasonalCoins: em.getUserData(guildId, userId).seasonalCoins,
+                    gambling: gsm.getStats(userId)
                 })
             );
 
             // Prune inactive players
-            await seasonManager.pruneInactivePlayers(guildId, seasonName, cfg.pruneDays || 30);
+            await sm.pruneInactivePlayers(guildId, seasonName, cfg.pruneDays || 30);
 
             try {
-                const season = seasonManager.getSeason(guildId, seasonName);
+                const season = sm.getSeason(guildId, seasonName);
                 if (season && !season.isActive && !season.summaryPosted) {
-                    const winners = seasonManager.getSeasonLeaderboard(guildId, seasonName, 'balance', 3);
+                    const winners = sm.getSeasonLeaderboard(guildId, seasonName, 'balance', 3);
                     const payouts = cfg.payouts || [];
                     const rewardRoles = cfg.rewardRoles || [];
 
@@ -585,7 +652,7 @@ async function updateSeasonLeaderboards(client) {
                         const winner = winners[i];
                         const payout = payouts[i] || 0;
                         if (payout > 0) {
-                            await economyManager.addBalance(guildId, winner.userId, payout);
+                            await em.addBalance(guildId, winner.userId, payout);
                         }
 
                         const roleId = rewardRoles[i];
@@ -598,14 +665,14 @@ async function updateSeasonLeaderboards(client) {
                         }
                     }
 
-                    const summaryEmbed = await seasonLeaderboardManager.generateSeasonSummaryEmbed(guildId, seasonManager, seasonName);
+                    const summaryEmbed = await slm.generateSeasonSummaryEmbed(guildId, sm, seasonName);
                     if (summaryEmbed) {
                         await channel.send({ embeds: [summaryEmbed] });
-                        await seasonManager.markSeasonSummaryPosted(guildId, seasonName);
+                        await sm.markSeasonSummaryPosted(guildId, seasonName);
                     }
                 }
 
-                const embeds = await seasonLeaderboardManager.generateSeasonEmbeds(guildId, seasonManager, seasonName, client);
+                const embeds = await slm.generateSeasonEmbeds(guildId, sm, seasonName, client);
                 
                 if (embeds.length === 0) continue;
 
@@ -619,7 +686,7 @@ async function updateSeasonLeaderboards(client) {
 
                 // Try to edit existing message
                 try {
-                    const msg = await withTimeout(seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId), 5000);
+                    const msg = await withTimeout(slm.findLeaderboardMessage(channel, guildId, existingMessageId), 5000);
                     if (msg) {
                         await withTimeout(msg.edit({ embeds: [embeds[0]], components }), 5000);
                         leaderboardMessage = msg;
@@ -647,8 +714,8 @@ async function updateSeasonLeaderboards(client) {
                 cfg.nextAutoUpdateAt = cfg.lastAutoUpdate + intervalMs;
                 seasonLeaderboardLastRunByGuild.set(guildId, cfg.lastAutoUpdate);
                 schedulerStateChanged = true;
-                await seasonLeaderboardManager.save();
-                seasonLeaderboardManager.setPageCache(guildId, {
+                await slm.save();
+                slm.setPageCache(guildId, {
                     embeds,
                     messageId: leaderboardMessage.id,
                     channelId: channel.id
@@ -665,7 +732,7 @@ async function updateSeasonLeaderboards(client) {
         }
 
         if (schedulerStateChanged) {
-            await seasonLeaderboardManager.save();
+            await slm.save();
         }
     } catch (error) {
         console.error('Error in leaderboard update task:', error);
