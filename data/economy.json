@@ -48,8 +48,8 @@
       ]
     },
     "195140009748201472": {
-      "balance": 100026,
-      "xp": 27176,
+      "balance": 100027,
+      "xp": 27181,
       "level": 17,
       "highestLevelReached": 17,
       "lastDaily": null,
@@ -63,8 +63,8 @@
       ]
     },
     "534769701297979392": {
-      "balance": 6603,
-      "xp": 33027,
+      "balance": 6604,
+      "xp": 33032,
       "level": 19,
       "highestLevelReached": 19,
       "lastDaily": null,
@@ -78,8 +78,8 @@
       ]
     },
     "349649557896036354": {
-      "balance": 735488,
-      "xp": 19275,
+      "balance": 735489,
+      "xp": 19280,
       "level": 14,
       "highestLevelReached": 14,
       "lastDaily": 1775919046103,
@@ -831,8 +831,8 @@
       ]
     },
     "282957332089143297": {
-      "balance": 2727,
-      "xp": 13671,
+      "balance": 2728,
+      "xp": 13676,
       "level": 12,
       "highestLevelReached": 12,
       "lastDaily": null,
@@ -1161,8 +1161,8 @@
       ]
     },
     "1364265413982031973": {
-      "balance": 1098,
-      "xp": 5490,
+      "balance": 1099,
+      "xp": 5495,
       "level": 8,
       "highestLevelReached": 8,
       "lastDaily": null,
@@ -1278,6 +1278,51 @@
       "seasonalCoins": 0,
       "guilds": [
         "guild123"
+      ]
+    },
+    "1386100123997569074": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "244489882624327680": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "924747497392472114": {
+      "balance": 0,
+      "xp": 0,
+      "level": 1,
+      "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
       ]
     }
   },
