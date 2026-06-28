@@ -290,6 +290,20 @@
             </div>
           </div>
 
+          <!-- Level System -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title"><i class="fas fa-arrow-up"></i> Level System</div>
+                <div class="card-subtitle">Enable or disable the XP and leveling system for this server.</div>
+              </div>
+              <label class="toggle-switch"><input type="checkbox" name="levelingEnabled" <%= (settings.features && settings.features.leveling !== false) ? 'checked' : '' %>><span class="toggle-slider"></span></label>
+            </div>
+            <div class="toggle-group">
+              <div class="toggle-info"><h4>XP & Leveling</h4><p>When disabled, users will not gain XP from messages or voice channels, and level-up announcements will not be sent.</p></div>
+            </div>
+          </div>
+
           <!-- Auto-Mod Quick Settings -->
           <div class="card">
             <div class="card-header">
@@ -623,10 +637,10 @@ document.getElementById('settingsForm').addEventListener('submit', async e => {
   if (!prefixes.length) { toast('Need at least one prefix', 'error'); btn.innerHTML = orig; btn.disabled = false; return; }
   data.prefixes = prefixes;
   for (const [k, v] of fd.entries()) {
-    if (['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite','emojiOnly'].includes(k)) data[k] = true;
+    if (['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite','emojiOnly','levelingEnabled'].includes(k)) data[k] = true;
     else data[k] = v;
   }
-  ['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite'].forEach(k => { if (!fd.has(k)) data[k] = false; });
+  ['welcomeEnabled','leaveEnabled','autoModEnabled','antiSpam','antiInvite','levelingEnabled'].forEach(k => { if (!fd.has(k)) data[k] = false; });
   try {
     const r = await fetch(`/api/settings/${guildId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     const j = await r.json();

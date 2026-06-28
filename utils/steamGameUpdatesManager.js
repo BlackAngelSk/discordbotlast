@@ -951,7 +951,7 @@ function formatSectionsAsEmbedText(sections, maxLength = 3000) {
 
 /**
  * Build a rich Discord embed for a game update notification.
- * Uses embed fields for better visual structure.
+ * Uses embed fields for better visual structure with a clean, light appearance.
  */
 function createUpdateEmbed(update) {
     const isValidUrl = (url) => {
@@ -964,8 +964,11 @@ function createUpdateEmbed(update) {
         }
     };
     
+    // Use a lighter color scheme: default to a clean light blue/white tone
+    const embedColor = update.color || 0x5865f2;
+    
     const embed = new EmbedBuilder()
-        .setColor(update.color || 0xf59e0b)
+        .setColor(embedColor)
         .setAuthor({
             name: truncate(update.gameName || update.providerLabel || 'Game Update', 256),
             iconURL: update.tinyImage || undefined
@@ -974,16 +977,12 @@ function createUpdateEmbed(update) {
         .setFooter({ text: `${update.providerLabel || 'Game'} • Update Alert` })
         .setTimestamp(toDateObject(update.date, Date.now()));
 
-    const sectionText = formatSectionsAsEmbedText(update.sections);
+    // Build a concise description with summary + link
     const summary = truncate(sanitizeText(update.summary || ''), 700);
     const descriptionParts = [];
 
-    if (summary && !sectionText) {
+    if (summary) {
         descriptionParts.push(summary);
-    }
-
-    if (sectionText) {
-        descriptionParts.push(sectionText);
     }
 
     if (isValidUrl(update.url)) {
@@ -994,7 +993,26 @@ function createUpdateEmbed(update) {
         embed.setDescription(truncate(descriptionParts.join('\n\n'), 4096));
     }
 
-    // Add fields for extra metadata
+    // Add each changelog section as a separate embed field for better readability
+    if (Array.isArray(update.sections) && update.sections.length > 0) {
+        for (const section of update.sections.slice(0, 5)) {
+            const rawTitle = String(section?.title || '').trim();
+            const title = truncate(rawTitle || 'Updates', 60).toUpperCase();
+            const items = Array.isArray(section?.items)
+                ? section.items
+                    .map(item => truncate(sanitizeText(item), 220))
+                    .filter(Boolean)
+                    .slice(0, 8)
+                : [];
+
+            if (!items.length) continue;
+
+            const fieldValue = items.map(item => `• ${item}`).join('\n');
+            embed.addFields({ name: title, value: truncate(fieldValue, 1024), inline: false });
+        }
+    }
+
+    // Add metadata fields in a compact inline row
     if (update.version) {
         embed.addFields({ name: 'Version', value: truncate(update.version, 100), inline: true });
     }

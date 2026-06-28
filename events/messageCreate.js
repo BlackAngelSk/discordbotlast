@@ -341,6 +341,8 @@ module.exports = {
 
         // Add XP (5-15 XP per message, with cooldown)
         try {
+            const features = settingsManager.get(message.guildId).features || {};
+            if (features.leveling !== false) {
             const xpCooldown = 60000; // 1 minute cooldown
             const lastXpKey = `${message.guildId}_${message.author.id}_lastXP`;
             
@@ -403,6 +405,7 @@ module.exports = {
                         await message.channel.send({ content: `${message.author}`, embeds: [embed] });
                     }
                 }
+            }
             }
         } catch (error) {
             console.error('XP tracking error:', error);

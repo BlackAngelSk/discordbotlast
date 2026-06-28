@@ -1323,6 +1323,14 @@ class Dashboard {
                     moderationManager.setModLogChannel(guildId, updates.modLogChannel || null);
                 }
 
+                // Handle leveling feature flag
+                if (updates.levelingEnabled !== undefined) {
+                    const currentSettings = settingsManager.get(guildId);
+                    if (!currentSettings.features) currentSettings.features = {};
+                    currentSettings.features.leveling = updates.levelingEnabled;
+                    await settingsManager.setMultiple(guildId, { features: currentSettings.features });
+                }
+
                 const modSettings = moderationManager.getAutomodSettings(guildId);
                 logDashboardAudit(req, 'UPDATE_SERVER_SETTINGS', {
                     updatedFields: Object.keys(settingsUpdates),

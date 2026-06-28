@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const economyManager = require('./economyManager');
+const settingsManager = require('./settingsManager');
 
 class VoiceRewardsManager {
     constructor() {
@@ -151,8 +152,9 @@ class VoiceRewardsManager {
 
                     // Only reward if been in voice for at least 1 minute
                     if (minutesInVoice >= 1) {
-                        // Award XP
-                        if (settings.xpPerMinute > 0) {
+                        // Award XP (only if leveling is enabled)
+                        const features = settingsManager.get(guildId).features || {};
+                        if (settings.xpPerMinute > 0 && features.leveling !== false) {
                             await economyManager.addXP(guildId, userId, settings.xpPerMinute);
                         }
 
