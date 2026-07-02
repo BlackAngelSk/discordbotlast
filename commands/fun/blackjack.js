@@ -1,530 +1,609 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+} = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 const { createShuffledDeck } = require('../../utils/playingCards');
 const { blackjackBoardAttachment } = require('../../utils/cardBoardRenderer');
 
 module.exports = {
-    name: 'blackjack',
-    description: 'Play blackjack and bet your coins!',
-    usage: '!blackjack <bet>',
-    aliases: ['bj', '21'],
-    category: 'fun',
-    async execute(message, args) {
-        try {
-            const bet = parseInt(args[0]);
+  name: 'blackjack',
+  description: 'Play blackjack and bet your coins!',
+  usage: '!blackjack <bet>',
+  aliases: ['bj', '21'],
+  category: 'fun',
+  async execute(message, args) {
+    try {
+      const bet = parseInt(args[0]);
 
-            if (!bet || bet < 10) {
-                return message.reply('❌ Please specify a valid bet amount (minimum 10 coins)!\nUsage: `!blackjack <bet>`');
-            }
+      if (!bet || bet < 10) {
+        return message.reply(
+          '❌ Please specify a valid bet amount (minimum 10 coins)!\nUsage: `!blackjack <bet>`'
+        );
+      }
 
-            // Check if user has enough money
-            const userData = economyManager.getUserData(message.guild.id, message.author.id);
-            if (userData.balance < bet) {
-                return message.reply(`❌ You don't have enough coins! Your balance: ${userData.balance} coins`);
-            }
+      // Check if user has enough money
+      const userData = economyManager.getUserData(message.guild.id, message.author.id);
+      if (userData.balance < bet) {
+        return message.reply(
+          `❌ You don't have enough coins! Your balance: ${userData.balance} coins`
+        );
+      }
 
-            // Deduct bet from user balance
-            await economyManager.removeMoney(message.guild.id, message.author.id, bet);
+      // Deduct bet from user balance
+      await economyManager.removeMoney(message.guild.id, message.author.id, bet);
 
-            // Play the game with betting
-            await playBlackjackWithBet(message, bet);
-
-        } catch (error) {
-            console.error('Error in blackjack command:', error);
-            message.reply('❌ An error occurred while playing blackjack!');
-        }
+      // Play the game with betting
+      await playBlackjackWithBet(message, bet);
+    } catch (error) {
+      console.error('Error in blackjack command:', error);
+      message.reply('❌ An error occurred while playing blackjack!');
     }
+  },
 };
 
 async function playBlackjackWithBet(message, bet) {
-    const deck = createShuffledDeck();
-    
-    const cardValue = (card) => {
-        if (card.rank === 'A') return 11;
-        if (['J', 'Q', 'K'].includes(card.rank)) return 10;
-        return parseInt(card.rank);
-    };
-    
-    const handValue = (hand) => {
-        let value = hand.reduce((sum, card) => sum + cardValue(card), 0);
-        let aces = hand.filter(c => c.rank === 'A').length;
-        while (value > 21 && aces > 0) {
-            value -= 10;
-            aces--;
-        }
-        return value;
-    };
-    
-    const formatHand = (hand, hide = false) => {
-        if (hide) {
-            return `${hand[0].rank}${hand[0].suit} 🂠`;
-        }
-        return hand.map(c => `${c.rank}${c.suit}`).join(' ');
-    };
+  const deck = createShuffledDeck();
 
-    const withBoardImage = (embed, hideDealerHole = false, activeHand = null) => {
-        const displayHand = activeHand || playerHand;
-        const file = blackjackBoardAttachment(displayHand, dealerHand, {
-            hideDealerHole,
-            playerName: message.author.username,
-            useAssetImages: true
-        }, 'blackjack-board.png');
-        
-        if (file) {
-            embed.setImage('attachment://blackjack-board.png');
-            return { embeds: [embed], files: [file] };
-        }
+  const cardValue = (card) => {
+    if (card.rank === 'A') return 11;
+    if (['J', 'Q', 'K'].includes(card.rank)) return 10;
+    return parseInt(card.rank);
+  };
 
-        const vectorBoard = blackjackBoardAttachment(displayHand, dealerHand, {
-            hideDealerHole,
-            playerName: message.author.username,
-            useAssetImages: false
-        }, 'blackjack-board.png');
-
-        if (vectorBoard) {
-            embed.setImage('attachment://blackjack-board.png');
-            return { embeds: [embed], files: [vectorBoard] };
-        }
-
-        return { embeds: [embed] };
-    };
-    
-    let playerHand = [deck.pop(), deck.pop()];
-    let dealerHand = [deck.pop(), deck.pop()];
-    
-    // Check for dealer blackjack (if showing Ace or 10-value card)
-    const dealerUpCard = dealerHand[0];
-    const dealerShowsAceOr10 = dealerUpCard.rank === 'A' || ['10', 'J', 'Q', 'K'].includes(dealerUpCard.rank);
-    const dealerHasBlackjack = handValue(dealerHand) === 21;
-    const playerHasBlackjack = handValue(playerHand) === 21;
-    
-    // If dealer shows Ace/10 and has blackjack, reveal immediately
-    if (dealerShowsAceOr10 && dealerHasBlackjack) {
-        const playerVal = handValue(playerHand);
-        let outcome;
-        let color;
-        let payout = 0;
-        
-        if (playerHasBlackjack) {
-            outcome = "🤝 Both blackjack! It's a push (tie)!";
-            color = 0xf1c40f;
-            payout = bet;
-            await gameStatsManager.recordBlackjack(message.author.id, 'tie');
-        } else {
-            outcome = '🃏 Dealer has Blackjack! Dealer wins.';
-            color = 0xed4245;
-            payout = 0;
-            await gameStatsManager.recordBlackjack(message.author.id, 'loss');
-        }
-        
-        if (payout > 0) {
-            await economyManager.addMoney(message.guild.id, message.author.id, payout);
-        }
-        
-        const instantResult = new EmbedBuilder()
-            .setColor(color)
-            .setTitle('🃏 Blackjack - Dealer Blackjack!')
-            .setThumbnail(message.author.displayAvatarURL())
-            .addFields(
-                { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                { name: `Dealer Hand (21)`, value: formatHand(dealerHand) },
-                { name: '💰 Payout', value: `${payout} coins`, inline: true }
-            )
-            .setDescription(outcome)
-            .setFooter({ text: `Bet: ${bet} coins` });
-        
-        await message.reply(withBoardImage(instantResult, false));
-        return;
+  const handValue = (hand) => {
+    let value = hand.reduce((sum, card) => sum + cardValue(card), 0);
+    let aces = hand.filter((c) => c.rank === 'A').length;
+    while (value > 21 && aces > 0) {
+      value -= 10;
+      aces--;
     }
-    
-    // If player has blackjack but dealer doesn't
+    return value;
+  };
+
+  const formatHand = (hand, hide = false) => {
+    if (hide) {
+      return `${hand[0].rank}${hand[0].suit} 🂠`;
+    }
+    return hand.map((c) => `${c.rank}${c.suit}`).join(' ');
+  };
+
+  const playerHand = [deck.pop(), deck.pop()];
+  const dealerHand = [deck.pop(), deck.pop()];
+
+  const withBoardImage = (embed, hideDealerHole = false, activeHand = null) => {
+    const displayHand = activeHand || playerHand;
+    const file = blackjackBoardAttachment(
+      displayHand,
+      dealerHand,
+      {
+        hideDealerHole,
+        playerName: message.author.username,
+        useAssetImages: true,
+      },
+      'blackjack-board.png'
+    );
+
+    if (file) {
+      embed.setImage('attachment://blackjack-board.png');
+      return { embeds: [embed], files: [file] };
+    }
+
+    const vectorBoard = blackjackBoardAttachment(
+      displayHand,
+      dealerHand,
+      {
+        hideDealerHole,
+        playerName: message.author.username,
+        useAssetImages: false,
+      },
+      'blackjack-board.png'
+    );
+
+    if (vectorBoard) {
+      embed.setImage('attachment://blackjack-board.png');
+      return { embeds: [embed], files: [vectorBoard] };
+    }
+
+    return { embeds: [embed] };
+  };
+
+  // Check for dealer blackjack (if showing Ace or 10-value card)
+  const dealerUpCard = dealerHand[0];
+  const dealerShowsAceOr10 =
+    dealerUpCard.rank === 'A' || ['10', 'J', 'Q', 'K'].includes(dealerUpCard.rank);
+  const dealerHasBlackjack = handValue(dealerHand) === 21;
+  const playerHasBlackjack = handValue(playerHand) === 21;
+
+  // If dealer shows Ace/10 and has blackjack, reveal immediately
+  if (dealerShowsAceOr10 && dealerHasBlackjack) {
+    const playerVal = handValue(playerHand);
+    let outcome;
+    let color;
+    let payout;
+
     if (playerHasBlackjack) {
-        const payout = Math.floor(bet * 2.5);
-        await economyManager.addMoney(message.guild.id, message.author.id, payout);
-        await gameStatsManager.recordBlackjack(message.author.id, 'win');
-        
-        const instantWin = new EmbedBuilder()
-            .setColor(0x57f287)
-            .setTitle('🃏 Blackjack!')
-            .setThumbnail(message.author.displayAvatarURL())
-            .addFields(
-                { name: `${message.author.username}'s Hand (21)`, value: formatHand(playerHand) },
-                { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
-                { name: '💰 Payout', value: `${payout} coins (2.5x)`, inline: true }
-            )
-            .setDescription('🎉 Blackjack! You win!')
-            .setFooter({ text: `Bet: ${bet} coins` });
-        
-        await message.reply(withBoardImage(instantWin, false));
-        return;
+      outcome = "🤝 Both blackjack! It's a push (tie)!";
+      color = 0xf1c40f;
+      payout = bet;
+      await gameStatsManager.recordBlackjack(message.author.id, 'tie');
+    } else {
+      outcome = '🃏 Dealer has Blackjack! Dealer wins.';
+      color = 0xed4245;
+      payout = 0;
+      await gameStatsManager.recordBlackjack(message.author.id, 'loss');
     }
-    
-    const createButtons = (disabled = false, canDouble = false, canSplit = false) => {
-        const components = [
-            new ButtonBuilder()
-                .setCustomId('bj_hit')
-                .setLabel('Hit')
-                .setEmoji('🎴')
-                .setStyle(ButtonStyle.Primary)
-                .setDisabled(disabled),
-            new ButtonBuilder()
-                .setCustomId('bj_stand')
-                .setLabel('Stand')
-                .setEmoji('✋')
-                .setStyle(ButtonStyle.Success)
-                .setDisabled(disabled)
-        ];
-        if (canDouble) components.push(
-            new ButtonBuilder()
-                .setCustomId('bj_double')
-                .setLabel('Double Down')
-                .setEmoji('💰')
-                .setStyle(ButtonStyle.Danger)
-                .setDisabled(disabled)
-        );
-        if (canSplit) components.push(
-            new ButtonBuilder()
-                .setCustomId('bj_split')
-                .setLabel('Split')
-                .setEmoji('✂️')
-                .setStyle(ButtonStyle.Secondary)
-                .setDisabled(disabled)
-        );
-        return new ActionRowBuilder().addComponents(...components);
-    };
 
-    // Check availability of double down / split on initial deal
-    const userDataInit = economyManager.getUserData(message.guild.id, message.author.id);
-    const initCanDouble = userDataInit.balance >= bet;
-    const initCanSplit = cardValue(playerHand[0]) === cardValue(playerHand[1]) && userDataInit.balance >= bet;
+    if (payout > 0) {
+      await economyManager.addMoney(message.guild.id, message.author.id, payout);
+    }
 
-    // Game state
-    let isSplit = false;
-    let splitHands = null;
-    let splitHandIndex = 0;
-    let splitBusted = [false, false];
-    let currentBet = bet;
+    const instantResult = new EmbedBuilder()
+      .setColor(color)
+      .setTitle('🃏 Blackjack - Dealer Blackjack!')
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields(
+        { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
+        { name: `Dealer Hand (21)`, value: formatHand(dealerHand) },
+        { name: '💰 Payout', value: `${payout} coins`, inline: true }
+      )
+      .setDescription(outcome)
+      .setFooter({ text: `Bet: ${bet} coins` });
 
-    const prompt = new EmbedBuilder()
+    await message.reply(withBoardImage(instantResult, false));
+    return;
+  }
+
+  // If player has blackjack but dealer doesn't
+  if (playerHasBlackjack) {
+    const payout = Math.floor(bet * 2.5);
+    await economyManager.addMoney(message.guild.id, message.author.id, payout);
+    await gameStatsManager.recordBlackjack(message.author.id, 'win');
+
+    const instantWin = new EmbedBuilder()
+      .setColor(0x57f287)
+      .setTitle('🃏 Blackjack!')
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields(
+        { name: `${message.author.username}'s Hand (21)`, value: formatHand(playerHand) },
+        { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
+        { name: '💰 Payout', value: `${payout} coins (2.5x)`, inline: true }
+      )
+      .setDescription('🎉 Blackjack! You win!')
+      .setFooter({ text: `Bet: ${bet} coins` });
+
+    await message.reply(withBoardImage(instantWin, false));
+    return;
+  }
+
+  const createButtons = (disabled = false, canDouble = false, canSplit = false) => {
+    const components = [
+      new ButtonBuilder()
+        .setCustomId('bj_hit')
+        .setLabel('Hit')
+        .setEmoji('🎴')
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId('bj_stand')
+        .setLabel('Stand')
+        .setEmoji('✋')
+        .setStyle(ButtonStyle.Success)
+        .setDisabled(disabled),
+    ];
+    if (canDouble)
+      components.push(
+        new ButtonBuilder()
+          .setCustomId('bj_double')
+          .setLabel('Double Down')
+          .setEmoji('💰')
+          .setStyle(ButtonStyle.Danger)
+          .setDisabled(disabled)
+      );
+    if (canSplit)
+      components.push(
+        new ButtonBuilder()
+          .setCustomId('bj_split')
+          .setLabel('Split')
+          .setEmoji('✂️')
+          .setStyle(ButtonStyle.Secondary)
+          .setDisabled(disabled)
+      );
+    return new ActionRowBuilder().addComponents(...components);
+  };
+
+  // Check availability of double down / split on initial deal
+  const userDataInit = economyManager.getUserData(message.guild.id, message.author.id);
+  const initCanDouble = userDataInit.balance >= bet;
+  const initCanSplit =
+    cardValue(playerHand[0]) === cardValue(playerHand[1]) && userDataInit.balance >= bet;
+
+  // Game state
+  let isSplit = false;
+  let splitHands = null;
+  let splitHandIndex = 0;
+  const splitBusted = [false, false];
+  let currentBet = bet;
+
+  const prompt = new EmbedBuilder()
+    .setColor(0x5865f2)
+    .setTitle('🃏 Blackjack')
+    .setThumbnail(message.author.displayAvatarURL())
+    .addFields(
+      {
+        name: `${message.author.username}'s Hand (${handValue(playerHand)})`,
+        value: formatHand(playerHand),
+      },
+      { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
+      { name: '💰 Bet', value: `${bet} coins`, inline: true }
+    )
+    .setDescription('Hit or Stand?')
+    .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
+
+  const msg = await message.reply({
+    ...withBoardImage(prompt, true),
+    components: [createButtons(false, initCanDouble, initCanSplit)],
+  });
+
+  const collector = msg.createMessageComponentCollector({
+    componentType: ComponentType.Button,
+    time: 60_000,
+    filter: (interaction) => interaction.user.id === message.author.id,
+  });
+
+  const showSplitHand = async (btnInteraction, handIdx) => {
+    const hand = splitHands[handIdx];
+    const val = handValue(hand);
+    const otherIdx = handIdx === 0 ? 1 : 0;
+    const otherHand = splitHands[otherIdx];
+    const otherLabel =
+      handIdx === 0
+        ? 'Hand 2 (waiting)'
+        : `Hand 1 (${splitBusted[0] ? '💥 Bust' : '✋ Stood'} — ${handValue(otherHand)})`;
+
+    const embed = new EmbedBuilder()
+      .setColor(0x5865f2)
+      .setTitle(`🃏 Blackjack — Split (Hand ${handIdx + 1})`)
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields(
+        {
+          name: `🎯 Hand ${handIdx + 1} — ${message.author.username} (${val})`,
+          value: formatHand(hand),
+        },
+        { name: otherLabel, value: formatHand(otherHand) },
+        { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
+        { name: '💰 Bet per hand', value: `${bet} coins`, inline: true }
+      )
+      .setDescription(`Playing Hand ${handIdx + 1} — Hit or Stand?`)
+      .setFooter({ text: `Total wagered: ${bet * 2} coins` });
+
+    await btnInteraction.update({
+      ...withBoardImage(embed, true, hand),
+      components: [createButtons()],
+    });
+  };
+
+  const finalizeSplit = async (btnInteraction) => {
+    const anyNotBusted = !splitBusted[0] || !splitBusted[1];
+    if (anyNotBusted) {
+      while (handValue(dealerHand) <= 16) {
+        dealerHand.push(deck.pop());
+      }
+    }
+    const dealerVal = handValue(dealerHand);
+
+    let totalPayout = 0;
+    const outcomes = [];
+    let wins = 0,
+      losses = 0;
+
+    for (let idx = 0; idx < 2; idx++) {
+      const val = handValue(splitHands[idx]);
+      const label = `Hand ${idx + 1}`;
+      if (splitBusted[idx]) {
+        outcomes.push(`${label}: 💥 Bust — lost ${bet} coins`);
+        losses++;
+      } else if (dealerVal > 21 || val > dealerVal) {
+        totalPayout += bet * 2;
+        outcomes.push(`${label}: 🎉 Win! — +${bet} profit`);
+        wins++;
+      } else if (val < dealerVal) {
+        outcomes.push(`${label}: 😅 Loss — lost ${bet} coins`);
+        losses++;
+      } else {
+        totalPayout += bet;
+        outcomes.push(`${label}: 🤝 Tie — ${bet} returned`);
+      }
+    }
+
+    if (totalPayout > 0) {
+      await economyManager.addMoney(message.guild.id, message.author.id, totalPayout);
+    }
+    const overallResult = wins > losses ? 'win' : losses > wins ? 'loss' : 'tie';
+    await gameStatsManager.recordBlackjack(message.author.id, overallResult);
+
+    const netResult = totalPayout - bet * 2;
+    const color = wins > losses ? 0x57f287 : losses > wins ? 0xed4245 : 0xf1c40f;
+
+    const final = new EmbedBuilder()
+      .setColor(color)
+      .setTitle('🃏 Blackjack — Split Result')
+      .setThumbnail(message.author.displayAvatarURL())
+      .addFields(
+        {
+          name: `Hand 1 (${handValue(splitHands[0])})`,
+          value: formatHand(splitHands[0]),
+          inline: true,
+        },
+        {
+          name: `Hand 2 (${handValue(splitHands[1])})`,
+          value: formatHand(splitHands[1]),
+          inline: true,
+        },
+        { name: `Dealer (${dealerVal})`, value: formatHand(dealerHand) },
+        { name: '📊 Results', value: outcomes.join('\n') },
+        {
+          name: '💰 Payout',
+          value: `${totalPayout} coins (Net: ${netResult >= 0 ? `+${netResult}` : netResult} coins)`,
+          inline: true,
+        }
+      )
+      .setFooter({ text: `Total wagered: ${bet * 2} coins` });
+
+    await btnInteraction.update({
+      ...withBoardImage(final, false, splitHands[0]),
+      components: [createButtons(true)],
+    });
+  };
+
+  collector.on('collect', async (interaction) => {
+    if (interaction.customId === 'bj_hit') {
+      if (isSplit) {
+        splitHands[splitHandIndex].push(deck.pop());
+        const val = handValue(splitHands[splitHandIndex]);
+        if (val > 21) {
+          splitBusted[splitHandIndex] = true;
+          if (splitHandIndex === 0) {
+            splitHandIndex = 1;
+            await showSplitHand(interaction, 1);
+          } else {
+            await finalizeSplit(interaction);
+            collector.stop('finished');
+          }
+        } else {
+          await showSplitHand(interaction, splitHandIndex);
+        }
+        return;
+      }
+
+      playerHand.push(deck.pop());
+      const playerVal = handValue(playerHand);
+
+      if (playerVal > 21) {
+        await gameStatsManager.recordBlackjack(message.author.id, 'loss');
+
+        const bust = new EmbedBuilder()
+          .setColor(0xed4245)
+          .setTitle('🃏 Blackjack - Bust!')
+          .setThumbnail(message.author.displayAvatarURL())
+          .addFields(
+            {
+              name: `${message.author.username}'s Hand (${playerVal})`,
+              value: formatHand(playerHand),
+            },
+            { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
+            { name: '💰 Loss', value: `${currentBet} coins`, inline: true }
+          )
+          .setDescription('💥 You busted! Dealer wins.')
+          .setFooter({ text: `Bet: ${currentBet} coins` });
+
+        await interaction.update({
+          ...withBoardImage(bust, false),
+          components: [createButtons(true)],
+        });
+        collector.stop('bust');
+        return;
+      }
+
+      const updated = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('🃏 Blackjack')
         .setThumbnail(message.author.displayAvatarURL())
         .addFields(
-            { name: `${message.author.username}'s Hand (${handValue(playerHand)})`, value: formatHand(playerHand) },
-            { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
-            { name: '💰 Bet', value: `${bet} coins`, inline: true }
+          {
+            name: `${message.author.username}'s Hand (${playerVal})`,
+            value: formatHand(playerHand),
+          },
+          { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
+          { name: '💰 Bet', value: `${currentBet} coins`, inline: true }
         )
         .setDescription('Hit or Stand?')
-        .setFooter({ text: `Payout: Win = ${bet * 2} coins | Tie = ${bet} coins` });
+        .setFooter({ text: `Payout: Win = ${currentBet * 2} coins | Tie = ${currentBet} coins` });
 
-    const msg = await message.reply({ ...withBoardImage(prompt, true), components: [createButtons(false, initCanDouble, initCanSplit)] });
-
-    const collector = msg.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: 60_000,
-        filter: interaction => interaction.user.id === message.author.id
-    });
-
-    const showSplitHand = async (btnInteraction, handIdx) => {
-        const hand = splitHands[handIdx];
-        const val = handValue(hand);
-        const otherIdx = handIdx === 0 ? 1 : 0;
-        const otherHand = splitHands[otherIdx];
-        const otherLabel = handIdx === 0
-            ? 'Hand 2 (waiting)'
-            : `Hand 1 (${splitBusted[0] ? '💥 Bust' : '✋ Stood'} — ${handValue(otherHand)})`;
-
-        const embed = new EmbedBuilder()
-            .setColor(0x5865f2)
-            .setTitle(`🃏 Blackjack — Split (Hand ${handIdx + 1})`)
-            .setThumbnail(message.author.displayAvatarURL())
-            .addFields(
-                { name: `🎯 Hand ${handIdx + 1} — ${message.author.username} (${val})`, value: formatHand(hand) },
-                { name: otherLabel, value: formatHand(otherHand) },
-                { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
-                { name: '💰 Bet per hand', value: `${bet} coins`, inline: true }
-            )
-            .setDescription(`Playing Hand ${handIdx + 1} — Hit or Stand?`)
-            .setFooter({ text: `Total wagered: ${bet * 2} coins` });
-
-        await btnInteraction.update({ ...withBoardImage(embed, true, hand), components: [createButtons()] });
-    };
-
-    const finalizeSplit = async (btnInteraction) => {
-        const anyNotBusted = !splitBusted[0] || !splitBusted[1];
-        if (anyNotBusted) {
-            while (handValue(dealerHand) <= 16) {
-                dealerHand.push(deck.pop());
-            }
+      await interaction.update({ ...withBoardImage(updated, true), components: [createButtons()] });
+    } else if (interaction.customId === 'bj_stand') {
+      if (isSplit) {
+        if (splitHandIndex === 0) {
+          splitHandIndex = 1;
+          await showSplitHand(interaction, 1);
+        } else {
+          await finalizeSplit(interaction);
+          collector.stop('finished');
         }
-        const dealerVal = handValue(dealerHand);
+        return;
+      }
 
-        let totalPayout = 0;
-        const outcomes = [];
-        let wins = 0, losses = 0;
+      // Dealer reveals hole card and plays according to rules
+      while (handValue(dealerHand) <= 16) {
+        dealerHand.push(deck.pop());
+      }
 
-        for (let idx = 0; idx < 2; idx++) {
-            const val = handValue(splitHands[idx]);
-            const label = `Hand ${idx + 1}`;
-            if (splitBusted[idx]) {
-                outcomes.push(`${label}: 💥 Bust — lost ${bet} coins`);
-                losses++;
-            } else if (dealerVal > 21 || val > dealerVal) {
-                totalPayout += bet * 2;
-                outcomes.push(`${label}: 🎉 Win! — +${bet} profit`);
-                wins++;
-            } else if (val < dealerVal) {
-                outcomes.push(`${label}: 😅 Loss — lost ${bet} coins`);
-                losses++;
-            } else {
-                totalPayout += bet;
-                outcomes.push(`${label}: 🤝 Tie — ${bet} returned`);
-            }
-        }
+      const playerVal = handValue(playerHand);
+      const dealerVal = handValue(dealerHand);
 
-        if (totalPayout > 0) {
-            await economyManager.addMoney(message.guild.id, message.author.id, totalPayout);
-        }
-        const overallResult = wins > losses ? 'win' : losses > wins ? 'loss' : 'tie';
-        await gameStatsManager.recordBlackjack(message.author.id, overallResult);
+      let outcome;
+      let color;
+      let result;
+      let payout;
 
-        const netResult = totalPayout - bet * 2;
-        const color = wins > losses ? 0x57f287 : losses > wins ? 0xed4245 : 0xf1c40f;
+      if (dealerVal > 21) {
+        outcome = '💥 Dealer busted! You win!';
+        color = 0x57f287;
+        result = 'win';
+        payout = currentBet * 2;
+      } else if (playerVal > dealerVal) {
+        outcome = '🎉 You win!';
+        color = 0x57f287;
+        result = 'win';
+        payout = currentBet * 2;
+      } else if (playerVal < dealerVal) {
+        outcome = '😅 Dealer wins.';
+        color = 0xed4245;
+        result = 'loss';
+        payout = 0;
+      } else {
+        outcome = "🤝 It's a push (tie)!";
+        color = 0xf1c40f;
+        result = 'tie';
+        payout = currentBet;
+      }
 
-        const final = new EmbedBuilder()
-            .setColor(color)
-            .setTitle('🃏 Blackjack — Split Result')
-            .setThumbnail(message.author.displayAvatarURL())
-            .addFields(
-                { name: `Hand 1 (${handValue(splitHands[0])})`, value: formatHand(splitHands[0]), inline: true },
-                { name: `Hand 2 (${handValue(splitHands[1])})`, value: formatHand(splitHands[1]), inline: true },
-                { name: `Dealer (${dealerVal})`, value: formatHand(dealerHand) },
-                { name: '📊 Results', value: outcomes.join('\n') },
-                { name: '💰 Payout', value: `${totalPayout} coins (Net: ${netResult >= 0 ? `+${netResult}` : netResult} coins)`, inline: true }
-            )
-            .setFooter({ text: `Total wagered: ${bet * 2} coins` });
+      await gameStatsManager.recordBlackjack(message.author.id, result);
+      if (payout > 0) {
+        await economyManager.addMoney(message.guild.id, message.author.id, payout);
+      }
 
-        await btnInteraction.update({ ...withBoardImage(final, false, splitHands[0]), components: [createButtons(true)] });
-    };
+      const final = new EmbedBuilder()
+        .setColor(color)
+        .setTitle('🃏 Blackjack - Final')
+        .setThumbnail(message.author.displayAvatarURL())
+        .addFields(
+          {
+            name: `${message.author.username}'s Hand (${playerVal})`,
+            value: formatHand(playerHand),
+          },
+          { name: `Dealer Hand (${dealerVal})`, value: formatHand(dealerHand) },
+          { name: '💰 Payout', value: `${payout} coins`, inline: true }
+        )
+        .setDescription(outcome)
+        .setFooter({ text: `Bet: ${currentBet} coins` });
 
-    collector.on('collect', async interaction => {
-        if (interaction.customId === 'bj_hit') {
-            if (isSplit) {
-                splitHands[splitHandIndex].push(deck.pop());
-                const val = handValue(splitHands[splitHandIndex]);
-                if (val > 21) {
-                    splitBusted[splitHandIndex] = true;
-                    if (splitHandIndex === 0) {
-                        splitHandIndex = 1;
-                        await showSplitHand(interaction, 1);
-                    } else {
-                        await finalizeSplit(interaction);
-                        collector.stop('finished');
-                    }
-                } else {
-                    await showSplitHand(interaction, splitHandIndex);
-                }
-                return;
-            }
+      await interaction.update({
+        ...withBoardImage(final, false),
+        components: [createButtons(true)],
+      });
+      collector.stop('finished');
+    } else if (interaction.customId === 'bj_double') {
+      const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
+      if (userVerify.balance < bet) {
+        await interaction.reply({
+          content: '❌ Not enough coins to double down!',
+          ephemeral: true,
+        });
+        return;
+      }
+      await economyManager.removeMoney(message.guild.id, message.author.id, bet);
+      currentBet = bet * 2;
+      playerHand.push(deck.pop());
+      const playerVal = handValue(playerHand);
 
-            playerHand.push(deck.pop());
-            const playerVal = handValue(playerHand);
+      if (playerVal > 21) {
+        await gameStatsManager.recordBlackjack(message.author.id, 'loss');
+        const bust = new EmbedBuilder()
+          .setColor(0xed4245)
+          .setTitle('🃏 Blackjack — Double Down Bust!')
+          .setThumbnail(message.author.displayAvatarURL())
+          .addFields(
+            {
+              name: `${message.author.username}'s Hand (${playerVal})`,
+              value: formatHand(playerHand),
+            },
+            { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
+            { name: '💰 Loss', value: `${currentBet} coins`, inline: true }
+          )
+          .setDescription('💥 Bust after double down! Dealer wins.')
+          .setFooter({ text: `Total bet: ${currentBet} coins` });
+        await interaction.update({
+          ...withBoardImage(bust, false),
+          components: [createButtons(true)],
+        });
+        collector.stop('bust');
+        return;
+      }
 
-            if (playerVal > 21) {
-                await gameStatsManager.recordBlackjack(message.author.id, 'loss');
+      // Auto-stand after double down
+      while (handValue(dealerHand) <= 16) {
+        dealerHand.push(deck.pop());
+      }
+      const dealerVal = handValue(dealerHand);
 
-                const bust = new EmbedBuilder()
-                    .setColor(0xed4245)
-                    .setTitle('🃏 Blackjack - Bust!')
-                    .setThumbnail(message.author.displayAvatarURL())
-                    .addFields(
-                        { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                        { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
-                        { name: '💰 Loss', value: `${currentBet} coins`, inline: true }
-                    )
-                    .setDescription('💥 You busted! Dealer wins.')
-                    .setFooter({ text: `Bet: ${currentBet} coins` });
+      let outcome, color, result, payout;
+      if (dealerVal > 21 || playerVal > dealerVal) {
+        outcome = dealerVal > 21 ? '💥 Dealer busted! You win!' : '🎉 You win!';
+        color = 0x57f287;
+        result = 'win';
+        payout = currentBet * 2;
+      } else if (playerVal < dealerVal) {
+        outcome = '😅 Dealer wins.';
+        color = 0xed4245;
+        result = 'loss';
+        payout = 0;
+      } else {
+        outcome = "🤝 It's a push (tie)!";
+        color = 0xf1c40f;
+        result = 'tie';
+        payout = currentBet;
+      }
 
-                await interaction.update({ ...withBoardImage(bust, false), components: [createButtons(true)] });
-                collector.stop('bust');
-                return;
-            }
+      await gameStatsManager.recordBlackjack(message.author.id, result);
+      if (payout > 0) {
+        await economyManager.addMoney(message.guild.id, message.author.id, payout);
+      }
 
-            const updated = new EmbedBuilder()
-                .setColor(0x5865f2)
-                .setTitle('🃏 Blackjack')
-                .setThumbnail(message.author.displayAvatarURL())
-                .addFields(
-                    { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                    { name: 'Dealer Hand', value: formatHand(dealerHand, true) },
-                    { name: '💰 Bet', value: `${currentBet} coins`, inline: true }
-                )
-                .setDescription('Hit or Stand?')
-                .setFooter({ text: `Payout: Win = ${currentBet * 2} coins | Tie = ${currentBet} coins` });
+      const final = new EmbedBuilder()
+        .setColor(color)
+        .setTitle('🃏 Blackjack — Double Down Result')
+        .setThumbnail(message.author.displayAvatarURL())
+        .addFields(
+          {
+            name: `${message.author.username}'s Hand (${playerVal})`,
+            value: formatHand(playerHand),
+          },
+          { name: `Dealer Hand (${dealerVal})`, value: formatHand(dealerHand) },
+          { name: '💰 Payout', value: `${payout} coins`, inline: true }
+        )
+        .setDescription(outcome)
+        .setFooter({ text: `Total bet: ${currentBet} coins (doubled from ${bet})` });
 
-            await interaction.update({ ...withBoardImage(updated, true), components: [createButtons()] });
+      await interaction.update({
+        ...withBoardImage(final, false),
+        components: [createButtons(true)],
+      });
+      collector.stop('finished');
+    } else if (interaction.customId === 'bj_split') {
+      const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
+      if (userVerify.balance < bet) {
+        await interaction.reply({ content: '❌ Not enough coins to split!', ephemeral: true });
+        return;
+      }
+      await economyManager.removeMoney(message.guild.id, message.author.id, bet);
+      isSplit = true;
+      splitHands = [
+        [playerHand[0], deck.pop()],
+        [playerHand[1], deck.pop()],
+      ];
+      splitHandIndex = 0;
+      await showSplitHand(interaction, 0);
+    }
+  });
 
-        } else if (interaction.customId === 'bj_stand') {
-            if (isSplit) {
-                if (splitHandIndex === 0) {
-                    splitHandIndex = 1;
-                    await showSplitHand(interaction, 1);
-                } else {
-                    await finalizeSplit(interaction);
-                    collector.stop('finished');
-                }
-                return;
-            }
-
-            // Dealer reveals hole card and plays according to rules
-            while (handValue(dealerHand) <= 16) {
-                dealerHand.push(deck.pop());
-            }
-
-            const playerVal = handValue(playerHand);
-            const dealerVal = handValue(dealerHand);
-
-            let outcome;
-            let color;
-            let result;
-            let payout;
-
-            if (dealerVal > 21) {
-                outcome = '💥 Dealer busted! You win!';
-                color = 0x57f287;
-                result = 'win';
-                payout = currentBet * 2;
-            } else if (playerVal > dealerVal) {
-                outcome = '🎉 You win!';
-                color = 0x57f287;
-                result = 'win';
-                payout = currentBet * 2;
-            } else if (playerVal < dealerVal) {
-                outcome = '😅 Dealer wins.';
-                color = 0xed4245;
-                result = 'loss';
-                payout = 0;
-            } else {
-                outcome = "🤝 It's a push (tie)!";
-                color = 0xf1c40f;
-                result = 'tie';
-                payout = currentBet;
-            }
-
-            await gameStatsManager.recordBlackjack(message.author.id, result);
-            if (payout > 0) {
-                await economyManager.addMoney(message.guild.id, message.author.id, payout);
-            }
-
-            const final = new EmbedBuilder()
-                .setColor(color)
-                .setTitle('🃏 Blackjack - Final')
-                .setThumbnail(message.author.displayAvatarURL())
-                .addFields(
-                    { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                    { name: `Dealer Hand (${dealerVal})`, value: formatHand(dealerHand) },
-                    { name: '💰 Payout', value: `${payout} coins`, inline: true }
-                )
-                .setDescription(outcome)
-                .setFooter({ text: `Bet: ${currentBet} coins` });
-
-            await interaction.update({ ...withBoardImage(final, false), components: [createButtons(true)] });
-            collector.stop('finished');
-
-        } else if (interaction.customId === 'bj_double') {
-            const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
-            if (userVerify.balance < bet) {
-                await interaction.reply({ content: '❌ Not enough coins to double down!', ephemeral: true });
-                return;
-            }
-            await economyManager.removeMoney(message.guild.id, message.author.id, bet);
-            currentBet = bet * 2;
-            playerHand.push(deck.pop());
-            const playerVal = handValue(playerHand);
-
-            if (playerVal > 21) {
-                await gameStatsManager.recordBlackjack(message.author.id, 'loss');
-                const bust = new EmbedBuilder()
-                    .setColor(0xed4245)
-                    .setTitle('🃏 Blackjack — Double Down Bust!')
-                    .setThumbnail(message.author.displayAvatarURL())
-                    .addFields(
-                        { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                        { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) },
-                        { name: '💰 Loss', value: `${currentBet} coins`, inline: true }
-                    )
-                    .setDescription('💥 Bust after double down! Dealer wins.')
-                    .setFooter({ text: `Total bet: ${currentBet} coins` });
-                await interaction.update({ ...withBoardImage(bust, false), components: [createButtons(true)] });
-                collector.stop('bust');
-                return;
-            }
-
-            // Auto-stand after double down
-            while (handValue(dealerHand) <= 16) {
-                dealerHand.push(deck.pop());
-            }
-            const dealerVal = handValue(dealerHand);
-
-            let outcome, color, result, payout;
-            if (dealerVal > 21 || playerVal > dealerVal) {
-                outcome = dealerVal > 21 ? '💥 Dealer busted! You win!' : '🎉 You win!';
-                color = 0x57f287;
-                result = 'win';
-                payout = currentBet * 2;
-            } else if (playerVal < dealerVal) {
-                outcome = '😅 Dealer wins.';
-                color = 0xed4245;
-                result = 'loss';
-                payout = 0;
-            } else {
-                outcome = "🤝 It's a push (tie)!";
-                color = 0xf1c40f;
-                result = 'tie';
-                payout = currentBet;
-            }
-
-            await gameStatsManager.recordBlackjack(message.author.id, result);
-            if (payout > 0) {
-                await economyManager.addMoney(message.guild.id, message.author.id, payout);
-            }
-
-            const final = new EmbedBuilder()
-                .setColor(color)
-                .setTitle('🃏 Blackjack — Double Down Result')
-                .setThumbnail(message.author.displayAvatarURL())
-                .addFields(
-                    { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
-                    { name: `Dealer Hand (${dealerVal})`, value: formatHand(dealerHand) },
-                    { name: '💰 Payout', value: `${payout} coins`, inline: true }
-                )
-                .setDescription(outcome)
-                .setFooter({ text: `Total bet: ${currentBet} coins (doubled from ${bet})` });
-
-            await interaction.update({ ...withBoardImage(final, false), components: [createButtons(true)] });
-            collector.stop('finished');
-
-        } else if (interaction.customId === 'bj_split') {
-            const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
-            if (userVerify.balance < bet) {
-                await interaction.reply({ content: '❌ Not enough coins to split!', ephemeral: true });
-                return;
-            }
-            await economyManager.removeMoney(message.guild.id, message.author.id, bet);
-            isSplit = true;
-            splitHands = [
-                [playerHand[0], deck.pop()],
-                [playerHand[1], deck.pop()]
-            ];
-            splitHandIndex = 0;
-            await showSplitHand(interaction, 0);
-        }
-    });
-
-    collector.on('end', async (_collected, reason) => {
-        if (reason === 'time') {
-            await msg.edit({ content: '⏰ Game timed out.', components: [createButtons(true)] });
-        }
-    });
+  collector.on('end', async (_collected, reason) => {
+    if (reason === 'time') {
+      await msg.edit({ content: '⏰ Game timed out.', components: [createButtons(true)] });
+    }
+  });
 }

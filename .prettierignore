@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# Data
+data/
+backups/
+
+# Coverage
+coverage/
+
+# Build
+dist/
+build/
+
+# Assets
+assets/
+
+# Lock files
+package-lock.json
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+.continue/
+
+# Large files that break when reformatted
+dashboard/server.js

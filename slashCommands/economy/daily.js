@@ -3,39 +3,40 @@ const economyManager = require('../../utils/economyManager');
 const achievementManager = require('../../utils/achievementManager');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('daily')
-        .setDescription('Claim your daily reward'),
-    
-    async execute(interaction) {
-        const result = await economyManager.claimDaily(interaction.guildId, interaction.user.id);
+  data: new SlashCommandBuilder().setName('daily').setDescription('Claim your daily reward'),
 
-        if (!result.success) {
-            const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
-            const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+  async execute(interaction) {
+    const result = await economyManager.claimDaily(interaction.guildId, interaction.user.id);
 
-            return interaction.reply({ 
-                content: `⏰ You've already claimed your daily reward! Come back in **${hours}h ${minutes}m**`, 
-                flags: MessageFlags.Ephemeral 
-            });
-        }
+    if (!result.success) {
+      const hours = Math.floor(result.timeLeft / (1000 * 60 * 60));
+      const minutes = Math.floor((result.timeLeft % (1000 * 60 * 60)) / (1000 * 60));
 
-        const unlocked = await achievementManager.syncUser(interaction.guildId, interaction.user.id);
+      return interaction.reply({
+        content: `⏰ You've already claimed your daily reward! Come back in **${hours}h ${minutes}m**`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
-        const embed = new EmbedBuilder()
-            .setColor('#00FF00')
-            .setTitle('🎁 Daily Reward Claimed!')
-            .setDescription(`You received **${result.amount}** coins!`)
-            .setFooter({ text: 'Come back tomorrow for more!' })
-            .setTimestamp();
+    const unlocked = await achievementManager.syncUser(interaction.guildId, interaction.user.id);
 
-        if (unlocked.length > 0) {
-            embed.addFields({
-                name: '🏅 Achievements Unlocked',
-                value: unlocked.map(a => `${a.emoji} **${a.name}**`).join('\n').substring(0, 1024)
-            });
-        }
+    const embed = new EmbedBuilder()
+      .setColor('#00FF00')
+      .setTitle('🎁 Daily Reward Claimed!')
+      .setDescription(`You received **${result.amount}** coins!`)
+      .setFooter({ text: 'Come back tomorrow for more!' })
+      .setTimestamp();
 
-        await interaction.reply({ embeds: [embed] });
-    },
+    if (unlocked.length > 0) {
+      embed.addFields({
+        name: '🏅 Achievements Unlocked',
+        value: unlocked
+          .map((a) => `${a.emoji} **${a.name}**`)
+          .join('\n')
+          .substring(0, 1024),
+      });
+    }
+
+    await interaction.reply({ embeds: [embed] });
+  },
 };

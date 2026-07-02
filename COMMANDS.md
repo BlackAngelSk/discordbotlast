@@ -13,75 +13,75 @@ Not every feature is available in both styles, but most major systems support on
 
 ## Music Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/play <query>` or `!play <query>` | Play a song or playlist |
-| `/queue` or `!queue` | Show the current queue |
-| `/pause`, `/resume`, `/skip`, `/stop` | Manage playback |
-| `/loop <mode>` or `!loop <mode>` | Set loop mode |
-| `/volume <value>` | Adjust playback volume |
-| `/autoplay` | Toggle related-song playback |
-| `/lyrics [song]` | Show lyrics for the current or requested track |
+| Command                               | Purpose                                        |
+| ------------------------------------- | ---------------------------------------------- |
+| `/play <query>` or `!play <query>`    | Play a song or playlist                        |
+| `/queue` or `!queue`                  | Show the current queue                         |
+| `/pause`, `/resume`, `/skip`, `/stop` | Manage playback                                |
+| `/loop <mode>` or `!loop <mode>`      | Set loop mode                                  |
+| `/volume <value>`                     | Adjust playback volume                         |
+| `/autoplay`                           | Toggle related-song playback                   |
+| `/lyrics [song]`                      | Show lyrics for the current or requested track |
 
 ## Economy Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/balance [user]` | Check coins, level, and XP |
-| `/daily` | Claim the daily reward |
-| `/weekly` | Claim the weekly reward |
-| `/leaderboard [type]` | View balance, level, or XP rankings |
-| `/shop` | Browse the server shop |
-| `/inventory [user]` | View owned items |
-| `/transfer @user <amount>` | Send coins to another user |
+| Command                    | Purpose                             |
+| -------------------------- | ----------------------------------- |
+| `/balance [user]`          | Check coins, level, and XP          |
+| `/daily`                   | Claim the daily reward              |
+| `/weekly`                  | Claim the weekly reward             |
+| `/leaderboard [type]`      | View balance, level, or XP rankings |
+| `/shop`                    | Browse the server shop              |
+| `/inventory [user]`        | View owned items                    |
+| `/transfer @user <amount>` | Send coins to another user          |
 
 ## Game and Fun Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/poll` | Create a poll |
-| `/8ball <question>` | Get a random answer |
-| `/meme` | Fetch a meme |
-| `!minigames` | Open the mini-game menu |
-| `/blackjack`, `/roulette`, `/slots`, `/mines`, `/coinflip` | Play economy-based games |
-| `!poker ...` | Use the multiplayer poker system |
-| `/gamestats [user]` | Review game statistics |
+| Command                                                    | Purpose                          |
+| ---------------------------------------------------------- | -------------------------------- |
+| `/poll`                                                    | Create a poll                    |
+| `/8ball <question>`                                        | Get a random answer              |
+| `/meme`                                                    | Fetch a meme                     |
+| `!minigames`                                               | Open the mini-game menu          |
+| `/blackjack`, `/roulette`, `/slots`, `/mines`, `/coinflip` | Play economy-based games         |
+| `!poker ...`                                               | Use the multiplayer poker system |
+| `/gamestats [user]`                                        | Review game statistics           |
 
 ## Moderation Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/ban`, `/kick`, `/mute`, `/timeout` | Moderate members |
-| `/warnings add`, `/warnings list`, `/warnings clear` | Manage warnings |
-| `/purge <amount>` | Remove messages |
-| `/lock`, `/unlock`, `/slowmode` | Manage channels |
-| `/automod ...` | Configure auto-moderation |
-| `/modlog <channel>` | Set the moderation log channel |
+| Command                                              | Purpose                        |
+| ---------------------------------------------------- | ------------------------------ |
+| `/ban`, `/kick`, `/mute`, `/timeout`                 | Moderate members               |
+| `/warnings add`, `/warnings list`, `/warnings clear` | Manage warnings                |
+| `/purge <amount>`                                    | Remove messages                |
+| `/lock`, `/unlock`, `/slowmode`                      | Manage channels                |
+| `/automod ...`                                       | Configure auto-moderation      |
+| `/modlog <channel>`                                  | Set the moderation log channel |
 
 ## Utility and Server Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/help` or `!help` | Open help menus |
-| `/ping` | Check bot latency |
+| Command                                 | Purpose                                            |
+| --------------------------------------- | -------------------------------------------------- |
+| `/help` or `!help`                      | Open help menus                                    |
+| `/ping`                                 | Check bot latency                                  |
 | `/userinfo`, `/roleinfo`, `/serverinfo` | View information about users, roles, or the server |
-| `/birthday` | Manage birthday settings |
-| `/analytics` | View analytics information |
-| `/activity` | Review user activity summaries |
-| `!config ...` | Change server-specific settings |
+| `/birthday`                             | Manage birthday settings                           |
+| `/analytics`                            | View analytics information                         |
+| `/activity`                             | Review user activity summaries                     |
+| `!config ...`                           | Change server-specific settings                    |
 
 ## Owner and Operations Commands
 
-| Command | Purpose |
-| --- | --- |
-| `/mongodb-space` | Check MongoDB storage usage |
-| `/mongodb-sync status` | View sync configuration |
-| `/mongodb-sync schedule` | Switch between manual and timed updates |
-| `/mongodb-sync run` | Trigger a sync immediately |
+| Command                              | Purpose                                                    |
+| ------------------------------------ | ---------------------------------------------------------- |
+| `/mongodb-space`                     | Check MongoDB storage usage                                |
+| `/mongodb-sync status`               | View sync configuration                                    |
+| `/mongodb-sync schedule`             | Switch between manual and timed updates                    |
+| `/mongodb-sync run`                  | Trigger a sync immediately                                 |
 | `/force-update-check [apply_update]` | Force-check GitHub for updates now (optionally check-only) |
-| `/testcommands` | Validate slash command availability |
-| `/system-stats` | Show CPU and memory information |
-| `/botstatus` | Review bot health and status |
+| `/testcommands`                      | Validate slash command availability                        |
+| `/system-stats`                      | Show CPU and memory information                            |
+| `/botstatus`                         | Review bot health and status                               |
 
 ## Command Discovery
 

@@ -1,39 +1,53 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+} = require('discord.js');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('unlock')
-        .setDescription('Unlock a channel to allow members to send messages')
-        .addChannelOption(option =>
-            option.setName('channel')
-                .setDescription('The channel to unlock (current channel if not specified)')
-                .setRequired(false))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-    
-    async execute(interaction) {
-        const channel = interaction.options.getChannel('channel') || interaction.channel;
+  data: new SlashCommandBuilder()
+    .setName('unlock')
+    .setDescription('Unlock a channel to allow members to send messages')
+    .addChannelOption((option) =>
+      option
+        .setName('channel')
+        .setDescription('The channel to unlock (current channel if not specified)')
+        .setRequired(false)
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 
-        if (!channel.permissionsFor(interaction.guild.members.me).has(PermissionFlagsBits.ManageChannels)) {
-            return interaction.reply({ content: '❌ I don\'t have permission to manage channels!', flags: MessageFlags.Ephemeral });
-        }
+  async execute(interaction) {
+    const channel = interaction.options.getChannel('channel') || interaction.channel;
 
-        try {
-            await channel.permissionOverwrites.edit(interaction.guild.id, {
-                SendMessages: null
-            });
-
-            const embed = new EmbedBuilder()
-                .setColor(0x57f287)
-                .setTitle('🔓 Channel Unlocked')
-                .setDescription(`${channel} has been unlocked!`)
-                .setFooter({ text: `Unlocked by ${interaction.user.username}` })
-                .setTimestamp();
-
-            await interaction.reply({ embeds: [embed] });
-
-        } catch (error) {
-            console.error('Error unlocking channel:', error);
-            await interaction.reply({ content: '❌ Failed to unlock the channel!', flags: MessageFlags.Ephemeral });
-        }
+    if (
+      !channel.permissionsFor(interaction.guild.members.me).has(PermissionFlagsBits.ManageChannels)
+    ) {
+      return interaction.reply({
+        content: "❌ I don't have permission to manage channels!",
+        flags: MessageFlags.Ephemeral,
+      });
     }
+
+    try {
+      await channel.permissionOverwrites.edit(interaction.guild.id, {
+        SendMessages: null,
+      });
+
+      const embed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle('🔓 Channel Unlocked')
+        .setDescription(`${channel} has been unlocked!`)
+        .setFooter({ text: `Unlocked by ${interaction.user.username}` })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Error unlocking channel:', error);
+      await interaction.reply({
+        content: '❌ Failed to unlock the channel!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  },
 };

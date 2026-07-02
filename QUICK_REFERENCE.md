@@ -21,37 +21,37 @@ Run these after the bot comes online:
 
 ## Common Commands
 
-| Task | Command |
-| --- | --- |
-| Play music | `/play <query>` |
-| Check queue | `/queue` |
-| Check balance | `/balance` |
-| Claim daily reward | `/daily` |
-| Create a poll | `/poll` |
-| Configure automod | `/automod settings` |
-| Configure welcome messages | `/welcomemessage` |
-| Check MongoDB sync mode | `/mongodb-sync status` |
+| Task                       | Command                |
+| -------------------------- | ---------------------- |
+| Play music                 | `/play <query>`        |
+| Check queue                | `/queue`               |
+| Check balance              | `/balance`             |
+| Claim daily reward         | `/daily`               |
+| Create a poll              | `/poll`                |
+| Configure automod          | `/automod settings`    |
+| Configure welcome messages | `/welcomemessage`      |
+| Check MongoDB sync mode    | `/mongodb-sync status` |
 
 ## MongoDB Quick Tasks
 
-| Task | Command |
-| --- | --- |
-| View sync status | `/mongodb-sync status` |
-| Switch to manual mode | `/mongodb-sync schedule mode:manual` |
-| Set timed sync | `/mongodb-sync schedule mode:interval minutes:10` |
-| Force sync now | `/mongodb-sync run` |
-| Check storage usage | `/mongodb-space` |
+| Task                  | Command                                           |
+| --------------------- | ------------------------------------------------- |
+| View sync status      | `/mongodb-sync status`                            |
+| Switch to manual mode | `/mongodb-sync schedule mode:manual`              |
+| Set timed sync        | `/mongodb-sync schedule mode:interval minutes:10` |
+| Force sync now        | `/mongodb-sync run`                               |
+| Check storage usage   | `/mongodb-space`                                  |
 
 ## Important Files
 
-| File | Purpose |
-| --- | --- |
-| `.env` | Environment configuration |
-| `README.md` | Project overview |
-| `SETUP.md` | Installation and deployment guide |
-| `COMMANDS.md` | Command reference |
-| `GUIDE.md` | Operations and feature guide |
-| `MONGODB.md` | MongoDB setup and migration guide |
+| File          | Purpose                           |
+| ------------- | --------------------------------- |
+| `.env`        | Environment configuration         |
+| `README.md`   | Project overview                  |
+| `SETUP.md`    | Installation and deployment guide |
+| `COMMANDS.md` | Command reference                 |
+| `GUIDE.md`    | Operations and feature guide      |
+| `MONGODB.md`  | MongoDB setup and migration guide |
 
 ## Common Troubleshooting Checks
 

@@ -10,44 +10,44 @@ const fs = require('fs');
 
 const testsDir = __dirname;
 const testFiles = fs
-    .readdirSync(testsDir)
-    .filter(f => f.endsWith('.test.js'))
-    .sort();
+  .readdirSync(testsDir)
+  .filter((f) => f.endsWith('.test.js'))
+  .sort();
 
 if (testFiles.length === 0) {
-    console.error('No test files found.');
-    process.exit(1);
+  console.error('No test files found.');
+  process.exit(1);
 }
 
 let allPassed = true;
 const results = [];
 
 for (const file of testFiles) {
-    const fullPath = path.join(testsDir, file);
-    console.log(`\n${'═'.repeat(60)}`);
-    console.log(`Running: ${file}`);
-    console.log('═'.repeat(60));
+  const fullPath = path.join(testsDir, file);
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`Running: ${file}`);
+  console.log('═'.repeat(60));
 
-    const result = spawnSync(process.execPath, [fullPath], {
-        stdio: 'inherit',
-        env: { ...process.env }
-    });
+  const result = spawnSync(process.execPath, [fullPath], {
+    stdio: 'inherit',
+    env: { ...process.env },
+  });
 
-    const ok = result.status === 0;
-    results.push({ file, ok });
-    if (!ok) allPassed = false;
+  const ok = result.status === 0;
+  results.push({ file, ok });
+  if (!ok) allPassed = false;
 }
 
-console.log('\n' + '═'.repeat(60));
+console.log(`\n${'═'.repeat(60)}`);
 console.log('Test Suite Summary');
 console.log('═'.repeat(60));
 
 for (const { file, ok } of results) {
-    console.log(`  ${ok ? '✅' : '❌'} ${file}`);
+  console.log(`  ${ok ? '✅' : '❌'} ${file}`);
 }
 
 const totalFiles = results.length;
-const failedFiles = results.filter(r => !r.ok).length;
+const failedFiles = results.filter((r) => !r.ok).length;
 console.log(`\n${totalFiles - failedFiles}/${totalFiles} test files passed.\n`);
 
 process.exit(allPassed ? 0 : 1);

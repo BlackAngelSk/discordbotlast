@@ -3,53 +3,52 @@ const settingsManager = require('../utils/settingsManager');
 const activityTracker = require('../utils/activityTracker');
 
 module.exports = {
-    name: Events.GuildMemberRemove,
-    async execute(member, client) {
-        try {
-            try {
-                await activityTracker.removeUser(member.guild.id, member.id);
-            } catch (error) {
-                console.error('Error removing member activity:', error);
-            }
+  name: Events.GuildMemberRemove,
+  async execute(member, client) {
+    try {
+      try {
+        await activityTracker.removeUser(member.guild.id, member.id);
+      } catch (error) {
+        console.error('Error removing member activity:', error);
+      }
 
-            const settings = settingsManager.get(member.guild.id);
+      const settings = settingsManager.get(member.guild.id);
 
-            // Check if leave messages are enabled
-            if (!settings.leaveEnabled) {
-                return;
-            }
+      // Check if leave messages are enabled
+      if (!settings.leaveEnabled) {
+        return;
+      }
 
-            // Get leave channel
-            const channelId = settings.leaveChannel;
-            if (!channelId) {
-                return;
-            }
+      // Get leave channel
+      const channelId = settings.leaveChannel;
+      if (!channelId) {
+        return;
+      }
 
-            // Try to get channel by ID first, then by name
-            let channel = member.guild.channels.cache.get(channelId);
-            if (!channel) {
-                channel = member.guild.channels.cache.find(
-                    ch => ch.name === channelId && ch.isTextBased()
-                );
-            }
-            
-            if (!channel || !channel.isTextBased()) {
-                console.log(`⚠️ Leave channel not found or not text-based in guild ${member.guild.name}`);
-                return;
-            }
+      // Try to get channel by ID first, then by name
+      let channel = member.guild.channels.cache.get(channelId);
+      if (!channel) {
+        channel = member.guild.channels.cache.find(
+          (ch) => ch.name === channelId && ch.isTextBased()
+        );
+      }
 
-            // Format leave message
-            const leaveMessage = settings.leaveMessage
-                .replace('{user}', member.user.username)
-                .replace('{mention}', `<@${member.user.id}>`)
-                .replace('{server}', member.guild.name)
-                .replace('{memberCount}', member.guild.memberCount.toString());
+      if (!channel || !channel.isTextBased()) {
+        console.log(`⚠️ Leave channel not found or not text-based in guild ${member.guild.name}`);
+        return;
+      }
 
-            await channel.send(leaveMessage);
-            console.log(`👋 ${member.user.tag} left ${member.guild.name}`);
+      // Format leave message
+      const leaveMessage = settings.leaveMessage
+        .replace('{user}', member.user.username)
+        .replace('{mention}', `<@${member.user.id}>`)
+        .replace('{server}', member.guild.name)
+        .replace('{memberCount}', member.guild.memberCount.toString());
 
-        } catch (error) {
-            console.error('Error in guildMemberRemove event:', error);
-        }
+      await channel.send(leaveMessage);
+      console.log(`👋 ${member.user.tag} left ${member.guild.name}`);
+    } catch (error) {
+      console.error('Error in guildMemberRemove event:', error);
     }
+  },
 };

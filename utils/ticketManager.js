@@ -2,108 +2,108 @@ const fs = require('fs').promises;
 const path = require('path');
 
 class TicketManager {
-    constructor() {
-        this.dataPath = path.join(__dirname, '..', 'data', 'tickets.json');
-        this.data = {
-            settings: {},
-            tickets: {}
-        };
-    }
+  constructor() {
+    this.dataPath = path.join(__dirname, '..', 'data', 'tickets.json');
+    this.data = {
+      settings: {},
+      tickets: {},
+    };
+  }
 
-    async init() {
-        try {
-            // Ensure data directory exists
-            const dataDir = path.dirname(this.dataPath);
-            await fs.mkdir(dataDir, { recursive: true });
+  async init() {
+    try {
+      // Ensure data directory exists
+      const dataDir = path.dirname(this.dataPath);
+      await fs.mkdir(dataDir, { recursive: true });
 
-            const data = await fs.readFile(this.dataPath, 'utf8');
-            this.data = JSON.parse(data);
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                await this.save();
-            } else {
-                console.error('Error loading tickets data:', error);
-            }
-        }
-    }
-
-    async save() {
-        try {
-            await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
-        } catch (error) {
-            console.error('Error saving tickets data:', error);
-        }
-    }
-
-    getSettings(guildId) {
-        if (!this.data.settings[guildId]) {
-            this.data.settings[guildId] = {
-                categoryId: null,
-                logsChannelId: null,
-                enabled: false
-            };
-        }
-        return this.data.settings[guildId];
-    }
-
-    async setSettings(guildId, settings) {
-        this.data.settings[guildId] = settings;
+      const data = await fs.readFile(this.dataPath, 'utf8');
+      this.data = JSON.parse(data);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
         await this.save();
+      } else {
+        console.error('Error loading tickets data:', error);
+      }
+    }
+  }
+
+  async save() {
+    try {
+      await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
+    } catch (error) {
+      console.error('Error saving tickets data:', error);
+    }
+  }
+
+  getSettings(guildId) {
+    if (!this.data.settings[guildId]) {
+      this.data.settings[guildId] = {
+        categoryId: null,
+        logsChannelId: null,
+        enabled: false,
+      };
+    }
+    return this.data.settings[guildId];
+  }
+
+  async setSettings(guildId, settings) {
+    this.data.settings[guildId] = settings;
+    await this.save();
+  }
+
+  async createTicket(guildId, userId, reason) {
+    const ticketId = `${guildId}_${userId}_${Date.now()}`;
+
+    if (!this.data.tickets[guildId]) {
+      this.data.tickets[guildId] = {};
     }
 
-    async createTicket(guildId, userId, reason) {
-        const ticketId = `${guildId}_${userId}_${Date.now()}`;
-        
-        if (!this.data.tickets[guildId]) {
-            this.data.tickets[guildId] = {};
-        }
+    this.data.tickets[guildId][ticketId] = {
+      userId,
+      reason,
+      status: 'open',
+      createdAt: new Date().toISOString(),
+      messages: [],
+    };
 
-        this.data.tickets[guildId][ticketId] = {
-            userId,
-            reason,
-            status: 'open',
-            createdAt: new Date().toISOString(),
-            messages: []
-        };
+    await this.save();
+    return ticketId;
+  }
 
-        await this.save();
-        return ticketId;
+  async closeTicket(guildId, ticketId) {
+    if (this.data.tickets[guildId] && this.data.tickets[guildId][ticketId]) {
+      this.data.tickets[guildId][ticketId].status = 'closed';
+      this.data.tickets[guildId][ticketId].closedAt = new Date().toISOString();
+      await this.save();
+      return true;
+    }
+    return false;
+  }
+
+  async saveTranscript(guildId, ticketId, content) {
+    if (!this.data.tickets[guildId] || !this.data.tickets[guildId][ticketId]) {
+      return null;
     }
 
-    async closeTicket(guildId, ticketId) {
-        if (this.data.tickets[guildId] && this.data.tickets[guildId][ticketId]) {
-            this.data.tickets[guildId][ticketId].status = 'closed';
-            this.data.tickets[guildId][ticketId].closedAt = new Date().toISOString();
-            await this.save();
-            return true;
-        }
-        return false;
-    }
+    const transcriptsDir = path.join(__dirname, '..', 'data', 'transcripts');
+    await fs.mkdir(transcriptsDir, { recursive: true });
 
-    async saveTranscript(guildId, ticketId, content) {
-        if (!this.data.tickets[guildId] || !this.data.tickets[guildId][ticketId]) {
-            return null;
-        }
+    const filename = `${ticketId}.txt`;
+    const filePath = path.join(transcriptsDir, filename);
+    await fs.writeFile(filePath, content, 'utf8');
 
-        const transcriptsDir = path.join(__dirname, '..', 'data', 'transcripts');
-        await fs.mkdir(transcriptsDir, { recursive: true });
+    this.data.tickets[guildId][ticketId].transcriptFile = filename;
+    await this.save();
+    return filePath;
+  }
 
-        const filename = `${ticketId}.txt`;
-        const filePath = path.join(transcriptsDir, filename);
-        await fs.writeFile(filePath, content, 'utf8');
+  getTicket(guildId, ticketId) {
+    return this.data.tickets[guildId] ? this.data.tickets[guildId][ticketId] : null;
+  }
 
-        this.data.tickets[guildId][ticketId].transcriptFile = filename;
-        await this.save();
-        return filePath;
-    }
-
-    getTicket(guildId, ticketId) {
-        return this.data.tickets[guildId] ? this.data.tickets[guildId][ticketId] : null;
-    }
-
-    getGuildTickets(guildId) {
-        return this.data.tickets[guildId] || {};
-    }
+  getGuildTickets(guildId) {
+    return this.data.tickets[guildId] || {};
+  }
 }
 
 module.exports = new TicketManager();

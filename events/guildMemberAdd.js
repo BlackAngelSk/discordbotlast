@@ -11,330 +11,378 @@ const fs = require('fs').promises;
 const path = require('path');
 
 function getRoleAssignabilityIssue(member, role) {
-    if (!role) return 'Role not found';
+  if (!role) return 'Role not found';
 
-    const me = member.guild.members.me;
-    if (!me) return 'Bot member cache unavailable';
+  const me = member.guild.members.me;
+  if (!me) return 'Bot member cache unavailable';
 
-    if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
-        return 'Bot lacks Manage Roles permission';
-    }
+  if (!me.permissions.has(PermissionFlagsBits.ManageRoles)) {
+    return 'Bot lacks Manage Roles permission';
+  }
 
-    if (role.managed) {
-        return 'Role is managed by an integration and cannot be assigned manually';
-    }
+  if (role.managed) {
+    return 'Role is managed by an integration and cannot be assigned manually';
+  }
 
-    if (role.id === member.guild.id) {
-        return 'Cannot assign the @everyone role';
-    }
+  if (role.id === member.guild.id) {
+    return 'Cannot assign the @everyone role';
+  }
 
-    if (me.roles.highest.comparePositionTo(role) <= 0) {
-        return 'Role is higher than or equal to the bot\'s highest role';
-    }
+  if (me.roles.highest.comparePositionTo(role) <= 0) {
+    return "Role is higher than or equal to the bot's highest role";
+  }
 
-    return null;
+  return null;
 }
 
 module.exports = {
-    name: Events.GuildMemberAdd,
-    async execute(member, client) {
-        try {
-            console.log(`👋 New member joined: ${member.user.tag}`);
+  name: Events.GuildMemberAdd,
+  async execute(member, client) {
+    try {
+      console.log(`👋 New member joined: ${member.user.tag}`);
 
-            try {
-                await activityTracker.registerMember(member.guild.id, member.id, member.joinedTimestamp || Date.now());
-            } catch (error) {
-                console.error('Error registering member activity:', error);
-            }
+      try {
+        await activityTracker.registerMember(
+          member.guild.id,
+          member.id,
+          member.joinedTimestamp || Date.now()
+        );
+      } catch (error) {
+        console.error('Error registering member activity:', error);
+      }
 
-            // Raid protection checks
-            const raidSettings = raidProtectionManager.getSettings(member.guild.id);
-            if (raidSettings.enabled) {
-                // Log the join
-                await raidProtectionManager.logJoin(member.guild.id, member.id);
+      // Raid protection checks
+      const raidSettings = raidProtectionManager.getSettings(member.guild.id);
+      if (raidSettings.enabled) {
+        // Log the join
+        await raidProtectionManager.logJoin(member.guild.id, member.id);
 
-                // Check if server is locked
-                if (raidProtectionManager.isLocked(member.guild.id)) {
-                    try {
-                        await member.kick('Server is in lockdown mode');
-                        console.log(`🛡️ Kicked ${member.user.tag} - server locked`);
-                        return;
-                    } catch (error) {
-                        console.error('Error kicking during lockdown:', error);
-                    }
-                }
-
-                // Check account age
-                if (raidSettings.accountAgeRequired > 0) {
-                    const isTooNew = raidProtectionManager.isAccountTooNew(member, raidSettings.accountAgeRequired);
-                    if (isTooNew) {
-                        if (raidSettings.autoKickNewAccounts) {
-                            try {
-                                await member.send(`Your account is too new to join ${member.guild.name}. Required age: ${raidSettings.accountAgeRequired} days.`).catch(() => {});
-                                await member.kick(`Account age below ${raidSettings.accountAgeRequired} days`);
-                                console.log(`🛡️ Kicked ${member.user.tag} - account too new`);
-                                return;
-                            } catch (error) {
-                                console.error('Error kicking new account:', error);
-                            }
-                        }
-                    }
-                }
-
-                // Check for raid (mass joins)
-                const raidCheck = raidProtectionManager.checkRaidAlert(member.guild.id);
-                if (raidCheck.isRaid && raidSettings.autoKickRaiders) {
-                    try {
-                        await member.kick('Suspected raid detected');
-                        console.log(`🛡️ Kicked ${member.user.tag} - raid suspected`);
-                        
-                        // Alert admins
-                        const modLogChannel = member.guild.channels.cache.find(c => 
-                            c.name.includes('mod-log') || c.name.includes('admin')
-                        );
-                        if (modLogChannel) {
-                            const embed = new EmbedBuilder()
-                                .setColor('#FF0000')
-                                .setTitle('🚨 Raid Detected!')
-                                .setDescription(`${raidCheck.joinCount} users joined in ${raidCheck.timeWindow} seconds!`)
-                                .addFields({ name: 'Action', value: 'Auto-kicking new joins' })
-                                .setTimestamp();
-                            await modLogChannel.send({ embeds: [embed] });
-                        }
-                        return;
-                    } catch (error) {
-                        console.error('Error kicking raider:', error);
-                    }
-                }
-            }
-
-            // Track invite
-            try {
-                const invites = await member.guild.invites.fetch();
-                const guildInvites = client.invites || new Map();
-                
-                if (!guildInvites.has(member.guild.id)) {
-                    guildInvites.set(member.guild.id, new Map());
-                }
-
-                const oldInvites = guildInvites.get(member.guild.id);
-                let inviter = null;
-
-                for (const invite of invites.values()) {
-                    const oldInvite = oldInvites.get(invite.code);
-                    
-                    if (!oldInvite || oldInvite.uses < invite.uses) {
-                        inviter = invite.inviter;
-                        break;
-                    }
-                }
-
-                // Update cached invites
-                const newInviteMap = new Map();
-                invites.forEach(invite => {
-                    newInviteMap.set(invite.code, invite);
-                });
-                guildInvites.set(member.guild.id, newInviteMap);
-
-                // Track the invite if we found an inviter
-                if (inviter) {
-                    await inviteManager.trackInvite(member.guild.id, inviter.id, member.id, member.user.username);
-                    console.log(`📊 ${inviter.username} invited ${member.user.username}`);
-                }
-            } catch (error) {
-                console.error('Error tracking invite:', error);
-            }
-            
-            const settings = settingsManager.get(member.guild.id);
-            
-            // Auto-assign role if configured
-            if (settings.autoRole) {
-                const configuredRole = String(settings.autoRole).trim();
-                const role = member.guild.roles.cache.get(configuredRole)
-                    || member.guild.roles.cache.find(r => r.name === configuredRole);
-
-                if (role) {
-                    const issue = getRoleAssignabilityIssue(member, role);
-                    if (issue) {
-                        console.warn(`⚠️ Could not assign auto-role "${role.name}" to ${member.user.tag}: ${issue}`);
-                    } else {
-                        try {
-                            await member.roles.add(role, 'Auto-role on member join');
-                            console.log(`✅ Assigned ${role.name} role to ${member.user.tag}`);
-                        } catch (error) {
-                            console.error(`❌ Error assigning auto-role "${role.name}" to ${member.user.tag}:`, error.message);
-                        }
-                    }
-                } else {
-                    console.log(`⚠️ Role "${settings.autoRole}" not found in guild ${member.guild.name}`);
-                    // Optionally create the role if it doesn't exist
-                    try {
-                        const me = member.guild.members.me;
-                        if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
-                            console.warn(`⚠️ Cannot create auto-role "${settings.autoRole}" in ${member.guild.name}: missing Manage Roles permission`);
-                        } else {
-                            const newRole = await member.guild.roles.create({
-                                name: settings.autoRole,
-                                color: 0x99AAB5,
-                                reason: 'Auto-created default member role',
-                            });
-
-                            const issue = getRoleAssignabilityIssue(member, newRole);
-                            if (issue) {
-                                console.warn(`⚠️ Created role "${newRole.name}" but could not assign it to ${member.user.tag}: ${issue}`);
-                            } else {
-                                await member.roles.add(newRole, 'Auto-role on member join');
-                                console.log(`✅ Created and assigned ${settings.autoRole} role to ${member.user.tag}`);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('❌ Error creating role:', error.message);
-                    }
-                }
-            }
-
-            // Update server stats
-            try {
-                await statsManager.recordMemberUpdate(member.guild.id, member.guild.memberCount);
-            } catch (error) {
-                console.error('Error updating stats:', error);
-            }
-
-            const welcomeEmbedConfig = client.welcomeMessageManager?.getWelcomeConfig(member.guild.id);
-            const hasEmbedWelcomeConfig = Boolean(
-                welcomeEmbedConfig?.enabled && welcomeEmbedConfig?.channelId
-            );
-
-            // Send welcome message if enabled
-            if (settings.welcomeEnabled && settings.welcomeChannel && !hasEmbedWelcomeConfig) {
-                // Try to get channel by ID first, then by name
-                let channel = member.guild.channels.cache.get(settings.welcomeChannel)
-                    || await member.guild.channels.fetch(settings.welcomeChannel).catch(() => null);
-                if (!channel) {
-                    channel = member.guild.channels.cache.find(
-                        ch => ch.name === settings.welcomeChannel && ch.isTextBased()
-                    );
-                }
-                
-                if (channel && channel.isTextBased()) {
-                    // Format welcome message with placeholders
-                    const welcomeMessage = settings.welcomeMessage
-                        .replace('{user}', `${member}`)
-                        .replace('{username}', member.user.username)
-                        .replace('{server}', member.guild.name)
-                        .replace('{memberCount}', member.guild.memberCount.toString());
-                    const accountCreatedUnix = member?.user?.createdTimestamp
-                        ? Math.floor(member.user.createdTimestamp / 1000)
-                        : null;
-                    const joinedUnix = member?.joinedTimestamp
-                        ? Math.floor(member.joinedTimestamp / 1000)
-                        : null;
-
-                    const welcomeEmbed = new EmbedBuilder()
-                        .setColor(0x57f287)
-                        .setTitle(`Welcome to ${member.guild.name}`)
-                        .setDescription(welcomeMessage)
-                        .addFields(
-                            { name: 'User', value: `<@${member.id}>`, inline: true },
-                            { name: 'Member Count', value: `${member.guild.memberCount}`, inline: true },
-                            {
-                                name: 'Account Created',
-                                value: accountCreatedUnix ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)` : 'Unknown',
-                                inline: false
-                            },
-                            {
-                                name: 'Joined Server',
-                                value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
-                                inline: false
-                            }
-                        )
-                        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                        .setTimestamp();
-
-                    await channel.send({ embeds: [welcomeEmbed] });
-                } else {
-                    console.log(`⚠️ Welcome channel not found or not text-based in guild ${member.guild.name}`);
-                }
-            }
-
-            // Send welcome card if enabled
-            try {
-                const settingsPath = path.join(__dirname, '..', 'data', 'settings.json');
-                let settingsData = {};
-                try {
-                    const data = await fs.readFile(settingsPath, 'utf8');
-                    settingsData = JSON.parse(data);
-                } catch (error) {
-                    settingsData = {};
-                }
-
-                const welcomeCardChannelId = settingsData[member.guild.id]?.welcomeCardChannel;
-                if (welcomeCardChannelId) {
-                    const welcomeChannel = await client.channels.fetch(welcomeCardChannelId).catch(() => null);
-                    
-                    if (welcomeChannel && welcomeChannel.isTextBased()) {
-                        const embed = new EmbedBuilder()
-                            .setColor(0x5865f2)
-                            .setTitle('👋 Welcome!')
-                            .setDescription(`Welcome to **${member.guild.name}**, ${member}!`)
-                            .addFields(
-                                { name: 'Member Count', value: `You are member #${member.guild.memberCount}`, inline: true },
-                                { name: 'Account Created', value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`, inline: true }
-                            )
-                            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                            .setFooter({ text: 'Welcome to our community!' })
-                            .setTimestamp();
-
-                        const guildIcon = member.guild.iconURL({ dynamic: true, size: 512 });
-                        if (guildIcon) {
-                            embed.setImage(guildIcon);
-                        }
-
-                        await welcomeChannel.send({ embeds: [embed] });
-                    } else if (welcomeCardChannelId) {
-                        console.warn(`⚠️ Welcome card channel ${welcomeCardChannelId} not found or not text-based in guild ${member.guild.name}`);
-                    }
-                }
-            } catch (error) {
-                console.error('Error sending welcome card:', error);
-            }
-
-            // Auto-enroll new member in active seasons
-            try {
-                const userData = economyManager.getUserData(member.guild.id, member.id);
-                const gamblingStats = gameStatsManager.getStats(member.id);
-                
-                const enrolledSeasons = await seasonManager.autoEnrollUserInSeasons(
-                    member.guild.id,
-                    member.id,
-                    {
-                        username: member.user.username,
-                        balance: userData.balance || 0,
-                        xp: userData.xp || 0,
-                        level: userData.level || 1,
-                        seasonalCoins: userData.seasonalCoins || 0,
-                        gambling: gamblingStats
-                    }
-                );
-                
-                if (enrolledSeasons.length > 0) {
-                    console.log(`✅ ${member.user.tag} auto-enrolled in ${enrolledSeasons.length} season(s): ${enrolledSeasons.join(', ')}`);
-                }
-            } catch (error) {
-                console.error('Error auto-enrolling user in seasons:', error);
-            }
-
-            // Send welcome message
-            try {
-                if (client.welcomeMessageManager) {
-                    await client.welcomeMessageManager.sendWelcomeMessage(member);
-                }
-            } catch (error) {
-                console.error('Error sending welcome message:', error);
-            }
-
-        } catch (error) {
-            console.error('Error in guildMemberAdd event:', error);
+        // Check if server is locked
+        if (raidProtectionManager.isLocked(member.guild.id)) {
+          try {
+            await member.kick('Server is in lockdown mode');
+            console.log(`🛡️ Kicked ${member.user.tag} - server locked`);
+            return;
+          } catch (error) {
+            console.error('Error kicking during lockdown:', error);
+          }
         }
+
+        // Check account age
+        if (raidSettings.accountAgeRequired > 0) {
+          const isTooNew = raidProtectionManager.isAccountTooNew(
+            member,
+            raidSettings.accountAgeRequired
+          );
+          if (isTooNew) {
+            if (raidSettings.autoKickNewAccounts) {
+              try {
+                await member
+                  .send(
+                    `Your account is too new to join ${member.guild.name}. Required age: ${raidSettings.accountAgeRequired} days.`
+                  )
+                  .catch(() => {});
+                await member.kick(`Account age below ${raidSettings.accountAgeRequired} days`);
+                console.log(`🛡️ Kicked ${member.user.tag} - account too new`);
+                return;
+              } catch (error) {
+                console.error('Error kicking new account:', error);
+              }
+            }
+          }
+        }
+
+        // Check for raid (mass joins)
+        const raidCheck = raidProtectionManager.checkRaidAlert(member.guild.id);
+        if (raidCheck.isRaid && raidSettings.autoKickRaiders) {
+          try {
+            await member.kick('Suspected raid detected');
+            console.log(`🛡️ Kicked ${member.user.tag} - raid suspected`);
+
+            // Alert admins
+            const modLogChannel = member.guild.channels.cache.find(
+              (c) => c.name.includes('mod-log') || c.name.includes('admin')
+            );
+            if (modLogChannel) {
+              const embed = new EmbedBuilder()
+                .setColor('#FF0000')
+                .setTitle('🚨 Raid Detected!')
+                .setDescription(
+                  `${raidCheck.joinCount} users joined in ${raidCheck.timeWindow} seconds!`
+                )
+                .addFields({ name: 'Action', value: 'Auto-kicking new joins' })
+                .setTimestamp();
+              await modLogChannel.send({ embeds: [embed] });
+            }
+            return;
+          } catch (error) {
+            console.error('Error kicking raider:', error);
+          }
+        }
+      }
+
+      // Track invite
+      try {
+        const invites = await member.guild.invites.fetch();
+        const guildInvites = client.invites || new Map();
+
+        if (!guildInvites.has(member.guild.id)) {
+          guildInvites.set(member.guild.id, new Map());
+        }
+
+        const oldInvites = guildInvites.get(member.guild.id);
+        let inviter = null;
+
+        for (const invite of invites.values()) {
+          const oldInvite = oldInvites.get(invite.code);
+
+          if (!oldInvite || oldInvite.uses < invite.uses) {
+            inviter = invite.inviter;
+            break;
+          }
+        }
+
+        // Update cached invites
+        const newInviteMap = new Map();
+        invites.forEach((invite) => {
+          newInviteMap.set(invite.code, invite);
+        });
+        guildInvites.set(member.guild.id, newInviteMap);
+
+        // Track the invite if we found an inviter
+        if (inviter) {
+          await inviteManager.trackInvite(
+            member.guild.id,
+            inviter.id,
+            member.id,
+            member.user.username
+          );
+          console.log(`📊 ${inviter.username} invited ${member.user.username}`);
+        }
+      } catch (error) {
+        console.error('Error tracking invite:', error);
+      }
+
+      const settings = settingsManager.get(member.guild.id);
+
+      // Auto-assign role if configured
+      if (settings.autoRole) {
+        const configuredRole = String(settings.autoRole).trim();
+        const role =
+          member.guild.roles.cache.get(configuredRole) ||
+          member.guild.roles.cache.find((r) => r.name === configuredRole);
+
+        if (role) {
+          const issue = getRoleAssignabilityIssue(member, role);
+          if (issue) {
+            console.warn(
+              `⚠️ Could not assign auto-role "${role.name}" to ${member.user.tag}: ${issue}`
+            );
+          } else {
+            try {
+              await member.roles.add(role, 'Auto-role on member join');
+              console.log(`✅ Assigned ${role.name} role to ${member.user.tag}`);
+            } catch (error) {
+              console.error(
+                `❌ Error assigning auto-role "${role.name}" to ${member.user.tag}:`,
+                error.message
+              );
+            }
+          }
+        } else {
+          console.log(`⚠️ Role "${settings.autoRole}" not found in guild ${member.guild.name}`);
+          // Optionally create the role if it doesn't exist
+          try {
+            const me = member.guild.members.me;
+            if (!me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+              console.warn(
+                `⚠️ Cannot create auto-role "${settings.autoRole}" in ${member.guild.name}: missing Manage Roles permission`
+              );
+            } else {
+              const newRole = await member.guild.roles.create({
+                name: settings.autoRole,
+                color: 0x99aab5,
+                reason: 'Auto-created default member role',
+              });
+
+              const issue = getRoleAssignabilityIssue(member, newRole);
+              if (issue) {
+                console.warn(
+                  `⚠️ Created role "${newRole.name}" but could not assign it to ${member.user.tag}: ${issue}`
+                );
+              } else {
+                await member.roles.add(newRole, 'Auto-role on member join');
+                console.log(
+                  `✅ Created and assigned ${settings.autoRole} role to ${member.user.tag}`
+                );
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error creating role:', error.message);
+          }
+        }
+      }
+
+      // Update server stats
+      try {
+        await statsManager.recordMemberUpdate(member.guild.id, member.guild.memberCount);
+      } catch (error) {
+        console.error('Error updating stats:', error);
+      }
+
+      const welcomeEmbedConfig = client.welcomeMessageManager?.getWelcomeConfig(member.guild.id);
+      const hasEmbedWelcomeConfig = Boolean(
+        welcomeEmbedConfig?.enabled && welcomeEmbedConfig?.channelId
+      );
+
+      // Send welcome message if enabled
+      if (settings.welcomeEnabled && settings.welcomeChannel && !hasEmbedWelcomeConfig) {
+        // Try to get channel by ID first, then by name
+        let channel =
+          member.guild.channels.cache.get(settings.welcomeChannel) ||
+          (await member.guild.channels.fetch(settings.welcomeChannel).catch(() => null));
+        if (!channel) {
+          channel = member.guild.channels.cache.find(
+            (ch) => ch.name === settings.welcomeChannel && ch.isTextBased()
+          );
+        }
+
+        if (channel && channel.isTextBased()) {
+          // Format welcome message with placeholders
+          const welcomeMessage = settings.welcomeMessage
+            .replace('{user}', `${member}`)
+            .replace('{username}', member.user.username)
+            .replace('{server}', member.guild.name)
+            .replace('{memberCount}', member.guild.memberCount.toString());
+          const accountCreatedUnix = member?.user?.createdTimestamp
+            ? Math.floor(member.user.createdTimestamp / 1000)
+            : null;
+          const joinedUnix = member?.joinedTimestamp
+            ? Math.floor(member.joinedTimestamp / 1000)
+            : null;
+
+          const welcomeEmbed = new EmbedBuilder()
+            .setColor(0x57f287)
+            .setTitle(`Welcome to ${member.guild.name}`)
+            .setDescription(welcomeMessage)
+            .addFields(
+              { name: 'User', value: `<@${member.id}>`, inline: true },
+              { name: 'Member Count', value: `${member.guild.memberCount}`, inline: true },
+              {
+                name: 'Account Created',
+                value: accountCreatedUnix
+                  ? `<t:${accountCreatedUnix}:F>\n(<t:${accountCreatedUnix}:R>)`
+                  : 'Unknown',
+                inline: false,
+              },
+              {
+                name: 'Joined Server',
+                value: joinedUnix ? `<t:${joinedUnix}:F>\n(<t:${joinedUnix}:R>)` : 'Unknown',
+                inline: false,
+              }
+            )
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setTimestamp();
+
+          await channel.send({ embeds: [welcomeEmbed] });
+        } else {
+          console.log(
+            `⚠️ Welcome channel not found or not text-based in guild ${member.guild.name}`
+          );
+        }
+      }
+
+      // Send welcome card if enabled
+      try {
+        const settingsPath = path.join(__dirname, '..', 'data', 'settings.json');
+        let settingsData = {};
+        try {
+          const data = await fs.readFile(settingsPath, 'utf8');
+          settingsData = JSON.parse(data);
+        } catch (error) {
+          settingsData = {};
+        }
+
+        const welcomeCardChannelId = settingsData[member.guild.id]?.welcomeCardChannel;
+        if (welcomeCardChannelId) {
+          const welcomeChannel = await client.channels
+            .fetch(welcomeCardChannelId)
+            .catch(() => null);
+
+          if (welcomeChannel && welcomeChannel.isTextBased()) {
+            const embed = new EmbedBuilder()
+              .setColor(0x5865f2)
+              .setTitle('👋 Welcome!')
+              .setDescription(`Welcome to **${member.guild.name}**, ${member}!`)
+              .addFields(
+                {
+                  name: 'Member Count',
+                  value: `You are member #${member.guild.memberCount}`,
+                  inline: true,
+                },
+                {
+                  name: 'Account Created',
+                  value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
+                  inline: true,
+                }
+              )
+              .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+              .setFooter({ text: 'Welcome to our community!' })
+              .setTimestamp();
+
+            const guildIcon = member.guild.iconURL({ dynamic: true, size: 512 });
+            if (guildIcon) {
+              embed.setImage(guildIcon);
+            }
+
+            await welcomeChannel.send({ embeds: [embed] });
+          } else if (welcomeCardChannelId) {
+            console.warn(
+              `⚠️ Welcome card channel ${welcomeCardChannelId} not found or not text-based in guild ${member.guild.name}`
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Error sending welcome card:', error);
+      }
+
+      // Auto-enroll new member in active seasons
+      try {
+        const userData = economyManager.getUserData(member.guild.id, member.id);
+        const gamblingStats = gameStatsManager.getStats(member.id);
+
+        const enrolledSeasons = await seasonManager.autoEnrollUserInSeasons(
+          member.guild.id,
+          member.id,
+          {
+            username: member.user.username,
+            balance: userData.balance || 0,
+            xp: userData.xp || 0,
+            level: userData.level || 1,
+            seasonalCoins: userData.seasonalCoins || 0,
+            gambling: gamblingStats,
+          }
+        );
+
+        if (enrolledSeasons.length > 0) {
+          console.log(
+            `✅ ${member.user.tag} auto-enrolled in ${enrolledSeasons.length} season(s): ${enrolledSeasons.join(', ')}`
+          );
+        }
+      } catch (error) {
+        console.error('Error auto-enrolling user in seasons:', error);
+      }
+
+      // Send welcome message
+      try {
+        if (client.welcomeMessageManager) {
+          await client.welcomeMessageManager.sendWelcomeMessage(member);
+        }
+      } catch (error) {
+        console.error('Error sending welcome message:', error);
+      }
+    } catch (error) {
+      console.error('Error in guildMemberAdd event:', error);
     }
+  },
 };

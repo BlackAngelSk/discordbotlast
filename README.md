@@ -1,4 +1,4 @@
-# Discord Bot 1.3
+# Discord Bot 2.0
 
 A feature-rich Discord bot built with `discord.js` v14 for community management, music playback, moderation, engagement systems, and server automation. The project supports both slash commands and prefix commands, includes an optional web dashboard, and can run on either JSON storage or MongoDB.
 
@@ -8,14 +8,14 @@ This repository is designed for servers that want a single bot to handle day-to-
 
 ## Core Features
 
-| Area | Capabilities |
-| --- | --- |
-| Moderation | warnings, timeouts, softbans, purge tools, audit logs, anti-spam, anti-invite, bad-word filtering |
-| Music | YouTube playback, queue controls, autoplay, loop modes, lyrics, previous track, jump, and user custom playlists |
-| Economy and Levels | XP, levels, daily and weekly rewards, balance tracking, leaderboards, shop system |
-| Community Tools | polls, profiles, invite tracking, birthdays, suggestions, reminders, activity tracking |
-| Automation | welcome and leave messages, auto-role, scheduled messages, seasonal leaderboard updates |
-| Operations | web dashboard, analytics, backups, health monitoring, MongoDB sync controls |
+| Area               | Capabilities                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Moderation         | warnings, timeouts, softbans, purge tools, audit logs, anti-spam, anti-invite, bad-word filtering               |
+| Music              | YouTube playback, queue controls, autoplay, loop modes, lyrics, previous track, jump, and user custom playlists |
+| Economy and Levels | XP, levels, daily and weekly rewards, balance tracking, leaderboards, shop system                               |
+| Community Tools    | polls, profiles, invite tracking, birthdays, suggestions, reminders, activity tracking                          |
+| Automation         | welcome and leave messages, auto-role, scheduled messages, seasonal leaderboard updates                         |
+| Operations         | web dashboard, analytics, backups, health monitoring, MongoDB sync controls                                     |
 
 ## Technology Stack
 
@@ -229,16 +229,16 @@ discordbotlast/
 
 ## Available Scripts
 
-| Script | Description |
-| --- | --- |
-| `npm start` | Start the bot |
-| `npm run dev` | Start the bot in development mode |
-| `npm run pm2:start` | Start bot with PM2 process manager |
-| `npm run pm2:restart` | Restart PM2 bot process |
-| `npm run pm2:logs` | View PM2 bot logs |
-| `npm run pm2:save` | Persist PM2 process list for reboot |
-| `npm run slots:sim` | Run the slot simulation utility |
-| `npm run test:slots` | Run slot logic tests |
+| Script                | Description                         |
+| --------------------- | ----------------------------------- |
+| `npm start`           | Start the bot                       |
+| `npm run dev`         | Start the bot in development mode   |
+| `npm run pm2:start`   | Start bot with PM2 process manager  |
+| `npm run pm2:restart` | Restart PM2 bot process             |
+| `npm run pm2:logs`    | View PM2 bot logs                   |
+| `npm run pm2:save`    | Persist PM2 process list for reboot |
+| `npm run slots:sim`   | Run the slot simulation utility     |
+| `npm run test:slots`  | Run slot logic tests                |
 
 ## Documentation
 

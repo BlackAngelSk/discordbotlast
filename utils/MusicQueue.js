@@ -1,630 +1,682 @@
-const { createAudioPlayer, AudioPlayerStatus, entersState, VoiceConnectionStatus, NoSubscriberBehavior } = require('@discordjs/voice');
+const {
+  createAudioPlayer,
+  AudioPlayerStatus,
+  entersState,
+  VoiceConnectionStatus,
+  NoSubscriberBehavior,
+} = require('@discordjs/voice');
 
 class MusicQueue {
-    constructor(guildId) {
-        this.guildId = guildId;
-        this.songs = [];
-        this.connection = null;
-        this.player = createAudioPlayer({
-            behaviors: {
-                noSubscriber: NoSubscriberBehavior.Pause
-            }
-        });
-        this.isPlaying = false;
-        this.currentSong = null;
-        this.disconnectTimer = null;
-        this.nowPlayingMessage = null;
-        this.readyLock = false;
-        this.volume = 0.5; // Default volume 50%
-        this.currentResource = null;
-        this.autoplay = false; // Autoplay feature
-        this.loop = 'off'; // 'off', 'song', or 'queue'
-        this.previousSongs = []; // Track song history
-        this.filters = {}; // Audio filters
-        this.activeFilter = null; // Active audio filter name
-        this.stay247 = false; // 24/7 mode — never auto-disconnect
-        this.ffmpegProcess = null;
-        this.ffmpegPath = null;
-        this.isShuttingDown = false;
+  constructor(guildId) {
+    this.guildId = guildId;
+    this.songs = [];
+    this.connection = null;
+    this.player = createAudioPlayer({
+      behaviors: {
+        noSubscriber: NoSubscriberBehavior.Pause,
+      },
+    });
+    this.isPlaying = false;
+    this.currentSong = null;
+    this.disconnectTimer = null;
+    this.nowPlayingMessage = null;
+    this.readyLock = false;
+    this.volume = 0.5; // Default volume 50%
+    this.currentResource = null;
+    this.autoplay = false; // Autoplay feature
+    this.loop = 'off'; // 'off', 'song', or 'queue'
+    this.previousSongs = []; // Track song history
+    this.filters = {}; // Audio filters
+    this.activeFilter = null; // Active audio filter name
+    this.stay247 = false; // 24/7 mode — never auto-disconnect
+    this.ffmpegProcess = null;
+    this.ffmpegPath = null;
+    this.isShuttingDown = false;
+    this.suppressNextIdleAdvance = false;
+
+    this.player.on(AudioPlayerStatus.Idle, () => {
+      console.log('🔄 Player entered Idle state');
+      if (this.suppressNextIdleAdvance) {
         this.suppressNextIdleAdvance = false;
+        return;
+      }
+      if (this.isShuttingDown) {
+        this.isShuttingDown = false;
+        return;
+      }
+      this.playNext();
+    });
 
-        this.player.on(AudioPlayerStatus.Idle, () => {
-            console.log('🔄 Player entered Idle state');
-            if (this.suppressNextIdleAdvance) {
-                this.suppressNextIdleAdvance = false;
-                return;
-            }
-            if (this.isShuttingDown) {
-                this.isShuttingDown = false;
-                return;
-            }
-            this.playNext();
-        });
+    this.player.on('error', (error) => {
+      console.error('❌ Audio player error:', error);
+      this.playNext();
+    });
 
-        this.player.on('error', error => {
-            console.error('❌ Audio player error:', error);
-            this.playNext();
-        });
+    this.player.on(AudioPlayerStatus.Playing, () => {
+      console.log('▶️ Player is now playing');
+    });
+  }
 
-        this.player.on(AudioPlayerStatus.Playing, () => {
-            console.log('▶️ Player is now playing');
-        });
+  async setupConnection(connection) {
+    this.connection = connection;
+
+    // Wait for connection to be ready before subscribing
+    try {
+      await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+      console.log('✅ Connection is ready');
+    } catch (error) {
+      console.error('❌ Connection failed to become ready:', error);
+      this.destroyConnectionSafely();
+      throw new Error('Failed to establish voice connection', { cause: error });
     }
 
-    async setupConnection(connection) {
-        this.connection = connection;
-        
-        // Wait for connection to be ready before subscribing
+    // Subscribe the connection to the player after connection is ready
+    this.connection.subscribe(this.player);
+    console.log('✅ Player subscribed to connection');
+
+    this.connection.on('stateChange', async (_, newState) => {
+      if (newState.status === VoiceConnectionStatus.Disconnected) {
+        const trackedConnection = this.connection;
+        if (!trackedConnection) {
+          return;
+        }
+
         try {
-            await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
-            console.log('✅ Connection is ready');
+          await Promise.race([
+            entersState(trackedConnection, VoiceConnectionStatus.Signalling, 5_000),
+            entersState(trackedConnection, VoiceConnectionStatus.Connecting, 5_000),
+          ]);
         } catch (error) {
-            console.error('❌ Connection failed to become ready:', error);
-            this.destroyConnectionSafely();
-            throw new Error('Failed to establish voice connection');
+          const isExpectedTeardown =
+            this.isShuttingDown ||
+            this.connection !== trackedConnection ||
+            trackedConnection.state.status === VoiceConnectionStatus.Destroyed;
+
+          if (isExpectedTeardown) {
+            return;
+          }
+
+          console.warn('⚠️ Connection lost, cleaning up...');
+          this.destroyConnectionSafely();
         }
-        
-        // Subscribe the connection to the player after connection is ready
-        this.connection.subscribe(this.player);
-        console.log('✅ Player subscribed to connection');
-        
-        this.connection.on('stateChange', async (_, newState) => {
-            if (newState.status === VoiceConnectionStatus.Disconnected) {
-                const trackedConnection = this.connection;
-                if (!trackedConnection) {
-                    return;
-                }
-
-                try {
-                    await Promise.race([
-                        entersState(trackedConnection, VoiceConnectionStatus.Signalling, 5_000),
-                        entersState(trackedConnection, VoiceConnectionStatus.Connecting, 5_000),
-                    ]);
-                } catch (error) {
-                    const isExpectedTeardown = this.isShuttingDown
-                        || this.connection !== trackedConnection
-                        || trackedConnection.state.status === VoiceConnectionStatus.Destroyed;
-
-                    if (isExpectedTeardown) {
-                        return;
-                    }
-
-                    console.warn('⚠️ Connection lost, cleaning up...');
-                    this.destroyConnectionSafely();
-                }
-            } else if (newState.status === VoiceConnectionStatus.Destroyed) {
-                this.connection = null;
-                this.stop();
-            } else if (!this.readyLock && (newState.status === VoiceConnectionStatus.Connecting || newState.status === VoiceConnectionStatus.Signalling)) {
-                this.readyLock = true;
-                try {
-                    await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
-                } catch {
-                    this.destroyConnectionSafely();
-                } finally {
-                    this.readyLock = false;
-                }
-            }
-        });
-    }
-
-    clearDisconnectTimer() {
-        if (this.disconnectTimer) {
-            clearTimeout(this.disconnectTimer);
-            this.disconnectTimer = null;
-        }
-    }
-
-    destroyConnectionSafely() {
-        const connection = this.connection;
+      } else if (newState.status === VoiceConnectionStatus.Destroyed) {
         this.connection = null;
-        this.clearDisconnectTimer();
-
-        const queues = require('./queues');
-        queues.delete(this.guildId);
-
-        if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
-            return false;
+        this.stop();
+      } else if (
+        !this.readyLock &&
+        (newState.status === VoiceConnectionStatus.Connecting ||
+          newState.status === VoiceConnectionStatus.Signalling)
+      ) {
+        this.readyLock = true;
+        try {
+          await entersState(this.connection, VoiceConnectionStatus.Ready, 20_000);
+        } catch {
+          this.destroyConnectionSafely();
+        } finally {
+          this.readyLock = false;
         }
+      }
+    });
+  }
 
-        connection.destroy();
-        return true;
+  clearDisconnectTimer() {
+    if (this.disconnectTimer) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
+  }
+
+  destroyConnectionSafely() {
+    const connection = this.connection;
+    this.connection = null;
+    this.clearDisconnectTimer();
+
+    const queues = require('./queues');
+    queues.delete(this.guildId);
+
+    if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
+      return false;
     }
 
-    classifyYtDlpError(stderrText = '') {
-        if (!stderrText) {
-            return null;
-        }
+    connection.destroy();
+    return true;
+  }
 
-        if (stderrText.includes('Sign in to confirm your age')) {
-            return 'This video is age-restricted and cannot be played by the bot.';
-        }
-
-        if (stderrText.includes('This video is unavailable') || stderrText.includes('Video unavailable')) {
-            return 'This video is unavailable.';
-        }
-
-        if (stderrText.includes('Private video')) {
-            return 'This video is private.';
-        }
-
-        return null;
+  classifyYtDlpError(stderrText = '') {
+    if (!stderrText) {
+      return null;
     }
 
-    addSong(song) {
-        this.songs.push(song);
+    if (stderrText.includes('Sign in to confirm your age')) {
+      return 'This video is age-restricted and cannot be played by the bot.';
     }
 
-    async playNext() {
-        console.log(`🔄 playNext called - Loop: ${this.loop}, Songs in queue: ${this.songs.length}`);
-        
-        // Handle loop modes
-        if (this.loop === 'song' && this.currentSong) {
-            // Loop the current song
-            console.log('🔁 Looping current song');
-            const songToLoop = { ...this.currentSong };
-            this.playSong(songToLoop);
-            return;
-        }
-
-        if (this.loop === 'queue' && this.currentSong) {
-            // Add current song to end of queue
-            console.log('🔁 Adding song to end of queue');
-            this.songs.push({ ...this.currentSong });
-        }
-
-        // Save current song to history
-        if (this.currentSong) {
-            this.previousSongs.push({ ...this.currentSong });
-            // Keep only last 10 songs
-            if (this.previousSongs.length > 10) {
-                this.previousSongs.shift();
-            }
-        }
-
-        if (this.songs.length === 0) {
-            console.log('⏹️ No more songs in queue');
-            
-            // Try autoplay if enabled
-            if (this.autoplay && this.currentSong) {
-                console.log('🎲 Attempting autoplay...');
-                await this.getRelatedSong();
-                return;
-            }
-            
-            this.isPlaying = false;
-            this.currentSong = null;
-            
-            // In 24/7 mode, never disconnect
-            if (this.stay247) {
-                console.log('🔄 24/7 mode active — staying in channel');
-                return;
-            }
-
-            // Set a timer to disconnect after 15 seconds of inactivity
-            console.log('⏱️ Setting 15 second disconnect timer');
-            this.disconnectTimer = setTimeout(() => {
-                if (this.connection && !this.isPlaying && this.songs.length === 0) {
-                    if (this.destroyConnectionSafely()) {
-                        console.log(`⏱️ Auto-disconnected from voice channel in guild ${this.guildId}`);
-                    }
-                }
-            }, 15000);
-            return;
-        }
-
-        // Clear disconnect timer if we're playing again
-        if (this.disconnectTimer) {
-            console.log('⏱️ Clearing disconnect timer');
-            this.clearDisconnectTimer();
-        }
-
-        this.currentSong = this.songs.shift();
-        console.log(`⏭️ Playing next song: ${this.currentSong.title}`);
-        await this.playSong(this.currentSong);
+    if (
+      stderrText.includes('This video is unavailable') ||
+      stderrText.includes('Video unavailable')
+    ) {
+      return 'This video is unavailable.';
     }
 
-    async playSong(song) {
-        this.isPlaying = true;
+    if (stderrText.includes('Private video')) {
+      return 'This video is private.';
+    }
 
-        console.log('🎵 Playing song:', song);
+    return null;
+  }
+
+  addSong(song) {
+    this.songs.push(song);
+  }
+
+  async playNext() {
+    console.log(`🔄 playNext called - Loop: ${this.loop}, Songs in queue: ${this.songs.length}`);
+
+    // Handle loop modes
+    if (this.loop === 'song' && this.currentSong) {
+      // Loop the current song
+      console.log('🔁 Looping current song');
+      const songToLoop = { ...this.currentSong };
+      this.playSong(songToLoop);
+      return;
+    }
+
+    if (this.loop === 'queue' && this.currentSong) {
+      // Add current song to end of queue
+      console.log('🔁 Adding song to end of queue');
+      this.songs.push({ ...this.currentSong });
+    }
+
+    // Save current song to history
+    if (this.currentSong) {
+      this.previousSongs.push({ ...this.currentSong });
+      // Keep only last 10 songs
+      if (this.previousSongs.length > 10) {
+        this.previousSongs.shift();
+      }
+    }
+
+    if (this.songs.length === 0) {
+      console.log('⏹️ No more songs in queue');
+
+      // Try autoplay if enabled
+      if (this.autoplay && this.currentSong) {
+        console.log('🎲 Attempting autoplay...');
+        await this.getRelatedSong();
+        return;
+      }
+
+      this.isPlaying = false;
+      this.currentSong = null;
+
+      // In 24/7 mode, never disconnect
+      if (this.stay247) {
+        console.log('🔄 24/7 mode active — staying in channel');
+        return;
+      }
+
+      // Set a timer to disconnect after 15 seconds of inactivity
+      console.log('⏱️ Setting 15 second disconnect timer');
+      this.disconnectTimer = setTimeout(() => {
+        if (this.connection && !this.isPlaying && this.songs.length === 0) {
+          if (this.destroyConnectionSafely()) {
+            console.log(`⏱️ Auto-disconnected from voice channel in guild ${this.guildId}`);
+          }
+        }
+      }, 15000);
+      return;
+    }
+
+    // Clear disconnect timer if we're playing again
+    if (this.disconnectTimer) {
+      console.log('⏱️ Clearing disconnect timer');
+      this.clearDisconnectTimer();
+    }
+
+    this.currentSong = this.songs.shift();
+    console.log(`⏭️ Playing next song: ${this.currentSong.title}`);
+    await this.playSong(this.currentSong);
+  }
+
+  async playSong(song) {
+    this.isPlaying = true;
+
+    console.log('🎵 Playing song:', song);
+
+    try {
+      if (!song || !song.url) {
+        console.error('❌ Invalid song URL, song:', song);
+        this.playNext();
+        return;
+      }
+
+      let playbackFailureHandled = false;
+      let ytdlpStderr = '';
+
+      const { createAudioResource, StreamType } = require('@discordjs/voice');
+      const { spawn, spawnSync } = require('child_process');
+      const path = require('path');
+      const fs = require('fs');
+
+      const handleStreamFailure = (rawError) => {
+        if (playbackFailureHandled || this.isShuttingDown) {
+          return;
+        }
+
+        playbackFailureHandled = true;
+        const friendlyError = this.classifyYtDlpError(rawError);
+
+        if (friendlyError) {
+          console.error(`❌ Skipping "${song.title}": ${friendlyError}`);
+        } else {
+          console.error('❌ yt-dlp stream failed:', rawError || 'Unknown stream error');
+        }
+
+        this.suppressNextIdleAdvance = true;
 
         try {
-            if (!song || !song.url) {
-                console.error('❌ Invalid song URL, song:', song);
-                this.playNext();
-                return;
-            }
+          this.player.stop();
+        } catch (_) {}
 
-            let playbackFailureHandled = false;
-            let ytdlpStderr = '';
-
-            const { createAudioResource, StreamType } = require('@discordjs/voice');
-            const { spawn, spawnSync } = require('child_process');
-            const path = require('path');
-            const fs = require('fs');
-
-            const handleStreamFailure = (rawError) => {
-                if (playbackFailureHandled || this.isShuttingDown) {
-                    return;
-                }
-
-                playbackFailureHandled = true;
-                const friendlyError = this.classifyYtDlpError(rawError);
-
-                if (friendlyError) {
-                    console.error(`❌ Skipping "${song.title}": ${friendlyError}`);
-                } else {
-                    console.error('❌ yt-dlp stream failed:', rawError || 'Unknown stream error');
-                }
-
-                this.suppressNextIdleAdvance = true;
-
-                try {
-                    this.player.stop();
-                } catch (_) {}
-
-                if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
-                    try {
-                        this.ffmpegProcess.stdin.end();
-                    } catch (_) {}
-                }
-
-                setTimeout(() => {
-                    if (this.ffmpegProcess) {
-                        try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
-                        this.ffmpegProcess = null;
-                    }
-                    if (this.ytdlpProcess) {
-                        try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
-                        this.ytdlpProcess = null;
-                    }
-                }, 100);
-
-                this.playNext();
-            };
-
-            // Resolve FFmpeg path once to avoid blocking event loop each song
-            if (!this.ffmpegPath) {
-                const staticPath = require('ffmpeg-static');
-                this.ffmpegPath = staticPath || 'ffmpeg';
-            }
-            const ffmpegPath = this.ffmpegPath;
-
-            console.log(`🎬 Using FFmpeg from: ${ffmpegPath}`);
-
-            // Make sure connection is ready before playing
-            if (!this.connection || this.connection.state.status === VoiceConnectionStatus.Destroyed) {
-                console.error('❌ Connection is destroyed, cannot play');
-                this.playNext();
-                return;
-            }
-
-            console.log('🎧 Streaming with yt-dlp → FFmpeg pipeline...');
-
-            // Clean up any previous processes
-            if (this.ffmpegProcess) {
-                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
-                this.ffmpegProcess = null;
-            }
-            if (this.ytdlpProcess) {
-                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
-                this.ytdlpProcess = null;
-            }
-
-            // Resolve yt-dlp path (PATH first, then common local path, then bundled fallback)
-            const ytdlpFromPath = spawnSync('which', ['yt-dlp'], { encoding: 'utf8' });
-            let ytdlpPath = ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.trim() : '';
-
-            if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-                const os = require('os');
-                const homeDir = os.homedir();
-                const localYtdlp = path.join(homeDir, '.local', 'bin', 'yt-dlp');
-                if (fs.existsSync(localYtdlp)) {
-                    ytdlpPath = localYtdlp;
-                }
-            }
-
-            if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-                const ytdlp = require('@distube/yt-dlp');
-                ytdlpPath = typeof ytdlp === 'string'
-                    ? ytdlp
-                    : ytdlp.path || path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
-            }
-            
-            console.log(`📥 Using yt-dlp from: ${ytdlpPath}`);
-
-            // Spawn yt-dlp to download and output audio to stdout
-            const ytdlpProcess = spawn(ytdlpPath, [
-                '--format', 'bestaudio/best',
-                '--no-playlist',
-                '--no-warnings',
-                '--quiet',
-                '--force-ipv4',
-                '--extractor-retries', '3',
-                '--fragment-retries', '3',
-                '--retry-sleep', '2',
-                '--geo-bypass',
-                '--extractor-args', 'youtube:player_client=android,web',
-                '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-                '--buffer-size', '512K',
-                '--output', '-',
-                song.url
-            ], {
-                windowsHide: true,
-                stdio: ['ignore', 'pipe', 'pipe']
-            });
-
-            // Spawn FFmpeg to convert audio to Opus
-            // Build ffmpeg audio filter arguments
-            const AUDIO_FILTERS = {
-                bassboost:   'bass=g=10,dynaudnorm=f=150:g=15',
-                nightcore:   'aresample=48000,asetrate=48000*1.25',
-                vaporwave:   'aresample=48000,asetrate=48000*0.8',
-                '8d':        'apulsator=hz=0.09',
-                karaoke:     'stereotools=mlev=0.015',
-                echo:        'aecho=0.8:0.88:60:0.4',
-                loud:        'dynaudnorm=f=200',
-                earrape:     'acrusher=level_in=8:level_out=18:bits=8:mode=log:aa=1',
-                tremolo:     'tremolo=5:0.9',
-                vibrato:     'vibrato=f=6.5:d=0.5',
-                reverse:     'areverse',
-                soft:        'volume=0.3',
-            };
-
-            const filterKey = this.activeFilter && AUDIO_FILTERS[this.activeFilter];
-            const ffmpegArgs = [
-                '-i', 'pipe:0',
-                '-analyzeduration', '0',
-                '-probesize', '32',
-                '-loglevel', '0',
-            ];
-            if (filterKey) {
-                ffmpegArgs.push('-af', filterKey);
-            }
-            ffmpegArgs.push(
-                '-acodec', 'pcm_s16le',
-                '-f', 's16le',
-                '-ar', '48000',
-                '-ac', '2',
-                '-bufsize', '512k',
-                'pipe:1'
-            );
-
-            const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs, {
-                windowsHide: true,
-                stdio: ['pipe', 'pipe', 'ignore']
-            });
-
-            // Store process references
-            this.ytdlpProcess = ytdlpProcess;
-            this.ffmpegProcess = ffmpegProcess;
-
-            // Pipe yt-dlp output to FFmpeg input
-            ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
-
-            // Prevent stream errors from crashing the bot
-            ytdlpProcess.stdout.on('error', () => {});
-            ffmpegProcess.stdin.on('error', () => {});
-            ffmpegProcess.stdout.on('error', () => {});
-
-            // Error handling
-            ytdlpProcess.on('error', (err) => {
-                handleStreamFailure(err.message || String(err));
-            });
-
-            ffmpegProcess.on('error', (err) => {
-                console.error('❌ FFmpeg error:', err);
-                if (!playbackFailureHandled) {
-                    this.playNext();
-                }
-            });
-
-            ytdlpProcess.stderr.on('data', (data) => {
-                const stderrChunk = data.toString();
-                ytdlpStderr += stderrChunk;
-
-                const friendlyError = this.classifyYtDlpError(ytdlpStderr);
-                if (friendlyError) {
-                    handleStreamFailure(ytdlpStderr);
-                    return;
-                }
-
-                console.error('yt-dlp stderr:', stderrChunk);
-            });
-
-            ytdlpProcess.on('close', (code) => {
-                if (code !== 0) {
-                    handleStreamFailure(ytdlpStderr || `yt-dlp exited with code ${code}`);
-                }
-            });
-
-            // Create audio resource from FFmpeg output
-            const resource = createAudioResource(ffmpegProcess.stdout, {
-                inputType: StreamType.Raw,
-                inlineVolume: true,
-                silencePaddingFrames: 5,
-                metadata: {
-                    title: song.title
-                }
-            });
-
-            this.currentResource = resource;
-            
-            // Set volume
-            if (resource.volume) {
-                resource.volume.setVolume(this.volume);
-            }
-
-            // Make sure we're still subscribed (redundancy check)
-            if (this.connection) {
-                this.connection.subscribe(this.player);
-            }
-            
-            console.log('▶️ Starting playback...');
-            this.player.play(resource);
-            
-            // Wait a moment to confirm playback started
-            await new Promise(resolve => setTimeout(resolve, 100));
-            console.log(`✅ Player status: ${this.player.state.status}`);
-            
-        } catch (error) {
-            console.error('❌ Error playing song:', error);
-            this.playNext();
-        }
-    }
-
-    playPrevious() {
-        if (this.previousSongs.length === 0) {
-            return false;
-        }
-
-        const previousSong = this.previousSongs.pop();
-        // Add current song back to front of queue if it exists
-        if (this.currentSong) {
-            this.songs.unshift(this.currentSong);
-        }
-        
-        this.player.stop();
-        // Manually set current song and play
-        this.currentSong = null;
-        this.songs.unshift(previousSong);
-        return true;
-    }
-
-    setLoop(mode) {
-        const validModes = ['off', 'song', 'queue'];
-        if (!validModes.includes(mode)) {
-            return false;
-        }
-        this.loop = mode;
-        return true;
-    }
-
-    jump(position) {
-        if (position < 1 || position > this.songs.length) {
-            return false;
-        }
-
-        // Remove all songs before the position
-        const skipped = position - 1;
-        this.songs.splice(0, skipped);
-        this.player.stop();
-        return true;
-    }
-
-    stop() {
-        this.isShuttingDown = true;
-        this.clearDisconnectTimer();
-        this.songs = [];
-        
-        // Stop the player first
-        this.player.stop();
-        
-        // Close FFmpeg stdin to prevent write errors
         if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
-            try { 
-                this.ffmpegProcess.stdin.end();
-            } catch (_) {}
+          try {
+            this.ffmpegProcess.stdin.end();
+          } catch (_) {}
         }
-        
-        // Kill processes after a short delay
+
         setTimeout(() => {
-            if (this.ffmpegProcess) {
-                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
-                this.ffmpegProcess = null;
-            }
-            if (this.ytdlpProcess) {
-                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
-                this.ytdlpProcess = null;
-            }
-        }, 100);
-        
-        this.isPlaying = false;
-        this.currentSong = null;
-    }
-
-    skip() {
-        // Stop the player first
-        this.player.stop();
-        
-        // Close FFmpeg stdin to prevent write errors
-        if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
-            try { 
-                this.ffmpegProcess.stdin.end();
+          if (this.ffmpegProcess) {
+            try {
+              this.ffmpegProcess.kill('SIGKILL');
             } catch (_) {}
-        }
-        
-        // Kill processes after a short delay
-        setTimeout(() => {
-            if (this.ffmpegProcess) {
-                try { this.ffmpegProcess.kill('SIGKILL'); } catch (_) {}
-                this.ffmpegProcess = null;
-            }
-            if (this.ytdlpProcess) {
-                try { this.ytdlpProcess.kill('SIGKILL'); } catch (_) {}
-                this.ytdlpProcess = null;
-            }
+            this.ffmpegProcess = null;
+          }
+          if (this.ytdlpProcess) {
+            try {
+              this.ytdlpProcess.kill('SIGKILL');
+            } catch (_) {}
+            this.ytdlpProcess = null;
+          }
         }, 100);
-    }
 
-    pause() {
-        this.player.pause();
-    }
+        this.playNext();
+      };
 
-    resume() {
-        this.player.unpause();
-    }
+      // Resolve FFmpeg path once to avoid blocking event loop each song
+      if (!this.ffmpegPath) {
+        const staticPath = require('ffmpeg-static');
+        this.ffmpegPath = staticPath || 'ffmpeg';
+      }
+      const ffmpegPath = this.ffmpegPath;
 
-    setVolume(volume) {
-        // Clamp volume between 0 and 2 (0% to 200%)
-        this.volume = Math.max(0, Math.min(2, volume));
-        if (this.currentResource && this.currentResource.volume) {
-            this.currentResource.volume.setVolume(this.volume);
-        }
-        return Math.round(this.volume * 100); // Return percentage
-    }
+      console.log(`🎬 Using FFmpeg from: ${ffmpegPath}`);
 
-    increaseVolume() {
-        return this.setVolume(this.volume + 0.1);
-    }
+      // Make sure connection is ready before playing
+      if (!this.connection || this.connection.state.status === VoiceConnectionStatus.Destroyed) {
+        console.error('❌ Connection is destroyed, cannot play');
+        this.playNext();
+        return;
+      }
 
-    decreaseVolume() {
-        return this.setVolume(this.volume - 0.1);
-    }
+      console.log('🎧 Streaming with yt-dlp → FFmpeg pipeline...');
 
-    async getRelatedSong() {
-        if (!this.currentSong || !this.currentSong.url) return;
-        
+      // Clean up any previous processes
+      if (this.ffmpegProcess) {
         try {
-            const ytsr = require('ytsr');
-            // Search for related content based on current song title
-            const searchResults = await ytsr(this.currentSong.title, { limit: 5 });
-            const videos = searchResults.items.filter(item => item.type === 'video');
-            
-            // Get a random video from results (not the same as current)
-            const relatedVideos = videos.filter(v => v.url !== this.currentSong.url);
-            if (relatedVideos.length === 0) return;
-            
-            const randomVideo = relatedVideos[Math.floor(Math.random() * relatedVideos.length)];
-            const { parseDuration } = require('./helpers');
-            
-            const song = {
-                title: randomVideo.title,
-                url: randomVideo.url,
-                duration: randomVideo.duration ? parseDuration(randomVideo.duration) : 0,
-                thumbnail: randomVideo.bestThumbnail?.url,
-                requester: 'Autoplay'
-            };
-            
-            this.addSong(song);
-            console.log('🎵 Autoplay added:', song.title);
-            this.playNext();
-        } catch (error) {
-            console.error('Error getting related song:', error);
-            this.isPlaying = false;
+          this.ffmpegProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ffmpegProcess = null;
+      }
+      if (this.ytdlpProcess) {
+        try {
+          this.ytdlpProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ytdlpProcess = null;
+      }
+
+      // Resolve yt-dlp path (PATH first, then common local path, then bundled fallback)
+      const ytdlpFromPath = spawnSync('which', ['yt-dlp'], { encoding: 'utf8' });
+      let ytdlpPath = ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.trim() : '';
+
+      if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
+        const os = require('os');
+        const homeDir = os.homedir();
+        const localYtdlp = path.join(homeDir, '.local', 'bin', 'yt-dlp');
+        if (fs.existsSync(localYtdlp)) {
+          ytdlpPath = localYtdlp;
         }
+      }
+
+      if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
+        const ytdlp = require('@distube/yt-dlp');
+        ytdlpPath =
+          typeof ytdlp === 'string'
+            ? ytdlp
+            : ytdlp.path ||
+              path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
+      }
+
+      console.log(`📥 Using yt-dlp from: ${ytdlpPath}`);
+
+      // Spawn yt-dlp to download and output audio to stdout
+      const ytdlpProcess = spawn(
+        ytdlpPath,
+        [
+          '--format',
+          'bestaudio/best',
+          '--no-playlist',
+          '--no-warnings',
+          '--quiet',
+          '--force-ipv4',
+          '--extractor-retries',
+          '3',
+          '--fragment-retries',
+          '3',
+          '--retry-sleep',
+          '2',
+          '--geo-bypass',
+          '--extractor-args',
+          'youtube:player_client=android,web',
+          '--user-agent',
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+          '--buffer-size',
+          '512K',
+          '--output',
+          '-',
+          song.url,
+        ],
+        {
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
+
+      // Spawn FFmpeg to convert audio to Opus
+      // Build ffmpeg audio filter arguments
+      const AUDIO_FILTERS = {
+        bassboost: 'bass=g=10,dynaudnorm=f=150:g=15',
+        nightcore: 'aresample=48000,asetrate=48000*1.25',
+        vaporwave: 'aresample=48000,asetrate=48000*0.8',
+        '8d': 'apulsator=hz=0.09',
+        karaoke: 'stereotools=mlev=0.015',
+        echo: 'aecho=0.8:0.88:60:0.4',
+        loud: 'dynaudnorm=f=200',
+        earrape: 'acrusher=level_in=8:level_out=18:bits=8:mode=log:aa=1',
+        tremolo: 'tremolo=5:0.9',
+        vibrato: 'vibrato=f=6.5:d=0.5',
+        reverse: 'areverse',
+        soft: 'volume=0.3',
+      };
+
+      const filterKey = this.activeFilter && AUDIO_FILTERS[this.activeFilter];
+      const ffmpegArgs = [
+        '-i',
+        'pipe:0',
+        '-analyzeduration',
+        '0',
+        '-probesize',
+        '32',
+        '-loglevel',
+        '0',
+      ];
+      if (filterKey) {
+        ffmpegArgs.push('-af', filterKey);
+      }
+      ffmpegArgs.push(
+        '-acodec',
+        'pcm_s16le',
+        '-f',
+        's16le',
+        '-ar',
+        '48000',
+        '-ac',
+        '2',
+        '-bufsize',
+        '512k',
+        'pipe:1'
+      );
+
+      const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs, {
+        windowsHide: true,
+        stdio: ['pipe', 'pipe', 'ignore'],
+      });
+
+      // Store process references
+      this.ytdlpProcess = ytdlpProcess;
+      this.ffmpegProcess = ffmpegProcess;
+
+      // Pipe yt-dlp output to FFmpeg input
+      ytdlpProcess.stdout.pipe(ffmpegProcess.stdin);
+
+      // Prevent stream errors from crashing the bot
+      ytdlpProcess.stdout.on('error', () => {});
+      ffmpegProcess.stdin.on('error', () => {});
+      ffmpegProcess.stdout.on('error', () => {});
+
+      // Error handling
+      ytdlpProcess.on('error', (err) => {
+        handleStreamFailure(err.message || String(err));
+      });
+
+      ffmpegProcess.on('error', (err) => {
+        console.error('❌ FFmpeg error:', err);
+        if (!playbackFailureHandled) {
+          this.playNext();
+        }
+      });
+
+      ytdlpProcess.stderr.on('data', (data) => {
+        const stderrChunk = data.toString();
+        ytdlpStderr += stderrChunk;
+
+        const friendlyError = this.classifyYtDlpError(ytdlpStderr);
+        if (friendlyError) {
+          handleStreamFailure(ytdlpStderr);
+          return;
+        }
+
+        console.error('yt-dlp stderr:', stderrChunk);
+      });
+
+      ytdlpProcess.on('close', (code) => {
+        if (code !== 0) {
+          handleStreamFailure(ytdlpStderr || `yt-dlp exited with code ${code}`);
+        }
+      });
+
+      // Create audio resource from FFmpeg output
+      const resource = createAudioResource(ffmpegProcess.stdout, {
+        inputType: StreamType.Raw,
+        inlineVolume: true,
+        silencePaddingFrames: 5,
+        metadata: {
+          title: song.title,
+        },
+      });
+
+      this.currentResource = resource;
+
+      // Set volume
+      if (resource.volume) {
+        resource.volume.setVolume(this.volume);
+      }
+
+      // Make sure we're still subscribed (redundancy check)
+      if (this.connection) {
+        this.connection.subscribe(this.player);
+      }
+
+      console.log('▶️ Starting playback...');
+      this.player.play(resource);
+
+      // Wait a moment to confirm playback started
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      console.log(`✅ Player status: ${this.player.state.status}`);
+    } catch (error) {
+      console.error('❌ Error playing song:', error);
+      this.playNext();
     }
+  }
+
+  playPrevious() {
+    if (this.previousSongs.length === 0) {
+      return false;
+    }
+
+    const previousSong = this.previousSongs.pop();
+    // Add current song back to front of queue if it exists
+    if (this.currentSong) {
+      this.songs.unshift(this.currentSong);
+    }
+
+    this.player.stop();
+    // Manually set current song and play
+    this.currentSong = null;
+    this.songs.unshift(previousSong);
+    return true;
+  }
+
+  setLoop(mode) {
+    const validModes = ['off', 'song', 'queue'];
+    if (!validModes.includes(mode)) {
+      return false;
+    }
+    this.loop = mode;
+    return true;
+  }
+
+  jump(position) {
+    if (position < 1 || position > this.songs.length) {
+      return false;
+    }
+
+    // Remove all songs before the position
+    const skipped = position - 1;
+    this.songs.splice(0, skipped);
+    this.player.stop();
+    return true;
+  }
+
+  stop() {
+    this.isShuttingDown = true;
+    this.clearDisconnectTimer();
+    this.songs = [];
+
+    // Stop the player first
+    this.player.stop();
+
+    // Close FFmpeg stdin to prevent write errors
+    if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
+      try {
+        this.ffmpegProcess.stdin.end();
+      } catch (_) {}
+    }
+
+    // Kill processes after a short delay
+    setTimeout(() => {
+      if (this.ffmpegProcess) {
+        try {
+          this.ffmpegProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ffmpegProcess = null;
+      }
+      if (this.ytdlpProcess) {
+        try {
+          this.ytdlpProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ytdlpProcess = null;
+      }
+    }, 100);
+
+    this.isPlaying = false;
+    this.currentSong = null;
+  }
+
+  skip() {
+    // Stop the player first
+    this.player.stop();
+
+    // Close FFmpeg stdin to prevent write errors
+    if (this.ffmpegProcess && this.ffmpegProcess.stdin) {
+      try {
+        this.ffmpegProcess.stdin.end();
+      } catch (_) {}
+    }
+
+    // Kill processes after a short delay
+    setTimeout(() => {
+      if (this.ffmpegProcess) {
+        try {
+          this.ffmpegProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ffmpegProcess = null;
+      }
+      if (this.ytdlpProcess) {
+        try {
+          this.ytdlpProcess.kill('SIGKILL');
+        } catch (_) {}
+        this.ytdlpProcess = null;
+      }
+    }, 100);
+  }
+
+  pause() {
+    this.player.pause();
+  }
+
+  resume() {
+    this.player.unpause();
+  }
+
+  setVolume(volume) {
+    // Clamp volume between 0 and 2 (0% to 200%)
+    this.volume = Math.max(0, Math.min(2, volume));
+    if (this.currentResource && this.currentResource.volume) {
+      this.currentResource.volume.setVolume(this.volume);
+    }
+    return Math.round(this.volume * 100); // Return percentage
+  }
+
+  increaseVolume() {
+    return this.setVolume(this.volume + 0.1);
+  }
+
+  decreaseVolume() {
+    return this.setVolume(this.volume - 0.1);
+  }
+
+  async getRelatedSong() {
+    if (!this.currentSong || !this.currentSong.url) return;
+
+    try {
+      const ytsr = require('ytsr');
+      // Search for related content based on current song title
+      const searchResults = await ytsr(this.currentSong.title, { limit: 5 });
+      const videos = searchResults.items.filter((item) => item.type === 'video');
+
+      // Get a random video from results (not the same as current)
+      const relatedVideos = videos.filter((v) => v.url !== this.currentSong.url);
+      if (relatedVideos.length === 0) return;
+
+      const randomVideo = relatedVideos[Math.floor(Math.random() * relatedVideos.length)];
+      const { parseDuration } = require('./helpers');
+
+      const song = {
+        title: randomVideo.title,
+        url: randomVideo.url,
+        duration: randomVideo.duration ? parseDuration(randomVideo.duration) : 0,
+        thumbnail: randomVideo.bestThumbnail?.url,
+        requester: 'Autoplay',
+      };
+
+      this.addSong(song);
+      console.log('🎵 Autoplay added:', song.title);
+      this.playNext();
+    } catch (error) {
+      console.error('Error getting related song:', error);
+      this.isPlaying = false;
+    }
+  }
 }
 
 module.exports = MusicQueue;

@@ -9,808 +9,828 @@ const databaseManager = require('./databaseManager');
 const { fetchUserSafe } = require('./discordFetch');
 
 class SeasonManager {
-    constructor() {
-        this.dataPath = path.join(__dirname, '..', 'data', 'seasons.json');
-        this.data = {
-            seasons: {},
-            currentSeason: null
-        };
-        this.loaded = false;
-        this.mongoWriteCooldownUntil = 0;
-    }
+  constructor() {
+    this.dataPath = path.join(__dirname, '..', 'data', 'seasons.json');
+    this.data = {
+      seasons: {},
+      currentSeason: null,
+    };
+    this.loaded = false;
+    this.mongoWriteCooldownUntil = 0;
+  }
 
-    async init() {
+  async init() {
+    try {
+      const dataDir = path.dirname(this.dataPath);
+      await fs.mkdir(dataDir, { recursive: true });
+
+      if (databaseManager.useDB === 'mongodb' && databaseManager.db) {
         try {
-            const dataDir = path.dirname(this.dataPath);
-            await fs.mkdir(dataDir, { recursive: true });
+          const seasonsCollection = databaseManager.db.collection('seasons');
+          const mongoData = await seasonsCollection.findOne({ _id: 'config' });
 
-            if (databaseManager.useDB === 'mongodb' && databaseManager.db) {
-                try {
-                    const seasonsCollection = databaseManager.db.collection('seasons');
-                    const mongoData = await seasonsCollection.findOne({ _id: 'config' });
-
-                    if (mongoData && typeof mongoData === 'object') {
-                        const { _id, ...rest } = mongoData;
-                        this.data = {
-                            seasons: rest.seasons || {},
-                            currentSeason: rest.currentSeason || {}
-                        };
-                        this.loaded = true;
-                        console.log('✅ Season manager initialized from MongoDB');
-                        return;
-                    }
-                } catch (error) {
-                    console.error('Error loading seasons from MongoDB, falling back to JSON:', error);
-                }
-            }
-
-            try {
-                const fileData = await fs.readFile(this.dataPath, 'utf8');
-                const sanitized = fileData.replace(/^\uFEFF/, '').trim();
-                const parsed = JSON.parse(sanitized || '{}');
-                if (parsed && typeof parsed === 'object') {
-                    this.data = {
-                        seasons: parsed.seasons || {},
-                        currentSeason: parsed.currentSeason || {}
-                    };
-                }
-            } catch (error) {
-                if (error.code !== 'ENOENT') {
-                    console.error('Error loading seasons:', error);
-                }
-            }
-
+          if (mongoData && typeof mongoData === 'object') {
+            const { _id, ...rest } = mongoData;
+            this.data = {
+              seasons: rest.seasons || {},
+              currentSeason: rest.currentSeason || {},
+            };
             this.loaded = true;
-            console.log('✅ Season manager initialized');
+            console.log('✅ Season manager initialized from MongoDB');
+            return;
+          }
         } catch (error) {
-            console.error('Failed to initialize season manager:', error);
+          console.error('Error loading seasons from MongoDB, falling back to JSON:', error);
         }
+      }
+
+      try {
+        const fileData = await fs.readFile(this.dataPath, 'utf8');
+        const sanitized = fileData.replace(/^\uFEFF/, '').trim();
+        const parsed = JSON.parse(sanitized || '{}');
+        if (parsed && typeof parsed === 'object') {
+          this.data = {
+            seasons: parsed.seasons || {},
+            currentSeason: parsed.currentSeason || {},
+          };
+        }
+      } catch (error) {
+        if (error.code !== 'ENOENT') {
+          console.error('Error loading seasons:', error);
+        }
+      }
+
+      this.loaded = true;
+      console.log('✅ Season manager initialized');
+    } catch (error) {
+      console.error('Failed to initialize season manager:', error);
     }
+  }
 
-    /**
-     * Migrate leaderboards to add missing usernames
-     * @param {Object} client - Discord client to fetch usernames
-     */
-    async migrateUsernames(client) {
-        let updated = 0;
-        for (const guildId in this.data.seasons) {
-            for (const seasonName in this.data.seasons[guildId]) {
-                const season = this.data.seasons[guildId][seasonName];
-                if (!season.leaderboard) continue;
+  /**
+   * Migrate leaderboards to add missing usernames
+   * @param {Object} client - Discord client to fetch usernames
+   */
+  async migrateUsernames(client) {
+    let updated = 0;
+    for (const guildId in this.data.seasons) {
+      for (const seasonName in this.data.seasons[guildId]) {
+        const season = this.data.seasons[guildId][seasonName];
+        if (!season.leaderboard) continue;
 
-                for (const userId in season.leaderboard) {
-                    const player = season.leaderboard[userId];
-                    if (!player.username || player.username === 'Unknown User') {
-                        try {
-                            const user = await fetchUserSafe(client, userId);
-                            player.username = user ? user.username : `User${userId.slice(-4)}`;
-                            updated++;
-                        } catch (error) {
-                            player.username = `User${userId.slice(-4)}`;
-                        }
-                    }
-                }
+        for (const userId in season.leaderboard) {
+          const player = season.leaderboard[userId];
+          if (!player.username || player.username === 'Unknown User') {
+            try {
+              const user = await fetchUserSafe(client, userId);
+              player.username = user ? user.username : `User${userId.slice(-4)}`;
+              updated++;
+            } catch (error) {
+              player.username = `User${userId.slice(-4)}`;
             }
+          }
         }
-        if (updated > 0) {
-            await this.save();
-            console.log(`✅ Migrated ${updated} player username(s) in seasons`);
-        }
-        return updated;
+      }
+    }
+    if (updated > 0) {
+      await this.save();
+      console.log(`✅ Migrated ${updated} player username(s) in seasons`);
+    }
+    return updated;
+  }
+
+  async save() {
+    try {
+      await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
+    } catch (error) {
+      console.error('Error saving seasons:', error);
+      return;
     }
 
-    async save() {
-        try {
-            await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
-        } catch (error) {
-            console.error('Error saving seasons:', error);
-            return;
-        }
-
-        // Also save to MongoDB when available, but avoid repeated spam on transient connection failures.
-        if (databaseManager.useDB !== 'mongodb') {
-            return;
-        }
-
-        const now = Date.now();
-        if (this.mongoWriteCooldownUntil > now) {
-            return;
-        }
-
-        if (!databaseManager.db) {
-            this.mongoWriteCooldownUntil = now + (60 * 1000);
-            return;
-        }
-
-        try {
-            await databaseManager.upsertOne('seasons', { _id: 'config' }, this.data);
-            this.mongoWriteCooldownUntil = 0;
-        } catch (error) {
-            const hint = typeof databaseManager.getMongoConnectionHint === 'function'
-                ? databaseManager.getMongoConnectionHint(error?.message)
-                : 'Verify MONGODB_URI, Atlas IP access list, and TLS/CA settings.';
-
-            // Back off Mongo writes for 5 minutes to prevent log flooding during outages.
-            this.mongoWriteCooldownUntil = Date.now() + (5 * 60 * 1000);
-            console.warn(`⚠️ Season Mongo save failed; JSON save succeeded. Pausing season Mongo writes for 5 minutes. ${hint}`);
-        }
+    // Also save to MongoDB when available, but avoid repeated spam on transient connection failures.
+    if (databaseManager.useDB !== 'mongodb') {
+      return;
     }
 
-    /**
-     * Create a new season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name (e.g., "season-development")
-     * @param {string} adminId - Creator admin ID
-     * @returns {Object} Season data
-     */
-    async createSeason(guildId, seasonName, adminId) {
-        if (!this.data.seasons[guildId]) {
-            this.data.seasons[guildId] = {};
-        }
-
-        // Check if season already exists
-        if (this.data.seasons[guildId][seasonName]) {
-            return { success: false, error: 'Season already exists' };
-        }
-
-        const seasonData = {
-            name: seasonName,
-            guildId,
-            createdAt: Date.now(),
-            createdBy: adminId,
-            startDate: new Date().toISOString(),
-            endDate: null,
-            isActive: true,
-            leaderboard: {}, // userId -> { balance, xp, level, coins }
-            totalPlayers: 0,
-            archived: false,
-            summaryPosted: false
-        };
-
-        this.data.seasons[guildId][seasonName] = seasonData;
-
-        // Set as current season for the guild
-        if (!this.data.currentSeason) {
-            this.data.currentSeason = {};
-        }
-        this.data.currentSeason[guildId] = seasonName;
-
-        await this.save();
-
-        return {
-            success: true,
-            season: seasonData
-        };
+    const now = Date.now();
+    if (this.mongoWriteCooldownUntil > now) {
+      return;
     }
 
-    /**
-     * Get current season for guild
-     * @param {string} guildId - Discord Guild ID
-     * @returns {string|null} Current season name
-     */
-    getCurrentSeason(guildId) {
-        return this.data.currentSeason?.[guildId] || null;
+    if (!databaseManager.db) {
+      this.mongoWriteCooldownUntil = now + 60 * 1000;
+      return;
     }
 
-    /**
-     * Get all seasons for a guild
-     * @param {string} guildId - Discord Guild ID
-     * @returns {Object} All seasons for guild
-     */
-    getGuildSeasons(guildId) {
-        return this.data.seasons[guildId] || {};
+    try {
+      await databaseManager.upsertOne('seasons', { _id: 'config' }, this.data);
+      this.mongoWriteCooldownUntil = 0;
+    } catch (error) {
+      const hint =
+        typeof databaseManager.getMongoConnectionHint === 'function'
+          ? databaseManager.getMongoConnectionHint(error?.message)
+          : 'Verify MONGODB_URI, Atlas IP access list, and TLS/CA settings.';
+
+      // Back off Mongo writes for 5 minutes to prevent log flooding during outages.
+      this.mongoWriteCooldownUntil = Date.now() + 5 * 60 * 1000;
+      console.warn(
+        `⚠️ Season Mongo save failed; JSON save succeeded. Pausing season Mongo writes for 5 minutes. ${hint}`
+      );
+    }
+  }
+
+  /**
+   * Create a new season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name (e.g., "season-development")
+   * @param {string} adminId - Creator admin ID
+   * @returns {Object} Season data
+   */
+  async createSeason(guildId, seasonName, adminId) {
+    if (!this.data.seasons[guildId]) {
+      this.data.seasons[guildId] = {};
     }
 
-    /**
-     * Get specific season data
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @returns {Object|null} Season data
-     */
-    getSeason(guildId, seasonName) {
-        return this.data.seasons?.[guildId]?.[seasonName] || null;
+    // Check if season already exists
+    if (this.data.seasons[guildId][seasonName]) {
+      return { success: false, error: 'Season already exists' };
     }
 
-    /**
-     * Record player progress in season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {string} userId - Discord User ID
-     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling, voiceHours, messageCount, mediaCount, activeChannels}
-     */
-    async recordPlayerStats(guildId, seasonName, userId, stats) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
-        }
+    const seasonData = {
+      name: seasonName,
+      guildId,
+      createdAt: Date.now(),
+      createdBy: adminId,
+      startDate: new Date().toISOString(),
+      endDate: null,
+      isActive: true,
+      leaderboard: {}, // userId -> { balance, xp, level, coins }
+      totalPlayers: 0,
+      archived: false,
+      summaryPosted: false,
+    };
 
+    this.data.seasons[guildId][seasonName] = seasonData;
+
+    // Set as current season for the guild
+    if (!this.data.currentSeason) {
+      this.data.currentSeason = {};
+    }
+    this.data.currentSeason[guildId] = seasonName;
+
+    await this.save();
+
+    return {
+      success: true,
+      season: seasonData,
+    };
+  }
+
+  /**
+   * Get current season for guild
+   * @param {string} guildId - Discord Guild ID
+   * @returns {string|null} Current season name
+   */
+  getCurrentSeason(guildId) {
+    return this.data.currentSeason?.[guildId] || null;
+  }
+
+  /**
+   * Get all seasons for a guild
+   * @param {string} guildId - Discord Guild ID
+   * @returns {Object} All seasons for guild
+   */
+  getGuildSeasons(guildId) {
+    return this.data.seasons[guildId] || {};
+  }
+
+  /**
+   * Get specific season data
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @returns {Object|null} Season data
+   */
+  getSeason(guildId, seasonName) {
+    return this.data.seasons?.[guildId]?.[seasonName] || null;
+  }
+
+  /**
+   * Record player progress in season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {string} userId - Discord User ID
+   * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling, voiceHours, messageCount, mediaCount, activeChannels}
+   */
+  async recordPlayerStats(guildId, seasonName, userId, stats) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+
+    season.leaderboard[userId] = {
+      userId,
+      username: stats.username || 'Unknown User',
+      balance: stats.balance || 0,
+      xp: stats.xp || 0,
+      level: stats.level || 1,
+      coins: stats.seasonalCoins || 0,
+      voiceHours: stats.voiceHours || 0,
+      messageCount: Number(stats.messageCount) || 0,
+      mediaCount: Number(stats.mediaCount) || 0,
+      activeChannels: Number(stats.activeChannels) || 0,
+      channelsActivity:
+        stats.channelsActivity && typeof stats.channelsActivity === 'object'
+          ? { ...stats.channelsActivity }
+          : {},
+      gambling: stats.gambling || {
+        blackjack: { wins: 0, losses: 0, ties: 0 },
+        roulette: { wins: 0, losses: 0 },
+        slots: { wins: 0, losses: 0 },
+        dice: { wins: 0, losses: 0 },
+        coinflip: { wins: 0, losses: 0 },
+        rps: { wins: 0, losses: 0, ties: 0 },
+        ttt: { wins: 0, losses: 0, ties: 0 },
+      },
+      lastUpdated: Date.now(),
+    };
+
+    season.totalPlayers = Object.keys(season.leaderboard).length;
+
+    await this.save();
+    return { success: true };
+  }
+
+  /**
+   * Add voice hours to a player's season stats
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {string} userId - Discord User ID
+   * @param {number} minutes - Minutes spent in voice
+   * @param {string} username - Discord username (optional)
+   * @returns {Object} Result with success status
+   */
+  async addVoiceHours(guildId, seasonName, userId, minutes, username = 'Unknown User') {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+
+    const voiceHours = minutes / 60;
+
+    // Initialize player if they don't exist yet
+    if (!season.leaderboard[userId]) {
+      season.leaderboard[userId] = {
+        userId,
+        username,
+        balance: 0,
+        xp: 0,
+        level: 1,
+        coins: 0,
+        voiceHours: 0,
+        messageCount: 0,
+        mediaCount: 0,
+        activeChannels: 0,
+        channelsActivity: {},
+        gambling: {
+          blackjack: { wins: 0, losses: 0, ties: 0 },
+          roulette: { wins: 0, losses: 0 },
+          slots: { wins: 0, losses: 0 },
+          dice: { wins: 0, losses: 0 },
+          coinflip: { wins: 0, losses: 0 },
+          rps: { wins: 0, losses: 0, ties: 0 },
+          ttt: { wins: 0, losses: 0, ties: 0 },
+        },
+        lastUpdated: Date.now(),
+      };
+      season.totalPlayers = Object.keys(season.leaderboard).length;
+    }
+
+    // Add voice hours
+    season.leaderboard[userId].voiceHours =
+      (season.leaderboard[userId].voiceHours || 0) + voiceHours;
+    season.leaderboard[userId].lastUpdated = Date.now();
+
+    await this.save();
+    return { success: true, voiceHours: season.leaderboard[userId].voiceHours };
+  }
+
+  /**
+   * Get season leaderboard
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {string} sortBy - Sort by: 'balance', 'xp', 'level', 'coins', 'voiceHours'
+   * @param {number} limit - Limit results
+   * @returns {Array} Leaderboard entries
+   */
+  getSeasonLeaderboard(guildId, seasonName, sortBy = 'coins', limit = 10) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season || !season.leaderboard || typeof season.leaderboard !== 'object') {
+      return [];
+    }
+
+    return Object.values(season.leaderboard)
+      .sort((a, b) => (Number(b?.[sortBy]) || 0) - (Number(a?.[sortBy]) || 0))
+      .slice(0, limit);
+  }
+
+  /**
+   * End a season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @returns {Object} Result
+   */
+  async endSeason(guildId, seasonName) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+
+    season.isActive = false;
+    season.endDate = new Date().toISOString();
+    season.archived = true;
+    season.summaryPosted = season.summaryPosted || false;
+
+    await this.save();
+    return { success: true };
+  }
+
+  async markSeasonSummaryPosted(guildId, seasonName) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+    season.summaryPosted = true;
+    await this.save();
+    return { success: true };
+  }
+
+  /**
+   * Archive season and reset guild economy
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @returns {Object} Result
+   */
+  async archiveSeason(guildId, seasonName) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+
+    await this.endSeason(guildId, seasonName);
+
+    // Clear current season
+    delete this.data.currentSeason[guildId];
+
+    await this.save();
+    return { success: true, season };
+  }
+
+  /**
+   * Get season summary/stats
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @returns {Object} Season summary
+   */
+  getSeasonSummary(guildId, seasonName) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return null;
+    }
+
+    const leaderboard = Object.values(season.leaderboard);
+    const totalBalance = leaderboard.reduce((sum, p) => sum + (p.balance || 0), 0);
+    const totalXP = leaderboard.reduce((sum, p) => sum + (p.xp || 0), 0);
+    const totalCoins = leaderboard.reduce((sum, p) => sum + (p.coins || 0), 0);
+
+    return {
+      name: season.name,
+      isActive: season.isActive,
+      startDate: season.startDate,
+      endDate: season.endDate,
+      totalPlayers: season.totalPlayers,
+      totalBalance,
+      totalXP,
+      totalCoins,
+      createdBy: season.createdBy,
+      createdAt: new Date(season.createdAt).toLocaleString(),
+    };
+  }
+
+  /**
+   * List all seasons for a guild
+   * @param {string} guildId - Discord Guild ID
+   * @returns {Array} List of seasons
+   */
+  listSeasons(guildId) {
+    const seasons = this.getGuildSeasons(guildId);
+    return Object.entries(seasons).map(([name, data]) => ({
+      name,
+      isActive: data.isActive,
+      startDate: data.startDate,
+      totalPlayers: data.totalPlayers,
+      archived: data.archived,
+    }));
+  }
+
+  /**
+   * Auto-enroll a user in all active seasons for a guild
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} userId - Discord User ID
+   * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling}
+   * @returns {Array} List of seasons user was enrolled in
+   */
+  async autoEnrollUserInSeasons(guildId, userId, stats = {}) {
+    const seasons = this.getGuildSeasons(guildId);
+    const enrolledSeasons = [];
+
+    for (const [seasonName, season] of Object.entries(seasons)) {
+      // Only enroll in active seasons
+      if (season.isActive && !season.leaderboard[userId]) {
         season.leaderboard[userId] = {
-            userId,
-            username: stats.username || 'Unknown User',
-            balance: stats.balance || 0,
-            xp: stats.xp || 0,
-            level: stats.level || 1,
-            coins: stats.seasonalCoins || 0,
-            voiceHours: stats.voiceHours || 0,
-            messageCount: Number(stats.messageCount) || 0,
-            mediaCount: Number(stats.mediaCount) || 0,
-            activeChannels: Number(stats.activeChannels) || 0,
-            channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
-                ? { ...stats.channelsActivity }
-                : {},
-            gambling: stats.gambling || {
-                blackjack: { wins: 0, losses: 0, ties: 0 },
-                roulette: { wins: 0, losses: 0 },
-                slots: { wins: 0, losses: 0 },
-                dice: { wins: 0, losses: 0 },
-                coinflip: { wins: 0, losses: 0 },
-                rps: { wins: 0, losses: 0, ties: 0 },
-                ttt: { wins: 0, losses: 0, ties: 0 }
-            },
-            lastUpdated: Date.now()
+          userId,
+          username: stats.username || 'Unknown User',
+          balance: stats.balance || 0,
+          xp: stats.xp || 0,
+          level: stats.level || 1,
+          coins: stats.seasonalCoins || 0,
+          voiceHours: Number(stats.voiceHours) || 0,
+          messageCount: Number(stats.messageCount) || 0,
+          mediaCount: Number(stats.mediaCount) || 0,
+          activeChannels: Number(stats.activeChannels) || 0,
+          channelsActivity:
+            stats.channelsActivity && typeof stats.channelsActivity === 'object'
+              ? { ...stats.channelsActivity }
+              : {},
+          gambling: stats.gambling || {
+            blackjack: { wins: 0, losses: 0, ties: 0 },
+            roulette: { wins: 0, losses: 0 },
+            slots: { wins: 0, losses: 0 },
+            dice: { wins: 0, losses: 0 },
+            coinflip: { wins: 0, losses: 0 },
+            rps: { wins: 0, losses: 0, ties: 0 },
+            ttt: { wins: 0, losses: 0, ties: 0 },
+          },
+          joinedAt: Date.now(),
+          lastUpdated: Date.now(),
         };
-
         season.totalPlayers = Object.keys(season.leaderboard).length;
-
-        await this.save();
-        return { success: true };
+        enrolledSeasons.push(seasonName);
+      }
     }
 
-    /**
-     * Add voice hours to a player's season stats
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {string} userId - Discord User ID
-     * @param {number} minutes - Minutes spent in voice
-     * @param {string} username - Discord username (optional)
-     * @returns {Object} Result with success status
-     */
-    async addVoiceHours(guildId, seasonName, userId, minutes, username = 'Unknown User') {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
+    if (enrolledSeasons.length > 0) {
+      await this.save();
+    }
+
+    return enrolledSeasons;
+  }
+
+  /**
+   * Auto-enroll all guild members in a specific season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {Array} members - Array of guild members
+   * @param {Function} getStats - Function to get user stats (userId) => {balance, xp, level, seasonalCoins, gambling}
+   * @returns {Object} Result with count of enrolled users
+   */
+  async autoEnrollAllMembers(guildId, seasonName, members, getStats) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found', enrolled: 0 };
+    }
+
+    let enrolledCount = 0;
+    for (const member of members) {
+      if (!member.user.bot && !season.leaderboard[member.id]) {
+        const stats = getStats(member.id) || {};
+        season.leaderboard[member.id] = {
+          userId: member.id,
+          username: stats.username || member.user.username || 'Unknown User',
+          balance: stats.balance || 0,
+          xp: stats.xp || 0,
+          level: stats.level || 1,
+          coins: stats.seasonalCoins || 0,
+          voiceHours: Number(stats.voiceHours) || 0,
+          messageCount: Number(stats.messageCount) || 0,
+          mediaCount: Number(stats.mediaCount) || 0,
+          activeChannels: Number(stats.activeChannels) || 0,
+          channelsActivity:
+            stats.channelsActivity && typeof stats.channelsActivity === 'object'
+              ? { ...stats.channelsActivity }
+              : {},
+          gambling: stats.gambling || {
+            blackjack: { wins: 0, losses: 0, ties: 0 },
+            roulette: { wins: 0, losses: 0 },
+            slots: { wins: 0, losses: 0 },
+            dice: { wins: 0, losses: 0 },
+            coinflip: { wins: 0, losses: 0 },
+            rps: { wins: 0, losses: 0, ties: 0 },
+            ttt: { wins: 0, losses: 0, ties: 0 },
+          },
+          joinedAt: Date.now(),
+          lastUpdated: Date.now(),
+        };
+        enrolledCount++;
+      }
+    }
+
+    if (enrolledCount > 0) {
+      season.totalPlayers = Object.keys(season.leaderboard).length;
+      await this.save();
+    }
+
+    return { success: true, enrolled: enrolledCount };
+  }
+
+  /**
+   * Check if user is enrolled in a season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {string} userId - Discord User ID
+   * @returns {boolean} Whether user is enrolled
+   */
+  isUserEnrolled(guildId, seasonName, userId) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) return false;
+    return !!season.leaderboard[userId];
+  }
+
+  /**
+   * Update gambling stats for a user in a season
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {string} userId - Discord User ID
+   * @param {Object} gamblingStats - Gambling stats object
+   * @returns {Object} Result
+   */
+  async updateGamblingStats(guildId, seasonName, userId, gamblingStats) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found' };
+    }
+
+    const playerEntry = season.leaderboard[userId];
+    if (!playerEntry) {
+      return { success: false, error: 'Player not enrolled in season' };
+    }
+
+    playerEntry.gambling = gamblingStats;
+    playerEntry.lastUpdated = Date.now();
+
+    await this.save();
+    return { success: true };
+  }
+
+  /**
+   * Refresh all player stats in a season from live data
+   * @param {string} guildId - Discord Guild ID
+   * @param {string} seasonName - Season name
+   * @param {Function} getStats - Function to get user stats (userId) => {balance, xp, level, seasonalCoins, gambling, username}
+   * @returns {Object} Result
+   */
+  async refreshSeasonStats(guildId, seasonName, getStats) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found', updated: 0 };
+    }
+
+    let updatedCount = 0;
+    for (const userId in season.leaderboard) {
+      const stats = getStats(userId);
+      if (stats) {
+        // Preserve cumulative season activity counters during refresh unless explicit values are provided.
+        const existingVoiceHours = Number(season.leaderboard[userId].voiceHours) || 0;
+        const existingMessageCount = Number(season.leaderboard[userId].messageCount) || 0;
+        const existingMediaCount = Number(season.leaderboard[userId].mediaCount) || 0;
+        const existingActiveChannels = Number(season.leaderboard[userId].activeChannels) || 0;
+        const existingChannelsActivity =
+          season.leaderboard[userId].channelsActivity &&
+          typeof season.leaderboard[userId].channelsActivity === 'object'
+            ? { ...season.leaderboard[userId].channelsActivity }
+            : {};
+
+        season.leaderboard[userId].balance = stats.balance || 0;
+        season.leaderboard[userId].xp = stats.xp || 0;
+        season.leaderboard[userId].level = stats.level || 1;
+        season.leaderboard[userId].coins = stats.seasonalCoins || 0;
+        season.leaderboard[userId].gambling = stats.gambling || season.leaderboard[userId].gambling;
+        season.leaderboard[userId].voiceHours = Number.isFinite(Number(stats.voiceHours))
+          ? Number(stats.voiceHours)
+          : existingVoiceHours;
+        season.leaderboard[userId].messageCount = Number.isFinite(Number(stats.messageCount))
+          ? Number(stats.messageCount)
+          : existingMessageCount;
+        season.leaderboard[userId].mediaCount = Number.isFinite(Number(stats.mediaCount))
+          ? Number(stats.mediaCount)
+          : existingMediaCount;
+        season.leaderboard[userId].activeChannels = Number.isFinite(Number(stats.activeChannels))
+          ? Number(stats.activeChannels)
+          : existingActiveChannels;
+        season.leaderboard[userId].channelsActivity =
+          stats.channelsActivity && typeof stats.channelsActivity === 'object'
+            ? { ...stats.channelsActivity }
+            : existingChannelsActivity;
+        if (stats.username) {
+          season.leaderboard[userId].username = stats.username;
         }
-
-        const voiceHours = minutes / 60;
-
-        // Initialize player if they don't exist yet
-        if (!season.leaderboard[userId]) {
-            season.leaderboard[userId] = {
-                userId,
-                username,
-                balance: 0,
-                xp: 0,
-                level: 1,
-                coins: 0,
-                voiceHours: 0,
-                messageCount: 0,
-                mediaCount: 0,
-                activeChannels: 0,
-                channelsActivity: {},
-                gambling: {
-                    blackjack: { wins: 0, losses: 0, ties: 0 },
-                    roulette: { wins: 0, losses: 0 },
-                    slots: { wins: 0, losses: 0 },
-                    dice: { wins: 0, losses: 0 },
-                    coinflip: { wins: 0, losses: 0 },
-                    rps: { wins: 0, losses: 0, ties: 0 },
-                    ttt: { wins: 0, losses: 0, ties: 0 }
-                },
-                lastUpdated: Date.now()
-            };
-            season.totalPlayers = Object.keys(season.leaderboard).length;
-        }
-
-        // Add voice hours
-        season.leaderboard[userId].voiceHours = (season.leaderboard[userId].voiceHours || 0) + voiceHours;
         season.leaderboard[userId].lastUpdated = Date.now();
-
-        await this.save();
-        return { success: true, voiceHours: season.leaderboard[userId].voiceHours };
+        updatedCount++;
+      }
     }
 
-    /**
-     * Get season leaderboard
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {string} sortBy - Sort by: 'balance', 'xp', 'level', 'coins', 'voiceHours'
-     * @param {number} limit - Limit results
-     * @returns {Array} Leaderboard entries
-     */
-    getSeasonLeaderboard(guildId, seasonName, sortBy = 'coins', limit = 10) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season || !season.leaderboard || typeof season.leaderboard !== 'object') {
-            return [];
-        }
-
-        return Object.values(season.leaderboard)
-            .sort((a, b) => (Number(b?.[sortBy]) || 0) - (Number(a?.[sortBy]) || 0))
-            .slice(0, limit);
+    if (updatedCount > 0) {
+      await this.save();
     }
 
-    /**
-     * End a season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @returns {Object} Result
-     */
-    async endSeason(guildId, seasonName) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
-        }
+    return { success: true, updated: updatedCount };
+  }
 
-        season.isActive = false;
-        season.endDate = new Date().toISOString();
-        season.archived = true;
-        season.summaryPosted = season.summaryPosted || false;
-
-        await this.save();
-        return { success: true };
+  async addMessageActivity(guildId, userId, payload = {}) {
+    const seasonName = this.getCurrentSeason(guildId);
+    if (!seasonName) {
+      return { success: false, error: 'No active season' };
     }
 
-    async markSeasonSummaryPosted(guildId, seasonName) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
-        }
-        season.summaryPosted = true;
-        await this.save();
-        return { success: true };
+    const season = this.getSeason(guildId, seasonName);
+    if (!season || !season.isActive) {
+      return { success: false, error: 'Season not found or inactive' };
     }
 
-    /**
-     * Archive season and reset guild economy
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @returns {Object} Result
-     */
-    async archiveSeason(guildId, seasonName) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
-        }
+    const username = payload.username || 'Unknown User';
+    const channelId = payload.channelId ? String(payload.channelId) : null;
+    const isMedia = Boolean(payload.isMedia);
 
-        await this.endSeason(guildId, seasonName);
-
-        // Clear current season
-        delete this.data.currentSeason[guildId];
-
-        await this.save();
-        return { success: true, season };
+    if (!season.leaderboard[userId]) {
+      season.leaderboard[userId] = {
+        userId,
+        username,
+        balance: 0,
+        xp: 0,
+        level: 1,
+        coins: 0,
+        voiceHours: 0,
+        messageCount: 0,
+        mediaCount: 0,
+        activeChannels: 0,
+        channelsActivity: {},
+        gambling: {
+          blackjack: { wins: 0, losses: 0, ties: 0 },
+          roulette: { wins: 0, losses: 0 },
+          slots: { wins: 0, losses: 0 },
+          dice: { wins: 0, losses: 0 },
+          coinflip: { wins: 0, losses: 0 },
+          rps: { wins: 0, losses: 0, ties: 0 },
+          ttt: { wins: 0, losses: 0, ties: 0 },
+        },
+        joinedAt: Date.now(),
+        lastUpdated: Date.now(),
+      };
+      season.totalPlayers = Object.keys(season.leaderboard).length;
     }
 
-    /**
-     * Get season summary/stats
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @returns {Object} Season summary
-     */
-    getSeasonSummary(guildId, seasonName) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return null;
-        }
-
-        const leaderboard = Object.values(season.leaderboard);
-        const totalBalance = leaderboard.reduce((sum, p) => sum + (p.balance || 0), 0);
-        const totalXP = leaderboard.reduce((sum, p) => sum + (p.xp || 0), 0);
-        const totalCoins = leaderboard.reduce((sum, p) => sum + (p.coins || 0), 0);
-
-        return {
-            name: season.name,
-            isActive: season.isActive,
-            startDate: season.startDate,
-            endDate: season.endDate,
-            totalPlayers: season.totalPlayers,
-            totalBalance,
-            totalXP,
-            totalCoins,
-            createdBy: season.createdBy,
-            createdAt: new Date(season.createdAt).toLocaleString()
-        };
+    const entry = season.leaderboard[userId];
+    entry.username = entry.username || username;
+    entry.messageCount = (Number(entry.messageCount) || 0) + 1;
+    if (isMedia) {
+      entry.mediaCount = (Number(entry.mediaCount) || 0) + 1;
     }
 
-    /**
-     * List all seasons for a guild
-     * @param {string} guildId - Discord Guild ID
-     * @returns {Array} List of seasons
-     */
-    listSeasons(guildId) {
-        const seasons = this.getGuildSeasons(guildId);
-        return Object.entries(seasons).map(([name, data]) => ({
-            name,
-            isActive: data.isActive,
-            startDate: data.startDate,
-            totalPlayers: data.totalPlayers,
-            archived: data.archived
-        }));
+    if (!entry.channelsActivity || typeof entry.channelsActivity !== 'object') {
+      entry.channelsActivity = {};
     }
 
-    /**
-     * Auto-enroll a user in all active seasons for a guild
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} userId - Discord User ID
-     * @param {Object} stats - Player stats {balance, xp, level, seasonalCoins, gambling}
-     * @returns {Array} List of seasons user was enrolled in
-     */
-    async autoEnrollUserInSeasons(guildId, userId, stats = {}) {
-        const seasons = this.getGuildSeasons(guildId);
-        const enrolledSeasons = [];
-
-        for (const [seasonName, season] of Object.entries(seasons)) {
-            // Only enroll in active seasons
-            if (season.isActive && !season.leaderboard[userId]) {
-                season.leaderboard[userId] = {
-                    userId,
-                    username: stats.username || 'Unknown User',
-                    balance: stats.balance || 0,
-                    xp: stats.xp || 0,
-                    level: stats.level || 1,
-                    coins: stats.seasonalCoins || 0,
-                    voiceHours: Number(stats.voiceHours) || 0,
-                    messageCount: Number(stats.messageCount) || 0,
-                    mediaCount: Number(stats.mediaCount) || 0,
-                    activeChannels: Number(stats.activeChannels) || 0,
-                    channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
-                        ? { ...stats.channelsActivity }
-                        : {},
-                    gambling: stats.gambling || {
-                        blackjack: { wins: 0, losses: 0, ties: 0 },
-                        roulette: { wins: 0, losses: 0 },
-                        slots: { wins: 0, losses: 0 },
-                        dice: { wins: 0, losses: 0 },
-                        coinflip: { wins: 0, losses: 0 },
-                        rps: { wins: 0, losses: 0, ties: 0 },
-                        ttt: { wins: 0, losses: 0, ties: 0 }
-                    },
-                    joinedAt: Date.now(),
-                    lastUpdated: Date.now()
-                };
-                season.totalPlayers = Object.keys(season.leaderboard).length;
-                enrolledSeasons.push(seasonName);
-            }
-        }
-
-        if (enrolledSeasons.length > 0) {
-            await this.save();
-        }
-
-        return enrolledSeasons;
+    if (channelId) {
+      entry.channelsActivity[channelId] = (Number(entry.channelsActivity[channelId]) || 0) + 1;
+      entry.activeChannels = Object.keys(entry.channelsActivity).length;
+    } else {
+      entry.activeChannels = Number(entry.activeChannels) || 0;
     }
 
-    /**
-     * Auto-enroll all guild members in a specific season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {Array} members - Array of guild members
-     * @param {Function} getStats - Function to get user stats (userId) => {balance, xp, level, seasonalCoins, gambling}
-     * @returns {Object} Result with count of enrolled users
-     */
-    async autoEnrollAllMembers(guildId, seasonName, members, getStats) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found', enrolled: 0 };
-        }
+    entry.lastUpdated = Date.now();
+    await this.save();
 
-        let enrolledCount = 0;
-        for (const member of members) {
-            if (!member.user.bot && !season.leaderboard[member.id]) {
-                const stats = getStats(member.id) || {};
-                season.leaderboard[member.id] = {
-                    userId: member.id,
-                    username: stats.username || member.user.username || 'Unknown User',
-                    balance: stats.balance || 0,
-                    xp: stats.xp || 0,
-                    level: stats.level || 1,
-                    coins: stats.seasonalCoins || 0,
-                    voiceHours: Number(stats.voiceHours) || 0,
-                    messageCount: Number(stats.messageCount) || 0,
-                    mediaCount: Number(stats.mediaCount) || 0,
-                    activeChannels: Number(stats.activeChannels) || 0,
-                    channelsActivity: stats.channelsActivity && typeof stats.channelsActivity === 'object'
-                        ? { ...stats.channelsActivity }
-                        : {},
-                    gambling: stats.gambling || {
-                        blackjack: { wins: 0, losses: 0, ties: 0 },
-                        roulette: { wins: 0, losses: 0 },
-                        slots: { wins: 0, losses: 0 },
-                        dice: { wins: 0, losses: 0 },
-                        coinflip: { wins: 0, losses: 0 },
-                        rps: { wins: 0, losses: 0, ties: 0 },
-                        ttt: { wins: 0, losses: 0, ties: 0 }
-                    },
-                    joinedAt: Date.now(),
-                    lastUpdated: Date.now()
-                };
-                enrolledCount++;
-            }
-        }
+    return {
+      success: true,
+      seasonName,
+      messageCount: entry.messageCount,
+      mediaCount: entry.mediaCount,
+      activeChannels: entry.activeChannels,
+    };
+  }
 
-        if (enrolledCount > 0) {
-            season.totalPlayers = Object.keys(season.leaderboard).length;
-            await this.save();
-        }
-
-        return { success: true, enrolled: enrolledCount };
+  async pruneInactivePlayers(guildId, seasonName, inactiveDays = 30) {
+    const season = this.getSeason(guildId, seasonName);
+    if (!season) {
+      return { success: false, error: 'Season not found', pruned: 0 };
     }
 
-    /**
-     * Check if user is enrolled in a season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {string} userId - Discord User ID
-     * @returns {boolean} Whether user is enrolled
-     */
-    isUserEnrolled(guildId, seasonName, userId) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) return false;
-        return !!season.leaderboard[userId];
+    if (inactiveDays <= 0) {
+      return { success: true, pruned: 0 };
     }
 
-    /**
-     * Update gambling stats for a user in a season
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {string} userId - Discord User ID
-     * @param {Object} gamblingStats - Gambling stats object
-     * @returns {Object} Result
-     */
-    async updateGamblingStats(guildId, seasonName, userId, gamblingStats) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found' };
-        }
+    const cutoff = Date.now() - inactiveDays * 24 * 60 * 60 * 1000;
+    let pruned = 0;
 
-        const playerEntry = season.leaderboard[userId];
-        if (!playerEntry) {
-            return { success: false, error: 'Player not enrolled in season' };
-        }
-
-        playerEntry.gambling = gamblingStats;
-        playerEntry.lastUpdated = Date.now();
-
-        await this.save();
-        return { success: true };
+    for (const userId in season.leaderboard) {
+      const entry = season.leaderboard[userId];
+      if (entry?.lastUpdated && entry.lastUpdated < cutoff) {
+        delete season.leaderboard[userId];
+        pruned++;
+      }
     }
 
-    /**
-     * Refresh all player stats in a season from live data
-     * @param {string} guildId - Discord Guild ID
-     * @param {string} seasonName - Season name
-     * @param {Function} getStats - Function to get user stats (userId) => {balance, xp, level, seasonalCoins, gambling, username}
-     * @returns {Object} Result
-     */
-    async refreshSeasonStats(guildId, seasonName, getStats) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found', updated: 0 };
-        }
-
-        let updatedCount = 0;
-        for (const userId in season.leaderboard) {
-            const stats = getStats(userId);
-            if (stats) {
-                // Preserve cumulative season activity counters during refresh unless explicit values are provided.
-                const existingVoiceHours = Number(season.leaderboard[userId].voiceHours) || 0;
-                const existingMessageCount = Number(season.leaderboard[userId].messageCount) || 0;
-                const existingMediaCount = Number(season.leaderboard[userId].mediaCount) || 0;
-                const existingActiveChannels = Number(season.leaderboard[userId].activeChannels) || 0;
-                const existingChannelsActivity = season.leaderboard[userId].channelsActivity && typeof season.leaderboard[userId].channelsActivity === 'object'
-                    ? { ...season.leaderboard[userId].channelsActivity }
-                    : {};
-
-                season.leaderboard[userId].balance = stats.balance || 0;
-                season.leaderboard[userId].xp = stats.xp || 0;
-                season.leaderboard[userId].level = stats.level || 1;
-                season.leaderboard[userId].coins = stats.seasonalCoins || 0;
-                season.leaderboard[userId].gambling = stats.gambling || season.leaderboard[userId].gambling;
-                season.leaderboard[userId].voiceHours = Number.isFinite(Number(stats.voiceHours)) ? Number(stats.voiceHours) : existingVoiceHours;
-                season.leaderboard[userId].messageCount = Number.isFinite(Number(stats.messageCount)) ? Number(stats.messageCount) : existingMessageCount;
-                season.leaderboard[userId].mediaCount = Number.isFinite(Number(stats.mediaCount)) ? Number(stats.mediaCount) : existingMediaCount;
-                season.leaderboard[userId].activeChannels = Number.isFinite(Number(stats.activeChannels)) ? Number(stats.activeChannels) : existingActiveChannels;
-                season.leaderboard[userId].channelsActivity = stats.channelsActivity && typeof stats.channelsActivity === 'object'
-                    ? { ...stats.channelsActivity }
-                    : existingChannelsActivity;
-                if (stats.username) {
-                    season.leaderboard[userId].username = stats.username;
-                }
-                season.leaderboard[userId].lastUpdated = Date.now();
-                updatedCount++;
-            }
-        }
-
-        if (updatedCount > 0) {
-            await this.save();
-        }
-
-        return { success: true, updated: updatedCount };
+    if (pruned > 0) {
+      season.totalPlayers = Object.keys(season.leaderboard).length;
+      await this.save();
     }
 
-    async addMessageActivity(guildId, userId, payload = {}) {
-        const seasonName = this.getCurrentSeason(guildId);
-        if (!seasonName) {
-            return { success: false, error: 'No active season' };
-        }
+    return { success: true, pruned };
+  }
 
-        const season = this.getSeason(guildId, seasonName);
-        if (!season || !season.isActive) {
-            return { success: false, error: 'Season not found or inactive' };
-        }
+  /**
+   * Get the current quarter name (spring, summer, fall, winter)
+   * @returns {string} Quarter name (spring|summer|fall|winter)
+   */
+  getCurrentQuarter() {
+    const month = new Date().getMonth(); // 0-11
+    if (month >= 2 && month <= 4) return 'spring';
+    if (month >= 5 && month <= 7) return 'summer';
+    if (month >= 8 && month <= 10) return 'fall';
+    return 'winter';
+  }
 
-        const username = payload.username || 'Unknown User';
-        const channelId = payload.channelId ? String(payload.channelId) : null;
-        const isMedia = Boolean(payload.isMedia);
+  /**
+   * Get seasonal name (e.g., "spring-2026")
+   * @returns {string} Season name in format "{quarter}-{year}"
+   */
+  getQuarterlySeasonName() {
+    const now = new Date();
+    const quarter = this.getCurrentQuarter();
+    const year = now.getFullYear();
+    return `${quarter}-${year}`;
+  }
 
-        if (!season.leaderboard[userId]) {
-            season.leaderboard[userId] = {
-                userId,
-                username,
-                balance: 0,
-                xp: 0,
-                level: 1,
-                coins: 0,
-                voiceHours: 0,
-                messageCount: 0,
-                mediaCount: 0,
-                activeChannels: 0,
-                channelsActivity: {},
-                gambling: {
-                    blackjack: { wins: 0, losses: 0, ties: 0 },
-                    roulette: { wins: 0, losses: 0 },
-                    slots: { wins: 0, losses: 0 },
-                    dice: { wins: 0, losses: 0 },
-                    coinflip: { wins: 0, losses: 0 },
-                    rps: { wins: 0, losses: 0, ties: 0 },
-                    ttt: { wins: 0, losses: 0, ties: 0 }
-                },
-                joinedAt: Date.now(),
-                lastUpdated: Date.now()
-            };
-            season.totalPlayers = Object.keys(season.leaderboard).length;
-        }
+  /**
+   * Auto-create quarterly seasons for guilds
+   * Called once per day to check if a new quarter has started
+   * @param {Object} client - Discord client for fetching guild members
+   * @param {string} botUserId - Bot user ID (for creator)
+   * @returns {Object} Result with created seasons count
+   */
+  async autoCreateQuarterlySeasons(client, botUserId) {
+    try {
+      const currentSeasonName = this.getQuarterlySeasonName();
+      let createdCount = 0;
 
-        const entry = season.leaderboard[userId];
-        entry.username = entry.username || username;
-        entry.messageCount = (Number(entry.messageCount) || 0) + 1;
-        if (isMedia) {
-            entry.mediaCount = (Number(entry.mediaCount) || 0) + 1;
-        }
-
-        if (!entry.channelsActivity || typeof entry.channelsActivity !== 'object') {
-            entry.channelsActivity = {};
-        }
-
-        if (channelId) {
-            entry.channelsActivity[channelId] = (Number(entry.channelsActivity[channelId]) || 0) + 1;
-            entry.activeChannels = Object.keys(entry.channelsActivity).length;
-        } else {
-            entry.activeChannels = Number(entry.activeChannels) || 0;
-        }
-
-        entry.lastUpdated = Date.now();
-        await this.save();
-
-        return {
-            success: true,
-            seasonName,
-            messageCount: entry.messageCount,
-            mediaCount: entry.mediaCount,
-            activeChannels: entry.activeChannels
-        };
-    }
-
-    async pruneInactivePlayers(guildId, seasonName, inactiveDays = 30) {
-        const season = this.getSeason(guildId, seasonName);
-        if (!season) {
-            return { success: false, error: 'Season not found', pruned: 0 };
-        }
-
-        if (inactiveDays <= 0) {
-            return { success: true, pruned: 0 };
-        }
-
-        const cutoff = Date.now() - (inactiveDays * 24 * 60 * 60 * 1000);
-        let pruned = 0;
-
-        for (const userId in season.leaderboard) {
-            const entry = season.leaderboard[userId];
-            if (entry?.lastUpdated && entry.lastUpdated < cutoff) {
-                delete season.leaderboard[userId];
-                pruned++;
-            }
-        }
-
-        if (pruned > 0) {
-            season.totalPlayers = Object.keys(season.leaderboard).length;
-            await this.save();
-        }
-
-        return { success: true, pruned };
-    }
-
-    /**
-     * Get the current quarter name (spring, summer, fall, winter)
-     * @returns {string} Quarter name (spring|summer|fall|winter)
-     */
-    getCurrentQuarter() {
-        const month = new Date().getMonth(); // 0-11
-        if (month >= 2 && month <= 4) return 'spring';
-        if (month >= 5 && month <= 7) return 'summer';
-        if (month >= 8 && month <= 10) return 'fall';
-        return 'winter';
-    }
-
-    /**
-     * Get seasonal name (e.g., "spring-2026")
-     * @returns {string} Season name in format "{quarter}-{year}"
-     */
-    getQuarterlySeasonName() {
-        const now = new Date();
-        const quarter = this.getCurrentQuarter();
-        const year = now.getFullYear();
-        return `${quarter}-${year}`;
-    }
-
-    /**
-     * Auto-create quarterly seasons for guilds
-     * Called once per day to check if a new quarter has started
-     * @param {Object} client - Discord client for fetching guild members
-     * @param {string} botUserId - Bot user ID (for creator)
-     * @returns {Object} Result with created seasons count
-     */
-    async autoCreateQuarterlySeasons(client, botUserId) {
+      // Get all guilds from the seasons data
+      for (const guildId in this.data.seasons) {
         try {
-            const currentSeasonName = this.getQuarterlySeasonName();
-            let createdCount = 0;
+          const guild = client.guilds.cache.get(guildId);
+          if (!guild) continue;
 
-            // Get all guilds from the seasons data
-            for (const guildId in this.data.seasons) {
-                try {
-                    const guild = client.guilds.cache.get(guildId);
-                    if (!guild) continue;
+          const currentSeason = this.getCurrentSeason(guildId);
 
-                    const currentSeason = this.getCurrentSeason(guildId);
-
-                    // If current season doesn't match expected quarterly season, create new one
-                    if (currentSeason !== currentSeasonName) {
-                        // Archive old season if it exists
-                        if (currentSeason) {
-                            const oldSeason = this.getSeason(guildId, currentSeason);
-                            if (oldSeason && oldSeason.isActive) {
-                                await this.endSeason(guildId, currentSeason);
-                                console.log(`🏁 Auto-archived season "${currentSeason}" for guild ${guildId}`);
-                            }
-                        }
-
-                        // Create new quarterly season
-                        const result = await this.createSeason(guildId, currentSeasonName, botUserId);
-                        if (result.success) {
-                            // Auto-enroll all members
-                            const members = await guild.members.fetch().catch(() => []);
-                            if (members.length > 0) {
-                                await this.autoEnrollAllMembers(
-                                    guildId,
-                                    currentSeasonName,
-                                    Array.from(members.values()),
-                                    () => ({})
-                                );
-                            }
-                            createdCount++;
-                            console.log(`✅ Auto-created quarterly season "${currentSeasonName}" for guild ${guildId}`);
-                        }
-                    }
-                } catch (error) {
-                    console.error(`Error processing guild ${guildId} for auto-seasonal creation:`, error);
-                }
+          // If current season doesn't match expected quarterly season, create new one
+          if (currentSeason !== currentSeasonName) {
+            // Archive old season if it exists
+            if (currentSeason) {
+              const oldSeason = this.getSeason(guildId, currentSeason);
+              if (oldSeason && oldSeason.isActive) {
+                await this.endSeason(guildId, currentSeason);
+                console.log(`🏁 Auto-archived season "${currentSeason}" for guild ${guildId}`);
+              }
             }
 
-            return { success: true, created: createdCount };
+            // Create new quarterly season
+            const result = await this.createSeason(guildId, currentSeasonName, botUserId);
+            if (result.success) {
+              // Auto-enroll all members
+              const members = await guild.members.fetch().catch(() => []);
+              if (members.length > 0) {
+                await this.autoEnrollAllMembers(
+                  guildId,
+                  currentSeasonName,
+                  Array.from(members.values()),
+                  () => ({})
+                );
+              }
+              createdCount++;
+              console.log(
+                `✅ Auto-created quarterly season "${currentSeasonName}" for guild ${guildId}`
+              );
+            }
+          }
         } catch (error) {
-            console.error('Error in autoCreateQuarterlySeasons:', error);
-            return { success: false, created: 0 };
+          console.error(`Error processing guild ${guildId} for auto-seasonal creation:`, error);
         }
+      }
+
+      return { success: true, created: createdCount };
+    } catch (error) {
+      console.error('Error in autoCreateQuarterlySeasons:', error);
+      return { success: false, created: 0 };
     }
+  }
 }
 
 module.exports = new SeasonManager();

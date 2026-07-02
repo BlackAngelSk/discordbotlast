@@ -1,0 +1,11 @@
+echo "🔍 Running pre-commit checks..."
+
+# Run ESLint
+echo "📝 Running ESLint..."
+npm run lint
+
+# Run Prettier check
+echo "🎨 Running Prettier check..."
+npm run format:check
+
+echo "✅ Pre-commit checks passed!"

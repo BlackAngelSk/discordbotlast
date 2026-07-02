@@ -5,56 +5,58 @@ const settingsManager = require('../../utils/settingsManager');
 const { hasBotWatcherPermission } = require('../../utils/permissions');
 
 module.exports = {
-    name: 'backup',
-    description: 'Create a backup of all bot data (Admin only)',
-    usage: '!backup',
-    aliases: ['savedata'],
-    category: 'admin',
-    async execute(message, args) {
-        try {
-            // Check permissions
-            if (!hasBotWatcherPermission(message.member)) {
-                const settings = settingsManager.get(message.guild.id);
-                return message.reply(`❌ You need the ${settings.botWatcherRole} role or Administrator permission to use this command!`);
-            }
+  name: 'backup',
+  description: 'Create a backup of all bot data (Admin only)',
+  usage: '!backup',
+  aliases: ['savedata'],
+  category: 'admin',
+  async execute(message, args) {
+    try {
+      // Check permissions
+      if (!hasBotWatcherPermission(message.member)) {
+        const settings = settingsManager.get(message.guild.id);
+        return message.reply(
+          `❌ You need the ${settings.botWatcherRole} role or Administrator permission to use this command!`
+        );
+      }
 
-            const dataDir = path.join(__dirname, '../../data');
-            const backupDir = path.join(__dirname, '../../backups');
+      const dataDir = path.join(__dirname, '../../data');
+      const backupDir = path.join(__dirname, '../../backups');
 
-            // Create backups directory if doesn't exist
-            await fs.mkdir(backupDir, { recursive: true });
+      // Create backups directory if doesn't exist
+      await fs.mkdir(backupDir, { recursive: true });
 
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const backupPath = path.join(backupDir, `backup_${timestamp}`);
-            await fs.mkdir(backupPath, { recursive: true });
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = path.join(backupDir, `backup_${timestamp}`);
+      await fs.mkdir(backupPath, { recursive: true });
 
-            // Copy all JSON files
-            const files = await fs.readdir(dataDir);
-            let backupCount = 0;
+      // Copy all JSON files
+      const files = await fs.readdir(dataDir);
+      let backupCount = 0;
 
-            for (const file of files) {
-                if (file.endsWith('.json')) {
-                    const source = path.join(dataDir, file);
-                    const dest = path.join(backupPath, file);
-                    await fs.copyFile(source, dest);
-                    backupCount++;
-                }
-            }
-
-            const embed = new EmbedBuilder()
-                .setColor(0x57f287)
-                .setTitle('✅ Backup Created')
-                .addFields(
-                    { name: 'Files Backed Up', value: `${backupCount}`, inline: true },
-                    { name: 'Backup Time', value: timestamp, inline: true },
-                    { name: 'Location', value: '`/backups/`', inline: false }
-                )
-                .setTimestamp();
-
-            return message.reply({ embeds: [embed] });
-        } catch (error) {
-            console.error('Error in backup command:', error);
-            message.reply('❌ An error occurred while creating backup!');
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const source = path.join(dataDir, file);
+          const dest = path.join(backupPath, file);
+          await fs.copyFile(source, dest);
+          backupCount++;
         }
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle('✅ Backup Created')
+        .addFields(
+          { name: 'Files Backed Up', value: `${backupCount}`, inline: true },
+          { name: 'Backup Time', value: timestamp, inline: true },
+          { name: 'Location', value: '`/backups/`', inline: false }
+        )
+        .setTimestamp();
+
+      return message.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Error in backup command:', error);
+      message.reply('❌ An error occurred while creating backup!');
     }
+  },
 };

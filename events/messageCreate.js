@@ -26,416 +26,464 @@ const URL_REGEX = /https?:\/\/[^\s]+/gi;
 const phishCache = new Map();
 
 function messageHasMediaContent(message) {
-    const attachments = Array.from(message.attachments?.values?.() || []);
-    const hasMediaAttachment = attachments.some((attachment) => {
-        const contentType = String(attachment.contentType || '').toLowerCase();
-        if (contentType.startsWith('image/') || contentType.startsWith('video/')) {
-            return true;
-        }
-
-        const url = String(attachment.url || attachment.proxyURL || '').toLowerCase();
-        return /\.(gif|png|jpe?g|webp|bmp|tiff?|mp4|mov|webm)(\?|$)/i.test(url);
-    });
-
-    if (hasMediaAttachment) {
-        return true;
+  const attachments = Array.from(message.attachments?.values?.() || []);
+  const hasMediaAttachment = attachments.some((attachment) => {
+    const contentType = String(attachment.contentType || '').toLowerCase();
+    if (contentType.startsWith('image/') || contentType.startsWith('video/')) {
+      return true;
     }
 
-    const embeds = Array.from(message.embeds || []);
-    const hasGifEmbed = embeds.some((embed) => {
-        const type = String(embed?.type || '').toLowerCase();
-        if (type === 'gifv') {
-            return true;
-        }
+    const url = String(attachment.url || attachment.proxyURL || '').toLowerCase();
+    return /\.(gif|png|jpe?g|webp|bmp|tiff?|mp4|mov|webm)(\?|$)/i.test(url);
+  });
 
-        const imageUrl = String(embed?.image?.url || embed?.thumbnail?.url || '').toLowerCase();
-        return /\.gif(\?|$)/i.test(imageUrl);
-    });
+  if (hasMediaAttachment) {
+    return true;
+  }
 
-    if (hasGifEmbed) {
-        return true;
+  const embeds = Array.from(message.embeds || []);
+  const hasGifEmbed = embeds.some((embed) => {
+    const type = String(embed?.type || '').toLowerCase();
+    if (type === 'gifv') {
+      return true;
     }
 
-    return /(https?:\/\/\S+\.gif(\?|\s|$))/i.test(String(message.content || ''));
+    const imageUrl = String(embed?.image?.url || embed?.thumbnail?.url || '').toLowerCase();
+    return /\.gif(\?|$)/i.test(imageUrl);
+  });
+
+  if (hasGifEmbed) {
+    return true;
+  }
+
+  return /(https?:\/\/\S+\.gif(\?|\s|$))/i.test(String(message.content || ''));
 }
 
 async function isPhishingDomain(domain) {
-    if (phishCache.has(domain)) return phishCache.get(domain);
-    return new Promise(resolve => {
-        const req = https.get(`https://phish.sinking.yachts/v2/check/${encodeURIComponent(domain)}`, { timeout: 3000 }, res => {
-            let data = '';
-            res.on('data', chunk => (data += chunk));
-            res.on('end', () => {
-                const result = data.trim() === 'true';
-                phishCache.set(domain, result);
-                setTimeout(() => phishCache.delete(domain), 30 * 60 * 1000); // expire after 30 min
-                resolve(result);
-            });
+  if (phishCache.has(domain)) return phishCache.get(domain);
+  return new Promise((resolve) => {
+    const req = https.get(
+      `https://phish.sinking.yachts/v2/check/${encodeURIComponent(domain)}`,
+      { timeout: 3000 },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => (data += chunk));
+        res.on('end', () => {
+          const result = data.trim() === 'true';
+          phishCache.set(domain, result);
+          setTimeout(() => phishCache.delete(domain), 30 * 60 * 1000); // expire after 30 min
+          resolve(result);
         });
-        req.on('error', () => resolve(false));
-        req.on('timeout', () => { req.destroy(); resolve(false); });
+      }
+    );
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
     });
+  });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
-    name: Events.MessageCreate,
-    async execute(message, client) {
-        // Ignore bot messages
-        if (message.author.bot) return;
+  name: Events.MessageCreate,
+  async execute(message, client) {
+    // Ignore bot messages
+    if (message.author.bot) return;
 
-        // Continue active counting games immediately so moderation returns do not block recovery.
-        try {
-            await countCommand.handleMessage(message);
-        } catch (error) {
-            console.error('Counting game message handling error:', error);
-        }
-
-        // Bot owner bypass - skip all moderation for bot owner
-        const botOwnerId = process.env.BOT_OWNER_ID;
-        const isBotOwner = botOwnerId && message.author.id === botOwnerId;
-        
-        // Log bot owner activity (optional)
-        if (isBotOwner && message.content.startsWith('!') || message.content.startsWith('/')) {
-            console.log(`🔑 Bot Owner command: ${message.author.tag} - ${message.content}`);
-        }
-
-        // Check if user is AFK and remove status
-        try {
-            const afkData = await afkManager.removeAFK(message.guildId, message.author.id);
-            if (afkData) {
-                const duration = afkManager.getAFKTime(message.guildId, message.author.id);
-                const reply = await message.reply(`👋 Welcome back! You were AFK for ${duration || 'a while'}.`);
-                setTimeout(() => reply.delete().catch(() => {}), 5000);
-            }
-        } catch (error) {
-            console.error('AFK check error:', error);
-        }
-
-        // Check mentions for AFK users
-        try {
-            if (message.mentions.users.size > 0) {
-                const afkMentions = [];
-                for (const [userId, user] of message.mentions.users) {
-                    const afkData = afkManager.isAFK(message.guildId, userId);
-                    if (afkData) {
-                        const duration = afkManager.getAFKTime(message.guildId, userId);
-                        afkMentions.push(`${user} is AFK: **${afkData.reason}** (${duration})`);
-                    }
-                }
-                
-                if (afkMentions.length > 0) {
-                    const reply = await message.reply(afkMentions.join('\\n'));
-                    setTimeout(() => reply.delete().catch(() => {}), 10000);
-                }
-            }
-        } catch (error) {
-            console.error('AFK mention check error:', error);
-        }
-
-        // Check auto-moderation (skip for bot owner)
-        if (!isBotOwner) {
-            const automodResult = moderationManager.checkMessage(
-                message.guildId,
-                message.content,
-                message.mentions.users.size
-            );
-
-            if (automodResult.violation) {
-            try {
-                await message.delete();
-                const warning = await message.channel.send(`⚠️ ${message.author}, your message was deleted: ${automodResult.reason}`);
-                setTimeout(() => warning.delete().catch(() => {}), 5000);
-                
-                // Log to mod log if configured
-                const modLogChannel = moderationManager.getModLogChannel(message.guildId);
-                if (modLogChannel) {
-                    const channel = await client.channels.fetch(modLogChannel).catch(() => null);
-                    if (channel) {
-                        const embed = new EmbedBuilder()
-                            .setColor('#FF0000')
-                            .setTitle('🛡️ Auto-Mod Action')
-                            .addFields(
-                                { name: 'User', value: message.author.tag, inline: true },
-                                { name: 'Channel', value: message.channel.toString(), inline: true },
-                                { name: 'Reason', value: automodResult.reason },
-                                { name: 'Message', value: message.content.substring(0, 1000) }
-                            )
-                            .setTimestamp();
-                        await channel.send({ embeds: [embed] });
-                    }
-                }
-            } catch (error) {
-                console.error('Auto-mod error:', error);
-            }
-            return;
-            }
-        }
-
-        // Anti-spam check (skip for bot owner)
-        if (!isBotOwner) {
-            const settings = moderationManager.getAutomodSettings(message.guildId);
-            if (settings.enabled && settings.antiSpam) {
-                const userId = message.author.id;
-                const now = Date.now();
-            
-            if (!userMessageTimestamps.has(userId)) {
-                userMessageTimestamps.set(userId, []);
-            }
-            
-            const timestamps = userMessageTimestamps.get(userId);
-            timestamps.push(now);
-            
-            // Keep only messages from last 5 seconds
-            const recentMessages = timestamps.filter(t => now - t < 5000);
-            userMessageTimestamps.set(userId, recentMessages);
-            
-            // If more than 5 messages in 5 seconds, it's spam
-            if (recentMessages.length > 5) {
-                try {
-                    await message.delete();
-                    const member = message.member;
-                    const botMember = message.guild.members.me;
-                    
-                    if (member && botMember) {
-                        // Check if bot has permission to timeout members
-                        if (!botMember.permissions.has('ModerateMembers')) {
-                            console.log('Anti-spam: Bot missing ModerateMembers permission');
-                            const warning = await message.channel.send(`⚠️ ${message.author} is spamming! (Bot lacks timeout permission)`);
-                            setTimeout(() => warning.delete().catch(() => {}), 5000);
-                            userMessageTimestamps.delete(userId);
-                            return;
-                        }
-                        
-                        // Check role hierarchy - bot must be higher than target
-                        if (member.roles.highest.position >= botMember.roles.highest.position) {
-                            console.log('Anti-spam: Cannot timeout user with higher/equal role');
-                            const warning = await message.channel.send(`⚠️ ${message.author} is spamming!`);
-                            setTimeout(() => warning.delete().catch(() => {}), 5000);
-                            userMessageTimestamps.delete(userId);
-                            return;
-                        }
-                        
-                        // Check if target is server owner
-                        if (member.id === message.guild.ownerId) {
-                            console.log('Anti-spam: Cannot timeout server owner');
-                            userMessageTimestamps.delete(userId);
-                            return;
-                        }
-                        
-                        await member.timeout(60000, 'Spam detected');
-                        const warning = await message.channel.send(`⚠️ ${message.author} has been timed out for spamming!`);
-                        setTimeout(() => warning.delete().catch(() => {}), 5000);
-                    }
-                    userMessageTimestamps.delete(userId);
-                } catch (error) {
-                    console.error('Anti-spam error:', error);
-                }
-                return;
-                }
-            }
-        }
-
-        // ── Anti-phishing check (skip for bot owner) ──────────────────────────
-        if (!isBotOwner) {
-            try {
-                const settings = moderationManager.getAutomodSettings(message.guildId);
-                if (settings.enabled) {
-                    const urls = message.content.match(URL_REGEX) || [];
-                    for (const rawUrl of urls) {
-                        let hostname;
-                        try { hostname = new URL(rawUrl).hostname.replace(/^www\./, ''); } catch { continue; }
-                        const phishing = await isPhishingDomain(hostname);
-                        if (phishing) {
-                            await message.delete().catch(() => {});
-                            const warn = await message.channel.send(`🚨 ${message.author}, that link has been flagged as a **phishing** URL and was removed.`);
-                            setTimeout(() => warn.delete().catch(() => {}), 8000);
-                            const modLogChannel = moderationManager.getModLogChannel(message.guildId);
-                            if (modLogChannel) {
-                                const ch = await client.channels.fetch(modLogChannel).catch(() => null);
-                                if (ch) {
-                                    const embed = new EmbedBuilder()
-                                        .setColor(0xff0000)
-                                        .setTitle('🚨 Phishing Link Detected')
-                                        .addFields(
-                                            { name: 'User', value: `${message.author.tag} (${message.author.id})`, inline: true },
-                                            { name: 'Channel', value: message.channel.toString(), inline: true },
-                                            { name: 'Domain', value: hostname },
-                                            { name: 'Message', value: message.content.substring(0, 500) }
-                                        )
-                                        .setTimestamp();
-                                    await ch.send({ embeds: [embed] });
-                                }
-                            }
-                            return;
-                        }
-                    }
-
-                    // Anti-invite filter — block external Discord invites
-                    if (settings.blockInvites) {
-                        const inviteMatches = message.content.match(INVITE_REGEX);
-                        if (inviteMatches && inviteMatches.length > 0) {
-                            const guildInvites = await message.guild.invites.fetch().catch(() => null);
-                            const ownCodes = guildInvites ? new Set([...guildInvites.values()].map(i => i.code)) : new Set();
-                            const hasExternal = inviteMatches.some(m => {
-                                const code = m.split('/').pop();
-                                return !ownCodes.has(code);
-                            });
-                            if (hasExternal) {
-                                await message.delete().catch(() => {});
-                                const warn = await message.channel.send(`⚠️ ${message.author}, external Discord invites are not allowed here.`);
-                                setTimeout(() => warn.delete().catch(() => {}), 6000);
-                                return;
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                console.error('Anti-phishing/invite check error:', err);
-            }
-        }
-
-        // ── Bump reminder detection (Disboard bot) ────────────────────────────
-        if (message.author.id === '302050872383242240' && message.embeds.length > 0) {
-            const embedDesc = message.embeds[0]?.description || '';
-            if (embedDesc.includes('Bump done') || embedDesc.includes('bump done') || embedDesc.toLowerCase().includes('bumped')) {
-                try {
-                    const bumpSettings = settingsManager.get(message.guildId);
-                    if (bumpSettings?.bumpReminderEnabled && bumpSettings?.bumpReminderChannel) {
-                        const ch = await client.channels.fetch(bumpSettings.bumpReminderChannel).catch(() => null);
-                        if (ch) {
-                            setTimeout(async () => {
-                                const mention = bumpSettings.bumpReminderRole ? `<@&${bumpSettings.bumpReminderRole}>` : '@here';
-                                await ch.send(`🔔 ${mention} It's been **2 hours** — time to \`/bump\` the server on Disboard!`).catch(() => {});
-                            }, 2 * 60 * 60 * 1000);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Bump reminder error:', err);
-                }
-            }
-        }
-
-        // Track message statistics
-        try {
-            const isMediaMessage = messageHasMediaContent(message);
-            await activityTracker.recordActivity(message.guildId, message.author.id, 'message');
-            await statsManager.recordMessage(message.guildId, message.author.id, message.channelId);
-            await seasonManager.addMessageActivity(message.guildId, message.author.id, {
-                username: message.author.username,
-                channelId: message.channelId,
-                isMedia: isMediaMessage
-            });
-        } catch (error) {
-            console.error('Stats tracking error:', error);
-        }
-
-        try {
-            await achievementManager.syncUser(message.guildId, message.author.id, { firstMessage: true });
-        } catch (error) {
-            console.error('Achievement tracking error:', error);
-        }
-
-        // ── Sticky messages ───────────────────────────────────────────────────
-        stickyMessages.handleMessage(message).catch(() => {});
-
-        // Add XP (5-15 XP per message, with cooldown)
-        try {
-            const features = settingsManager.get(message.guildId).features || {};
-            if (features.leveling !== false) {
-            const xpCooldown = 60000; // 1 minute cooldown
-            const lastXpKey = `${message.guildId}_${message.author.id}_lastXP`;
-            
-            if (!global[lastXpKey] || Date.now() - global[lastXpKey] > xpCooldown) {
-                // Apply channel XP multiplier + global XP event multiplier
-                const channelMultiplier = levelRewardsManager.getXPMultiplier(message.guildId, message.channelId);
-                const eventMultiplier = economyManager.getXPMultiplier(message.guildId);
-                const baseXP = Math.floor(Math.random() * 11) + 5; // 5-15 XP
-                const xpGain = Math.floor(baseXP * channelMultiplier * eventMultiplier);
-                
-                // Set cooldown immediately so it persists even if notification fails below
-                global[lastXpKey] = Date.now();
-
-                const result = await economyManager.addXP(message.guildId, message.author.id, xpGain);
-                
-                if (result.leveledUp) {
-                    const reward = result.level * 100;
-                    await economyManager.addMoney(message.guildId, message.author.id, reward);
-                    
-                    // Check for level role rewards
-                    const roleReward = levelRewardsManager.getRoleForLevel(message.guildId, result.level);
-                    let roleRewardText = '';
-                    
-                    if (roleReward) {
-                        try {
-                            const role = await message.guild.roles.fetch(roleReward);
-                            if (role) {
-                                await message.member.roles.add(role);
-                                roleRewardText = `\\n🎭 You earned the **${role.name}** role!`;
-                                
-                                // Remove lower level roles if not stacking
-                                const settings = levelRewardsManager.getSettings(message.guildId);
-                                if (!settings.stackRoles) {
-                                    const allRewards = levelRewardsManager.getAllRewardsSorted(message.guildId);
-                                    for (const oldReward of allRewards) {
-                                        if (oldReward.level < result.level && oldReward.roleId !== roleReward) {
-                                            const oldRole = message.member.roles.cache.get(oldReward.roleId);
-                                            if (oldRole) {
-                                                await message.member.roles.remove(oldRole).catch(() => {});
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (error) {
-                            console.error('Error assigning level role:', error);
-                        }
-                    }
-                    
-                    const settings = levelRewardsManager.getSettings(message.guildId);
-                    if (settings.notificationsEnabled) {
-                        const embed = new EmbedBuilder()
-                            .setColor('#FFD700')
-                            .setTitle('🎉 Level Up!')
-                            .setDescription(`${message.author} reached level **${result.level}**!${roleRewardText}`)
-                            .addFields({ name: 'Reward', value: `💰 ${reward} coins` })
-                            .setThumbnail(message.author.displayAvatarURL())
-                            .setTimestamp();
-                        
-                        await message.channel.send({ content: `${message.author}`, embeds: [embed] });
-                    }
-                }
-            }
-            }
-        } catch (error) {
-            console.error('XP tracking error:', error);
-        }
-
-        try {
-            await telegramSyncManager.relayDiscordMessage(message);
-        } catch (error) {
-            console.error('Telegram sync relay error:', error.message);
-        }
-
-        // Check for custom commands (uses server prefixes)
-        const prefixes = settingsManager.getPrefixes(message.guildId);
-        const usedPrefix = prefixes.find(prefix => message.content.startsWith(prefix));
-
-        if (usedPrefix) {
-            const args = message.content.slice(usedPrefix.length).trim().split(/ +/);
-            const commandName = (args[0] || '').toLowerCase();
-            const customCommand = customCommandManager.getCommand(message.guildId, commandName);
-            
-            if (customCommand) {
-                try {
-                    return message.reply(customCommand);
-                } catch (error) {
-                    console.error('Custom command error:', error);
-                }
-            }
-        }
-
-        // Command handling is done in index.js through CommandHandler
+    // Continue active counting games immediately so moderation returns do not block recovery.
+    try {
+      await countCommand.handleMessage(message);
+    } catch (error) {
+      console.error('Counting game message handling error:', error);
     }
-};
 
+    // Bot owner bypass - skip all moderation for bot owner
+    const botOwnerId = process.env.BOT_OWNER_ID;
+    const isBotOwner = botOwnerId && message.author.id === botOwnerId;
+
+    // Log bot owner activity (optional)
+    if ((isBotOwner && message.content.startsWith('!')) || message.content.startsWith('/')) {
+      console.log(`🔑 Bot Owner command: ${message.author.tag} - ${message.content}`);
+    }
+
+    // Check if user is AFK and remove status
+    try {
+      const afkData = await afkManager.removeAFK(message.guildId, message.author.id);
+      if (afkData) {
+        const duration = afkManager.getAFKTime(message.guildId, message.author.id);
+        const reply = await message.reply(
+          `👋 Welcome back! You were AFK for ${duration || 'a while'}.`
+        );
+        setTimeout(() => reply.delete().catch(() => {}), 5000);
+      }
+    } catch (error) {
+      console.error('AFK check error:', error);
+    }
+
+    // Check mentions for AFK users
+    try {
+      if (message.mentions.users.size > 0) {
+        const afkMentions = [];
+        for (const [userId, user] of message.mentions.users) {
+          const afkData = afkManager.isAFK(message.guildId, userId);
+          if (afkData) {
+            const duration = afkManager.getAFKTime(message.guildId, userId);
+            afkMentions.push(`${user} is AFK: **${afkData.reason}** (${duration})`);
+          }
+        }
+
+        if (afkMentions.length > 0) {
+          const reply = await message.reply(afkMentions.join('\\n'));
+          setTimeout(() => reply.delete().catch(() => {}), 10000);
+        }
+      }
+    } catch (error) {
+      console.error('AFK mention check error:', error);
+    }
+
+    // Check auto-moderation (skip for bot owner)
+    if (!isBotOwner) {
+      const automodResult = moderationManager.checkMessage(
+        message.guildId,
+        message.content,
+        message.mentions.users.size
+      );
+
+      if (automodResult.violation) {
+        try {
+          await message.delete();
+          const warning = await message.channel.send(
+            `⚠️ ${message.author}, your message was deleted: ${automodResult.reason}`
+          );
+          setTimeout(() => warning.delete().catch(() => {}), 5000);
+
+          // Log to mod log if configured
+          const modLogChannel = moderationManager.getModLogChannel(message.guildId);
+          if (modLogChannel) {
+            const channel = await client.channels.fetch(modLogChannel).catch(() => null);
+            if (channel) {
+              const embed = new EmbedBuilder()
+                .setColor('#FF0000')
+                .setTitle('🛡️ Auto-Mod Action')
+                .addFields(
+                  { name: 'User', value: message.author.tag, inline: true },
+                  { name: 'Channel', value: message.channel.toString(), inline: true },
+                  { name: 'Reason', value: automodResult.reason },
+                  { name: 'Message', value: message.content.substring(0, 1000) }
+                )
+                .setTimestamp();
+              await channel.send({ embeds: [embed] });
+            }
+          }
+        } catch (error) {
+          console.error('Auto-mod error:', error);
+        }
+        return;
+      }
+    }
+
+    // Anti-spam check (skip for bot owner)
+    if (!isBotOwner) {
+      const settings = moderationManager.getAutomodSettings(message.guildId);
+      if (settings.enabled && settings.antiSpam) {
+        const userId = message.author.id;
+        const now = Date.now();
+
+        if (!userMessageTimestamps.has(userId)) {
+          userMessageTimestamps.set(userId, []);
+        }
+
+        const timestamps = userMessageTimestamps.get(userId);
+        timestamps.push(now);
+
+        // Keep only messages from last 5 seconds
+        const recentMessages = timestamps.filter((t) => now - t < 5000);
+        userMessageTimestamps.set(userId, recentMessages);
+
+        // If more than 5 messages in 5 seconds, it's spam
+        if (recentMessages.length > 5) {
+          try {
+            await message.delete();
+            const member = message.member;
+            const botMember = message.guild.members.me;
+
+            if (member && botMember) {
+              // Check if bot has permission to timeout members
+              if (!botMember.permissions.has('ModerateMembers')) {
+                console.log('Anti-spam: Bot missing ModerateMembers permission');
+                const warning = await message.channel.send(
+                  `⚠️ ${message.author} is spamming! (Bot lacks timeout permission)`
+                );
+                setTimeout(() => warning.delete().catch(() => {}), 5000);
+                userMessageTimestamps.delete(userId);
+                return;
+              }
+
+              // Check role hierarchy - bot must be higher than target
+              if (member.roles.highest.position >= botMember.roles.highest.position) {
+                console.log('Anti-spam: Cannot timeout user with higher/equal role');
+                const warning = await message.channel.send(`⚠️ ${message.author} is spamming!`);
+                setTimeout(() => warning.delete().catch(() => {}), 5000);
+                userMessageTimestamps.delete(userId);
+                return;
+              }
+
+              // Check if target is server owner
+              if (member.id === message.guild.ownerId) {
+                console.log('Anti-spam: Cannot timeout server owner');
+                userMessageTimestamps.delete(userId);
+                return;
+              }
+
+              await member.timeout(60000, 'Spam detected');
+              const warning = await message.channel.send(
+                `⚠️ ${message.author} has been timed out for spamming!`
+              );
+              setTimeout(() => warning.delete().catch(() => {}), 5000);
+            }
+            userMessageTimestamps.delete(userId);
+          } catch (error) {
+            console.error('Anti-spam error:', error);
+          }
+          return;
+        }
+      }
+    }
+
+    // ── Anti-phishing check (skip for bot owner) ──────────────────────────
+    if (!isBotOwner) {
+      try {
+        const settings = moderationManager.getAutomodSettings(message.guildId);
+        if (settings.enabled) {
+          const urls = message.content.match(URL_REGEX) || [];
+          for (const rawUrl of urls) {
+            let hostname;
+            try {
+              hostname = new URL(rawUrl).hostname.replace(/^www\./, '');
+            } catch {
+              continue;
+            }
+            const phishing = await isPhishingDomain(hostname);
+            if (phishing) {
+              await message.delete().catch(() => {});
+              const warn = await message.channel.send(
+                `🚨 ${message.author}, that link has been flagged as a **phishing** URL and was removed.`
+              );
+              setTimeout(() => warn.delete().catch(() => {}), 8000);
+              const modLogChannel = moderationManager.getModLogChannel(message.guildId);
+              if (modLogChannel) {
+                const ch = await client.channels.fetch(modLogChannel).catch(() => null);
+                if (ch) {
+                  const embed = new EmbedBuilder()
+                    .setColor(0xff0000)
+                    .setTitle('🚨 Phishing Link Detected')
+                    .addFields(
+                      {
+                        name: 'User',
+                        value: `${message.author.tag} (${message.author.id})`,
+                        inline: true,
+                      },
+                      { name: 'Channel', value: message.channel.toString(), inline: true },
+                      { name: 'Domain', value: hostname },
+                      { name: 'Message', value: message.content.substring(0, 500) }
+                    )
+                    .setTimestamp();
+                  await ch.send({ embeds: [embed] });
+                }
+              }
+              return;
+            }
+          }
+
+          // Anti-invite filter — block external Discord invites
+          if (settings.blockInvites) {
+            const inviteMatches = message.content.match(INVITE_REGEX);
+            if (inviteMatches && inviteMatches.length > 0) {
+              const guildInvites = await message.guild.invites.fetch().catch(() => null);
+              const ownCodes = guildInvites
+                ? new Set([...guildInvites.values()].map((i) => i.code))
+                : new Set();
+              const hasExternal = inviteMatches.some((m) => {
+                const code = m.split('/').pop();
+                return !ownCodes.has(code);
+              });
+              if (hasExternal) {
+                await message.delete().catch(() => {});
+                const warn = await message.channel.send(
+                  `⚠️ ${message.author}, external Discord invites are not allowed here.`
+                );
+                setTimeout(() => warn.delete().catch(() => {}), 6000);
+                return;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Anti-phishing/invite check error:', err);
+      }
+    }
+
+    // ── Bump reminder detection (Disboard bot) ────────────────────────────
+    if (message.author.id === '302050872383242240' && message.embeds.length > 0) {
+      const embedDesc = message.embeds[0]?.description || '';
+      if (
+        embedDesc.includes('Bump done') ||
+        embedDesc.includes('bump done') ||
+        embedDesc.toLowerCase().includes('bumped')
+      ) {
+        try {
+          const bumpSettings = settingsManager.get(message.guildId);
+          if (bumpSettings?.bumpReminderEnabled && bumpSettings?.bumpReminderChannel) {
+            const ch = await client.channels
+              .fetch(bumpSettings.bumpReminderChannel)
+              .catch(() => null);
+            if (ch) {
+              setTimeout(
+                async () => {
+                  const mention = bumpSettings.bumpReminderRole
+                    ? `<@&${bumpSettings.bumpReminderRole}>`
+                    : '@here';
+                  await ch
+                    .send(
+                      `🔔 ${mention} It's been **2 hours** — time to \`/bump\` the server on Disboard!`
+                    )
+                    .catch(() => {});
+                },
+                2 * 60 * 60 * 1000
+              );
+            }
+          }
+        } catch (err) {
+          console.error('Bump reminder error:', err);
+        }
+      }
+    }
+
+    // Track message statistics
+    try {
+      const isMediaMessage = messageHasMediaContent(message);
+      await activityTracker.recordActivity(message.guildId, message.author.id, 'message');
+      await statsManager.recordMessage(message.guildId, message.author.id, message.channelId);
+      await seasonManager.addMessageActivity(message.guildId, message.author.id, {
+        username: message.author.username,
+        channelId: message.channelId,
+        isMedia: isMediaMessage,
+      });
+    } catch (error) {
+      console.error('Stats tracking error:', error);
+    }
+
+    try {
+      await achievementManager.syncUser(message.guildId, message.author.id, { firstMessage: true });
+    } catch (error) {
+      console.error('Achievement tracking error:', error);
+    }
+
+    // ── Sticky messages ───────────────────────────────────────────────────
+    stickyMessages.handleMessage(message).catch(() => {});
+
+    // Add XP (5-15 XP per message, with cooldown)
+    try {
+      const features = settingsManager.get(message.guildId).features || {};
+      if (features.leveling !== false) {
+        const xpCooldown = 60000; // 1 minute cooldown
+        const lastXpKey = `${message.guildId}_${message.author.id}_lastXP`;
+
+        if (!global[lastXpKey] || Date.now() - global[lastXpKey] > xpCooldown) {
+          // Apply channel XP multiplier + global XP event multiplier
+          const channelMultiplier = levelRewardsManager.getXPMultiplier(
+            message.guildId,
+            message.channelId
+          );
+          const eventMultiplier = economyManager.getXPMultiplier(message.guildId);
+          const baseXP = Math.floor(Math.random() * 11) + 5; // 5-15 XP
+          const xpGain = Math.floor(baseXP * channelMultiplier * eventMultiplier);
+
+          // Set cooldown immediately so it persists even if notification fails below
+          global[lastXpKey] = Date.now();
+
+          const result = await economyManager.addXP(message.guildId, message.author.id, xpGain);
+
+          if (result.leveledUp) {
+            const reward = result.level * 100;
+            await economyManager.addMoney(message.guildId, message.author.id, reward);
+
+            // Check for level role rewards
+            const roleReward = levelRewardsManager.getRoleForLevel(message.guildId, result.level);
+            let roleRewardText = '';
+
+            if (roleReward) {
+              try {
+                const role = await message.guild.roles.fetch(roleReward);
+                if (role) {
+                  await message.member.roles.add(role);
+                  roleRewardText = `\\n🎭 You earned the **${role.name}** role!`;
+
+                  // Remove lower level roles if not stacking
+                  const settings = levelRewardsManager.getSettings(message.guildId);
+                  if (!settings.stackRoles) {
+                    const allRewards = levelRewardsManager.getAllRewardsSorted(message.guildId);
+                    for (const oldReward of allRewards) {
+                      if (oldReward.level < result.level && oldReward.roleId !== roleReward) {
+                        const oldRole = message.member.roles.cache.get(oldReward.roleId);
+                        if (oldRole) {
+                          await message.member.roles.remove(oldRole).catch(() => {});
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error('Error assigning level role:', error);
+              }
+            }
+
+            const settings = levelRewardsManager.getSettings(message.guildId);
+            if (settings.notificationsEnabled) {
+              const embed = new EmbedBuilder()
+                .setColor('#FFD700')
+                .setTitle('🎉 Level Up!')
+                .setDescription(
+                  `${message.author} reached level **${result.level}**!${roleRewardText}`
+                )
+                .addFields({ name: 'Reward', value: `💰 ${reward} coins` })
+                .setThumbnail(message.author.displayAvatarURL())
+                .setTimestamp();
+
+              await message.channel.send({ content: `${message.author}`, embeds: [embed] });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('XP tracking error:', error);
+    }
+
+    try {
+      await telegramSyncManager.relayDiscordMessage(message);
+    } catch (error) {
+      console.error('Telegram sync relay error:', error.message);
+    }
+
+    // Check for custom commands (uses server prefixes)
+    const prefixes = settingsManager.getPrefixes(message.guildId);
+    const usedPrefix = prefixes.find((prefix) => message.content.startsWith(prefix));
+
+    if (usedPrefix) {
+      const args = message.content.slice(usedPrefix.length).trim().split(/ +/);
+      const commandName = (args[0] || '').toLowerCase();
+      const customCommand = customCommandManager.getCommand(message.guildId, commandName);
+
+      if (customCommand) {
+        try {
+          return message.reply(customCommand);
+        } catch (error) {
+          console.error('Custom command error:', error);
+        }
+      }
+    }
+
+    // Command handling is done in index.js through CommandHandler
+  },
+};

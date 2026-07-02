@@ -4,203 +4,203 @@ const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('./discordFetch');
 
 class ScheduledMessagesManager {
-    constructor() {
-        this.dataPath = path.join(__dirname, '..', 'data', 'scheduledMessages.json');
-        this.data = {
-            messages: {} // { guildId: { messageId: { channelId, content, schedule, lastSent, enabled } } }
-        };
-        this.client = null;
-        this.intervals = new Map();
-        this.inFlight = new Set();
-    }
+  constructor() {
+    this.dataPath = path.join(__dirname, '..', 'data', 'scheduledMessages.json');
+    this.data = {
+      messages: {}, // { guildId: { messageId: { channelId, content, schedule, lastSent, enabled } } }
+    };
+    this.client = null;
+    this.intervals = new Map();
+    this.inFlight = new Set();
+  }
 
-    async init(client = null) {
-        if (client) this.client = client;
+  async init(client = null) {
+    if (client) this.client = client;
 
-        try {
-            const dataDir = path.dirname(this.dataPath);
-            await fs.mkdir(dataDir, { recursive: true });
-            const data = await fs.readFile(this.dataPath, 'utf8');
-            this.data = JSON.parse(data);
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                await this.save();
-            } else {
-                console.error('Error loading scheduled messages:', error);
-            }
-        }
-
-        // Start all active schedules
-        if (this.client) {
-            this.startAllSchedules();
-        }
-    }
-
-    async save() {
-        try {
-            await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
-        } catch (error) {
-            console.error('Error saving scheduled messages:', error);
-        }
-    }
-
-    async createScheduledMessage(guildId, channelId, content, schedule) {
-        if (!this.data.messages[guildId]) {
-            this.data.messages[guildId] = {};
-        }
-
-        const messageId = `${guildId}_${Date.now()}`;
-        this.data.messages[guildId][messageId] = {
-            id: messageId,
-            channelId,
-            content,
-            schedule, // { type: 'interval', value: hours } or { type: 'cron', value: '0 12 * * *' }
-            lastSent: null,
-            enabled: true,
-            createdAt: new Date().toISOString()
-        };
-
+    try {
+      const dataDir = path.dirname(this.dataPath);
+      await fs.mkdir(dataDir, { recursive: true });
+      const data = await fs.readFile(this.dataPath, 'utf8');
+      this.data = JSON.parse(data);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
         await this.save();
-
-        // Start the schedule
-        if (this.client) {
-            this.startSchedule(guildId, messageId);
-        }
-
-        return messageId;
+      } else {
+        console.error('Error loading scheduled messages:', error);
+      }
     }
 
-    async deleteScheduledMessage(guildId, messageId) {
-        if (this.data.messages[guildId]?.[messageId]) {
-            // Stop the interval
-            this.stopSchedule(messageId);
-            
-            delete this.data.messages[guildId][messageId];
-            await this.save();
-            return true;
-        }
-        return false;
+    // Start all active schedules
+    if (this.client) {
+      this.startAllSchedules();
+    }
+  }
+
+  async save() {
+    try {
+      await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
+    } catch (error) {
+      console.error('Error saving scheduled messages:', error);
+    }
+  }
+
+  async createScheduledMessage(guildId, channelId, content, schedule) {
+    if (!this.data.messages[guildId]) {
+      this.data.messages[guildId] = {};
     }
 
-    async toggleScheduledMessage(guildId, messageId, enabled) {
-        const message = this.data.messages[guildId]?.[messageId];
-        if (message) {
-            message.enabled = enabled;
-            await this.save();
+    const messageId = `${guildId}_${Date.now()}`;
+    this.data.messages[guildId][messageId] = {
+      id: messageId,
+      channelId,
+      content,
+      schedule, // { type: 'interval', value: hours } or { type: 'cron', value: '0 12 * * *' }
+      lastSent: null,
+      enabled: true,
+      createdAt: new Date().toISOString(),
+    };
 
-            if (enabled) {
-                this.startSchedule(guildId, messageId);
-            } else {
-                this.stopSchedule(messageId);
-            }
-            return true;
-        }
-        return false;
+    await this.save();
+
+    // Start the schedule
+    if (this.client) {
+      this.startSchedule(guildId, messageId);
     }
 
-    getGuildMessages(guildId) {
-        return Object.values(this.data.messages[guildId] || {});
+    return messageId;
+  }
+
+  async deleteScheduledMessage(guildId, messageId) {
+    if (this.data.messages[guildId]?.[messageId]) {
+      // Stop the interval
+      this.stopSchedule(messageId);
+
+      delete this.data.messages[guildId][messageId];
+      await this.save();
+      return true;
     }
+    return false;
+  }
 
-    getMessage(guildId, messageId) {
-        return this.data.messages[guildId]?.[messageId] || null;
-    }
+  async toggleScheduledMessage(guildId, messageId, enabled) {
+    const message = this.data.messages[guildId]?.[messageId];
+    if (message) {
+      message.enabled = enabled;
+      await this.save();
 
-    startSchedule(guildId, messageId) {
-        const message = this.getMessage(guildId, messageId);
-        if (!message || !message.enabled || !this.client) return;
-
-        // Clear existing interval if any
+      if (enabled) {
+        this.startSchedule(guildId, messageId);
+      } else {
         this.stopSchedule(messageId);
-
-        const intervalMs = this.getIntervalMs(message.schedule);
-        if (!intervalMs) return;
-
-        const interval = setInterval(async () => {
-            await this.sendScheduledMessage(guildId, messageId);
-        }, intervalMs);
-
-        this.intervals.set(messageId, interval);
-
-        // Send immediately if never sent
-        if (!message.lastSent) {
-            this.sendScheduledMessage(guildId, messageId);
-        }
+      }
+      return true;
     }
+    return false;
+  }
 
-    stopSchedule(messageId) {
-        const interval = this.intervals.get(messageId);
-        if (interval) {
-            clearInterval(interval);
-            this.intervals.delete(messageId);
-        }
+  getGuildMessages(guildId) {
+    return Object.values(this.data.messages[guildId] || {});
+  }
+
+  getMessage(guildId, messageId) {
+    return this.data.messages[guildId]?.[messageId] || null;
+  }
+
+  startSchedule(guildId, messageId) {
+    const message = this.getMessage(guildId, messageId);
+    if (!message || !message.enabled || !this.client) return;
+
+    // Clear existing interval if any
+    this.stopSchedule(messageId);
+
+    const intervalMs = this.getIntervalMs(message.schedule);
+    if (!intervalMs) return;
+
+    const interval = setInterval(async () => {
+      await this.sendScheduledMessage(guildId, messageId);
+    }, intervalMs);
+
+    this.intervals.set(messageId, interval);
+
+    // Send immediately if never sent
+    if (!message.lastSent) {
+      this.sendScheduledMessage(guildId, messageId);
     }
+  }
 
-    startAllSchedules() {
-        for (const guildId in this.data.messages) {
-            for (const messageId in this.data.messages[guildId]) {
-                const message = this.data.messages[guildId][messageId];
-                if (message.enabled) {
-                    this.startSchedule(guildId, messageId);
-                }
-            }
-        }
+  stopSchedule(messageId) {
+    const interval = this.intervals.get(messageId);
+    if (interval) {
+      clearInterval(interval);
+      this.intervals.delete(messageId);
     }
+  }
 
-    stopAllSchedules() {
-        for (const interval of this.intervals.values()) {
-            clearInterval(interval);
+  startAllSchedules() {
+    for (const guildId in this.data.messages) {
+      for (const messageId in this.data.messages[guildId]) {
+        const message = this.data.messages[guildId][messageId];
+        if (message.enabled) {
+          this.startSchedule(guildId, messageId);
         }
-        this.intervals.clear();
+      }
     }
+  }
 
-    async sendScheduledMessage(guildId, messageId) {
-        const message = this.getMessage(guildId, messageId);
-        if (!message || !this.client) return;
-        if (this.inFlight.has(messageId)) return;
-        this.inFlight.add(messageId);
+  stopAllSchedules() {
+    for (const interval of this.intervals.values()) {
+      clearInterval(interval);
+    }
+    this.intervals.clear();
+  }
 
+  async sendScheduledMessage(guildId, messageId) {
+    const message = this.getMessage(guildId, messageId);
+    if (!message || !this.client) return;
+    if (this.inFlight.has(messageId)) return;
+    this.inFlight.add(messageId);
+
+    try {
+      const channel = await fetchChannelSafe(this.client, message.channelId);
+      if (!channel || !channel.isTextBased()) return;
+
+      // Parse content for embeds
+      if (message.content.startsWith('{') && message.content.includes('"embed"')) {
         try {
-            const channel = await fetchChannelSafe(this.client, message.channelId);
-            if (!channel || !channel.isTextBased()) return;
-
-            // Parse content for embeds
-            if (message.content.startsWith('{') && message.content.includes('"embed"')) {
-                try {
-                    const data = JSON.parse(message.content);
-                    if (data.embed) {
-                        const embed = new EmbedBuilder(data.embed);
-                        await channel.send({ embeds: [embed] });
-                    } else {
-                        await channel.send(data.content || message.content);
-                    }
-                } catch {
-                    await channel.send(message.content);
-                }
-            } else {
-                await channel.send(message.content);
-            }
-
-            // Update last sent time
-            message.lastSent = new Date().toISOString();
-            await this.save();
-
-            console.log(`📅 Sent scheduled message ${messageId} in guild ${guildId}`);
-        } catch (error) {
-            console.error(`Error sending scheduled message ${messageId}:`, error);
-        } finally {
-            this.inFlight.delete(messageId);
+          const data = JSON.parse(message.content);
+          if (data.embed) {
+            const embed = new EmbedBuilder(data.embed);
+            await channel.send({ embeds: [embed] });
+          } else {
+            await channel.send(data.content || message.content);
+          }
+        } catch {
+          await channel.send(message.content);
         }
-    }
+      } else {
+        await channel.send(message.content);
+      }
 
-    getIntervalMs(schedule) {
-        if (schedule.type === 'interval') {
-            return schedule.value * 60 * 60 * 1000; // Convert hours to ms
-        }
-        // For cron-style schedules, you'd need a cron parser library
-        // For now, just support interval
-        return null;
+      // Update last sent time
+      message.lastSent = new Date().toISOString();
+      await this.save();
+
+      console.log(`📅 Sent scheduled message ${messageId} in guild ${guildId}`);
+    } catch (error) {
+      console.error(`Error sending scheduled message ${messageId}:`, error);
+    } finally {
+      this.inFlight.delete(messageId);
     }
+  }
+
+  getIntervalMs(schedule) {
+    if (schedule.type === 'interval') {
+      return schedule.value * 60 * 60 * 1000; // Convert hours to ms
+    }
+    // For cron-style schedules, you'd need a cron parser library
+    // For now, just support interval
+    return null;
+  }
 }
 
 module.exports = new ScheduledMessagesManager();

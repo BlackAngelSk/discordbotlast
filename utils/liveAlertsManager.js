@@ -17,802 +17,902 @@ const YOUTUBE_SEND_DEDUPE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const TWITCH_SEND_DEDUPE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function parseXmlText(xml, tag) {
-    const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i'));
-    return m ? m[1].trim() : null;
+  const m = xml.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\/${tag}>`, 'i'));
+  return m ? m[1].trim() : null;
 }
 
 function parseYouTubeRssFeed(xml) {
-    // Find first <entry> block.
-    const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
-    if (!entryMatch) return null;
-    const entry = entryMatch[1];
+  // Find first <entry> block.
+  const entryMatch = xml.match(/<entry>([\s\S]*?)<\/entry>/);
+  if (!entryMatch) return null;
+  const entry = entryMatch[1];
 
-    const videoIdRaw = parseXmlText(entry, 'yt:videoId');
-    const title = parseXmlText(entry, 'title');
-    const channelName = parseXmlText(xml, 'title'); // channel title is before entries
-    const mediaThumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]+)"/i);
-    const thumb = buildYouTubeThumbnailUrl(
-        videoIdRaw,
-        mediaThumbMatch?.[1] || (entry.match(/medium_url="([^"]+)"/))?.[1] || null
-    );
+  const videoIdRaw = parseXmlText(entry, 'yt:videoId');
+  const title = parseXmlText(entry, 'title');
+  const channelName = parseXmlText(xml, 'title'); // channel title is before entries
+  const mediaThumbMatch = entry.match(/<media:thumbnail[^>]*url="([^"]+)"/i);
+  const thumb = buildYouTubeThumbnailUrl(
+    videoIdRaw,
+    mediaThumbMatch?.[1] || entry.match(/medium_url="([^"]+)"/)?.[1] || null
+  );
 
-    return videoIdRaw ? { videoId: videoIdRaw, title: title || 'New Video', channelName: channelName || null, thumb } : null;
+  return videoIdRaw
+    ? { videoId: videoIdRaw, title: title || 'New Video', channelName: channelName || null, thumb }
+    : null;
 }
 
 function isHttpUrl(value) {
-    if (!value) return false;
-    try {
-        const parsed = new URL(String(value));
-        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-    } catch {
-        return false;
-    }
+  if (!value) return false;
+  try {
+    const parsed = new URL(String(value));
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function isLikelyImageUrl(value) {
-    if (!isHttpUrl(value)) return false;
+  if (!isHttpUrl(value)) return false;
 
-    try {
-        const parsed = new URL(String(value));
-        const host = parsed.hostname.toLowerCase();
-        const pathName = parsed.pathname.toLowerCase();
+  try {
+    const parsed = new URL(String(value));
+    const host = parsed.hostname.toLowerCase();
+    const pathName = parsed.pathname.toLowerCase();
 
-        // YouTube thumbnails are served from ytimg hosts and may not include extensions.
-        if (host.includes('ytimg.com') || host.includes('ggpht.com')) return true;
+    // YouTube thumbnails are served from ytimg hosts and may not include extensions.
+    if (host.includes('ytimg.com') || host.includes('ggpht.com')) return true;
 
-        // Generic image URL fallback.
-        return /(\.png|\.jpe?g|\.gif|\.webp|\.bmp)$/.test(pathName);
-    } catch {
-        return false;
-    }
+    // Generic image URL fallback.
+    return /(\.png|\.jpe?g|\.gif|\.webp|\.bmp)$/.test(pathName);
+  } catch {
+    return false;
+  }
 }
 
 function buildYouTubeThumbnailUrl(videoId, preferredUrl = null) {
-    if (isLikelyImageUrl(preferredUrl)) return preferredUrl;
-    if (!videoId) return null;
-    return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
+  if (isLikelyImageUrl(preferredUrl)) return preferredUrl;
+  if (!videoId) return null;
+  return `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
 }
 
 function httpsRequest(url, { method = 'GET', headers = {}, body = null } = {}) {
-    return new Promise((resolve, reject) => {
-        const payload = typeof body === 'string' ? body : body ? JSON.stringify(body) : null;
-        const requestHeaders = { ...headers };
+  return new Promise((resolve, reject) => {
+    const payload = typeof body === 'string' ? body : body ? JSON.stringify(body) : null;
+    const requestHeaders = { ...headers };
 
-        if (payload && !requestHeaders['Content-Length']) {
-            requestHeaders['Content-Length'] = Buffer.byteLength(payload);
+    if (payload && !requestHeaders['Content-Length']) {
+      requestHeaders['Content-Length'] = Buffer.byteLength(payload);
+    }
+
+    const req = https.request(url, { method, headers: requestHeaders, timeout: 8000 }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => {
+        try {
+          resolve({ status: res.statusCode, headers: res.headers || {}, body: JSON.parse(data) });
+        } catch {
+          resolve({ status: res.statusCode, headers: res.headers || {}, body: data });
         }
-
-        const req = https.request(url, { method, headers: requestHeaders, timeout: 8000 }, res => {
-            let data = '';
-            res.on('data', c => (data += c));
-            res.on('end', () => {
-                try { resolve({ status: res.statusCode, headers: res.headers || {}, body: JSON.parse(data) }); }
-                catch { resolve({ status: res.statusCode, headers: res.headers || {}, body: data }); }
-            });
-        });
-
-        req.on('error', reject);
-        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
-
-        if (payload) req.write(payload);
-        req.end();
+      });
     });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('timeout'));
+    });
+
+    if (payload) req.write(payload);
+    req.end();
+  });
 }
 
 function httpsGet(url, headers = {}) {
-    return httpsRequest(url, { method: 'GET', headers });
+  return httpsRequest(url, { method: 'GET', headers });
 }
 
 function normalizeYouTubeChannelIdentifier(input) {
-    const value = String(input || '').trim();
-    if (!value) return value;
+  const value = String(input || '').trim();
+  if (!value) return value;
 
-    // Accept direct UC channel IDs anywhere in the string (raw value or URL).
-    const match = value.match(/(UC[\w-]{22})/);
-    if (match) return match[1];
+  // Accept direct UC channel IDs anywhere in the string (raw value or URL).
+  const match = value.match(/(UC[\w-]{22})/);
+  if (match) return match[1];
 
-    // Normalize handles from URLs or raw input so downstream resolution is consistent.
-    const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
-    if (handleMatch?.[1]) {
-        return `@${handleMatch[1]}`;
-    }
+  // Normalize handles from URLs or raw input so downstream resolution is consistent.
+  const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
+  if (handleMatch?.[1]) {
+    return `@${handleMatch[1]}`;
+  }
 
-    return value;
+  return value;
 }
 
 function buildYouTubeChannelUrl(input, fallbackChannelId = null) {
-    const value = String(input || '').trim();
+  const value = String(input || '').trim();
 
-    if (value.includes('youtube.com') || value.includes('youtu.be')) {
-        return value;
-    }
+  if (value.includes('youtube.com') || value.includes('youtu.be')) {
+    return value;
+  }
 
-    const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
-    if (handleMatch?.[1]) {
-        return `https://www.youtube.com/@${handleMatch[1]}`;
-    }
+  const handleMatch = value.match(/@([A-Za-z0-9._-]+)/);
+  if (handleMatch?.[1]) {
+    return `https://www.youtube.com/@${handleMatch[1]}`;
+  }
 
-    const ucMatch = value.match(/(UC[\w-]{22})/) || String(fallbackChannelId || '').match(/(UC[\w-]{22})/);
-    if (ucMatch?.[1]) {
-        return `https://www.youtube.com/channel/${ucMatch[1]}`;
-    }
+  const ucMatch =
+    value.match(/(UC[\w-]{22})/) || String(fallbackChannelId || '').match(/(UC[\w-]{22})/);
+  if (ucMatch?.[1]) {
+    return `https://www.youtube.com/channel/${ucMatch[1]}`;
+  }
 
-    return null;
+  return null;
 }
 
 class LiveAlertsManager {
-    constructor() {
-        // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, channelName?, discordChannelId, roleId?, lastVideoId }] } }
-        this.data = {};
-        this._twitchToken = null;
-        this._twitchTokenExpiry = 0;
-        this._interval = null;
-        this._warnedMissingTwitchCredentials = false;
-        this._warnedTwitchAuthFailure = false;
-        this._youtubeQuotaBlockedUntil = 0;
-        this._warnedYouTubeQuota = false;
-        this._youtubeFailureCount = {}; // Track consecutive 404 failures per channel
-        this._youtubeFailureThreshold = 3; // Remove channel after N consecutive 404s
-        this._youtubeUnresolvedIdentifierWarned = {}; // Track unresolved non-UC identifiers to avoid log spam
-        this._pollInProgress = false;
-        this._guildPollInProgress = new Set();
-        this._recentYouTubeSends = new Map();
-        this._recentTwitchSends = new Map();
+  constructor() {
+    // data: { guildId: { twitch: [{ username, channelId, roleId?, lastLive }], youtube: [{ channelId, channelName?, discordChannelId, roleId?, lastVideoId }] } }
+    this.data = {};
+    this._twitchToken = null;
+    this._twitchTokenExpiry = 0;
+    this._interval = null;
+    this._warnedMissingTwitchCredentials = false;
+    this._warnedTwitchAuthFailure = false;
+    this._youtubeQuotaBlockedUntil = 0;
+    this._warnedYouTubeQuota = false;
+    this._youtubeFailureCount = {}; // Track consecutive 404 failures per channel
+    this._youtubeFailureThreshold = 3; // Remove channel after N consecutive 404s
+    this._youtubeUnresolvedIdentifierWarned = {}; // Track unresolved non-UC identifiers to avoid log spam
+    this._pollInProgress = false;
+    this._guildPollInProgress = new Set();
+    this._recentYouTubeSends = new Map();
+    this._recentTwitchSends = new Map();
+  }
+
+  _buildYouTubeSendKey(guildId, entry, item) {
+    const channelId = String(entry?.discordChannelId || '');
+    const videoId = String(item?.videoId || item?.id?.videoId || '').trim();
+    if (!guildId || !channelId || !videoId) return null;
+    return `yt:${guildId}:${channelId}:${videoId}`;
+  }
+
+  _buildTwitchSendKey(guildId, entry, stream) {
+    const channelId = String(entry?.channelId || '');
+    const streamId = String(stream?.id || '').trim();
+    const startedAt = String(stream?.started_at || '').trim();
+    const identity = streamId || `${String(entry?.username || '').toLowerCase()}:${startedAt}`;
+    if (!guildId || !channelId || !identity) return null;
+    return `tw:${guildId}:${channelId}:${identity}`;
+  }
+
+  _isDuplicateSend(cache, key, ttlMs) {
+    if (!key) return false;
+    const now = Date.now();
+
+    for (const [existingKey, timestamp] of cache.entries()) {
+      if (now - timestamp > ttlMs) {
+        cache.delete(existingKey);
+      }
     }
 
-    _buildYouTubeSendKey(guildId, entry, item) {
-        const channelId = String(entry?.discordChannelId || '');
-        const videoId = String(item?.videoId || item?.id?.videoId || '').trim();
-        if (!guildId || !channelId || !videoId) return null;
-        return `yt:${guildId}:${channelId}:${videoId}`;
+    const lastSentAt = cache.get(key);
+    if (lastSentAt && now - lastSentAt < ttlMs) {
+      return true;
     }
 
-    _buildTwitchSendKey(guildId, entry, stream) {
-        const channelId = String(entry?.channelId || '');
-        const streamId = String(stream?.id || '').trim();
-        const startedAt = String(stream?.started_at || '').trim();
-        const identity = streamId || `${String(entry?.username || '').toLowerCase()}:${startedAt}`;
-        if (!guildId || !channelId || !identity) return null;
-        return `tw:${guildId}:${channelId}:${identity}`;
+    cache.set(key, now);
+    return false;
+  }
+
+  async init(client) {
+    try {
+      const raw = await fs.readFile(DATA_FILE, 'utf8');
+      this.data = JSON.parse(raw);
+    } catch {
+      await this.save();
+    }
+    this._client = client;
+    this._startPolling();
+  }
+
+  async save() {
+    await fs.writeFile(DATA_FILE, JSON.stringify(this.data, null, 2));
+  }
+
+  // ── Config methods ────────────────────────────────────────────────────────
+  async addTwitchAlert(guildId, twitchUsername, discordChannelId, roleId = null) {
+    if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
+    const existing = this.data[guildId].twitch.find(
+      (e) => e.username.toLowerCase() === twitchUsername.toLowerCase()
+    );
+    if (existing) {
+      existing.channelId = discordChannelId;
+      existing.roleId = roleId;
+    } else
+      this.data[guildId].twitch.push({
+        username: twitchUsername.toLowerCase(),
+        channelId: discordChannelId,
+        roleId,
+        lastLive: false,
+      });
+    await this.save();
+    setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
+  }
+
+  async removeTwitchAlert(guildId, twitchUsername) {
+    if (!this.data[guildId]) return;
+    this.data[guildId].twitch = this.data[guildId].twitch.filter(
+      (e) => e.username !== twitchUsername.toLowerCase()
+    );
+    await this.save();
+  }
+
+  async addYouTubeAlert(guildId, ytChannelId, discordChannelId, roleId = null, channelUrl = null) {
+    if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
+    const originalIdentifier = String(ytChannelId || '').trim();
+    const normalizedChannelId = normalizeYouTubeChannelIdentifier(originalIdentifier);
+    const existing = this.data[guildId].youtube.find(
+      (e) =>
+        e.channelId === normalizedChannelId ||
+        normalizeYouTubeChannelIdentifier(e.sourceIdentifier || '') === normalizedChannelId
+    );
+
+    const constructedUrl = buildYouTubeChannelUrl(
+      channelUrl || originalIdentifier,
+      normalizedChannelId
+    );
+
+    if (existing) {
+      existing.discordChannelId = discordChannelId;
+      existing.roleId = roleId;
+      existing.sourceIdentifier =
+        originalIdentifier || existing.sourceIdentifier || existing.channelId;
+      existing.channelUrl =
+        constructedUrl ||
+        existing.channelUrl ||
+        buildYouTubeChannelUrl(existing.sourceIdentifier, existing.channelId);
+    } else {
+      this.data[guildId].youtube.push({
+        channelId: normalizedChannelId,
+        sourceIdentifier: originalIdentifier || normalizedChannelId,
+        channelName: null,
+        discordChannelId,
+        roleId,
+        lastVideoId: null,
+        channelUrl: constructedUrl,
+      });
+    }
+    await this.save();
+    setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
+  }
+
+  async removeYouTubeAlert(guildId, ytChannelId) {
+    if (!this.data[guildId]) return;
+    const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
+    this.data[guildId].youtube = this.data[guildId].youtube.filter(
+      (e) => e.channelId !== normalizedChannelId
+    );
+    await this.save();
+  }
+
+  getAlerts(guildId) {
+    return this.data[guildId] || { twitch: [], youtube: [] };
+  }
+
+  async sendTestAlert(guildId, platform, identifier = null) {
+    const config = this.data[guildId] || { twitch: [], youtube: [] };
+    const normalizedPlatform = String(platform || '').toLowerCase();
+
+    if (!['twitch', 'youtube'].includes(normalizedPlatform)) {
+      return { success: false, error: 'Platform must be twitch or youtube.' };
     }
 
-    _isDuplicateSend(cache, key, ttlMs) {
-        if (!key) return false;
-        const now = Date.now();
+    if (normalizedPlatform === 'twitch') {
+      const normalizedIdentifier = String(identifier || '')
+        .trim()
+        .toLowerCase();
+      const entry = normalizedIdentifier
+        ? (config.twitch || []).find((item) => item.username === normalizedIdentifier)
+        : (config.twitch || [])[0];
 
-        for (const [existingKey, timestamp] of cache.entries()) {
-            if (now - timestamp > ttlMs) {
-                cache.delete(existingKey);
-            }
-        }
-
-        const lastSentAt = cache.get(key);
-        if (lastSentAt && now - lastSentAt < ttlMs) {
-            return true;
-        }
-
-        cache.set(key, now);
-        return false;
-    }
-
-    async init(client) {
-        try {
-            const raw = await fs.readFile(DATA_FILE, 'utf8');
-            this.data = JSON.parse(raw);
-        } catch {
-            await this.save();
-        }
-        this._client = client;
-        this._startPolling();
-    }
-
-    async save() {
-        await fs.writeFile(DATA_FILE, JSON.stringify(this.data, null, 2));
-    }
-
-    // ── Config methods ────────────────────────────────────────────────────────
-    async addTwitchAlert(guildId, twitchUsername, discordChannelId, roleId = null) {
-        if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
-        const existing = this.data[guildId].twitch.find(e => e.username.toLowerCase() === twitchUsername.toLowerCase());
-        if (existing) { existing.channelId = discordChannelId; existing.roleId = roleId; }
-        else this.data[guildId].twitch.push({ username: twitchUsername.toLowerCase(), channelId: discordChannelId, roleId, lastLive: false });
-        await this.save();
-        setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
-    }
-
-    async removeTwitchAlert(guildId, twitchUsername) {
-        if (!this.data[guildId]) return;
-        this.data[guildId].twitch = this.data[guildId].twitch.filter(e => e.username !== twitchUsername.toLowerCase());
-        await this.save();
-    }
-
-    async addYouTubeAlert(guildId, ytChannelId, discordChannelId, roleId = null, channelUrl = null) {
-        if (!this.data[guildId]) this.data[guildId] = { twitch: [], youtube: [] };
-        const originalIdentifier = String(ytChannelId || '').trim();
-        const normalizedChannelId = normalizeYouTubeChannelIdentifier(originalIdentifier);
-        const existing = this.data[guildId].youtube.find(e =>
-            e.channelId === normalizedChannelId
-            || normalizeYouTubeChannelIdentifier(e.sourceIdentifier || '') === normalizedChannelId
-        );
-
-        const constructedUrl = buildYouTubeChannelUrl(channelUrl || originalIdentifier, normalizedChannelId);
-
-        if (existing) {
-            existing.discordChannelId = discordChannelId;
-            existing.roleId = roleId;
-            existing.sourceIdentifier = originalIdentifier || existing.sourceIdentifier || existing.channelId;
-            existing.channelUrl = constructedUrl || existing.channelUrl || buildYouTubeChannelUrl(existing.sourceIdentifier, existing.channelId);
-        } else {
-            this.data[guildId].youtube.push({
-                channelId: normalizedChannelId,
-                sourceIdentifier: originalIdentifier || normalizedChannelId,
-                channelName: null,
-                discordChannelId,
-                roleId,
-                lastVideoId: null,
-                channelUrl: constructedUrl
-            });
-        }
-        await this.save();
-        setTimeout(() => this._pollGuild(guildId).catch(() => {}), 1500);
-    }
-
-    async removeYouTubeAlert(guildId, ytChannelId) {
-        if (!this.data[guildId]) return;
-        const normalizedChannelId = normalizeYouTubeChannelIdentifier(ytChannelId);
-        this.data[guildId].youtube = this.data[guildId].youtube.filter(e => e.channelId !== normalizedChannelId);
-        await this.save();
-    }
-
-    getAlerts(guildId) {
-        return this.data[guildId] || { twitch: [], youtube: [] };
-    }
-
-    async sendTestAlert(guildId, platform, identifier = null) {
-        const config = this.data[guildId] || { twitch: [], youtube: [] };
-        const normalizedPlatform = String(platform || '').toLowerCase();
-
-        if (!['twitch', 'youtube'].includes(normalizedPlatform)) {
-            return { success: false, error: 'Platform must be twitch or youtube.' };
-        }
-
-        if (normalizedPlatform === 'twitch') {
-            const normalizedIdentifier = String(identifier || '').trim().toLowerCase();
-            const entry = normalizedIdentifier
-                ? (config.twitch || []).find(item => item.username === normalizedIdentifier)
-                : (config.twitch || [])[0];
-
-            if (!entry) {
-                return {
-                    success: false,
-                    error: normalizedIdentifier
-                        ? `No Twitch alert found for "${normalizedIdentifier}".`
-                        : 'No Twitch alerts configured for this server.'
-                };
-            }
-
-            const now = Date.now();
-            const testStream = {
-                user_name: entry.username,
-                title: 'This is a test live alert from your Discord bot.',
-                game_name: 'Just Chatting',
-                viewer_count: Math.floor((now / 1000) % 150) + 1,
-                started_at: new Date(now - (15 * 60 * 1000)).toISOString()
-            };
-
-            await this._postTwitchAlert(guildId, entry, testStream);
-            return {
-                success: true,
-                platform: 'twitch',
-                target: entry.username,
-                channelId: entry.channelId
-            };
-        }
-
-        const normalizedIdentifier = normalizeYouTubeChannelIdentifier(identifier || '');
-        const entry = normalizedIdentifier
-            ? (config.youtube || []).find(item => normalizeYouTubeChannelIdentifier(item.channelId) === normalizedIdentifier)
-            : (config.youtube || [])[0];
-
-        if (!entry) {
-            return {
-                success: false,
-                error: normalizedIdentifier
-                    ? `No YouTube alert found for "${normalizedIdentifier}".`
-                    : 'No YouTube alerts configured for this server.'
-            };
-        }
-
-        const now = Date.now();
-        const testVideoId = `test${String(now).slice(-8)}`;
-        const testItem = {
-            videoId: testVideoId,
-            title: 'Test Upload Notification',
-            thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
-            snippet: {
-                channelTitle: entry.channelName || 'YouTube Channel',
-                description: 'This is a test YouTube alert embed to verify formatting and channel permissions.',
-                publishedAt: new Date(now).toISOString(),
-                thumbnails: {
-                    high: { url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' }
-                }
-            }
-        };
-
-        await this._postYouTubeAlert(guildId, entry, testItem);
+      if (!entry) {
         return {
-            success: true,
-            platform: 'youtube',
-            target: entry.channelName || entry.channelId,
-            channelId: entry.discordChannelId
+          success: false,
+          error: normalizedIdentifier
+            ? `No Twitch alert found for "${normalizedIdentifier}".`
+            : 'No Twitch alerts configured for this server.',
         };
+      }
+
+      const now = Date.now();
+      const testStream = {
+        user_name: entry.username,
+        title: 'This is a test live alert from your Discord bot.',
+        game_name: 'Just Chatting',
+        viewer_count: Math.floor((now / 1000) % 150) + 1,
+        started_at: new Date(now - 15 * 60 * 1000).toISOString(),
+      };
+
+      await this._postTwitchAlert(guildId, entry, testStream);
+      return {
+        success: true,
+        platform: 'twitch',
+        target: entry.username,
+        channelId: entry.channelId,
+      };
     }
 
-    // ── Twitch ────────────────────────────────────────────────────────────────
-    async _getTwitchToken() {
-        if (this._twitchToken && Date.now() < this._twitchTokenExpiry) return this._twitchToken;
+    const normalizedIdentifier = normalizeYouTubeChannelIdentifier(identifier || '');
+    const entry = normalizedIdentifier
+      ? (config.youtube || []).find(
+          (item) => normalizeYouTubeChannelIdentifier(item.channelId) === normalizedIdentifier
+        )
+      : (config.youtube || [])[0];
 
-        const clientId = process.env.TWITCH_CLIENT_ID;
-        const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-
-        if (!clientId || !clientSecret) {
-            if (!this._warnedMissingTwitchCredentials) {
-                console.warn('Twitch live alerts are disabled: TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are missing.');
-                this._warnedMissingTwitchCredentials = true;
-            }
-            return null;
-        }
-
-        try {
-            const body = new URLSearchParams({
-                client_id: clientId,
-                client_secret: clientSecret,
-                grant_type: 'client_credentials'
-            }).toString();
-
-            const res = await httpsRequest('https://id.twitch.tv/oauth2/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body
-            });
-
-            if (res.body?.access_token) {
-                this._twitchToken = res.body.access_token;
-                this._twitchTokenExpiry = Date.now() + ((res.body.expires_in || 3600) - 60) * 1000;
-                this._warnedTwitchAuthFailure = false;
-                return this._twitchToken;
-            }
-
-            if (!this._warnedTwitchAuthFailure) {
-                console.error('Twitch token request failed:', res.body?.message || `HTTP ${res.status}`);
-                this._warnedTwitchAuthFailure = true;
-            }
-        } catch (err) {
-            console.error('Twitch token error:', err.message);
-        }
-        return null;
+    if (!entry) {
+      return {
+        success: false,
+        error: normalizedIdentifier
+          ? `No YouTube alert found for "${normalizedIdentifier}".`
+          : 'No YouTube alerts configured for this server.',
+      };
     }
 
-    async _checkTwitch(entry, guildId) {
-        const token = await this._getTwitchToken();
-        if (!token) return;
-        const clientId = process.env.TWITCH_CLIENT_ID;
-        try {
-            const res = await httpsGet(
-                `https://api.twitch.tv/helix/streams?user_login=${entry.username}`,
-                { 'Client-ID': clientId, 'Authorization': `Bearer ${token}` }
-            );
-            const stream = res.body?.data?.[0];
-            const isLive = !!stream;
+    const now = Date.now();
+    const testVideoId = `test${String(now).slice(-8)}`;
+    const testItem = {
+      videoId: testVideoId,
+      title: 'Test Upload Notification',
+      thumb: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+      snippet: {
+        channelTitle: entry.channelName || 'YouTube Channel',
+        description:
+          'This is a test YouTube alert embed to verify formatting and channel permissions.',
+        publishedAt: new Date(now).toISOString(),
+        thumbnails: {
+          high: { url: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg' },
+        },
+      },
+    };
 
-            if (isLive && !entry.lastLive) {
-                entry.lastLive = true;
-                await this.save();
-                await this._postTwitchAlert(guildId, entry, stream);
-            } else if (!isLive && entry.lastLive) {
-                entry.lastLive = false;
-                await this.save();
-            }
-        } catch (err) {
-            console.error(`Twitch check error (${entry.username}):`, err.message);
-        }
-    }
+    await this._postYouTubeAlert(guildId, entry, testItem);
+    return {
+      success: true,
+      platform: 'youtube',
+      target: entry.channelName || entry.channelId,
+      channelId: entry.discordChannelId,
+    };
+  }
 
-    async _postTwitchAlert(guildId, entry, stream) {
-        if (!this._client) return;
-        const channel = this._client.channels.cache.get(entry.channelId);
-        if (!channel) return;
+  // ── Twitch ────────────────────────────────────────────────────────────────
+  async _getTwitchToken() {
+    if (this._twitchToken && Date.now() < this._twitchTokenExpiry) return this._twitchToken;
 
-        const twitchSendKey = this._buildTwitchSendKey(guildId, entry, stream);
-        if (this._isDuplicateSend(this._recentTwitchSends, twitchSendKey, TWITCH_SEND_DEDUPE_TTL_MS)) {
-            return;
-        }
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
-        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-        
-        const viewerCount = stream.viewer_count?.toString() || '0';
-        const gameEmoji = '🎮';
-        const viewerEmoji = '👥';
-        const liveEmoji = '🔴';
-        
-        const embed = new EmbedBuilder()
-            .setColor(0x9146ff)
-            .setAuthor({ name: `${stream.user_name}`, iconURL: `https://static-cdn.jtvnw.net/jtv_user_pictures/${entry.username.toLowerCase()}-profile_image-70x70.png` })
-            .setTitle(`${liveEmoji} NOW LIVE on Twitch!`)
-            .setURL(`https://twitch.tv/${entry.username}`)
-            .setDescription(`**${stream.title || 'No title provided'}**`)
-            .addFields(
-                { name: `${gameEmoji} Game`, value: stream.game_name || 'Unknown', inline: true },
-                { name: `${viewerEmoji} Viewers`, value: viewerCount, inline: true },
-                { name: '⏱️ Stream Started', value: `<t:${Math.floor(new Date(stream.started_at).getTime() / 1000)}:R>`, inline: false },
-            )
-            .setImage(`https://static-cdn.jtvnw.net/previews-ttv/live_user_${entry.username.toLowerCase()}-1280x720.jpg`)
-            .setFooter({ text: 'Twitch • Live Alert', iconURL: 'https://www.twitch.tv/favicon.ico' })
-            .setTimestamp();
-        
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setLabel('Watch Stream')
-                    .setURL(`https://twitch.tv/${entry.username}`)
-                    .setStyle(ButtonStyle.Link)
-                    .setEmoji('🔴'),
-            );
-        
-        const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
-        await channel.send({ content: `${mention}${liveEmoji} **${stream.user_name}** is now live!`, embeds: [embed], components: [buttons] }).catch(() => {});
-    }
-
-    // ── YouTube ───────────────────────────────────────────────────────────────
-    _isYouTubeQuotaError(errorBody, status, fallbackMessage = '') {
-        const message = String(
-            errorBody?.error?.message ||
-            fallbackMessage ||
-            ''
-        ).toLowerCase();
-
-        const reasons = Array.isArray(errorBody?.error?.errors)
-            ? errorBody.error.errors.map(e => String(e?.reason || '').toLowerCase())
-            : [];
-
-        if (message.includes('quota') || reasons.some(r => r.includes('quota') || r.includes('dailylimitexceeded'))) {
-            return true;
-        }
-
-        // Some APIs surface daily limit as forbidden without a detailed reason.
-        return status === 403 && message.includes('exceeded');
-    }
-
-    _setYouTubeQuotaBackoff(context = '') {
-        const now = Date.now();
-        const blockedUntil = now + YOUTUBE_QUOTA_BACKOFF_MS;
-        if (blockedUntil > this._youtubeQuotaBlockedUntil) {
-            this._youtubeQuotaBlockedUntil = blockedUntil;
-        }
-
-        if (!this._warnedYouTubeQuota) {
-            const resumeTime = new Date(this._youtubeQuotaBlockedUntil).toISOString();
-            console.warn(`YouTube live alerts paused until ${resumeTime} due to API quota limits.${context ? ` Source: ${context}` : ''}`);
-            this._warnedYouTubeQuota = true;
-        }
-    }
-
-    async _getYouTubeChannelMeta(identifier, apiKey) {
-        const raw = String(identifier || '').trim();
-        if (!raw) return null;
-
-        const ucMatch = raw.match(/(UC[\w-]{22})/);
-        const channelId = ucMatch ? ucMatch[1] : raw;
-
-        const tryRequest = async (url) => {
-            const res = await httpsGet(url);
-            if (res.status >= 400 || res.body?.error) {
-                if (this._isYouTubeQuotaError(res.body, res.status)) {
-                    this._setYouTubeQuotaBackoff(`channel meta for ${identifier}`);
-                }
-                const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
-                throw new Error(errMessage);
-            }
-            const item = res.body?.items?.[0];
-            if (!item) return null;
-            return {
-                channelId: item.id || channelId,
-                channelName: item.snippet?.title || null
-            };
-        };
-
-        // Preferred lookup when already a UC id.
-        if (/^UC[\w-]{22}$/.test(channelId)) {
-            return tryRequest(`https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&id=${encodeURIComponent(channelId)}&part=snippet&maxResults=1`);
-        }
-
-        // Support handle URLs or bare handles (e.g. @mychannel).
-        const handleMatch = raw.match(/@([A-Za-z0-9._-]+)/);
-        if (handleMatch?.[1]) {
-            const handle = handleMatch[1];
-            return tryRequest(`https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&forHandle=${encodeURIComponent(handle)}&part=snippet&maxResults=1`);
-        }
-
-        return null;
-    }
-
-    _extractUcChannelIdFromHtml(html) {
-        const text = String(html || '');
-        if (!text) return null;
-
-        const patterns = [
-            /"externalId"\s*:\s*"(UC[\w-]{22})"/i,
-            /"channelId"\s*:\s*"(UC[\w-]{22})"/i,
-            /\/channel\/(UC[\w-]{22})/i
-        ];
-
-        for (const pattern of patterns) {
-            const match = text.match(pattern);
-            if (match?.[1]) {
-                return match[1];
-            }
-        }
-
-        return null;
-    }
-
-    async _resolveYouTubeChannelIdWithoutApi(identifier) {
-        const raw = normalizeYouTubeChannelIdentifier(identifier);
-        if (!raw) return null;
-        if (/^UC[\w-]{22}$/.test(raw)) return raw;
-
-        const handle = raw.match(/^@([A-Za-z0-9._-]+)$/)?.[1]
-            || raw.match(/@([A-Za-z0-9._-]+)/)?.[1]
-            || null;
-
-        if (!handle) return null;
-
-        let url = `https://www.youtube.com/@${handle}`;
-        for (let i = 0; i < 4; i += 1) {
-            const res = await httpsGet(url, {
-                'Accept': 'text/html,application/xhtml+xml',
-                'User-Agent': 'Mozilla/5.0 (compatible; discordbotlivealerts/1.0)'
-            }).catch(() => null);
-
-            if (!res) return null;
-
-            const status = Number(res.status || 0);
-            const location = typeof res.headers?.location === 'string' ? res.headers.location : null;
-            if ([301, 302, 303, 307, 308].includes(status) && location) {
-                if (/^https?:\/\//i.test(location)) {
-                    url = location;
-                } else {
-                    url = `https://www.youtube.com${location.startsWith('/') ? '' : '/'}${location}`;
-                }
-                continue;
-            }
-
-            if (status >= 400) return null;
-
-            const resolved = this._extractUcChannelIdFromHtml(res.body);
-            if (resolved) return resolved;
-            return null;
-        }
-
-        return null;
-    }
-
-    async _checkYouTube(entry, guildId) {
-        if (Date.now() < this._youtubeQuotaBlockedUntil) return;
-
-        // Quota cooldown ended, allow one warning again if it happens later.
-        if (this._warnedYouTubeQuota) {
-            this._warnedYouTubeQuota = false;
-        }
-
-        try {
-            // Resolve/persist channel name + ensure UC id — uses API only when data is missing.
-            const originalIdentifier = String(entry.channelId || '').trim();
-            const hasUcId = /^UC[\w-]{22}$/.test(originalIdentifier);
-            if (!entry.channelName || !hasUcId) {
-                const apiKey = process.env.YOUTUBE_API_KEY;
-                if (apiKey) {
-                    const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(() => null);
-                    if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
-                        entry.channelId = resolvedMeta.channelId;
-                        if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
-                            entry.channelUrl = buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId);
-                        }
-                        await this.save();
-                    }
-                    if (resolvedMeta?.channelName && entry.channelName !== resolvedMeta.channelName) {
-                        entry.channelName = resolvedMeta.channelName;
-                        await this.save();
-                    }
-                } else if (!hasUcId) {
-                    const resolvedChannelId = await this._resolveYouTubeChannelIdWithoutApi(entry.channelId);
-                    if (resolvedChannelId && entry.channelId !== resolvedChannelId) {
-                        entry.channelId = resolvedChannelId;
-                        if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
-                            entry.channelUrl = buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId);
-                        }
-                        await this.save();
-                    }
-                }
-            }
-
-            const resolvedChannelId = String(entry.channelId || '').trim();
-            const resolvedHasUcId = /^UC[\w-]{22}$/.test(resolvedChannelId);
-            const unresolvedKey = `${guildId}_${originalIdentifier || resolvedChannelId}`;
-            if (!resolvedHasUcId) {
-                if (!this._youtubeUnresolvedIdentifierWarned[unresolvedKey]) {
-                    console.warn(`YouTube alert unresolved identifier (${originalIdentifier || resolvedChannelId}) in guild ${guildId}. Waiting for a resolvable UC channel ID instead of counting RSS 404 failures.`);
-                    this._youtubeUnresolvedIdentifierWarned[unresolvedKey] = true;
-                }
-                return;
-            }
-
-            delete this._youtubeUnresolvedIdentifierWarned[unresolvedKey];
-
-            // Use the free public RSS feed — costs zero API quota.
-            const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(entry.channelId)}`;
-            const rssRes = await httpsGet(rssUrl, { 'Accept': 'application/rss+xml, application/xml, text/xml' });
-            if (rssRes.status >= 400) {
-                const failKey = `${guildId}_${entry.channelId}`;
-
-                // Keep tracking error streaks for diagnostics, but never auto-remove alerts.
-                // External APIs can return temporary 404/5xx and we should not "forget" subscriptions.
-                if (rssRes.status === 404) {
-                    this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
-
-                    if (this._youtubeFailureCount[failKey] === 1) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP 404 - Channel not found. Keeping alert configured and retrying automatically.`);
-                    }
-
-                    if (this._youtubeFailureCount[failKey] % 10 === 0) {
-                        console.warn(`YouTube RSS still failing for ${entry.channelId}: ${this._youtubeFailureCount[failKey]} consecutive 404 responses.`);
-                    }
-                }
-                else if (rssRes.status >= 500) {
-                    this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
-
-                    if (this._youtubeFailureCount[failKey] === 1) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - YouTube service issue. Keeping alert configured and retrying automatically.`);
-                    } else if (this._youtubeFailureCount[failKey] % 5 === 0) {
-                        console.warn(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - Retry ${this._youtubeFailureCount[failKey]}`);
-                    }
-                }
-                else {
-                    console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
-                }
-                return;
-            }
-
-            // Successful response - reset failure counter
-            const failKey = `${guildId}_${entry.channelId}`;
-            if (this._youtubeFailureCount[failKey] > 0) {
-                delete this._youtubeFailureCount[failKey];
-            }
-
-            const xml = typeof rssRes.body === 'string' ? rssRes.body : JSON.stringify(rssRes.body);
-            const parsed = parseYouTubeRssFeed(xml);
-            if (!parsed) return;
-
-            const { videoId, title, channelName: rssChannelName, thumb } = parsed;
-
-            if (rssChannelName && entry.channelName !== rssChannelName) {
-                entry.channelName = rssChannelName;
-                await this.save();
-            }
-
-            // First successful fetch seeds state so old uploads do not trigger alerts.
-            if (!entry.lastVideoId) {
-                entry.lastVideoId = videoId;
-                await this.save();
-                return;
-            }
-
-            if (videoId === entry.lastVideoId) return;
-            entry.lastVideoId = videoId;
-            await this.save();
-            await this._postYouTubeAlert(guildId, entry, { videoId, title, thumb });
-        } catch (err) {
-            console.error(`YouTube check error (${entry.channelId}):`, err.message);
-        }
-    }
-
-    async _postYouTubeAlert(guildId, entry, item) {
-        if (!this._client) return;
-        const channel = this._client.channels.cache.get(entry.discordChannelId);
-        if (!channel) return;
-
-        const youtubeSendKey = this._buildYouTubeSendKey(guildId, entry, item);
-        if (this._isDuplicateSend(this._recentYouTubeSends, youtubeSendKey, YOUTUBE_SEND_DEDUPE_TTL_MS)) {
-            return;
-        }
-
-        const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-        
-        const title = item.title || item.snippet?.title || 'New Video';
-        const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
-        const videoId = item.videoId || item.id?.videoId;
-        const thumbUrl = buildYouTubeThumbnailUrl(
-            videoId,
-            item.thumb || item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || null
+    if (!clientId || !clientSecret) {
+      if (!this._warnedMissingTwitchCredentials) {
+        console.warn(
+          'Twitch live alerts are disabled: TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET are missing.'
         );
-        const description = item.snippet?.description ? item.snippet.description.substring(0, 200) + (item.snippet.description.length > 200 ? '...' : '') : 'New video uploaded';
-        const publishedAt = item.snippet?.publishedAt || new Date().toISOString();
-        const channelVisitUrl = entry.channelUrl || buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId) || `https://www.youtube.com/channel/${entry.channelId}`;
-        
-        const embed = new EmbedBuilder()
-            .setColor(0xff0000)
-            .setAuthor({ name: channelTitle, iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
-            .setTitle(`▶️ New Video Published`)
-            .setURL(`https://youtube.com/watch?v=${videoId}`)
-            .setDescription(`**${title}**`)
-            .addFields(
-                { name: '📝 Description', value: description || 'No description', inline: false },
-                { name: '⏰ Published', value: `<t:${Math.floor(new Date(publishedAt).getTime() / 1000)}:R>`, inline: true },
-                { name: '🔗 Channel', value: `[Visit Channel](${channelVisitUrl})`, inline: true },
-            )
-            .setFooter({ text: 'YouTube • Video Alert', iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png' })
-            .setTimestamp();
+        this._warnedMissingTwitchCredentials = true;
+      }
+      return null;
+    }
 
-        if (thumbUrl) {
-            embed.setImage(thumbUrl);
+    try {
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'client_credentials',
+      }).toString();
+
+      const res = await httpsRequest('https://id.twitch.tv/oauth2/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body,
+      });
+
+      if (res.body?.access_token) {
+        this._twitchToken = res.body.access_token;
+        this._twitchTokenExpiry = Date.now() + ((res.body.expires_in || 3600) - 60) * 1000;
+        this._warnedTwitchAuthFailure = false;
+        return this._twitchToken;
+      }
+
+      if (!this._warnedTwitchAuthFailure) {
+        console.error('Twitch token request failed:', res.body?.message || `HTTP ${res.status}`);
+        this._warnedTwitchAuthFailure = true;
+      }
+    } catch (err) {
+      console.error('Twitch token error:', err.message);
+    }
+    return null;
+  }
+
+  async _checkTwitch(entry, guildId) {
+    const token = await this._getTwitchToken();
+    if (!token) return;
+    const clientId = process.env.TWITCH_CLIENT_ID;
+    try {
+      const res = await httpsGet(
+        `https://api.twitch.tv/helix/streams?user_login=${entry.username}`,
+        { 'Client-ID': clientId, Authorization: `Bearer ${token}` }
+      );
+      const stream = res.body?.data?.[0];
+      const isLive = !!stream;
+
+      if (isLive && !entry.lastLive) {
+        entry.lastLive = true;
+        await this.save();
+        await this._postTwitchAlert(guildId, entry, stream);
+      } else if (!isLive && entry.lastLive) {
+        entry.lastLive = false;
+        await this.save();
+      }
+    } catch (err) {
+      console.error(`Twitch check error (${entry.username}):`, err.message);
+    }
+  }
+
+  async _postTwitchAlert(guildId, entry, stream) {
+    if (!this._client) return;
+    const channel = this._client.channels.cache.get(entry.channelId);
+    if (!channel) return;
+
+    const twitchSendKey = this._buildTwitchSendKey(guildId, entry, stream);
+    if (this._isDuplicateSend(this._recentTwitchSends, twitchSendKey, TWITCH_SEND_DEDUPE_TTL_MS)) {
+      return;
+    }
+
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+
+    const viewerCount = stream.viewer_count?.toString() || '0';
+    const gameEmoji = '🎮';
+    const viewerEmoji = '👥';
+    const liveEmoji = '🔴';
+
+    const embed = new EmbedBuilder()
+      .setColor(0x9146ff)
+      .setAuthor({
+        name: `${stream.user_name}`,
+        iconURL: `https://static-cdn.jtvnw.net/jtv_user_pictures/${entry.username.toLowerCase()}-profile_image-70x70.png`,
+      })
+      .setTitle(`${liveEmoji} NOW LIVE on Twitch!`)
+      .setURL(`https://twitch.tv/${entry.username}`)
+      .setDescription(`**${stream.title || 'No title provided'}**`)
+      .addFields(
+        { name: `${gameEmoji} Game`, value: stream.game_name || 'Unknown', inline: true },
+        { name: `${viewerEmoji} Viewers`, value: viewerCount, inline: true },
+        {
+          name: '⏱️ Stream Started',
+          value: `<t:${Math.floor(new Date(stream.started_at).getTime() / 1000)}:R>`,
+          inline: false,
         }
-        
-        const buttons = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setLabel('Watch Video')
-                    .setURL(`https://youtube.com/watch?v=${videoId}`)
-                    .setStyle(ButtonStyle.Link)
-                    .setEmoji('▶️'),
+      )
+      .setImage(
+        `https://static-cdn.jtvnw.net/previews-ttv/live_user_${entry.username.toLowerCase()}-1280x720.jpg`
+      )
+      .setFooter({ text: 'Twitch • Live Alert', iconURL: 'https://www.twitch.tv/favicon.ico' })
+      .setTimestamp();
+
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Watch Stream')
+        .setURL(`https://twitch.tv/${entry.username}`)
+        .setStyle(ButtonStyle.Link)
+        .setEmoji('🔴')
+    );
+
+    const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
+    await channel
+      .send({
+        content: `${mention}${liveEmoji} **${stream.user_name}** is now live!`,
+        embeds: [embed],
+        components: [buttons],
+      })
+      .catch(() => {});
+  }
+
+  // ── YouTube ───────────────────────────────────────────────────────────────
+  _isYouTubeQuotaError(errorBody, status, fallbackMessage = '') {
+    const message = String(errorBody?.error?.message || fallbackMessage || '').toLowerCase();
+
+    const reasons = Array.isArray(errorBody?.error?.errors)
+      ? errorBody.error.errors.map((e) => String(e?.reason || '').toLowerCase())
+      : [];
+
+    if (
+      message.includes('quota') ||
+      reasons.some((r) => r.includes('quota') || r.includes('dailylimitexceeded'))
+    ) {
+      return true;
+    }
+
+    // Some APIs surface daily limit as forbidden without a detailed reason.
+    return status === 403 && message.includes('exceeded');
+  }
+
+  _setYouTubeQuotaBackoff(context = '') {
+    const now = Date.now();
+    const blockedUntil = now + YOUTUBE_QUOTA_BACKOFF_MS;
+    if (blockedUntil > this._youtubeQuotaBlockedUntil) {
+      this._youtubeQuotaBlockedUntil = blockedUntil;
+    }
+
+    if (!this._warnedYouTubeQuota) {
+      const resumeTime = new Date(this._youtubeQuotaBlockedUntil).toISOString();
+      console.warn(
+        `YouTube live alerts paused until ${resumeTime} due to API quota limits.${context ? ` Source: ${context}` : ''}`
+      );
+      this._warnedYouTubeQuota = true;
+    }
+  }
+
+  async _getYouTubeChannelMeta(identifier, apiKey) {
+    const raw = String(identifier || '').trim();
+    if (!raw) return null;
+
+    const ucMatch = raw.match(/(UC[\w-]{22})/);
+    const channelId = ucMatch ? ucMatch[1] : raw;
+
+    const tryRequest = async (url) => {
+      const res = await httpsGet(url);
+      if (res.status >= 400 || res.body?.error) {
+        if (this._isYouTubeQuotaError(res.body, res.status)) {
+          this._setYouTubeQuotaBackoff(`channel meta for ${identifier}`);
+        }
+        const errMessage = res.body?.error?.message || `HTTP ${res.status}`;
+        throw new Error(errMessage);
+      }
+      const item = res.body?.items?.[0];
+      if (!item) return null;
+      return {
+        channelId: item.id || channelId,
+        channelName: item.snippet?.title || null,
+      };
+    };
+
+    // Preferred lookup when already a UC id.
+    if (/^UC[\w-]{22}$/.test(channelId)) {
+      return tryRequest(
+        `https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&id=${encodeURIComponent(channelId)}&part=snippet&maxResults=1`
+      );
+    }
+
+    // Support handle URLs or bare handles (e.g. @mychannel).
+    const handleMatch = raw.match(/@([A-Za-z0-9._-]+)/);
+    if (handleMatch?.[1]) {
+      const handle = handleMatch[1];
+      return tryRequest(
+        `https://www.googleapis.com/youtube/v3/channels?key=${apiKey}&forHandle=${encodeURIComponent(handle)}&part=snippet&maxResults=1`
+      );
+    }
+
+    return null;
+  }
+
+  _extractUcChannelIdFromHtml(html) {
+    const text = String(html || '');
+    if (!text) return null;
+
+    const patterns = [
+      /"externalId"\s*:\s*"(UC[\w-]{22})"/i,
+      /"channelId"\s*:\s*"(UC[\w-]{22})"/i,
+      /\/channel\/(UC[\w-]{22})/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return null;
+  }
+
+  async _resolveYouTubeChannelIdWithoutApi(identifier) {
+    const raw = normalizeYouTubeChannelIdentifier(identifier);
+    if (!raw) return null;
+    if (/^UC[\w-]{22}$/.test(raw)) return raw;
+
+    const handle =
+      raw.match(/^@([A-Za-z0-9._-]+)$/)?.[1] || raw.match(/@([A-Za-z0-9._-]+)/)?.[1] || null;
+
+    if (!handle) return null;
+
+    let url = `https://www.youtube.com/@${handle}`;
+    for (let i = 0; i < 4; i += 1) {
+      const res = await httpsGet(url, {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'Mozilla/5.0 (compatible; discordbotlivealerts/1.0)',
+      }).catch(() => null);
+
+      if (!res) return null;
+
+      const status = Number(res.status || 0);
+      const location = typeof res.headers?.location === 'string' ? res.headers.location : null;
+      if ([301, 302, 303, 307, 308].includes(status) && location) {
+        if (/^https?:\/\//i.test(location)) {
+          url = location;
+        } else {
+          url = `https://www.youtube.com${location.startsWith('/') ? '' : '/'}${location}`;
+        }
+        continue;
+      }
+
+      if (status >= 400) return null;
+
+      const resolved = this._extractUcChannelIdFromHtml(res.body);
+      if (resolved) return resolved;
+      return null;
+    }
+
+    return null;
+  }
+
+  async _checkYouTube(entry, guildId) {
+    if (Date.now() < this._youtubeQuotaBlockedUntil) return;
+
+    // Quota cooldown ended, allow one warning again if it happens later.
+    if (this._warnedYouTubeQuota) {
+      this._warnedYouTubeQuota = false;
+    }
+
+    try {
+      // Resolve/persist channel name + ensure UC id — uses API only when data is missing.
+      const originalIdentifier = String(entry.channelId || '').trim();
+      const hasUcId = /^UC[\w-]{22}$/.test(originalIdentifier);
+      if (!entry.channelName || !hasUcId) {
+        const apiKey = process.env.YOUTUBE_API_KEY;
+        if (apiKey) {
+          const resolvedMeta = await this._getYouTubeChannelMeta(entry.channelId, apiKey).catch(
+            () => null
+          );
+          if (resolvedMeta?.channelId && entry.channelId !== resolvedMeta.channelId) {
+            entry.channelId = resolvedMeta.channelId;
+            if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
+              entry.channelUrl = buildYouTubeChannelUrl(
+                entry.sourceIdentifier || entry.channelId,
+                entry.channelId
+              );
+            }
+            await this.save();
+          }
+          if (resolvedMeta?.channelName && entry.channelName !== resolvedMeta.channelName) {
+            entry.channelName = resolvedMeta.channelName;
+            await this.save();
+          }
+        } else if (!hasUcId) {
+          const resolvedChannelId = await this._resolveYouTubeChannelIdWithoutApi(entry.channelId);
+          if (resolvedChannelId && entry.channelId !== resolvedChannelId) {
+            entry.channelId = resolvedChannelId;
+            if (!entry.channelUrl || entry.channelUrl.includes('/channel/@')) {
+              entry.channelUrl = buildYouTubeChannelUrl(
+                entry.sourceIdentifier || entry.channelId,
+                entry.channelId
+              );
+            }
+            await this.save();
+          }
+        }
+      }
+
+      const resolvedChannelId = String(entry.channelId || '').trim();
+      const resolvedHasUcId = /^UC[\w-]{22}$/.test(resolvedChannelId);
+      const unresolvedKey = `${guildId}_${originalIdentifier || resolvedChannelId}`;
+      if (!resolvedHasUcId) {
+        if (!this._youtubeUnresolvedIdentifierWarned[unresolvedKey]) {
+          console.warn(
+            `YouTube alert unresolved identifier (${originalIdentifier || resolvedChannelId}) in guild ${guildId}. Waiting for a resolvable UC channel ID instead of counting RSS 404 failures.`
+          );
+          this._youtubeUnresolvedIdentifierWarned[unresolvedKey] = true;
+        }
+        return;
+      }
+
+      delete this._youtubeUnresolvedIdentifierWarned[unresolvedKey];
+
+      // Use the free public RSS feed — costs zero API quota.
+      const rssUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(entry.channelId)}`;
+      const rssRes = await httpsGet(rssUrl, {
+        Accept: 'application/rss+xml, application/xml, text/xml',
+      });
+      if (rssRes.status >= 400) {
+        const failKey = `${guildId}_${entry.channelId}`;
+
+        // Keep tracking error streaks for diagnostics, but never auto-remove alerts.
+        // External APIs can return temporary 404/5xx and we should not "forget" subscriptions.
+        if (rssRes.status === 404) {
+          this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
+
+          if (this._youtubeFailureCount[failKey] === 1) {
+            console.warn(
+              `YouTube RSS error (${entry.channelId}): HTTP 404 - Channel not found. Keeping alert configured and retrying automatically.`
             );
-        
-        const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
-        await channel.send({ content: `${mention}▶️ **${channelTitle}** uploaded a new video!`, embeds: [embed], components: [buttons] }).catch(() => {});
-    }
+          }
 
-    // ── Polling ───────────────────────────────────────────────────────────────
-    _startPolling() {
-        if (this._interval) clearInterval(this._interval);
-        this._interval = setInterval(() => this._poll().catch(() => {}), POLL_INTERVAL);
-        setTimeout(() => this._poll().catch(() => {}), 10000);
-    }
+          if (this._youtubeFailureCount[failKey] % 10 === 0) {
+            console.warn(
+              `YouTube RSS still failing for ${entry.channelId}: ${this._youtubeFailureCount[failKey]} consecutive 404 responses.`
+            );
+          }
+        } else if (rssRes.status >= 500) {
+          this._youtubeFailureCount[failKey] = (this._youtubeFailureCount[failKey] || 0) + 1;
 
-    async _pollGuild(guildId) {
-        if (this._guildPollInProgress.has(guildId)) return;
-
-        this._guildPollInProgress.add(guildId);
-        const config = this.data[guildId];
-        if (!config) {
-            this._guildPollInProgress.delete(guildId);
-            return;
+          if (this._youtubeFailureCount[failKey] === 1) {
+            console.warn(
+              `YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - YouTube service issue. Keeping alert configured and retrying automatically.`
+            );
+          } else if (this._youtubeFailureCount[failKey] % 5 === 0) {
+            console.warn(
+              `YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status} - Retry ${this._youtubeFailureCount[failKey]}`
+            );
+          }
+        } else {
+          console.error(`YouTube RSS error (${entry.channelId}): HTTP ${rssRes.status}`);
         }
+        return;
+      }
 
-        try {
-            for (const entry of (config.twitch || [])) {
-                await this._checkTwitch(entry, guildId);
-            }
-            for (const entry of (config.youtube || [])) {
-                await this._checkYouTube(entry, guildId);
-            }
-        } finally {
-            this._guildPollInProgress.delete(guildId);
-        }
+      // Successful response - reset failure counter
+      const failKey = `${guildId}_${entry.channelId}`;
+      if (this._youtubeFailureCount[failKey] > 0) {
+        delete this._youtubeFailureCount[failKey];
+      }
+
+      const xml = typeof rssRes.body === 'string' ? rssRes.body : JSON.stringify(rssRes.body);
+      const parsed = parseYouTubeRssFeed(xml);
+      if (!parsed) return;
+
+      const { videoId, title, channelName: rssChannelName, thumb } = parsed;
+
+      if (rssChannelName && entry.channelName !== rssChannelName) {
+        entry.channelName = rssChannelName;
+        await this.save();
+      }
+
+      // First successful fetch seeds state so old uploads do not trigger alerts.
+      if (!entry.lastVideoId) {
+        entry.lastVideoId = videoId;
+        await this.save();
+        return;
+      }
+
+      if (videoId === entry.lastVideoId) return;
+      entry.lastVideoId = videoId;
+      await this.save();
+      await this._postYouTubeAlert(guildId, entry, { videoId, title, thumb });
+    } catch (err) {
+      console.error(`YouTube check error (${entry.channelId}):`, err.message);
+    }
+  }
+
+  async _postYouTubeAlert(guildId, entry, item) {
+    if (!this._client) return;
+    const channel = this._client.channels.cache.get(entry.discordChannelId);
+    if (!channel) return;
+
+    const youtubeSendKey = this._buildYouTubeSendKey(guildId, entry, item);
+    if (
+      this._isDuplicateSend(this._recentYouTubeSends, youtubeSendKey, YOUTUBE_SEND_DEDUPE_TTL_MS)
+    ) {
+      return;
     }
 
-    async _poll() {
-        if (this._pollInProgress) return;
-        this._pollInProgress = true;
+    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-        try {
-            for (const guildId of Object.keys(this.data)) {
-                await this._pollGuild(guildId);
-            }
-        } finally {
-            this._pollInProgress = false;
-        }
+    const title = item.title || item.snippet?.title || 'New Video';
+    const channelTitle = item.snippet?.channelTitle || entry.channelName || 'YouTube Channel';
+    const videoId = item.videoId || item.id?.videoId;
+    const thumbUrl = buildYouTubeThumbnailUrl(
+      videoId,
+      item.thumb ||
+        item.snippet?.thumbnails?.high?.url ||
+        item.snippet?.thumbnails?.medium?.url ||
+        null
+    );
+    const description = item.snippet?.description
+      ? item.snippet.description.substring(0, 200) +
+        (item.snippet.description.length > 200 ? '...' : '')
+      : 'New video uploaded';
+    const publishedAt = item.snippet?.publishedAt || new Date().toISOString();
+    const channelVisitUrl =
+      entry.channelUrl ||
+      buildYouTubeChannelUrl(entry.sourceIdentifier || entry.channelId, entry.channelId) ||
+      `https://www.youtube.com/channel/${entry.channelId}`;
+
+    const embed = new EmbedBuilder()
+      .setColor(0xff0000)
+      .setAuthor({
+        name: channelTitle,
+        iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png',
+      })
+      .setTitle(`▶️ New Video Published`)
+      .setURL(`https://youtube.com/watch?v=${videoId}`)
+      .setDescription(`**${title}**`)
+      .addFields(
+        { name: '📝 Description', value: description || 'No description', inline: false },
+        {
+          name: '⏰ Published',
+          value: `<t:${Math.floor(new Date(publishedAt).getTime() / 1000)}:R>`,
+          inline: true,
+        },
+        { name: '🔗 Channel', value: `[Visit Channel](${channelVisitUrl})`, inline: true }
+      )
+      .setFooter({
+        text: 'YouTube • Video Alert',
+        iconURL: 'https://www.youtube.com/s/desktop/54ce3f60/img/favicon_32x32.png',
+      })
+      .setTimestamp();
+
+    if (thumbUrl) {
+      embed.setImage(thumbUrl);
     }
+
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setLabel('Watch Video')
+        .setURL(`https://youtube.com/watch?v=${videoId}`)
+        .setStyle(ButtonStyle.Link)
+        .setEmoji('▶️')
+    );
+
+    const mention = entry.roleId ? `<@&${entry.roleId}> ` : '';
+    await channel
+      .send({
+        content: `${mention}▶️ **${channelTitle}** uploaded a new video!`,
+        embeds: [embed],
+        components: [buttons],
+      })
+      .catch(() => {});
+  }
+
+  // ── Polling ───────────────────────────────────────────────────────────────
+  _startPolling() {
+    if (this._interval) clearInterval(this._interval);
+    this._interval = setInterval(() => this._poll().catch(() => {}), POLL_INTERVAL);
+    setTimeout(() => this._poll().catch(() => {}), 10000);
+  }
+
+  async _pollGuild(guildId) {
+    if (this._guildPollInProgress.has(guildId)) return;
+
+    this._guildPollInProgress.add(guildId);
+    const config = this.data[guildId];
+    if (!config) {
+      this._guildPollInProgress.delete(guildId);
+      return;
+    }
+
+    try {
+      for (const entry of config.twitch || []) {
+        await this._checkTwitch(entry, guildId);
+      }
+      for (const entry of config.youtube || []) {
+        await this._checkYouTube(entry, guildId);
+      }
+    } finally {
+      this._guildPollInProgress.delete(guildId);
+    }
+  }
+
+  async _poll() {
+    if (this._pollInProgress) return;
+    this._pollInProgress = true;
+
+    try {
+      for (const guildId of Object.keys(this.data)) {
+        await this._pollGuild(guildId);
+      }
+    } finally {
+      this._pollInProgress = false;
+    }
+  }
 }
 
 module.exports = new LiveAlertsManager();

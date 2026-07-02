@@ -37,7 +37,11 @@
 
     // Handle old dropdown button (fallback)
     var toggle = getThemeToggle();
-    if (toggle && toggle.dataset.bound !== 'true' && toggle.classList.contains('theme-selector-btn')) {
+    if (
+      toggle &&
+      toggle.dataset.bound !== 'true' &&
+      toggle.classList.contains('theme-selector-btn')
+    ) {
       toggle.dataset.bound = 'true';
       toggle.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -114,7 +118,7 @@
       success: 'fa-check-circle',
       error: 'fa-xmark-circle',
       info: 'fa-circle-info',
-      warning: 'fa-triangle-exclamation'
+      warning: 'fa-triangle-exclamation',
     };
     const container = ensureToastContainer();
     const toast = document.createElement('div');
@@ -136,6 +140,6 @@
     initThemeToggle: initThemeToggle,
     initMobileSidebar: initMobileSidebar,
     initPage: initPage,
-    showToast: showToast
+    showToast: showToast,
   };
-}());
+})();

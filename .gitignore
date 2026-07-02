@@ -1,16 +1,15 @@
 # Dependencies
 node_modules/
-data/
+
 # Environment variables
 .env
+.env.local
+.env.*.local
 
 # Logs
 logs/
 *.log
 npm-debug.log*
-.continue
-# YouTube debug files
-*-player-script.js
 
 # OS files
 .DS_Store
@@ -18,18 +17,50 @@ Thumbs.db
 
 # IDE
 .vscode/
+.idea/
 
 # Bot data - Auto-generated at runtime
 data/
-.idea/
+backups/
+
+# Coverage reports
+coverage/
+
+# Build artifacts
+dist/
+build/
+
+# YouTube debug files
+*-player-script.js
 
 # Generator scripts
 generate_commands_list.js
-data/economy.json
-data/economy.json
-data/stats.json
-data/economy.json
-data/stats.json
-/data
 
+# Lock files (optional - some projects track these)
+# package-lock.json
+
+# PM2
+.pm2/
+
+# Docker
+docker-compose.override.yml
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Misc
 math
+.continue/

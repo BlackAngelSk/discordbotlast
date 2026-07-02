@@ -3,33 +3,40 @@ const queues = require('../../utils/queues');
 const { isDJ } = require('../../utils/permissions');
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('previous')
-        .setDescription('Play the previous song'),
-    
-    async execute(interaction) {
-        const queue = queues.get(interaction.guildId);
+  data: new SlashCommandBuilder().setName('previous').setDescription('Play the previous song'),
 
-        if (!queue || !queue.isPlaying) {
-            return interaction.reply({ content: '❌ Nothing is playing right now!', flags: MessageFlags.Ephemeral });
-        }
+  async execute(interaction) {
+    const queue = queues.get(interaction.guildId);
 
-        if (!await isDJ(interaction.member)) {
-            return interaction.reply({ content: '❌ You need the DJ role to use this command!', flags: MessageFlags.Ephemeral });
-        }
+    if (!queue || !queue.isPlaying) {
+      return interaction.reply({
+        content: '❌ Nothing is playing right now!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
-        const success = queue.playPrevious();
+    if (!(await isDJ(interaction.member))) {
+      return interaction.reply({
+        content: '❌ You need the DJ role to use this command!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
-        if (!success) {
-            return interaction.reply({ content: '❌ No previous song in history!', flags: MessageFlags.Ephemeral });
-        }
+    const success = queue.playPrevious();
 
-        const embed = new EmbedBuilder()
-            .setColor('#00FF00')
-            .setTitle('⏮️ Playing Previous Song')
-            .setDescription('Going back to the previous song...')
-            .setTimestamp();
+    if (!success) {
+      return interaction.reply({
+        content: '❌ No previous song in history!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
-        await interaction.reply({ embeds: [embed] });
-    },
+    const embed = new EmbedBuilder()
+      .setColor('#00FF00')
+      .setTitle('⏮️ Playing Previous Song')
+      .setDescription('Going back to the previous song...')
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+  },
 };

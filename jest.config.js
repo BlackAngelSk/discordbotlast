@@ -1,0 +1,31 @@
+module.exports = {
+  testEnvironment: 'node',
+  roots: ['<rootDir>/tests'],
+  testMatch: ['**/*.test.js'],
+  collectCoverageFrom: [
+    'utils/**/*.js',
+    'commands/**/*.js',
+    'events/**/*.js',
+    'dashboard/**/*.js',
+    '!**/node_modules/**',
+    '!**/tests/**',
+    '!**/data/**',
+    '!**/logs/**',
+    '!**/backups/**',
+    '!**/assets/**',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'lcov', 'html'],
+  coverageThreshold: {
+    global: {
+      branches: 30,
+      functions: 30,
+      lines: 30,
+      statements: 30,
+    },
+  },
+  testTimeout: 10000,
+  verbose: true,
+  forceExit: true,
+  detectOpenHandles: true,
+};

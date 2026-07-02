@@ -2,187 +2,192 @@ const fs = require('fs').promises;
 const path = require('path');
 
 class ModerationManager {
-    constructor() {
-        this.dataPath = path.join(__dirname, '..', 'data', 'moderation.json');
-        this.data = {
-            warnings: {},
-            modLogs: {},
-            automod: {}
-        };
-    }
+  constructor() {
+    this.dataPath = path.join(__dirname, '..', 'data', 'moderation.json');
+    this.data = {
+      warnings: {},
+      modLogs: {},
+      automod: {},
+    };
+  }
 
-    async init() {
-        try {
-            // Ensure data directory exists
-            const dataDir = path.dirname(this.dataPath);
-            await fs.mkdir(dataDir, { recursive: true });
+  async init() {
+    try {
+      // Ensure data directory exists
+      const dataDir = path.dirname(this.dataPath);
+      await fs.mkdir(dataDir, { recursive: true });
 
-            const data = await fs.readFile(this.dataPath, 'utf8');
-            this.data = JSON.parse(data);
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                await this.save();
-            } else {
-                console.error('Error loading moderation data:', error);
-            }
-        }
-    }
-
-    async save() {
-        try {
-            await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
-        } catch (error) {
-            console.error('Error saving moderation data:', error);
-        }
-    }
-
-    async addWarning(guildId, userId, moderatorId, reason) {
-        const key = `${guildId}_${userId}`;
-        if (!this.data.warnings[key]) {
-            this.data.warnings[key] = [];
-        }
-
-        const warning = {
-            id: Date.now(),
-            moderatorId,
-            reason,
-            timestamp: new Date().toISOString()
-        };
-
-        this.data.warnings[key].push(warning);
+      const data = await fs.readFile(this.dataPath, 'utf8');
+      this.data = JSON.parse(data);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
         await this.save();
-        return warning;
+      } else {
+        console.error('Error loading moderation data:', error);
+      }
+    }
+  }
+
+  async save() {
+    try {
+      await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
+    } catch (error) {
+      console.error('Error saving moderation data:', error);
+    }
+  }
+
+  async addWarning(guildId, userId, moderatorId, reason) {
+    const key = `${guildId}_${userId}`;
+    if (!this.data.warnings[key]) {
+      this.data.warnings[key] = [];
     }
 
-    getWarnings(guildId, userId) {
-        const key = `${guildId}_${userId}`;
-        return this.data.warnings[key] || [];
+    const warning = {
+      id: Date.now(),
+      moderatorId,
+      reason,
+      timestamp: new Date().toISOString(),
+    };
+
+    this.data.warnings[key].push(warning);
+    await this.save();
+    return warning;
+  }
+
+  getWarnings(guildId, userId) {
+    const key = `${guildId}_${userId}`;
+    return this.data.warnings[key] || [];
+  }
+
+  async clearWarnings(guildId, userId) {
+    const key = `${guildId}_${userId}`;
+    this.data.warnings[key] = [];
+    await this.save();
+  }
+
+  async removeWarning(guildId, userId, warningId) {
+    const key = `${guildId}_${userId}`;
+    if (!this.data.warnings[key]) return false;
+
+    const index = this.data.warnings[key].findIndex((w) => w.id === warningId);
+    if (index === -1) return false;
+
+    this.data.warnings[key].splice(index, 1);
+    await this.save();
+    return true;
+  }
+
+  async setModLogChannel(guildId, channelId) {
+    this.data.modLogs[guildId] = channelId;
+    await this.save();
+  }
+
+  getModLogChannel(guildId) {
+    return this.data.modLogs[guildId];
+  }
+
+  getAutomodSettings(guildId) {
+    if (!this.data.automod[guildId]) {
+      this.data.automod[guildId] = {
+        enabled: false,
+        antiSpam: true,
+        antiInvite: true,
+        emojiOnly: false,
+        badWords: [],
+        maxMentions: 5,
+        maxEmojis: 10,
+      };
+    }
+    return this.data.automod[guildId];
+  }
+
+  async updateAutomodSettings(guildId, settings) {
+    this.data.automod[guildId] = {
+      ...this.getAutomodSettings(guildId),
+      ...settings,
+    };
+    await this.save();
+  }
+
+  checkMessage(guildId, content, mentions) {
+    const settings = this.getAutomodSettings(guildId);
+    if (!settings.enabled) return { violation: false };
+
+    const emojiRegex = /<a?:\w+:\d+>|[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
+    const hasEmoji = (content.match(emojiRegex) || []).length > 0;
+    const hasLettersOrNumbers = /[\p{L}\p{N}]/u.test(content);
+
+    // Check for Discord invites
+    if (settings.antiInvite && /discord\.gg\/|discord\.com\/invite\//i.test(content)) {
+      return { violation: true, reason: 'Discord invite link detected' };
     }
 
-    async clearWarnings(guildId, userId) {
-        const key = `${guildId}_${userId}`;
-        this.data.warnings[key] = [];
-        await this.save();
-    }
+    // Check for bad words (including obfuscation)
+    if (settings.badWords.length > 0) {
+      const lowerContent = content.toLowerCase();
+      const normalizedContent = lowerContent
+        .replace(/\s+/g, '')
+        .replace(/[@$!\|]/g, '')
+        .replace(/[0]/g, 'o')
+        .replace(/[1!|]/g, 'i')
+        .replace(/[3]/g, 'e')
+        .replace(/[4@]/g, 'a')
+        .replace(/[5$]/g, 's')
+        .replace(/[7]/g, 't')
+        .replace(/[8]/g, 'b')
+        .replace(/[^a-z0-9]/g, '')
+        .replace(/(.)\1{2,}/g, '$1$1');
 
-    async removeWarning(guildId, userId, warningId) {
-        const key = `${guildId}_${userId}`;
-        if (!this.data.warnings[key]) return false;
+      for (const word of settings.badWords) {
+        const normalizedWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (normalizedWord.length === 0) continue;
 
-        const index = this.data.warnings[key].findIndex(w => w.id === warningId);
-        if (index === -1) return false;
-
-        this.data.warnings[key].splice(index, 1);
-        await this.save();
-        return true;
-    }
-
-    async setModLogChannel(guildId, channelId) {
-        this.data.modLogs[guildId] = channelId;
-        await this.save();
-    }
-
-    getModLogChannel(guildId) {
-        return this.data.modLogs[guildId];
-    }
-
-    getAutomodSettings(guildId) {
-        if (!this.data.automod[guildId]) {
-            this.data.automod[guildId] = {
-                enabled: false,
-                antiSpam: true,
-                antiInvite: true,
-                emojiOnly: false,
-                badWords: [],
-                maxMentions: 5,
-                maxEmojis: 10
-            };
+        if (
+          lowerContent.includes(word.toLowerCase()) ||
+          normalizedContent.includes(normalizedWord)
+        ) {
+          return { violation: true, reason: 'Inappropriate language detected' };
         }
-        return this.data.automod[guildId];
+      }
     }
 
-    async updateAutomodSettings(guildId, settings) {
-        this.data.automod[guildId] = {
-            ...this.getAutomodSettings(guildId),
-            ...settings
-        };
-        await this.save();
+    // Check for emoji-only messages
+    if (settings.emojiOnly && hasEmoji && !hasLettersOrNumbers) {
+      return { violation: true, reason: 'Emoji-only message detected' };
     }
 
-    checkMessage(guildId, content, mentions) {
-        const settings = this.getAutomodSettings(guildId);
-        if (!settings.enabled) return { violation: false };
-
-        const emojiRegex = /<a?:\w+:\d+>|[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/gu;
-        const hasEmoji = (content.match(emojiRegex) || []).length > 0;
-        const hasLettersOrNumbers = /[\p{L}\p{N}]/u.test(content);
-
-        // Check for Discord invites
-        if (settings.antiInvite && /discord\.gg\/|discord\.com\/invite\//i.test(content)) {
-            return { violation: true, reason: 'Discord invite link detected' };
-        }
-
-        // Check for bad words (including obfuscation)
-        if (settings.badWords.length > 0) {
-            const lowerContent = content.toLowerCase();
-            const normalizedContent = lowerContent
-                .replace(/\s+/g, '')
-                .replace(/[@$!\|]/g, '')
-                .replace(/[0]/g, 'o')
-                .replace(/[1!|]/g, 'i')
-                .replace(/[3]/g, 'e')
-                .replace(/[4@]/g, 'a')
-                .replace(/[5$]/g, 's')
-                .replace(/[7]/g, 't')
-                .replace(/[8]/g, 'b')
-                .replace(/[^a-z0-9]/g, '')
-                .replace(/(.)\1{2,}/g, '$1$1');
-
-            for (const word of settings.badWords) {
-                const normalizedWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (normalizedWord.length === 0) continue;
-
-                if (lowerContent.includes(word.toLowerCase()) || normalizedContent.includes(normalizedWord)) {
-                    return { violation: true, reason: 'Inappropriate language detected' };
-                }
-            }
-        }
-
-        // Check for emoji-only messages
-        if (settings.emojiOnly && hasEmoji && !hasLettersOrNumbers) {
-            return { violation: true, reason: 'Emoji-only message detected' };
-        }
-
-        // Check for excessive mentions
-        if (mentions > settings.maxMentions) {
-            return { violation: true, reason: `Excessive mentions (max ${settings.maxMentions})` };
-        }
-
-        // Check for excessive emojis
-        const emojiCount = (content.match(emojiRegex) || []).length;
-        if (emojiCount > settings.maxEmojis) {
-            return { violation: true, reason: `Excessive emojis (max ${settings.maxEmojis})` };
-        }
-
-        return { violation: false };
+    // Check for excessive mentions
+    if (mentions > settings.maxMentions) {
+      return { violation: true, reason: `Excessive mentions (max ${settings.maxMentions})` };
     }
 
-    async addBadWord(guildId, word) {
-        if (!this.data.automod[guildId]) {
-            this.data.automod[guildId] = this.getAutomodSettings(guildId);
-        }
-        if (!this.data.automod[guildId].badWords.includes(word)) {
-            this.data.automod[guildId].badWords.push(word);
-            await this.save();
-        }
+    // Check for excessive emojis
+    const emojiCount = (content.match(emojiRegex) || []).length;
+    if (emojiCount > settings.maxEmojis) {
+      return { violation: true, reason: `Excessive emojis (max ${settings.maxEmojis})` };
     }
 
-    async removeBadWord(guildId, word) {
-        if (this.data.automod[guildId]) {
-            this.data.automod[guildId].badWords = this.data.automod[guildId].badWords.filter(w => w !== word);
-            await this.save();
-        }
+    return { violation: false };
+  }
+
+  async addBadWord(guildId, word) {
+    if (!this.data.automod[guildId]) {
+      this.data.automod[guildId] = this.getAutomodSettings(guildId);
     }
+    if (!this.data.automod[guildId].badWords.includes(word)) {
+      this.data.automod[guildId].badWords.push(word);
+      await this.save();
+    }
+  }
+
+  async removeBadWord(guildId, word) {
+    if (this.data.automod[guildId]) {
+      this.data.automod[guildId].badWords = this.data.automod[guildId].badWords.filter(
+        (w) => w !== word
+      );
+      await this.save();
+    }
+  }
 }
 
 module.exports = new ModerationManager();

@@ -1,11 +1,18 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, MessageFlags } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ComponentType,
+  MessageFlags,
+} = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
 
 const rpsChoices = [
   { id: 'rock', label: 'Rock', emoji: '🪨' },
   { id: 'paper', label: 'Paper', emoji: '📄' },
-  { id: 'scissors', label: 'Scissors', emoji: '✂️' }
+  { id: 'scissors', label: 'Scissors', emoji: '✂️' },
 ];
 
 const triviaQuestions = [
@@ -14,121 +21,122 @@ const triviaQuestions = [
     options: ['Member', 'DJ', 'Moderator', 'Admin'],
     answerIndex: 1,
     explanation: 'The DJ role gates the playback controls unless you are admin/alone with the bot.',
-    category: 'Bot'
+    category: 'Bot',
   },
   {
     question: 'What is the default command prefix for this bot?',
     options: ['?', '!', '.', '/'],
     answerIndex: 1,
     explanation: 'You can change it with the config prefix command per server.',
-    category: 'Bot'
+    category: 'Bot',
   },
   {
     question: 'How many songs can the playlist loader add at once by default?',
     options: ['10', '25', '50', 'Unlimited'],
     answerIndex: 2,
     explanation: 'Playlist handling is capped at 50 entries for speed and safety.',
-    category: 'Bot'
+    category: 'Bot',
   },
   {
     question: 'Which emoji reaction skips the current song?',
     options: ['⏸️', '▶️', '⏭️', '⏹️'],
     answerIndex: 2,
     explanation: '⏭️ is mapped to Skip in the reaction controls.',
-    category: 'Bot'
+    category: 'Bot',
   },
   {
     question: 'What is the capital of France?',
     options: ['Berlin', 'Madrid', 'Paris', 'Rome'],
     answerIndex: 2,
     explanation: 'Paris has been the capital of France since the 12th century.',
-    category: 'General'
+    category: 'General',
   },
   {
     question: 'What is the largest planet in our solar system?',
     options: ['Earth', 'Mars', 'Jupiter', 'Saturn'],
     answerIndex: 2,
     explanation: 'Jupiter is more than twice as massive as all other planets combined.',
-    category: 'General'
+    category: 'General',
   },
   {
     question: 'Who painted the Mona Lisa?',
     options: ['Michelangelo', 'Leonardo da Vinci', 'Raphael', 'Donatello'],
     answerIndex: 1,
     explanation: 'Leonardo da Vinci painted the Mona Lisa in the early 1500s.',
-    category: 'General'
+    category: 'General',
   },
   {
     question: 'In which year did World War II end?',
     options: ['1943', '1944', '1945', '1946'],
     answerIndex: 2,
     explanation: 'World War II ended in 1945 with the surrender of Japan.',
-    category: 'General'
+    category: 'General',
   },
   {
     question: 'Which video game franchise features Master Chief?',
     options: ['Halo', 'Call of Duty', 'Destiny', 'Gears of War'],
     answerIndex: 0,
     explanation: 'Master Chief is the iconic protagonist of the Halo series.',
-    category: 'Gaming'
+    category: 'Gaming',
   },
   {
     question: 'What year was Minecraft officially released?',
     options: ['2009', '2010', '2011', '2012'],
     answerIndex: 2,
     explanation: 'Minecraft was officially released on November 18, 2011.',
-    category: 'Gaming'
+    category: 'Gaming',
   },
   {
     question: 'Which company created the game Fortnite?',
     options: ['Riot Games', 'Epic Games', 'Activision', 'EA'],
     answerIndex: 1,
     explanation: 'Epic Games developed and published Fortnite in 2017.',
-    category: 'Gaming'
+    category: 'Gaming',
   },
   {
     question: 'What is the best-selling video game of all time?',
     options: ['Tetris', 'Minecraft', 'GTA V', 'Wii Sports'],
     answerIndex: 1,
     explanation: 'Minecraft has sold over 300 million copies worldwide.',
-    category: 'Gaming'
+    category: 'Gaming',
   },
   {
     question: 'Who is known as the "King of Pop"?',
     options: ['Elvis Presley', 'Michael Jackson', 'Prince', 'Freddie Mercury'],
     answerIndex: 1,
     explanation: 'Michael Jackson earned this title for his contributions to music and dance.',
-    category: 'Music'
+    category: 'Music',
   },
   {
     question: 'Which band wrote "Bohemian Rhapsody"?',
     options: ['The Beatles', 'Led Zeppelin', 'Queen', 'Pink Floyd'],
     answerIndex: 2,
     explanation: 'Queen released this iconic song in 1975, written by Freddie Mercury.',
-    category: 'Music'
+    category: 'Music',
   },
   {
     question: 'What instrument does a drummer play?',
     options: ['Guitar', 'Drums', 'Bass', 'Keyboard'],
     answerIndex: 1,
     explanation: 'Drummers play percussion instruments, primarily drums.',
-    category: 'Music'
+    category: 'Music',
   },
   {
     question: 'Which artist released the album "Thriller"?',
     options: ['Prince', 'Madonna', 'Michael Jackson', 'Whitney Houston'],
     answerIndex: 2,
     explanation: 'Thriller (1982) is the best-selling album of all time.',
-    category: 'Music'
-  }
+    category: 'Music',
+  },
 ];
 
-const disableRow = (row, styleMutator) => new ActionRowBuilder().addComponents(
-  row.components.map((component, index) => {
-    const cloned = ButtonBuilder.from(component).setDisabled(true);
-    return styleMutator ? styleMutator(cloned, index) : cloned;
-  })
-);
+const disableRow = (row, styleMutator) =>
+  new ActionRowBuilder().addComponents(
+    row.components.map((component, index) => {
+      const cloned = ButtonBuilder.from(component).setDisabled(true);
+      return styleMutator ? styleMutator(cloned, index) : cloned;
+    })
+  );
 
 const getRpsResult = (player, bot) => {
   if (player === bot) return 'tie';
@@ -149,7 +157,7 @@ async function playRps(message) {
     .setDescription('Pick a hand — bot will pick right after you.');
 
   const row = new ActionRowBuilder().addComponents(
-    rpsChoices.map(choice =>
+    rpsChoices.map((choice) =>
       new ButtonBuilder()
         .setCustomId(`rps_${choice.id}`)
         .setLabel(choice.label)
@@ -163,10 +171,10 @@ async function playRps(message) {
   const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 30_000,
-    filter: interaction => interaction.user.id === message.author.id
+    filter: (interaction) => interaction.user.id === message.author.id,
   });
 
-  collector.on('collect', async interaction => {
+  collector.on('collect', async (interaction) => {
     const userPick = interaction.customId.replace('rps_', '');
     const botPick = rpsChoices[Math.floor(Math.random() * rpsChoices.length)].id;
     const outcome = getRpsResult(userPick, botPick);
@@ -175,8 +183,13 @@ async function playRps(message) {
       .setColor(outcome === 'win' ? 0x57f287 : outcome === 'lose' ? 0xed4245 : 0xf1c40f)
       .setTitle('Rock • Paper • Scissors')
       .setDescription(
-        `You chose **${userPick}** | Bot chose **${botPick}**\n` +
-        (outcome === 'win' ? '🎉 You win!' : outcome === 'lose' ? '😅 Bot wins this round.' : "🤝 It's a tie!")
+        `You chose **${userPick}** | Bot chose **${botPick}**\n${
+          outcome === 'win'
+            ? '🎉 You win!'
+            : outcome === 'lose'
+              ? '😅 Bot wins this round.'
+              : "🤝 It's a tie!"
+        }`
       );
 
     try {
@@ -191,7 +204,10 @@ async function playRps(message) {
 
   collector.on('end', async (_collected, reason) => {
     if (reason === 'time') {
-      await msg.edit({ content: '⏰ Timed out. Start again to play another round.', components: [disableRow(row)] });
+      await msg.edit({
+        content: '⏰ Timed out. Start again to play another round.',
+        components: [disableRow(row)],
+      });
     }
   });
 }
@@ -204,17 +220,19 @@ async function playGuessNumber(message) {
   const intro = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle('Guess The Number')
-    .setDescription('I picked a number between **1** and **100**. You have **6** tries — reply with your guesses!');
+    .setDescription(
+      'I picked a number between **1** and **100**. You have **6** tries — reply with your guesses!'
+    );
 
   await message.reply({ embeds: [intro] });
 
   const collector = message.channel.createMessageCollector({
-    filter: msg => msg.author.id === message.author.id,
+    filter: (msg) => msg.author.id === message.author.id,
     time: 60_000,
-    max: maxAttempts
+    max: maxAttempts,
   });
 
-  collector.on('collect', msg => {
+  collector.on('collect', (msg) => {
     const guess = parseInt(msg.content.trim(), 10);
     if (Number.isNaN(guess) || guess < 1 || guess > 100) {
       msg.reply('❔ Send a whole number between 1 and 100.');
@@ -252,13 +270,18 @@ async function playGuessNumber(message) {
 
 async function playTicTacToe(message) {
   const board = [' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '];
-  let currentPlayer = 'X'; // User is X, Bot is O
+  const currentPlayer = 'X'; // User is X, Bot is O
 
   const checkWinner = (b) => {
     const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
-      [0, 3, 6], [1, 4, 7], [2, 5, 8], // cols
-      [0, 4, 8], [2, 4, 6]             // diagonals
+      [0, 1, 2],
+      [3, 4, 5],
+      [6, 7, 8], // rows
+      [0, 3, 6],
+      [1, 4, 7],
+      [2, 5, 8], // cols
+      [0, 4, 8],
+      [2, 4, 6], // diagonals
     ];
     for (const [a, b, c] of lines) {
       if (board[a] !== ' ' && board[a] === board[b] && board[a] === board[c]) {
@@ -272,14 +295,19 @@ async function playTicTacToe(message) {
     // Simple AI: check for win, then block, then pick random
     const findMove = (symbol) => {
       const lines = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],
-        [0, 4, 8], [2, 4, 6]
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
       ];
       for (const [a, b, c] of lines) {
         const cells = [board[a], board[b], board[c]];
-        if (cells.filter(x => x === symbol).length === 2 && cells.includes(' ')) {
-          return [a, b, c].find(i => board[i] === ' ');
+        if (cells.filter((x) => x === symbol).length === 2 && cells.includes(' ')) {
+          return [a, b, c].find((i) => board[i] === ' ');
         }
       }
       return null;
@@ -288,30 +316,32 @@ async function playTicTacToe(message) {
     // Try to win
     let move = findMove('O');
     if (move !== null) return move;
-    
+
     // Try to block
     move = findMove('X');
     if (move !== null) return move;
-    
+
     // Pick center or random
     if (board[4] === ' ') return 4;
-    const available = board.map((v, i) => v === ' ' ? i : null).filter(x => x !== null);
+    const available = board.map((v, i) => (v === ' ' ? i : null)).filter((x) => x !== null);
     return available[Math.floor(Math.random() * available.length)];
   };
 
   const renderBoard = () => {
-    const emojis = { 'X': '❌', 'O': '⭕', ' ': '⬜' };
-    return board.map((cell, i) => {
-      if (i % 3 === 0 && i !== 0) return '\n';
-      return emojis[cell];
-    }).join('');
+    const emojis = { X: '❌', O: '⭕', ' ': '⬜' };
+    return board
+      .map((cell, i) => {
+        if (i % 3 === 0 && i !== 0) return '\n';
+        return emojis[cell];
+      })
+      .join('');
   };
 
   const createButtons = (disabled = false) => {
     const rows = [];
     for (let i = 0; i < 3; i++) {
       const row = new ActionRowBuilder().addComponents(
-        [0, 1, 2].map(j => {
+        [0, 1, 2].map((j) => {
           const idx = i * 3 + j;
           return new ButtonBuilder()
             .setCustomId(`ttt_${idx}`)
@@ -335,10 +365,10 @@ async function playTicTacToe(message) {
   const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 120_000,
-    filter: interaction => interaction.user.id === message.author.id
+    filter: (interaction) => interaction.user.id === message.author.id,
   });
 
-  collector.on('collect', async interaction => {
+  collector.on('collect', async (interaction) => {
     const idx = Number(interaction.customId.replace('ttt_', ''));
     board[idx] = 'X';
 
@@ -348,10 +378,11 @@ async function playTicTacToe(message) {
         .setColor(winner === 'X' ? 0x57f287 : winner === 'O' ? 0xed4245 : 0xf1c40f)
         .setTitle('Tic-Tac-Toe')
         .setDescription(
-          renderBoard() + '\n\n' +
-          (winner === 'X' ? '🎉 You win!' : winner === 'O' ? '🤖 Bot wins!' : "🤝 It's a tie!")
+          `${renderBoard()}\n\n${
+            winner === 'X' ? '🎉 You win!' : winner === 'O' ? '🤖 Bot wins!' : "🤝 It's a tie!"
+          }`
         );
-      
+
       try {
         await interaction.update({ embeds: [result], components: createButtons(true) });
       } catch (error) {
@@ -372,15 +403,18 @@ async function playTicTacToe(message) {
       .setColor(winner ? (winner === 'O' ? 0xed4245 : 0xf1c40f) : 0x5865f2)
       .setTitle('Tic-Tac-Toe')
       .setDescription(
-        renderBoard() + '\n\n' +
-        (winner === 'O' ? '🤖 Bot wins!' : winner === 'tie' ? "🤝 It's a tie!" : 'Your turn!')
+        `${renderBoard()}\n\n${
+          winner === 'O' ? '🤖 Bot wins!' : winner === 'tie' ? "🤝 It's a tie!" : 'Your turn!'
+        }`
       );
 
     try {
       await interaction.update({ embeds: [statusEmbed], components: createButtons(!!winner) });
     } catch (error) {
       if (error.code === 10062) {
-        await msg.edit({ embeds: [statusEmbed], components: createButtons(!!winner) }).catch(() => {});
+        await msg
+          .edit({ embeds: [statusEmbed], components: createButtons(!!winner) })
+          .catch(() => {});
       }
     }
     if (winner) collector.stop('finished');
@@ -397,60 +431,61 @@ async function playBlackjack(message) {
   const deck = [];
   const suits = ['♠', '♥', '♦', '♣'];
   const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-  
+
   for (const suit of suits) {
     for (const rank of ranks) {
       deck.push({ rank, suit });
     }
   }
-  
+
   const shuffle = (arr) => {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
   };
-  
+
   shuffle(deck);
-  
+
   const cardValue = (card) => {
     if (card.rank === 'A') return 11;
     if (['J', 'Q', 'K'].includes(card.rank)) return 10;
     return parseInt(card.rank);
   };
-  
+
   const handValue = (hand) => {
     let value = hand.reduce((sum, card) => sum + cardValue(card), 0);
-    let aces = hand.filter(c => c.rank === 'A').length;
+    let aces = hand.filter((c) => c.rank === 'A').length;
     while (value > 21 && aces > 0) {
       value -= 10;
       aces--;
     }
     return value;
   };
-  
+
   const formatHand = (hand, hide = false) => {
     if (hide) {
       return `${hand[0].rank}${hand[0].suit} 🂠`;
     }
-    return hand.map(c => `${c.rank}${c.suit}`).join(' ');
+    return hand.map((c) => `${c.rank}${c.suit}`).join(' ');
   };
-  
-  let playerHand = [deck.pop(), deck.pop()];
-  let dealerHand = [deck.pop(), deck.pop()];
-  
+
+  const playerHand = [deck.pop(), deck.pop()];
+  const dealerHand = [deck.pop(), deck.pop()];
+
   // Check for dealer blackjack (if showing Ace or 10-value card)
   const dealerUpCard = dealerHand[0];
-  const dealerShowsAceOr10 = dealerUpCard.rank === 'A' || ['10', 'J', 'Q', 'K'].includes(dealerUpCard.rank);
+  const dealerShowsAceOr10 =
+    dealerUpCard.rank === 'A' || ['10', 'J', 'Q', 'K'].includes(dealerUpCard.rank);
   const dealerHasBlackjack = handValue(dealerHand) === 21;
   const playerHasBlackjack = handValue(playerHand) === 21;
-  
+
   // If dealer shows Ace/10 and has blackjack, reveal immediately
   if (dealerShowsAceOr10 && dealerHasBlackjack) {
     const playerVal = handValue(playerHand);
     let outcome;
     let color;
-    
+
     if (playerHasBlackjack) {
       outcome = "🤝 Both blackjack! It's a push (tie)!";
       color = 0xf1c40f;
@@ -460,7 +495,7 @@ async function playBlackjack(message) {
       color = 0xed4245;
       await gameStatsManager.recordBlackjack(message.author.id, 'loss');
     }
-    
+
     const instantResult = new EmbedBuilder()
       .setColor(color)
       .setTitle('🃏 Blackjack - Dealer Blackjack!')
@@ -471,15 +506,15 @@ async function playBlackjack(message) {
       )
       .setDescription(outcome)
       .setFooter({ text: `Player ID: ${message.author.id}` });
-    
+
     await message.reply({ embeds: [instantResult] });
     return;
   }
-  
+
   // If player has blackjack but dealer doesn't
   if (playerHasBlackjack) {
     await gameStatsManager.recordBlackjack(message.author.id, 'win');
-    
+
     const instantWin = new EmbedBuilder()
       .setColor(0x57f287)
       .setTitle('🃏 Blackjack!')
@@ -490,13 +525,13 @@ async function playBlackjack(message) {
       )
       .setDescription('🎉 Blackjack! You win!')
       .setFooter({ text: `Player ID: ${message.author.id}` });
-    
+
     await message.reply({ embeds: [instantWin] });
     return;
   }
-  
-  const createButtons = (disabled = false) => {
-    return new ActionRowBuilder().addComponents(
+
+  const createButtons = (disabled = false) =>
+    new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('bj_hit')
         .setLabel('Hit')
@@ -510,46 +545,51 @@ async function playBlackjack(message) {
         .setStyle(ButtonStyle.Success)
         .setDisabled(disabled)
     );
-  };
-  
+
   const prompt = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle('🃏 Blackjack (Demo)')
     .setThumbnail(message.author.displayAvatarURL())
     .addFields(
-      { name: `${message.author.username}'s Hand (${handValue(playerHand)})`, value: formatHand(playerHand) },
+      {
+        name: `${message.author.username}'s Hand (${handValue(playerHand)})`,
+        value: formatHand(playerHand),
+      },
       { name: 'Dealer Hand', value: formatHand(dealerHand, true) }
     )
     .setDescription('Hit or Stand?')
     .setFooter({ text: `Player ID: ${message.author.id}` });
-  
+
   const msg = await message.reply({ embeds: [prompt], components: [createButtons()] });
-  
+
   const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
-    filter: interaction => interaction.user.id === message.author.id
+    filter: (interaction) => interaction.user.id === message.author.id,
   });
-  
-  collector.on('collect', async interaction => {
+
+  collector.on('collect', async (interaction) => {
     if (interaction.customId === 'bj_hit') {
       playerHand.push(deck.pop());
       const playerVal = handValue(playerHand);
-      
+
       if (playerVal > 21) {
         await gameStatsManager.recordBlackjack(message.author.id, 'loss');
-        
+
         const bust = new EmbedBuilder()
           .setColor(0xed4245)
           .setTitle('🃏 Blackjack - Bust!')
           .setThumbnail(message.author.displayAvatarURL())
           .addFields(
-            { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
+            {
+              name: `${message.author.username}'s Hand (${playerVal})`,
+              value: formatHand(playerHand),
+            },
             { name: `Dealer Hand (${handValue(dealerHand)})`, value: formatHand(dealerHand) }
           )
           .setDescription('💥 You busted! Dealer wins.')
           .setFooter({ text: `Player ID: ${message.author.id}` });
-        
+
         try {
           await interaction.update({ embeds: [bust], components: [createButtons(true)] });
         } catch (error) {
@@ -560,18 +600,21 @@ async function playBlackjack(message) {
         collector.stop('bust');
         return;
       }
-      
+
       const updated = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('🃏 Blackjack (Demo)')
         .setThumbnail(message.author.displayAvatarURL())
         .addFields(
-          { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
+          {
+            name: `${message.author.username}'s Hand (${playerVal})`,
+            value: formatHand(playerHand),
+          },
           { name: 'Dealer Hand', value: formatHand(dealerHand, true) }
         )
         .setDescription('Hit or Stand?')
         .setFooter({ text: `Player ID: ${message.author.id}` });
-      
+
       try {
         await interaction.update({ embeds: [updated], components: [createButtons()] });
       } catch (error) {
@@ -579,21 +622,20 @@ async function playBlackjack(message) {
           await msg.edit({ embeds: [updated], components: [createButtons()] }).catch(() => {});
         }
       }
-      
     } else if (interaction.customId === 'bj_stand') {
       // Dealer reveals hole card and plays according to rules
       // Dealer must hit on 16 or less, must stand on 17 or more
       while (handValue(dealerHand) <= 16) {
         dealerHand.push(deck.pop());
       }
-      
+
       const playerVal = handValue(playerHand);
       const dealerVal = handValue(dealerHand);
-      
+
       let outcome;
       let color;
       let result;
-      
+
       if (dealerVal > 21) {
         outcome = '💥 Dealer busted! You win!';
         color = 0x57f287;
@@ -611,20 +653,23 @@ async function playBlackjack(message) {
         color = 0xf1c40f;
         result = 'tie';
       }
-      
+
       await gameStatsManager.recordBlackjack(message.author.id, result);
-      
+
       const final = new EmbedBuilder()
         .setColor(color)
         .setTitle('🃏 Blackjack - Final (Demo)')
         .setThumbnail(message.author.displayAvatarURL())
         .addFields(
-          { name: `${message.author.username}'s Hand (${playerVal})`, value: formatHand(playerHand) },
+          {
+            name: `${message.author.username}'s Hand (${playerVal})`,
+            value: formatHand(playerHand),
+          },
           { name: `Dealer Hand (${dealerVal})`, value: formatHand(dealerHand) }
         )
         .setDescription(outcome)
         .setFooter({ text: `Player ID: ${message.author.id}` });
-      
+
       try {
         await interaction.update({ embeds: [final], components: [createButtons(true)] });
       } catch (error) {
@@ -635,7 +680,7 @@ async function playBlackjack(message) {
       collector.stop('finished');
     }
   });
-  
+
   collector.on('end', async (_collected, reason) => {
     if (reason === 'time') {
       await msg.edit({ content: '⏰ Game timed out.', components: [createButtons(true)] });
@@ -653,7 +698,7 @@ async function playTrivia(message) {
     .setDescription(question.question)
     .addFields({
       name: 'Options',
-      value: question.options.map((opt, idx) => `${letters[idx]}. ${opt}`).join('\n')
+      value: question.options.map((opt, idx) => `${letters[idx]}. ${opt}`).join('\n'),
     });
 
   const row = new ActionRowBuilder().addComponents(
@@ -670,10 +715,10 @@ async function playTrivia(message) {
   const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 45_000,
-    filter: interaction => interaction.user.id === message.author.id
+    filter: (interaction) => interaction.user.id === message.author.id,
   });
 
-  collector.on('collect', async interaction => {
+  collector.on('collect', async (interaction) => {
     const pick = Number(interaction.customId.replace('trivia_', ''));
     const correct = pick === question.answerIndex;
 
@@ -683,7 +728,10 @@ async function playTrivia(message) {
       .setDescription(correct ? '✅ Correct!' : '❌ Not quite.')
       .addFields(
         { name: 'Your answer', value: `${letters[pick]}. ${question.options[pick]}` },
-        { name: 'Correct answer', value: `${letters[question.answerIndex]}. ${question.options[question.answerIndex]}` },
+        {
+          name: 'Correct answer',
+          value: `${letters[question.answerIndex]}. ${question.options[question.answerIndex]}`,
+        },
         { name: 'Why?', value: question.explanation }
       );
 
@@ -705,7 +753,7 @@ async function playTrivia(message) {
 
   collector.on('end', async (_collected, reason) => {
     if (reason === 'time') {
-      const styledRow = disableRow(row, btn => btn.setStyle(ButtonStyle.Secondary));
+      const styledRow = disableRow(row, (btn) => btn.setStyle(ButtonStyle.Secondary));
       await msg.edit({ content: '⏰ Trivia timed out.', components: [styledRow] });
     }
   });
@@ -714,12 +762,12 @@ async function playTrivia(message) {
 async function playRoulette(message) {
   const redNumbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
   const blackNumbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35];
-  
+
   const getNumberColor = (num) => {
     if (num === 0) return '🟢';
     return redNumbers.includes(num) ? '🔴' : '⚫';
   };
-  
+
   const prompt = new EmbedBuilder()
     .setColor(0x5865f2)
     .setTitle('🎰 Roulette (Demo)')
@@ -729,7 +777,7 @@ async function playRoulette(message) {
       { name: 'Color Bet', value: 'Red, Black or Green (0)', inline: true },
       { name: 'Other Bets', value: 'Odd/Even, High/Low (pays 1:1)', inline: true }
     );
-  
+
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId('roulette_red')
@@ -746,17 +794,11 @@ async function playRoulette(message) {
       .setLabel('Green (0)')
       .setEmoji('🟢')
       .setStyle(ButtonStyle.Success),
-    new ButtonBuilder()
-      .setCustomId('roulette_odd')
-      .setLabel('Odd')
-      .setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId('roulette_odd').setLabel('Odd').setStyle(ButtonStyle.Primary)
   );
-  
+
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('roulette_even')
-      .setLabel('Even')
-      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('roulette_even').setLabel('Even').setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('roulette_low')
       .setLabel('Low (1-18)')
@@ -771,44 +813,44 @@ async function playRoulette(message) {
       .setEmoji('🔢')
       .setStyle(ButtonStyle.Primary)
   );
-  
+
   const msg = await message.reply({ embeds: [prompt], components: [row1, row2] });
-  
+
   const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 60_000,
-    filter: interaction => interaction.user.id === message.author.id
+    filter: (interaction) => interaction.user.id === message.author.id,
   });
-  
-  collector.on('collect', async interaction => {
+
+  collector.on('collect', async (interaction) => {
     const betType = interaction.customId.replace('roulette_', '');
-    
+
     // If picking a number, ask for input
     if (betType === 'number') {
-      await interaction.reply({ 
-        content: '🔢 Reply with a number from **0 to 36**:', 
-        flags: MessageFlags.Ephemeral
+      await interaction.reply({
+        content: '🔢 Reply with a number from **0 to 36**:',
+        flags: MessageFlags.Ephemeral,
       });
-      
+
       const numCollector = message.channel.createMessageCollector({
-        filter: m => m.author.id === message.author.id,
+        filter: (m) => m.author.id === message.author.id,
         time: 30_000,
-        max: 1
+        max: 1,
       });
-      
-      numCollector.on('collect', async m => {
+
+      numCollector.on('collect', async (m) => {
         const chosenNum = parseInt(m.content.trim(), 10);
         if (Number.isNaN(chosenNum) || chosenNum < 0 || chosenNum > 36) {
           m.reply('❌ Invalid number! Must be 0-36.');
           return;
         }
-        
+
         const result = Math.floor(Math.random() * 37);
         const won = result === chosenNum;
         const color = getNumberColor(result);
-        
+
         await gameStatsManager.recordRoulette(message.author.id, won);
-        
+
         const resultEmbed = new EmbedBuilder()
           .setColor(won ? 0x57f287 : 0xed4245)
           .setTitle('🎰 Roulette - Result (Demo)')
@@ -817,14 +859,14 @@ async function playRoulette(message) {
             { name: 'Your Bet', value: `Number ${chosenNum}`, inline: true },
             { name: 'Payout', value: won ? '35:1 🎉' : 'Lost 😅', inline: true }
           );
-        
+
         await msg.edit({ embeds: [resultEmbed], components: [] });
         collector.stop('finished');
       });
-      
+
       return;
     }
-    
+
     // Spin the wheel
     const result = Math.floor(Math.random() * 37);
     const color = getNumberColor(result);
@@ -834,13 +876,13 @@ async function playRoulette(message) {
     const isEven = result !== 0 && result % 2 === 0;
     const isLow = result >= 1 && result <= 18;
     const isHigh = result >= 19 && result <= 36;
-    
+
     let won = false;
     let betDescription = '';
-    
+
     let payout = '1:1';
-    
-    switch(betType) {
+
+    switch (betType) {
       case 'red':
         won = isRed;
         betDescription = '🔴 Red';
@@ -871,9 +913,9 @@ async function playRoulette(message) {
         betDescription = 'High (19-36)';
         break;
     }
-    
+
     await gameStatsManager.recordRoulette(message.author.id, won);
-    
+
     const resultEmbed = new EmbedBuilder()
       .setColor(won ? 0x57f287 : 0xed4245)
       .setTitle('🎰 Roulette - Result (Demo)')
@@ -882,7 +924,7 @@ async function playRoulette(message) {
         { name: 'Your Bet', value: betDescription, inline: true },
         { name: 'Result', value: won ? `✅ Won! (${payout})` : '❌ Lost', inline: true }
       );
-    
+
     try {
       await interaction.update({ embeds: [resultEmbed], components: [] });
     } catch (error) {
@@ -892,7 +934,7 @@ async function playRoulette(message) {
     }
     collector.stop('finished');
   });
-  
+
   collector.on('end', async (_collected, reason) => {
     if (reason === 'time') {
       await msg.edit({ content: '⏰ Roulette timed out.', components: [] });
@@ -902,28 +944,26 @@ async function playRoulette(message) {
 
 async function playSlots(message) {
   const slotSymbols = ['🍎', '🍊', '🍋', '🍌', '🍇', '⭐', '💎', '🔔'];
-  
-  const spinSlots = () => {
-    return [
-      slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
-      slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
-      slotSymbols[Math.floor(Math.random() * slotSymbols.length)]
-    ];
-  };
+
+  const spinSlots = () => [
+    slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
+    slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
+    slotSymbols[Math.floor(Math.random() * slotSymbols.length)],
+  ];
 
   const checkWin = (symbols) => {
     const [slot1, slot2, slot3] = symbols;
-    
+
     // Check for three of a kind
     if (slot1 === slot2 && slot2 === slot3) {
       return true;
     }
-    
+
     // Check for two of a kind
     if (slot1 === slot2 || slot2 === slot3 || slot1 === slot3) {
       return true;
     }
-    
+
     return false;
   };
 
@@ -935,13 +975,13 @@ async function playSlots(message) {
   const msg = await message.reply({ embeds: [spinEmbed] });
 
   // Simulate spinning
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 1500));
 
   const result = spinSlots();
   const won = checkWin(result);
 
   let resultDescription = `**${result[0]} | ${result[1]} | ${result[2]}**\n\n`;
-  
+
   if (won) {
     resultDescription += '✨ **You got a match!**';
   } else {
@@ -951,7 +991,7 @@ async function playSlots(message) {
   const resultEmbed = new EmbedBuilder()
     .setColor(won ? 0x57f287 : 0xed4245)
     .setTitle('🎰 Slots Machine - Result (Demo)')
-    .setDescription(resultDescription + '\n\n💡 Want to play for real coins? Try `!slots <bet>`');
+    .setDescription(`${resultDescription}\n\n💡 Want to play for real coins? Try \`!slots <bet>\``);
 
   await msg.edit({ embeds: [resultEmbed] });
 }
@@ -965,7 +1005,24 @@ module.exports = {
     const prefix = settings.prefix;
     const sub = (args[0] || '').toLowerCase();
 
-    if (!sub || !['rps', 'guess', 'trivia', 'tictactoe', 'ttt', 'blackjack', 'bj', 'roulette', 'roul', 'slots', 'slot', 'mines', 'mine'].includes(sub)) {
+    if (
+      !sub ||
+      ![
+        'rps',
+        'guess',
+        'trivia',
+        'tictactoe',
+        'ttt',
+        'blackjack',
+        'bj',
+        'roulette',
+        'roul',
+        'slots',
+        'slot',
+        'mines',
+        'mine',
+      ].includes(sub)
+    ) {
       const usage = new EmbedBuilder()
         .setColor(0x5865f2)
         .setTitle('Mini Games')
@@ -1000,7 +1057,9 @@ module.exports = {
     } else if (sub === 'slots' || sub === 'slot') {
       await playSlots(message);
     } else if (sub === 'mines' || sub === 'mine') {
-      await message.reply(`💣 Mines uses the dedicated command: \`${prefix}mines <bet|max|all> [mines 1-6]\``);
+      await message.reply(
+        `💣 Mines uses the dedicated command: \`${prefix}mines <bet|max|all> [mines 1-6]\``
+      );
     }
-  }
+  },
 };

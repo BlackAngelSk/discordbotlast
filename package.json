@@ -1,6 +1,6 @@
 {
   "name": "discord-bot",
-  "version": "1.6.2",
+  "version": "2.0.0",
   "description": "A Discord bot built with discord.js. and a variety of features, including music playback, games, and more.",
   "main": "index.js",
   "scripts": {
@@ -14,7 +14,14 @@
     "test:slots": "node scripts/test-slots-logic.js",
     "test:steam-dates": "node scripts/test-steam-update-dates.js",
     "test": "node tests/run-all.js",
-    "test:mongo": "node test-mongo-connect.js"
+    "test:mongo": "node test-mongo-connect.js",
+    "test:jest": "jest",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "keywords": [
     "discord",
@@ -51,5 +58,14 @@
     "youtube-dl-exec": "^3.0.29",
     "ytdl-core": "^4.11.5",
     "ytsr": "^3.8.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "husky": "^9.1.7",
+    "jest": "^30.4.2",
+    "prettier": "^3.9.4"
   }
 }

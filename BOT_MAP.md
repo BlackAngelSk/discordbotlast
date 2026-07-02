@@ -1,6 +1,7 @@
 # 🗺️ Discord Bot Complete Architecture Map
 
 ## 📁 Project Overview
+
 - **Name:** discord-bot v1.6.2
 - **Author:** BlackAngelSK
 - **Framework:** discord.js v14
@@ -13,14 +14,16 @@
 ## 🎯 Entry Points & Configuration
 
 ### Core Files
-| File | Purpose |
-|------|---------|
-| `index.js` | Main entry point (460 lines) - initializes all managers, handlers, starts bot |
-| `.env` / `.env.example` | Environment configuration (DISCORD_TOKEN required) |
-| `package.json` | Dependencies & npm scripts |
-| `ecosystem.config.js` | PM2 cluster configuration |
+
+| File                    | Purpose                                                                       |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `index.js`              | Main entry point (460 lines) - initializes all managers, handlers, starts bot |
+| `.env` / `.env.example` | Environment configuration (DISCORD_TOKEN required)                            |
+| `package.json`          | Dependencies & npm scripts                                                    |
+| `ecosystem.config.js`   | PM2 cluster configuration                                                     |
 
 ### Startup Scripts
+
 - `start.bat` / `start.sh` - Quick start
 - `start_bot.bat` - Alternative start script
 - `install.bat` / `install.sh` - Installation scripts
@@ -30,6 +33,7 @@
 ## 💬 Prefix Commands (`commands/`)
 
 ### Admin (28 files) - `commands/admin/`
+
 ```
 addcoins.js          add economy currency to users
 aipersona.js         AI personality configuration
@@ -62,6 +66,7 @@ xpevent.js           XP event configuration
 ```
 
 ### Economy (4 files) - `commands/economy/`
+
 ```
 daily.js             Daily currency reward
 leaderboard.js       Economy leaderboard
@@ -70,6 +75,7 @@ weekly.js            Weekly currency reward
 ```
 
 ### Fun (32 files) - `commands/fun/`
+
 ```
 2048.js              2048 puzzle game
 accept.js            Couple acceptance
@@ -108,6 +114,7 @@ wordle.js            Wordle word game
 ```
 
 ### Moderation (21 files) - `commands/moderation/`
+
 ```
 ban.js               Ban member
 clear.js             Clear messages
@@ -133,6 +140,7 @@ welcomecard.js       Welcome card image
 ```
 
 ### Music (20 files) - `commands/music/`
+
 ```
 247.js               24/7 voice mode
 autoplay.js          Autoplay similar songs
@@ -156,6 +164,7 @@ volume.js            Adjust volume
 ```
 
 ### Utility (16 files) - `commands/utility/`
+
 ```
 achievements.js      Achievement display
 confess.js           Confession system
@@ -181,6 +190,7 @@ stats.js             Bot statistics
 ## ⚡ Slash Commands (`slashCommands/`)
 
 ### Admin (15 files) - `slashCommands/admin/`
+
 ```
 auditlog.js          View audit logs
 auditlogs.js         Audit log viewer
@@ -201,6 +211,7 @@ welcomemessage.js    Welcome message config
 ```
 
 ### Economy (6 files) - `slashCommands/economy/`
+
 ```
 balance.js           Check balance
 daily.js             Daily reward
@@ -211,6 +222,7 @@ weekly.js            Weekly reward
 ```
 
 ### Fun (23 files) - `slashCommands/fun/`
+
 ```
 8ball.js             Magic 8-ball
 accept.js            Couple acceptance
@@ -243,75 +255,83 @@ ttt.js               Tic Tac Toe
 ## 🔧 Utils (~80 Manager Files)
 
 ### Core Infrastructure
-| File | Purpose |
-|------|---------|
-| `commandHandler.js` | Prefix command dispatcher |
-| `eventHandler.js` | Event loader & manager |
-| `slashCommandHandler.js` | Slash command dispatcher |
-| `databaseManager.js` | MongoDB connection & queries |
-| `settingsManager.js` | Server settings storage |
-| `languageManager.js` | i18n / localization |
+
+| File                     | Purpose                      |
+| ------------------------ | ---------------------------- |
+| `commandHandler.js`      | Prefix command dispatcher    |
+| `eventHandler.js`        | Event loader & manager       |
+| `slashCommandHandler.js` | Slash command dispatcher     |
+| `databaseManager.js`     | MongoDB connection & queries |
+| `settingsManager.js`     | Server settings storage      |
+| `languageManager.js`     | i18n / localization          |
 
 ### Economy & Progression
-| File | Purpose |
-|------|---------|
-| `economyManager.js` | Currency, balance, transactions |
-| `levelRewardsManager.js` | Level-up rewards |
-| `shopManager.js` | Shop items & purchases |
-| `gameStatsManager.js` | Game statistics tracking |
-| `statsManager.js` | General stats collection |
-| `seasonManager.js` | Seasonal competitions |
-| `seasonLeaderboardManager.js` | Season leaderboards |
+
+| File                          | Purpose                         |
+| ----------------------------- | ------------------------------- |
+| `economyManager.js`           | Currency, balance, transactions |
+| `levelRewardsManager.js`      | Level-up rewards                |
+| `shopManager.js`              | Shop items & purchases          |
+| `gameStatsManager.js`         | Game statistics tracking        |
+| `statsManager.js`             | General stats collection        |
+| `seasonManager.js`            | Seasonal competitions           |
+| `seasonLeaderboardManager.js` | Season leaderboards             |
 
 ### Moderation & Logging
-| File | Purpose |
-|------|---------|
-| `moderationManager.js` | Ban/kick/warn tracking |
-| `ticketManager.js` | Ticket system |
-| `raidProtectionManager.js` | Raid prevention |
-| `loggingManager.js` | Activity logging |
-| `auditLog.js` | Audit trail |
+
+| File                       | Purpose                |
+| -------------------------- | ---------------------- |
+| `moderationManager.js`     | Ban/kick/warn tracking |
+| `ticketManager.js`         | Ticket system          |
+| `raidProtectionManager.js` | Raid prevention        |
+| `loggingManager.js`        | Activity logging       |
+| `auditLog.js`              | Audit trail            |
 
 ### Music System
-| File | Purpose |
-|------|---------|
-| `MusicQueue.js` | Queue data structure |
-| `musicPlaylistManager.js` | Playlist storage |
-| `youtubeSearch.js` | YouTube search utility |
-| `queues.js` | Shared queue Map |
+
+| File                      | Purpose                |
+| ------------------------- | ---------------------- |
+| `MusicQueue.js`           | Queue data structure   |
+| `musicPlaylistManager.js` | Playlist storage       |
+| `youtubeSearch.js`        | YouTube search utility |
+| `queues.js`               | Shared queue Map       |
 
 ### Games & Mini-games
-| File | Purpose |
-|------|---------|
+
+| File                   | Purpose                  |
+| ---------------------- | ------------------------ |
 | `pokerTableManager.js` | Multiplayer poker tables |
-| `playingCards.js` | Card deck utilities |
-| `horseRaceManager.js` | Horse race logic |
-| `tetrisSession.js` | Tetris game session |
-| `petManager.js` | Pet system |
-| `heistManager.js` | Heist mini-game |
+| `playingCards.js`      | Card deck utilities      |
+| `horseRaceManager.js`  | Horse race logic         |
+| `tetrisSession.js`     | Tetris game session      |
+| `petManager.js`        | Pet system               |
+| `heistManager.js`      | Heist mini-game          |
 
 ### Alerts & External APIs
-| File | Purpose |
-|------|---------|
+
+| File                             | Purpose                   |
+| -------------------------------- | ------------------------- |
 | `steamFreeGamesAlertsManager.js` | Steam free games notifier |
-| `steamGameUpdatesManager.js` | Steam game update alerts |
-| `epicGamesAlertsManager.js` | Epic Games deals |
-| `minecraftStatusManager.js` | Minecraft server status |
-| `liveAlertsManager.js` | Live event alerts |
+| `steamGameUpdatesManager.js`     | Steam game update alerts  |
+| `epicGamesAlertsManager.js`      | Epic Games deals          |
+| `minecraftStatusManager.js`      | Minecraft server status   |
+| `liveAlertsManager.js`           | Live event alerts         |
 
 ### System Utilities
-| File | Purpose |
-|------|---------|
-| `errorHandler.js` | Error tracking & reporting |
-| `logger.js` | Custom logging system |
-| `cooldownManager.js` | Command cooldowns |
-| `rateLimiter.js` | Rate limiting |
-| `shutdownManager.js` | Graceful shutdown |
-| `autoBackup.js` | Database backups |
-| `updateNotifier.js` | Update notifications |
-| `devMode.js` | Developer mode toggle |
+
+| File                 | Purpose                    |
+| -------------------- | -------------------------- |
+| `errorHandler.js`    | Error tracking & reporting |
+| `logger.js`          | Custom logging system      |
+| `cooldownManager.js` | Command cooldowns          |
+| `rateLimiter.js`     | Rate limiting              |
+| `shutdownManager.js` | Graceful shutdown          |
+| `autoBackup.js`      | Database backups           |
+| `updateNotifier.js`  | Update notifications       |
+| `devMode.js`         | Developer mode toggle      |
 
 ### Additional Managers
+
 - `achievementManager.js` - Achievement system
 - `activityTracker.js` - User activity tracking
 - `afkManager.js` - AFK detection
@@ -352,59 +372,62 @@ ttt.js               Tic Tac Toe
 
 ## 📡 Events (`events/`)
 
-| File | Trigger | Purpose |
-|------|---------|---------|
-| `ready.js` | Bot ready | Initialization tasks |
-| `messageCreate.js` | New message | Command handling |
-| `interactionCreate.js` | Slash commands | Interaction handling |
-| `guildMemberAdd.js` | Member joins | Welcome messages |
-| `guildMemberRemove.js` | Member leaves | Logging |
-| `guildMemberUpdate.js` | Member update | Role changes |
-| `voiceStateUpdate.js` | Voice change | Voice rewards/AFK |
-| `reactionAdd.js` | Reaction added | Reaction roles/starboard |
-| `reactionRemove.js` | Reaction removed | Cleanup |
-| `messageDelete.js` | Message deleted | Logging |
-| `messageUpdate.js` | Message edited | Logging |
-| `birthdayChecker.js` | Scheduled | Birthday detection |
-| `milestoneMemberAdd.js` | Member joins | Milestone tracking |
-| `error.js` | Error thrown | Error handling |
+| File                    | Trigger          | Purpose                  |
+| ----------------------- | ---------------- | ------------------------ |
+| `ready.js`              | Bot ready        | Initialization tasks     |
+| `messageCreate.js`      | New message      | Command handling         |
+| `interactionCreate.js`  | Slash commands   | Interaction handling     |
+| `guildMemberAdd.js`     | Member joins     | Welcome messages         |
+| `guildMemberRemove.js`  | Member leaves    | Logging                  |
+| `guildMemberUpdate.js`  | Member update    | Role changes             |
+| `voiceStateUpdate.js`   | Voice change     | Voice rewards/AFK        |
+| `reactionAdd.js`        | Reaction added   | Reaction roles/starboard |
+| `reactionRemove.js`     | Reaction removed | Cleanup                  |
+| `messageDelete.js`      | Message deleted  | Logging                  |
+| `messageUpdate.js`      | Message edited   | Logging                  |
+| `birthdayChecker.js`    | Scheduled        | Birthday detection       |
+| `milestoneMemberAdd.js` | Member joins     | Milestone tracking       |
+| `error.js`              | Error thrown     | Error handling           |
 
 ---
 
 ## 🎨 Dashboard (`dashboard/`)
 
 ### Server & Routes
+
 - `server.js` - Express server + Socket.IO (real-time updates)
 - `routes.js` - API endpoints & middleware
 
 ### Views (26 EJS Templates in `views/`)
-| Template | Purpose |
-|----------|---------|
-| `dashboard.ejs` | Main dashboard overview |
-| `server-profile.ejs` | Server details page |
-| `server-profile-public.ejs` | Public server profile |
-| `economy.ejs` | Economy settings |
-| `moderation.ejs` | Moderation config |
-| `community.ejs` | Community features |
-| `steam-updates.ejs` | Steam update alerts |
-| `steam-promos.ejs` | Steam promo alerts |
-| `steam-free-games.ejs` | Free games alerts |
-| `live-alerts.ejs` | Live event config |
-| `voice-tools.ejs` | Voice channel tools |
-| `shop.ejs` | Custom role shop |
-| `permissions.ejs` | Permission settings |
-| `automod.ejs` | Auto-moderation |
-| `safety.ejs` | Safety features |
-| `commands.ejs` | Command config |
-| `activity.ejs` | Activity tracking |
-| `analytics.ejs` | Analytics dashboard |
-| `global-leaderboard.ejs` | Global rankings |
-| `health.ejs` | Health monitoring |
-| `owner-settings.ejs` | Owner controls |
-| `telegram-sync.ejs` | Telegram integration |
-| `index.ejs` | Login page |
+
+| Template                    | Purpose                 |
+| --------------------------- | ----------------------- |
+| `dashboard.ejs`             | Main dashboard overview |
+| `server-profile.ejs`        | Server details page     |
+| `server-profile-public.ejs` | Public server profile   |
+| `economy.ejs`               | Economy settings        |
+| `moderation.ejs`            | Moderation config       |
+| `community.ejs`             | Community features      |
+| `steam-updates.ejs`         | Steam update alerts     |
+| `steam-promos.ejs`          | Steam promo alerts      |
+| `steam-free-games.ejs`      | Free games alerts       |
+| `live-alerts.ejs`           | Live event config       |
+| `voice-tools.ejs`           | Voice channel tools     |
+| `shop.ejs`                  | Custom role shop        |
+| `permissions.ejs`           | Permission settings     |
+| `automod.ejs`               | Auto-moderation         |
+| `safety.ejs`                | Safety features         |
+| `commands.ejs`              | Command config          |
+| `activity.ejs`              | Activity tracking       |
+| `analytics.ejs`             | Analytics dashboard     |
+| `global-leaderboard.ejs`    | Global rankings         |
+| `health.ejs`                | Health monitoring       |
+| `owner-settings.ejs`        | Owner controls          |
+| `telegram-sync.ejs`         | Telegram integration    |
+| `index.ejs`                 | Login page              |
 
 ### Partials (`views/partials/`)
+
 - `dashboard-common-scripts.ejs` - Shared JavaScript
 
 ---
@@ -412,6 +435,7 @@ ttt.js               Tic Tac Toe
 ## 🧪 Tests & Scripts
 
 ### Tests (`tests/`)
+
 ```
 cooldowManager.test.js    Cooldown tests
 economyManager.test.js    Economy tests
@@ -424,6 +448,7 @@ test_updater.py           Python updater test
 ```
 
 ### Scripts (`scripts/`)
+
 ```
 bot-watcher.sh            Process watcher
 lvl.js                    Level testing
@@ -432,6 +457,7 @@ tmp_validate_patched_commands.js Command validation
 ```
 
 ### Self Updater (`self updater/`)
+
 ```
 updater.py                Python update script
 start_updater.bat         Windows launcher
@@ -441,24 +467,26 @@ start_updater.bat         Windows launcher
 
 ## 📚 Documentation
 
-| File | Purpose |
-|------|---------|
-| `README.md` | Project overview |
-| `SETUP.md` | Installation guide |
-| `GUIDE.md` | Feature guide |
+| File                 | Purpose                  |
+| -------------------- | ------------------------ |
+| `README.md`          | Project overview         |
+| `SETUP.md`           | Installation guide       |
+| `GUIDE.md`           | Feature guide            |
 | `QUICK_REFERENCE.md` | Quick commands reference |
-| `COMMANDS.md` | Full command list |
-| `MONGODB.md` | MongoDB setup |
-| `SECURITY_AUDIT.md` | Security review |
+| `COMMANDS.md`        | Full command list        |
+| `MONGODB.md`         | MongoDB setup            |
+| `SECURITY_AUDIT.md`  | Security review          |
 
 ---
 
 ## 🎴 Assets (`assets/`)
 
 ### Cards (`assets/cards/`)
+
 Standard playing card images (C2-C14, D2-D14, H2-H14, S2-S14)
 
 ### Icons
+
 - `bot-icon.svg` - Bot profile icon
 
 ---
@@ -467,14 +495,14 @@ Standard playing card images (C2-C14, D2-D14, H2-H14, S2-S14)
 
 ```json
 {
-  "discord.js": "^14.14.1",      // Discord API
-  "mongodb": "^6.21.0",           // Database
-  "express": "^5.2.1",            // Web server
-  "ejs": "^4.0.1",                // Templates
-  "socket.io": "^4.8.3",          // Real-time
+  "discord.js": "^14.14.1", // Discord API
+  "mongodb": "^6.21.0", // Database
+  "express": "^5.2.1", // Web server
+  "ejs": "^4.0.1", // Templates
+  "socket.io": "^4.8.3", // Real-time
   "@distube/ytdl-core": "^4.16.12", // Music
   "@google/generative-ai": "^0.24.1", // AI
-  "passport-discord": "^0.1.4"    // OAuth
+  "passport-discord": "^0.1.4" // OAuth
 }
 ```
 
@@ -495,13 +523,13 @@ Standard playing card images (C2-C14, D2-D14, H2-H14, S2-S14)
 
 ## 📊 Bot Features Summary
 
-| Category | Count |
-|----------|-------|
-| Prefix Commands | 121 files |
-| Slash Commands | 44 files |
-| Utils/Managers | ~80 files |
-| Events | 17 files |
-| Dashboard Views | 26 templates |
-| Games & Mini-games | 50+ |
+| Category           | Count        |
+| ------------------ | ------------ |
+| Prefix Commands    | 121 files    |
+| Slash Commands     | 44 files     |
+| Utils/Managers     | ~80 files    |
+| Events             | 17 files     |
+| Dashboard Views    | 26 templates |
+| Games & Mini-games | 50+          |
 
 **Total:** 300+ files across a full-featured Discord bot ecosystem.

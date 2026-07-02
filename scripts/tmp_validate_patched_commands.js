@@ -9,9 +9,13 @@ const commands = [
 process.env.BOT_OWNER_ID = '1';
 
 const fakeCollector = {
-  on() { return this; },
-  once() { return this; },
-  stop() {}
+  on() {
+    return this;
+  },
+  once() {
+    return this;
+  },
+  stop() {},
 };
 
 const fakeMessage = {
@@ -29,11 +33,11 @@ function makeInteraction(name) {
       id: '1',
       username: 'tester',
       tag: 'tester#0001',
-      displayAvatarURL: () => ''
+      displayAvatarURL: () => '',
     },
     member: {
       permissions: { has: () => true },
-      roles: { cache: { has: () => true } }
+      roles: { cache: { has: () => true } },
     },
     guild: { id: 'guild-1' },
     guildId: 'guild-1',
