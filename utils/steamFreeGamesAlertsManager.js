@@ -1416,7 +1416,16 @@ class SteamFreeGamesAlertsManager {
     // no active giveaways (e.g. {"status":0,"status_message":"No active giveaways available…"}).
     // Treat this as an empty array instead of throwing.
     if (!Array.isArray(payload)) {
-      if (payload && typeof payload === 'object' && 'status' in payload) {
+      if (payload && typeof payload === 'object') {
+        // The GamerPower API returns an object instead of an array when there are
+        // no active giveaways (e.g. {"status":0,"status_message":"…"} or other
+        // error shapes).  Treat any object response as an empty list.
+        if (!('status' in payload)) {
+          console.warn(
+            'Steam giveaways API returned an object without a status field:',
+            JSON.stringify(payload).slice(0, 300)
+          );
+        }
         payload = [];
       } else {
         throw new Error(`Steam giveaways API returned an unexpected payload: ${typeof payload}`);
