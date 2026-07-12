@@ -3,9 +3,9 @@ const dns = require('dns').promises;
 
 const MINECRAFT_STATUS_TIMEOUT_MS = Math.max(
   1000,
-  Number(process.env.MINECRAFT_STATUS_TIMEOUT_MS) || 8000
+  Number(process.env.MINECRAFT_STATUS_TIMEOUT_MS) || 5000
 );
-const MINECRAFT_STATUS_TIMEOUT_RETRIES = 1;
+const MINECRAFT_STATUS_TIMEOUT_RETRIES = 2;
 const MCSTATUS_API_BASE = 'https://api.mcstatus.io/v2/status';
 
 const normalizeMinecraftStatusInput = (hostInput, portInput) => {
@@ -199,45 +199,69 @@ const fetchMinecraftServerStatus = async (host, port) => {
   const requestAddress = normalizedPort ? `${normalizedHost}:${normalizedPort}` : normalizedHost;
   let fallbackError = null;
   let primaryOfflineStatus = null;
+  let lastStatus = null;
 
-  try {
-    const mcsrvPayload = await fetchJsonWithTimeout(
-      `https://api.mcsrvstat.us/3/${encodeURIComponent(requestAddress)}`
-    );
-    const status = fromMcsrvStatus(mcsrvPayload);
-    if (status.online) {
-      return status;
-    }
-
-    // mcsrvstat occasionally returns loopback placeholder data for custom DNS hosts.
-    // Treat that as inconclusive so protocol-specific lookups can still decide status.
-    if (!isLoopbackIp(status.ip)) {
-      primaryOfflineStatus = status;
-    }
-  } catch (error) {
-    fallbackError = error;
-  }
-
-  const protocolAttempts = [
-    { edition: 'java', address: requestAddress },
-    { edition: 'bedrock', address: port ? requestAddress : `${host}:19132` },
+  // Run the two primary API lookups in parallel so we don't waste a full timeout
+  // waiting on one before trying the other.
+  const primaryLookups = [
+    {
+      label: 'mcsrvstat',
+      run: async () => {
+        const payload = await fetchJsonWithTimeout(
+          `https://api.mcsrvstat.us/3/${encodeURIComponent(requestAddress)}`
+        );
+        return fromMcsrvStatus(payload);
+      },
+    },
+    {
+      label: 'mcstatus-java',
+      run: async () => {
+        const payload = await fetchJsonWithTimeout(
+          `${MCSTATUS_API_BASE}/java/${encodeURIComponent(requestAddress)}`
+        );
+        return fromMcstatus(payload, 'java', requestAddress);
+      },
+    },
   ];
 
-  let lastStatus = null;
-  for (const attempt of protocolAttempts) {
-    try {
-      const payload = await fetchJsonWithTimeout(
-        `${MCSTATUS_API_BASE}/${attempt.edition}/${encodeURIComponent(attempt.address)}`
-      );
-      const status = fromMcstatus(payload, attempt.edition, attempt.address);
+  const primaryResults = await Promise.allSettled(primaryLookups.map((lookup) => lookup.run()));
+
+  for (const [index, result] of primaryResults.entries()) {
+    if (result.status === 'fulfilled') {
+      const status = result.value;
       if (status.online) {
         return status;
       }
 
-      lastStatus = status;
-    } catch {
-      // Keep trying other protocol variants.
+      if (index === 0) {
+        // mcsrvstat: loopback IPs are inconclusive, skip storing as primary offline.
+        if (!isLoopbackIp(status.ip)) {
+          primaryOfflineStatus = status;
+        }
+      } else if (!lastStatus) {
+        lastStatus = status;
+      }
+    } else if (!fallbackError) {
+      fallbackError = result.reason;
     }
+  }
+
+  // Bedrock fallback (sequential, secondary).
+  try {
+    const bedrockAddress = port ? requestAddress : `${host}:19132`;
+    const payload = await fetchJsonWithTimeout(
+      `${MCSTATUS_API_BASE}/bedrock/${encodeURIComponent(bedrockAddress)}`
+    );
+    const status = fromMcstatus(payload, 'bedrock', bedrockAddress);
+    if (status.online) {
+      return status;
+    }
+
+    if (!lastStatus) {
+      lastStatus = status;
+    }
+  } catch {
+    // Keep trying other fallbacks.
   }
 
   // SRV fallback for java hosts behind vanity domains.

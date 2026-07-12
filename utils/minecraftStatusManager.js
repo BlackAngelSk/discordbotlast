@@ -15,6 +15,7 @@ const MAX_TRACKED_PLAYERS = 200;
 const DISCORD_RETRYABLE_STATUSES = new Set([500, 502, 503, 504]);
 const DISCORD_MAX_RETRY_ATTEMPTS = 3;
 const DISCORD_RETRY_BASE_DELAY_MS = 1200;
+const TRANSIENT_ERROR_THRESHOLD = 3;
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -361,6 +362,28 @@ class MinecraftStatusManager {
     return Number(error.status) === 404 || Number(error.code) === 10008;
   }
 
+  isTransientStatusError(error) {
+    if (!error) {
+      return false;
+    }
+
+    const message = String(error.message || '').toLowerCase();
+    if (message.includes('timed out') || message.includes('timeout')) {
+      return true;
+    }
+
+    const code = String(error.code || '').toUpperCase();
+    return (
+      code === 'ECONNRESET' ||
+      code === 'ETIMEDOUT' ||
+      code === 'ENOTFOUND' ||
+      code === 'ECONNREFUSED' ||
+      code === 'EAI_AGAIN' ||
+      code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      code === 'ABORT_ERR'
+    );
+  }
+
   async withDiscordRetry(operation, contextLabel) {
     let lastError = null;
 
@@ -570,6 +593,7 @@ class MinecraftStatusManager {
         lastGoodStatus,
         playerSessionTracker,
         consecutiveOfflineChecks: nextOfflineChecks,
+        consecutiveTransientErrors: 0,
         lastError: null,
         nextUpdateAt: new Date(
           Date.now() + normalizeIntervalMinutes(config.intervalMinutes) * 60 * 1000
@@ -583,7 +607,6 @@ class MinecraftStatusManager {
       const current = this.data.guilds[guildId];
       if (current) {
         current.lastCheckedAt = new Date().toISOString();
-        current.lastOnline = false;
         current.lastError = error.message || 'Update failed';
         current.nextUpdateAt = new Date(
           Date.now() + normalizeIntervalMinutes(current.intervalMinutes) * 60 * 1000
@@ -596,19 +619,67 @@ class MinecraftStatusManager {
           ? guild.channels.cache.get(current.channelId) ||
             (await guild.channels.fetch(current.channelId).catch(() => null))
           : null;
-        if (channel?.isTextBased?.()) {
-          try {
-            const message = await this.sendOrEditMessage(
-              channel,
-              current.messageId,
-              this.buildErrorEmbed(guild, current, error.message || 'Update failed')
-            );
-            current.messageId = message?.id || current.messageId || null;
-          } catch (secondaryError) {
-            console.warn(
-              'Minecraft status fallback message update failed:',
-              secondaryError?.message || secondaryError
-            );
+
+        // Transient network/timeout errors: preserve the last known good status as stale
+        // instead of immediately showing a scary error embed. Only fall back to the error
+        // embed after repeated consecutive transient failures.
+        const isTransient = this.isTransientStatusError(error);
+        const consecutiveTransientErrors =
+          Number(current.consecutiveTransientErrors || 0) + (isTransient ? 1 : 0);
+        const shouldShowStaleStatus =
+          isTransient &&
+          !!current.lastGoodStatus &&
+          consecutiveTransientErrors < TRANSIENT_ERROR_THRESHOLD;
+
+        current.consecutiveTransientErrors = isTransient ? consecutiveTransientErrors : 0;
+
+        if (shouldShowStaleStatus) {
+          current.lastOnline = true;
+          const staleStatus = {
+            ...current.lastGoodStatus,
+            stale: true,
+            offlineCheckCount: consecutiveTransientErrors,
+            offlineCheckThreshold: TRANSIENT_ERROR_THRESHOLD,
+            staleObservedStatus: { online: false, error: error.message },
+          };
+          const playerSessionTracker = updatePlayerSessionTracker(
+            current.playerSessionTracker,
+            staleStatus,
+            { confirmedOnline: true, nowMs: Date.now() }
+          );
+          current.playerSessionTracker = playerSessionTracker;
+
+          if (channel?.isTextBased?.()) {
+            try {
+              const message = await this.sendOrEditMessage(
+                channel,
+                current.messageId,
+                this.buildStatusEmbed(guild, current, staleStatus, playerSessionTracker)
+              );
+              current.messageId = message?.id || current.messageId || null;
+            } catch (secondaryError) {
+              console.warn(
+                'Minecraft status stale fallback message update failed:',
+                secondaryError?.message || secondaryError
+              );
+            }
+          }
+        } else {
+          current.lastOnline = false;
+          if (channel?.isTextBased?.()) {
+            try {
+              const message = await this.sendOrEditMessage(
+                channel,
+                current.messageId,
+                this.buildErrorEmbed(guild, current, error.message || 'Update failed')
+              );
+              current.messageId = message?.id || current.messageId || null;
+            } catch (secondaryError) {
+              console.warn(
+                'Minecraft status fallback message update failed:',
+                secondaryError?.message || secondaryError
+              );
+            }
           }
         }
 
