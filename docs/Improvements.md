@@ -9,7 +9,6 @@ This document outlines the improvements made to the Discord bot project.
 - **ESLint**: Added ESLint configuration with comprehensive rules for code quality
 - **Prettier**: Added Prettier configuration for consistent code formatting
 - **EditorConfig**: Added EditorConfig for consistent coding styles across editors
-- **Husky**: Added pre-commit hooks to run linting and formatting checks
 
 ### 2. Testing Framework
 
@@ -53,7 +52,6 @@ This document outlines the improvements made to the Discord bot project.
 | `Dockerfile`               | Docker container configuration |
 | `docker-compose.yml`       | Docker Compose configuration   |
 | `.github/workflows/ci.yml` | GitHub Actions CI/CD pipeline  |
-| `.husky/pre-commit`        | Pre-commit hook for linting    |
 | `tests/helpers.test.js`    | Sample Jest test file          |
 | `IMPROVEMENTS.md`          | This documentation file        |
 

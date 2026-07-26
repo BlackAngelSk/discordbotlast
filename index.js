@@ -475,10 +475,6 @@ loadHandlers().then(() => {
         console.error('Error initializing tier 2 managers:', err);
       });
 
-      // ── Deferred MongoDB startup sync ──
-      databaseManager.deferredStartupSync().catch((err) => {
-        console.error('Error in deferred startup sync:', err);
-      });
 
       // ── Non-critical ready tasks (don't block each other) ──
 

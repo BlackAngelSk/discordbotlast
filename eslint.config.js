@@ -163,7 +163,6 @@ module.exports = [
       '*.min.js',
       '*.bundle.js',
       'coverage/',
-      '.husky/',
       '.github/',
       '.venv/',
       'scripts/',
