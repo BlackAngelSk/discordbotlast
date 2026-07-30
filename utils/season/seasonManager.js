@@ -5,8 +5,8 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const databaseManager = require('./databaseManager');
-const { fetchUserSafe } = require('./discordFetch');
+const databaseManager = require('../core/databaseManager');
+const { fetchUserSafe } = require('../core/discordFetch');
 
 class SeasonManager {
   constructor() {

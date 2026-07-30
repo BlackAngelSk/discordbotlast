@@ -151,6 +151,157 @@ module.exports = {
 
     // ── Modal submissions ─────────────────────────────────────────────────
     if (interaction.isModalSubmit()) {
+      // ── Help search modal submission ────────────────────────────────────
+      if (interaction.customId === 'help_search_modal') {
+        try {
+          const query = interaction.fields.getTextInputValue('help_search_query');
+          const settingsManager = require('../utils/settingsManager');
+          const commandPermissionsManager = require('../utils/commandPermissionsManager');
+          const { memberHasBetaAccess } = require('../utils/betaAccess');
+          const {
+            getAccessContext,
+            canViewCategory,
+            getVisibleCategories,
+            buildCategorySelectMenu,
+            buildMainHelpEmbed,
+            getCategoryEmbed,
+          } = require('../utils/helpCatalog');
+
+          const settings = settingsManager.get(interaction.guildId);
+          const p = settings.prefix;
+          const accessContext = getAccessContext(interaction.user.id, interaction.member);
+
+          // Build catalog
+          const catalog = [];
+          const seen = new Set();
+
+          // Prefix commands
+          const prefixMap = interaction.client?.commandHandler?.commands;
+          if (prefixMap && typeof prefixMap.values === 'function') {
+            for (const command of prefixMap.values()) {
+              if (!command?.name) continue;
+              const name = String(command.name).toLowerCase();
+              if (seen.has(name)) continue;
+              seen.add(name);
+              const aliases = Array.isArray(command.aliases)
+                ? command.aliases.map((alias) => String(alias).toLowerCase())
+                : [];
+              const category = String(command.category || 'utility').toLowerCase();
+              let accessLevel = 'everyone';
+              if (category === 'admin') accessLevel = 'admin';
+              catalog.push({
+                name,
+                displayName: command.name,
+                type: 'prefix',
+                category,
+                description: command.description || 'No description available',
+                usage: command.usage || `${p}${name}`,
+                aliases,
+                accessLevel,
+                beta: !!command.beta,
+              });
+            }
+          }
+
+          // Slash commands
+          const slashCollection = interaction.client?.slashCommandHandler?.commands;
+          if (slashCollection && typeof slashCollection.values === 'function') {
+            for (const command of slashCollection.values()) {
+              const commandName = command?.data?.name;
+              if (!commandName) continue;
+              const name = String(commandName).toLowerCase();
+              if (seen.has(name)) continue;
+              seen.add(name);
+              const category = String(command.category || 'utility').toLowerCase();
+              let accessLevel = 'everyone';
+              if (category === 'admin') accessLevel = 'admin';
+              catalog.push({
+                name,
+                displayName: commandName,
+                type: 'slash',
+                category,
+                description: command?.data?.description || command?.description || 'No description available',
+                usage: `/${commandName}`,
+                aliases: [],
+                accessLevel,
+                beta: !!command.beta,
+              });
+            }
+          }
+
+          // Filter visible
+          const visibleCatalog = catalog.filter((command) => {
+            if (command.accessLevel === 'owner' && !accessContext.isOwner) return false;
+            if (command.accessLevel === 'admin' && !accessContext.isOwner && !accessContext.isAdmin) return false;
+            return true;
+          });
+
+          // Search
+          const q = query.toLowerCase().trim();
+          const results = visibleCatalog
+            .map((command) => {
+              let score = 0;
+              const name = command.name.toLowerCase();
+              const displayName = String(command.displayName || '').toLowerCase();
+              const description = String(command.description || '').toLowerCase();
+              const aliases = command.aliases || [];
+
+              if (name === q) score += 120;
+              else if (displayName === q) score += 115;
+              else if (name.startsWith(q)) score += 90;
+              else if (displayName.startsWith(q)) score += 85;
+              else if (name.includes(q)) score += 70;
+
+              if (aliases.includes(q)) score += 80;
+              else if (aliases.some((alias) => alias.startsWith(q))) score += 55;
+              else if (aliases.some((alias) => alias.includes(q))) score += 40;
+
+              if (description.includes(q)) score += 25;
+              return { command, score };
+            })
+            .filter((item) => item.score > 0)
+            .sort((a, b) => b.score - a.score || a.command.name.localeCompare(b.command.name))
+            .map((item) => item.command);
+
+          if (results.length === 0) {
+            return interaction.reply({
+              content: `❌ No commands found for "${query}".`,
+              flags: 64,
+            });
+          }
+
+          const SEARCH_PAGE_SIZE = 8;
+          const totalPages = Math.max(1, Math.ceil(results.length / SEARCH_PAGE_SIZE));
+          const currentPage = 0;
+
+          const lineItems = results.slice(0, SEARCH_PAGE_SIZE).map((command) => {
+            const icon = command.type === 'slash' ? '⚡' : '⌨️';
+            const aliasText = command.aliases.length
+              ? ` (aliases: ${command.aliases.slice(0, 3).join(', ')})`
+              : '';
+            const categoryText = command.category ? ` [${command.category}]` : '';
+            return `${icon} **${command.usage}** — ${command.description}${aliasText}${categoryText}`;
+          });
+
+          const embed = new EmbedBuilder()
+            .setColor('#5865F2')
+            .setTitle(`🔎 Help Search: ${query}`)
+            .setDescription(lineItems.join('\n').slice(0, 3800))
+            .setFooter({
+              text: `Found ${results.length} result(s) • Page 1/${totalPages} • ⚡ slash • ⌨️ prefix`,
+            })
+            .setTimestamp();
+
+          await interaction.reply({ embeds: [embed], flags: 64 });
+        } catch (error) {
+          console.error('Error handling help search modal:', error);
+          await interaction
+            .reply({ content: '❌ An error occurred while searching commands.', flags: 64 })
+            .catch(() => {});
+        }
+        return;
+      }
+
       if (interaction.customId.startsWith('poker_buyin_')) {
         try {
           const { PokerTableManager } = require('../utils/pokerTableManager');

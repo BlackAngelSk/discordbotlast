@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const settingsManager = require('./settingsManager');
 const commandPermissionsManager = require('./commandPermissionsManager');
-const { memberHasBetaAccess, getBetaRoleName } = require('./betaAccess');
+const { memberHasBetaAccess, getBetaRoleName } = require('../betaAccess');
 
 class CommandHandler {
   constructor(client) {
@@ -11,7 +11,7 @@ class CommandHandler {
   }
 
   async loadCommands() {
-    const commandsPath = path.join(__dirname, '../commands');
+    const commandsPath = path.join(__dirname, '..', '..', 'commands');
 
     // Recursively load commands from all subdirectories
     const loadCommandsRecursive = (dir) => {

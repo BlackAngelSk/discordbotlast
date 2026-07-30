@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { EmbedBuilder, MessageFlags } = require('discord.js');
-const economyManager = require('./economyManager');
+const economyManager = require('../economy/economyManager');
 
 const FILE = path.join(__dirname, '..', 'data', 'horseRaces.json');
 

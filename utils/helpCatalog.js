@@ -1,4 +1,11 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+} = require('discord.js');
 
 const CATEGORY_DEFINITIONS = [
   {
@@ -126,6 +133,29 @@ function buildCategoryRows(visibleCategories) {
   }
 
   return rows;
+}
+
+/**
+ * Builds a select menu row for category selection (popup-style dropdown)
+ */
+function buildCategorySelectMenu(visibleCategories) {
+  const options = visibleCategories.map(
+    (category) =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(category.label)
+        .setValue(category.key)
+        .setEmoji(category.emoji)
+        .setDescription(category.fieldValue)
+  );
+
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('help_category_select')
+      .setPlaceholder('📂 Select a category...')
+      .setMinValues(1)
+      .setMaxValues(1)
+      .addOptions(options)
+  );
 }
 
 function buildMainHelpEmbed(prefix, visibleCategories) {
@@ -474,6 +504,7 @@ module.exports = {
   canViewCategory,
   getVisibleCategories,
   buildCategoryRows,
+  buildCategorySelectMenu,
   buildMainHelpEmbed,
   getCategoryEmbed,
 };

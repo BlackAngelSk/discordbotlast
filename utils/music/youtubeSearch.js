@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { execFile, spawnSync } = require('child_process');
 const ytsr = require('ytsr');
-const { parseDuration } = require('./helpers');
+const { parseDuration } = require('../core/helpers');
 
 function mapVideoResult(item) {
   const thumbnailUrl = item.bestThumbnail?.url;

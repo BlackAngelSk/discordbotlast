@@ -137,17 +137,17 @@ const {
   BaseInteraction,
   MessageFlags,
 } = require('discord.js');
-const CommandHandler = require('./utils/commandHandler');
-const EventHandler = require('./utils/eventHandler');
-const SlashCommandHandler = require('./utils/slashCommandHandler');
-const settingsManager = require('./utils/settingsManager');
-const languageManager = require('./utils/languageManager');
-const databaseManager = require('./utils/databaseManager');
-const commandPermissionsManager = require('./utils/commandPermissionsManager');
-const { dashboardPermissionsManager } = require('./utils/dashboardPermissionsManager');
-const { isDevModeEnabled } = require('./utils/devMode');
-const { fetchMemberSafe, withTimeout } = require('./utils/discordFetch');
-const { notifyOwnerIfUpdated } = require('./utils/updateNotifier');
+const CommandHandler = require('./utils/core/commandHandler');
+const EventHandler = require('./utils/core/eventHandler');
+const SlashCommandHandler = require('./utils/core/slashCommandHandler');
+const settingsManager = require('./utils/core/settingsManager');
+const languageManager = require('./utils/core/languageManager');
+const databaseManager = require('./utils/core/databaseManager');
+const commandPermissionsManager = require('./utils/core/commandPermissionsManager');
+const { dashboardPermissionsManager } = require('./utils/dashboard/dashboardPermissionsManager');
+const { isDevModeEnabled } = require('./utils/core/devMode');
+const { fetchMemberSafe, withTimeout } = require('./utils/core/discordFetch');
+const { notifyOwnerIfUpdated } = require('./utils/core/updateNotifier');
 
 // ── Lazy-loaded managers (loaded on demand, not at startup) ──────────────────
 let economyManager, moderationManager, gameStatsManager, statsManager;
@@ -162,60 +162,60 @@ let Dashboard; // Lazy-loaded only when DASHBOARD_ENABLED=true
 
 function lazyLoadManager(name) {
   if (name === 'economyManager')
-    return (economyManager = economyManager || require('./utils/economyManager'));
+    return (economyManager = economyManager || require('./utils/economy/economyManager'));
   if (name === 'moderationManager')
-    return (moderationManager = moderationManager || require('./utils/moderationManager'));
+    return (moderationManager = moderationManager || require('./utils/moderation/moderationManager'));
   if (name === 'gameStatsManager')
-    return (gameStatsManager = gameStatsManager || require('./utils/gameStatsManager'));
+    return (gameStatsManager = gameStatsManager || require('./utils/games/gameStatsManager'));
   if (name === 'statsManager')
-    return (statsManager = statsManager || require('./utils/statsManager'));
+    return (statsManager = statsManager || require('./utils/stats/statsManager'));
   if (name === 'reactionRoleManager')
-    return (reactionRoleManager = reactionRoleManager || require('./utils/reactionRoleManager'));
+    return (reactionRoleManager = reactionRoleManager || require('./utils/roles/reactionRoleManager'));
   if (name === 'starboardManager')
-    return (starboardManager = starboardManager || require('./utils/starboardManager'));
+    return (starboardManager = starboardManager || require('./utils/roles/starboardManager'));
   if (name === 'customCommandManager')
-    return (customCommandManager = customCommandManager || require('./utils/customCommandManager'));
+    return (customCommandManager = customCommandManager || require('./utils/roles/customCommandManager'));
   if (name === 'ticketManager')
-    return (ticketManager = ticketManager || require('./utils/ticketManager'));
+    return (ticketManager = ticketManager || require('./utils/automation/ticketManager'));
   if (name === 'relationshipManager')
     return (relationshipManager = relationshipManager || require('./utils/relationshipManager'));
   if (name === 'achievementManager')
     return (achievementManager = achievementManager || require('./utils/achievementManager'));
   if (name === 'analyticsManager')
-    return (analyticsManager = analyticsManager || require('./utils/analyticsManager'));
+    return (analyticsManager = analyticsManager || require('./utils/dashboard/analyticsManager'));
   if (name === 'musicPlaylistManager')
-    return (musicPlaylistManager = musicPlaylistManager || require('./utils/musicPlaylistManager'));
+    return (musicPlaylistManager = musicPlaylistManager || require('./utils/music/musicPlaylistManager'));
   if (name === 'enhancedAIManager')
-    return (enhancedAIManager = enhancedAIManager || require('./utils/enhancedAIManager'));
+    return (enhancedAIManager = enhancedAIManager || require('./utils/ai/enhancedAIManager'));
   if (name === 'levelRewardsManager')
     return (levelRewardsManager = levelRewardsManager || require('./utils/levelRewardsManager'));
   if (name === 'suggestionManager')
-    return (suggestionManager = suggestionManager || require('./utils/suggestionManager'));
-  if (name === 'shopManager') return (shopManager = shopManager || require('./utils/shopManager'));
+    return (suggestionManager = suggestionManager || require('./utils/automation/suggestionManager'));
+  if (name === 'shopManager') return (shopManager = shopManager || require('./utils/economy/shopManager'));
   if (name === 'afkManager') return (afkManager = afkManager || require('./utils/afkManager'));
   if (name === 'voiceRewardsManager')
     return (voiceRewardsManager = voiceRewardsManager || require('./utils/voiceRewardsManager'));
   if (name === 'raidProtectionManager')
     return (raidProtectionManager =
-      raidProtectionManager || require('./utils/raidProtectionManager'));
+      raidProtectionManager || require('./utils/moderation/raidProtectionManager'));
   if (name === 'scheduledMessagesManager')
     return (scheduledMessagesManager =
-      scheduledMessagesManager || require('./utils/scheduledMessagesManager'));
+      scheduledMessagesManager || require('./utils/automation/scheduledMessagesManager'));
   if (name === 'birthdayManager')
-    return (birthdayManager = birthdayManager || require('./utils/birthdayManager'));
+    return (birthdayManager = birthdayManager || require('./utils/automation/birthdayManager'));
   if (name === 'customRoleShop')
-    return (customRoleShop = customRoleShop || require('./utils/customRoleShop'));
+    return (customRoleShop = customRoleShop || require('./utils/economy/customRoleShop'));
   if (name === 'activityTracker')
-    return (activityTracker = activityTracker || require('./utils/activityTracker'));
+    return (activityTracker = activityTracker || require('./utils/stats/activityTracker'));
   if (name === 'serverMilestones')
-    return (serverMilestones = serverMilestones || require('./utils/serverMilestones'));
+    return (serverMilestones = serverMilestones || require('./utils/season/serverMilestones'));
   if (name === 'seasonManager')
-    return (seasonManager = seasonManager || require('./utils/seasonManager'));
+    return (seasonManager = seasonManager || require('./utils/season/seasonManager'));
   if (name === 'seasonLeaderboardManager')
     return (seasonLeaderboardManager =
-      seasonLeaderboardManager || require('./utils/seasonLeaderboardManager'));
+      seasonLeaderboardManager || require('./utils/season/seasonLeaderboardManager'));
   if (name === 'autoUpdateManager')
-    return (autoUpdateManager = autoUpdateManager || require('./utils/autoUpdateManager'));
+    return (autoUpdateManager = autoUpdateManager || require('./utils/core/autoUpdateManager'));
 }
 
 // Expose lazy loader globally for other modules that need managers at runtime
@@ -271,17 +271,17 @@ client.commandHandler = commandHandler;
 client.slashCommandHandler = slashCommandHandler;
 
 // Initialize new system managers (lightweight, no I/O)
-const ErrorHandler = require('./utils/errorHandler');
-const CooldownManager = require('./utils/cooldownManager');
-const RateLimiter = require('./utils/rateLimiter');
-const ShutdownManager = require('./utils/shutdownManager');
-const InputValidator = require('./utils/inputValidator');
-const Logger = require('./utils/logger');
-const UptimeMonitor = require('./utils/uptimeMonitor');
-const AuditLog = require('./utils/auditLog');
+const ErrorHandler = require('./utils/core/errorHandler');
+const CooldownManager = require('./utils/core/cooldownManager');
+const RateLimiter = require('./utils/core/rateLimiter');
+const ShutdownManager = require('./utils/core/shutdownManager');
+const InputValidator = require('./utils/core/inputValidator');
+const Logger = require('./utils/core/logger');
+const UptimeMonitor = require('./utils/core/uptimeMonitor');
+const AuditLog = require('./utils/dashboard/auditLog');
 const WelcomeMessageManager = require('./utils/welcomeMessageManager');
-const ReminderManager = require('./utils/reminderManager');
-const RoleTemplateManager = require('./utils/roleTemplateManager');
+const ReminderManager = require('./utils/automation/reminderManager');
+const RoleTemplateManager = require('./utils/roles/roleTemplateManager');
 
 const errorHandler = new ErrorHandler(client);
 const cooldownManager = new CooldownManager();
@@ -309,7 +309,7 @@ client.welcomeMessageManager = welcomeMessageManager;
 client.reminderManager = reminderManager;
 client.roleTemplateManager = roleTemplateManager;
 client.InputValidator = InputValidator;
-client.queues = require('./utils/queues'); // shared music queue Map used by all music commands
+client.queues = require('./utils/core/queues'); // shared music queue Map used by all music commands
 
 // ── Helper for timed init steps ──────────────────────────────────────────────
 const runInitStep = async (label, initFn) => {
@@ -353,7 +353,7 @@ async function loadHandlers() {
     // ═══════════════════════════════════════════════════════════════════════
     // Phase 4: Deferred AutoBackup construction (avoids sync I/O at startup)
     // ═══════════════════════════════════════════════════════════════════════
-    const AutoBackup = require('./utils/autoBackup');
+    const AutoBackup = require('./utils/core/autoBackup');
     autoBackup = new AutoBackup();
     client.autoBackup = autoBackup;
 
@@ -374,7 +374,7 @@ async function loadHandlers() {
 async function initTier2Managers() {
   console.time('⏱️ Tier 2 managers init');
 
-  const { minecraftStatusManager } = require('./utils/minecraftStatusManager');
+  const { minecraftStatusManager } = require('./utils/status/minecraftStatusManager');
 
   await Promise.all([
     runInitStep('Economy manager', () => lazyLoadManager('economyManager').init()),

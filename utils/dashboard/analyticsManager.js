@@ -3,7 +3,7 @@
  * Tracks server activity, command usage, member engagement
  */
 
-const databaseManager = require('./databaseManager');
+const databaseManager = require('../core/databaseManager');
 const fs = require('fs').promises;
 const path = require('path');
 

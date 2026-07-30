@@ -1,4 +1,4 @@
-const InputValidator = require('./inputValidator');
+const InputValidator = require('../core/inputValidator');
 
 /**
  * Parse a natural-language reminder instruction.

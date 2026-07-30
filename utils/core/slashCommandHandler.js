@@ -2,7 +2,7 @@ const { REST, Routes, Collection, MessageFlags } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
 const commandPermissionsManager = require('./commandPermissionsManager');
-const activityTracker = require('./activityTracker');
+const activityTracker = require('../stats/activityTracker');
 
 class SlashCommandHandler {
   constructor(client) {
@@ -11,7 +11,7 @@ class SlashCommandHandler {
   }
 
   async loadSlashCommands() {
-    const slashCommandsPath = path.join(__dirname, '..', 'slashCommands');
+    const slashCommandsPath = path.join(__dirname, '..', '..', 'slashCommands');
 
     try {
       // Recursively load slash commands from all subdirectories

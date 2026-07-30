@@ -2,9 +2,9 @@ const fs = require('fs').promises;
 const path = require('path');
 const https = require('https');
 const { EmbedBuilder } = require('discord.js');
-const { fetchChannelSafe } = require('./discordFetch');
-const { toDateObject, toEpochMs } = require('./helpers');
-const settingsManager = require('./settingsManager');
+const { fetchChannelSafe } = require('../core/discordFetch');
+const { toDateObject, toEpochMs } = require('../core/helpers');
+const settingsManager = require('../core/settingsManager');
 
 const DATA_FILE = path.join(__dirname, '..', 'data', 'steamGameUpdates.json');
 const APP_DETAILS_URL = 'https://store.steampowered.com/api/appdetails?l=en&appids=';
@@ -276,12 +276,12 @@ const SPECIAL_TRACKED_SOURCES = {
   },
 };
 
-function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0 } = {}) {
+function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0, timeout = REQUEST_TIMEOUT } = {}) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
       {
-        timeout: REQUEST_TIMEOUT,
+        timeout,
         headers: { ...REQUEST_HEADERS, ...headers },
       },
       (res) => {
@@ -297,7 +297,7 @@ function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0 
 
             const nextUrl = new URL(res.headers.location, url).toString();
             return resolve(
-              httpsGet(nextUrl, { responseType, headers, redirectCount: redirectCount + 1 })
+              httpsGet(nextUrl, { responseType, headers, timeout, redirectCount: redirectCount + 1 })
             );
           }
 
@@ -346,7 +346,7 @@ async function httpsGetTextWithRetry(url, options, attempts = FETCH_RETRY_ATTEMP
     } catch (error) {
       lastError = error;
       const message = String(error?.message || '').toLowerCase();
-      const isTransient = /timeout|timed out|econnreset|socket hang up|etimedout|enotfound/i.test(
+      const isTransient = /timeout|timed out|econnreset|socket hang up|etimedout|enotfound|http\s+5\d{2}/i.test(
         message
       );
       if (attempt >= attempts || !isTransient) {
@@ -1579,7 +1579,13 @@ function extractDriverVersion(text) {
  */
 async function fetchNvidiaUpdates() {
   try {
-    const html = await httpsGetText(NVIDIA_BLOG_URL);
+    let html;
+    try {
+      html = await httpsGetTextWithRetry(NVIDIA_BLOG_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
+    } catch {
+      // Fallback to NVIDIA drivers page if the blog page times out or returns 5xx
+      html = await httpsGetTextWithRetry(NVIDIA_DRIVERS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
+    }
     const source = SPECIAL_TRACKED_SOURCES.nvidia;
 
     // Look for driver-related articles in the blog listing
@@ -1664,8 +1670,8 @@ async function fetchNvidiaUpdates() {
       },
     ];
   } catch (error) {
-    console.error('Error fetching NVIDIA driver updates:', error);
-    return [];
+    console.error('Error fetching NVIDIA driver updates:', error.message || error);
+    throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
   }
 }
 
@@ -1808,8 +1814,8 @@ async function fetchIntelUpdates() {
       },
     ];
   } catch (error) {
-    console.error('Error fetching Intel driver updates:', error);
-    return [];
+    console.error('Error fetching Intel driver updates:', error.message || error);
+    throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
   }
 }
 

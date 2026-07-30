@@ -5,6 +5,11 @@ const {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } = require('discord.js');
 const settingsManager = require('../../utils/settingsManager');
 const commandPermissionsManager = require('../../utils/commandPermissionsManager');
@@ -14,6 +19,7 @@ const {
   canViewCategory,
   getVisibleCategories,
   buildCategoryRows,
+  buildCategorySelectMenu,
   buildMainHelpEmbed,
   getCategoryEmbed,
 } = require('../../utils/helpCatalog');
@@ -187,6 +193,40 @@ function buildSearchEmbed(searchTerm, results, currentPage, totalPages) {
     .setTimestamp();
 }
 
+/**
+ * Creates the "Search" button that opens a modal popup
+ */
+function buildSearchButton() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('help_search_open')
+      .setLabel('🔍 Search Commands')
+      .setStyle(ButtonStyle.Primary)
+  );
+}
+
+/**
+ * Creates the modal popup for command search
+ */
+function buildSearchModal() {
+  const modal = new ModalBuilder()
+    .setCustomId('help_search_modal')
+    .setTitle('🔍 Search Commands');
+
+  const searchInput = new TextInputBuilder()
+    .setCustomId('help_search_query')
+    .setLabel('Enter command name or keyword')
+    .setPlaceholder('e.g. play, economy, music, ban...')
+    .setStyle(TextInputStyle.Short)
+    .setMinLength(1)
+    .setMaxLength(100)
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(searchInput));
+
+  return modal;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('help')
@@ -202,6 +242,9 @@ module.exports = {
     ),
 
   async execute(interaction) {
+    // Defer immediately so Discord doesn't timeout the interaction (3s limit)
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
     const commandName = interaction.options.getString('command');
     const searchTerm = interaction.options.getString('search');
     const settings = settingsManager.get(interaction.guildId);
@@ -225,9 +268,8 @@ module.exports = {
         .map((item) => item.command);
 
       if (results.length === 0) {
-        return interaction.reply({
+        return interaction.editReply({
           content: `❌ No commands found for "${searchTerm}".`,
-          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -237,7 +279,7 @@ module.exports = {
       const embed = buildSearchEmbed(searchTerm, results, currentPage, totalPages);
       const rows = buildSearchRows(searchId, currentPage, totalPages);
 
-      await interaction.reply({ embeds: [embed], components: rows, flags: MessageFlags.Ephemeral });
+      await interaction.editReply({ embeds: [embed], components: rows });
 
       if (totalPages > 1) {
         const message = await interaction.fetchReply();
@@ -281,9 +323,8 @@ module.exports = {
       );
 
       if (!command) {
-        return interaction.reply({
+        return interaction.editReply({
           content: `❌ Command "${commandName}" not found!`,
-          flags: MessageFlags.Ephemeral,
         });
       }
 
@@ -305,14 +346,19 @@ module.exports = {
         embed.addFields({ name: 'Aliases', value: command.aliases.join(', ') });
       }
 
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return interaction.editReply({ embeds: [embed] });
     }
 
     const visibleCategories = getVisibleCategories(accessContext);
     const embed = buildMainHelpEmbed(p, visibleCategories);
-    const rows = buildCategoryRows(visibleCategories);
+    const selectMenu = buildCategorySelectMenu(visibleCategories);
+    const searchBtn = buildSearchButton();
 
-    await interaction.reply({ embeds: [embed], components: rows });
+    // Ephemeral reply — only the user sees the help popup
+    await interaction.editReply({
+      embeds: [embed],
+      components: [selectMenu, searchBtn],
+    });
 
     const message = await interaction.fetchReply();
     if (!message || typeof message.createMessageComponentCollector !== 'function') {
@@ -324,11 +370,44 @@ module.exports = {
     collector.on('collect', async (i) => {
       if (i.user.id !== interaction.user.id) {
         return i.reply({
-          content: '❌ These buttons are not for you!',
+          content: '❌ This help menu is not for you!',
           flags: MessageFlags.Ephemeral,
         });
       }
 
+      // Handle "Search" button — open modal popup
+      if (i.customId === 'help_search_open') {
+        const modal = buildSearchModal();
+        try {
+          await i.showModal(modal);
+        } catch (error) {
+          console.error('Failed to show help search modal:', error);
+        }
+        return;
+      }
+
+      // Handle dropdown category selection
+      if (i.customId === 'help_category_select') {
+        const category = i.values[0];
+        if (!canViewCategory(category, accessContext)) {
+          return i.reply({
+            content: '❌ You do not have permission to view that help category.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+
+        try {
+          const categoryEmbed = getCategoryEmbed(p, category, accessContext);
+          await i.update({ embeds: [categoryEmbed], components: [selectMenu, searchBtn] });
+        } catch (error) {
+          if (error?.code !== 10062) {
+            console.error('Help select menu interaction error:', error);
+          }
+        }
+        return;
+      }
+
+      // Legacy button compatibility
       const category = i.customId.replace('help_', '');
       if (!canViewCategory(category, accessContext)) {
         return i.reply({
@@ -343,7 +422,7 @@ module.exports = {
         }
 
         const categoryEmbed = getCategoryEmbed(p, category, accessContext);
-        await i.editReply({ embeds: [categoryEmbed], components: rows });
+        await i.editReply({ embeds: [categoryEmbed], components: [selectMenu, searchBtn] });
       } catch (error) {
         if (error?.code !== 10062) {
           console.error('Help button interaction error:', error);
@@ -352,8 +431,9 @@ module.exports = {
     });
 
     collector.on('end', () => {
-      rows.forEach((row) => row.components.forEach((button) => button.setDisabled(true)));
-      interaction.editReply({ components: rows }).catch(() => {});
+      selectMenu.components.forEach((comp) => comp.setDisabled(true));
+      searchBtn.components.forEach((comp) => comp.setDisabled(true));
+      interaction.editReply({ components: [selectMenu, searchBtn] }).catch(() => {});
     });
   },
 };

@@ -131,7 +131,7 @@ class MusicQueue {
     this.connection = null;
     this.clearDisconnectTimer();
 
-    const queues = require('./queues');
+    const queues = require('../core/queues');
     queues.delete(this.guildId);
 
     if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
@@ -659,7 +659,7 @@ class MusicQueue {
       if (relatedVideos.length === 0) return;
 
       const randomVideo = relatedVideos[Math.floor(Math.random() * relatedVideos.length)];
-      const { parseDuration } = require('./helpers');
+      const { parseDuration } = require('../core/helpers');
 
       const song = {
         title: randomVideo.title,

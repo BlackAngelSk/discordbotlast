@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { EmbedBuilder, ChannelType } = require('discord.js');
-const settingsManager = require('./settingsManager');
+const settingsManager = require('../core/settingsManager');
 
 const LOGGING_SETTINGS_FILE = path.join(__dirname, '../data/logging.json');
 

@@ -5,7 +5,7 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const { fetchUserSafe, fetchChannelSafe } = require('./discordFetch');
+const { fetchUserSafe, fetchChannelSafe } = require('../core/discordFetch');
 
 class NotificationManager {
   constructor(client) {

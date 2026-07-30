@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
-const { fetchChannelSafe } = require('./discordFetch');
+const { fetchChannelSafe } = require('../core/discordFetch');
 
 class ScheduledMessagesManager {
   constructor() {
