@@ -123,11 +123,13 @@ class SlashCommandHandler {
     }
 
     try {
-      await activityTracker.recordActivity(
-        interaction.guildId,
-        interaction.user.id,
-        'slash_command'
-      );
+      // Fire-and-forget: don't block the interaction response for activity tracking.
+      // Awaiting this can write large JSON files to disk and push the total time past
+      // Discord's 3-second interaction acknowledgement window, causing error 10062.
+      activityTracker
+        .recordActivity(interaction.guildId, interaction.user.id, 'slash_command')
+        .catch((err) => console.error('Activity tracking error:', err.message));
+
       await command.execute(interaction);
     } catch (error) {
       console.error(`Error executing ${interaction.commandName}:`, error);

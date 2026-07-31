@@ -20,7 +20,6 @@ module.exports = {
     '!poker create <maxPot> [players] - Create flexible table\n!poker host <blind> [buyin] [players] - Traditional table\n!poker join <blind> [buyin] - Join traditional table\n!poker list - View available tables\n!poker start|status|leave - Game commands\n!poker stats [user] - View poker stats\n!poker leaderboard - Server leaderboard\n!poker spectate - Watch an ongoing game',
   aliases: ['holdem', 'txpoker'],
   category: 'fun',
-  beta: false,
   async execute(message, args) {
     try {
       PokerTableManager.cleanupInactiveTables(10 * 60 * 1000);

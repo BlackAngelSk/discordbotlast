@@ -413,11 +413,11 @@ function getCategoryEmbed(prefix, category, accessContext) {
           },
           {
             name: '🆕 New Fun',
-            value: `\`${prefix}wordle\` - Guess the 5-letter word in 6 tries (win coins!)\n\`${prefix}hangman\` - Classic hangman with ASCII gallows\n\`${prefix}fish\` - Cast a line and catch fish for coins (30s cooldown)\n\`${prefix}hunt\` - Hunt animals for coins (45s cooldown)\n\`${prefix}heist [small|medium|large]\` - Launch a crew heist with real risk and payout tiers\n\`${prefix}heist targets/stats/upgrades\` - Track progression and upgrade specialties\n\`${prefix}pet adopt/view/feed/play/release/types\` - Adopt and care for a virtual pet\n\`${prefix}ascii <text>\` - Convert text to block-letter ASCII art (max 20 chars)`,
+            value: `\`${prefix}wordle\` - Guess the 5-letter word in 6 tries (win coins!)\n\`${prefix}hangman\` - Classic hangman with ASCII gallows\n\`${prefix}fish\` - Cast a line and catch fish for coins (30s cooldown)\n\`${prefix}hunt\` - Hunt animals for coins (45s cooldown)\n\`${prefix}heist [small|medium|large]\` - Launch a crew heist with real risk and payout tiers\n\`${prefix}heist targets/stats/upgrades\` - Track progression and upgrade specialties\n\`${prefix}pet adopt/view/feed/play/release/types\` - Adopt and care for a virtual pet\n\`${prefix}ascii <text>\` - Convert text to block-letter ASCII art (max 20 chars)\n\`${prefix}poker host <blind> [buyin]\`, \`${prefix}poker join <blind>\`, \`${prefix}poker start\`, \`${prefix}poker status\`, \`${prefix}poker leave\` - Multiplayer Texas Hold'em`,
           },
           {
             name: '🧪 Beta Commands',
-            value: `\`${prefix}poker host <blind> [buyin]\`, \`${prefix}poker join <blind>\`, \`${prefix}poker start\`, \`${prefix}poker status\`, \`${prefix}poker leave\`\n\`/snake\` - Play Snake with button controls\n\`${prefix}showcards\` - Show all 52 playing cards (temp/debug)\nRequires **bot beta access** role.\nIn beta poker, balance is test-only (infinite) and does not update real economy.`,
+            value: `\`/snake\` - Play Snake with button controls\n\`${prefix}showcards\` - Show all 52 playing cards (temp/debug)\nRequires **bot beta access** role.`,
           }
         );
       break;
