@@ -1,9 +1,7 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { execFile, spawnSync } = require('child_process');
+const { execFile } = require('child_process');
 const ytsr = require('ytsr');
 const { parseDuration } = require('../core/helpers');
+const { resolveYtDlpPath } = require('../ytdlpPathResolver');
 
 function mapVideoResult(item) {
   const thumbnailUrl = item.bestThumbnail?.url;
@@ -43,35 +41,6 @@ function execFileAsync(filePath, args) {
       resolve(stdout);
     });
   });
-}
-
-function resolveYtDlpPath() {
-  const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
-  const ytdlpFromPath = spawnSync(lookupCommand, ['yt-dlp'], { encoding: 'utf8' });
-  let ytdlpPath =
-    ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.split(/\r?\n/).find(Boolean)?.trim() : '';
-
-  if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-    const localYtdlp = path.join(os.homedir(), '.local', 'bin', 'yt-dlp');
-    if (fs.existsSync(localYtdlp)) {
-      ytdlpPath = localYtdlp;
-    }
-  }
-
-  if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-    const ytdlp = require('@distube/yt-dlp');
-    const bundledPath =
-      typeof ytdlp === 'string'
-        ? ytdlp
-        : ytdlp.path ||
-          path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
-
-    if (bundledPath && fs.existsSync(bundledPath)) {
-      ytdlpPath = bundledPath;
-    }
-  }
-
-  return ytdlpPath;
 }
 
 async function searchWithYtDlp(query, limit) {

@@ -5,6 +5,7 @@ const {
   VoiceConnectionStatus,
   NoSubscriberBehavior,
 } = require('@discordjs/voice');
+const { resolveYtDlpPath } = require('../ytdlpPathResolver');
 
 class MusicQueue {
   constructor(guildId) {
@@ -334,27 +335,8 @@ class MusicQueue {
         this.ytdlpProcess = null;
       }
 
-      // Resolve yt-dlp path (PATH first, then common local path, then bundled fallback)
-      const ytdlpFromPath = spawnSync('which', ['yt-dlp'], { encoding: 'utf8' });
-      let ytdlpPath = ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.trim() : '';
-
-      if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-        const os = require('os');
-        const homeDir = os.homedir();
-        const localYtdlp = path.join(homeDir, '.local', 'bin', 'yt-dlp');
-        if (fs.existsSync(localYtdlp)) {
-          ytdlpPath = localYtdlp;
-        }
-      }
-
-      if (!ytdlpPath || !fs.existsSync(ytdlpPath)) {
-        const ytdlp = require('@distube/yt-dlp');
-        ytdlpPath =
-          typeof ytdlp === 'string'
-            ? ytdlp
-            : ytdlp.path ||
-              path.join(__dirname, '..', 'node_modules', '@distube', 'yt-dlp', 'bin', 'yt-dlp.exe');
-      }
+      // Resolve yt-dlp path using shared resolver
+      const ytdlpPath = resolveYtDlpPath();
 
       console.log(`📥 Using yt-dlp from: ${ytdlpPath}`);
 
