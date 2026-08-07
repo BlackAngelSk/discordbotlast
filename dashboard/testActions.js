@@ -17,27 +17,30 @@ const runDashboardTestAction = async ({ guildId, guild, member, type, client }) 
     const welcomeMessageManager = client?.welcomeMessageManager;
     const welcomeEmbedConfig = welcomeMessageManager?.getWelcomeConfig(guildId);
 
-    if (welcomeEmbedConfig?.enabled && welcomeEmbedConfig.channelId) {
+    // Try the embed-based welcome system first (check channelId, not just enabled)
+    if (welcomeEmbedConfig?.channelId) {
       const embedChannel =
         guild.channels.cache.get(welcomeEmbedConfig.channelId) ||
         (await guild.channels.fetch(welcomeEmbedConfig.channelId).catch(() => null));
 
-      if (!embedChannel || !embedChannel.isTextBased()) {
-        throw new Error('Welcome embed channel is not available or not text-based.');
+      if (embedChannel && embedChannel.isTextBased()) {
+        const embed = welcomeMessageManager.createWelcomeEmbed(member, welcomeEmbedConfig);
+        await embedChannel.send({
+          content: '🧪 Test welcome embed',
+          embeds: [embed],
+        });
+        return welcomeEmbedConfig.enabled
+          ? 'Sent welcome embed test successfully.'
+          : 'Sent welcome embed test successfully. Note: welcome embed is currently disabled.';
       }
-
-      const embed = welcomeMessageManager.createWelcomeEmbed(member, welcomeEmbedConfig);
-      await embedChannel.send({
-        content: '🧪 Test welcome embed',
-        embeds: [embed],
-      });
-      return 'Sent welcome embed test successfully.';
+      // Embed channel was configured but is no longer available — fall through to legacy check
     }
 
+    // Fallback to legacy settings-based welcome system
     const settings = settingsManager.get(guildId);
     const channel = resolveStoredTextChannel(guild, settings.welcomeChannel);
     if (!channel) {
-      throw new Error('Welcome channel is not configured or not available.');
+      return '⚠️ Welcome channel is not configured. Please set a welcome channel in server settings before testing.';
     }
 
     const message = replaceMemberTemplateTokens(settings.welcomeMessage, member, guild);
@@ -79,7 +82,7 @@ const runDashboardTestAction = async ({ guildId, guild, member, type, client }) 
     const settings = settingsManager.get(guildId);
     const channel = resolveStoredTextChannel(guild, settings.leaveChannel);
     if (!settings.leaveEnabled || !channel) {
-      throw new Error('Leave messages are not fully configured yet.');
+      return '⚠️ Leave messages are not fully configured. Please set a leave channel and enable leave messages in server settings before testing.';
     }
 
     const message = replaceMemberTemplateTokens(settings.leaveMessage, member, guild);
@@ -90,7 +93,7 @@ const runDashboardTestAction = async ({ guildId, guild, member, type, client }) 
   if (type === 'logging') {
     const loggingChannelId = await loggingManager.getLoggingChannel(guildId);
     if (!loggingChannelId) {
-      throw new Error('No logging channel is configured.');
+      return '⚠️ No logging channel is configured. Please set a logging channel in server settings before testing.';
     }
 
     const embed = new EmbedBuilder()
@@ -113,7 +116,7 @@ const runDashboardTestAction = async ({ guildId, guild, member, type, client }) 
       ? guild.channels.cache.get(suggestionSettings.channelId)
       : null;
     if (!suggestionSettings.enabled || !channel || !channel.isTextBased()) {
-      throw new Error('Suggestions are not fully configured yet.');
+      return '⚠️ Suggestions are not fully configured. Please enable suggestions and set a suggestion channel in server settings before testing.';
     }
 
     const staffMention = suggestionSettings.staffRoleId
