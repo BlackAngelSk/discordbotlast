@@ -40,7 +40,7 @@ function withTimeout(promise, timeoutMs, label, timeoutCode = 'STEAM_OPERATION_T
   });
 }
 
-function httpsGetJson(url) {
+function httpsGetJsonOnce(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
@@ -77,6 +77,25 @@ function httpsGetJson(url) {
       req.destroy(new Error('Steam giveaways API request timed out'));
     });
   });
+}
+
+async function httpsGetJson(url, { retries = 2, delayMs = 2000 } = {}) {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await httpsGetJsonOnce(url);
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        const wait = delayMs * Math.pow(2, attempt);
+        console.warn(
+          `Steam giveaways API fetch attempt ${attempt + 1} failed (${err.message}), retrying in ${wait}ms...`
+        );
+        await new Promise((r) => setTimeout(r, wait));
+      }
+    }
+  }
+  throw lastError;
 }
 
 function sanitizeText(value) {
