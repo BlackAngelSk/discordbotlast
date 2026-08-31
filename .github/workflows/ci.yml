@@ -1,5 +1,8 @@
 name: CI/CD Pipeline
 
+env:
+  YOUTUBE_DL_SKIP_DOWNLOAD: 1
+
 on:
   push:
     branches: [main, develop]
