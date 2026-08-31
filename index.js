@@ -164,17 +164,20 @@ function lazyLoadManager(name) {
   if (name === 'economyManager')
     return (economyManager = economyManager || require('./utils/economy/economyManager'));
   if (name === 'moderationManager')
-    return (moderationManager = moderationManager || require('./utils/moderation/moderationManager'));
+    return (moderationManager =
+      moderationManager || require('./utils/moderation/moderationManager'));
   if (name === 'gameStatsManager')
     return (gameStatsManager = gameStatsManager || require('./utils/games/gameStatsManager'));
   if (name === 'statsManager')
     return (statsManager = statsManager || require('./utils/stats/statsManager'));
   if (name === 'reactionRoleManager')
-    return (reactionRoleManager = reactionRoleManager || require('./utils/roles/reactionRoleManager'));
+    return (reactionRoleManager =
+      reactionRoleManager || require('./utils/roles/reactionRoleManager'));
   if (name === 'starboardManager')
     return (starboardManager = starboardManager || require('./utils/roles/starboardManager'));
   if (name === 'customCommandManager')
-    return (customCommandManager = customCommandManager || require('./utils/roles/customCommandManager'));
+    return (customCommandManager =
+      customCommandManager || require('./utils/roles/customCommandManager'));
   if (name === 'ticketManager')
     return (ticketManager = ticketManager || require('./utils/automation/ticketManager'));
   if (name === 'relationshipManager')
@@ -184,14 +187,17 @@ function lazyLoadManager(name) {
   if (name === 'analyticsManager')
     return (analyticsManager = analyticsManager || require('./utils/dashboard/analyticsManager'));
   if (name === 'musicPlaylistManager')
-    return (musicPlaylistManager = musicPlaylistManager || require('./utils/music/musicPlaylistManager'));
+    return (musicPlaylistManager =
+      musicPlaylistManager || require('./utils/music/musicPlaylistManager'));
   if (name === 'enhancedAIManager')
     return (enhancedAIManager = enhancedAIManager || require('./utils/ai/enhancedAIManager'));
   if (name === 'levelRewardsManager')
     return (levelRewardsManager = levelRewardsManager || require('./utils/levelRewardsManager'));
   if (name === 'suggestionManager')
-    return (suggestionManager = suggestionManager || require('./utils/automation/suggestionManager'));
-  if (name === 'shopManager') return (shopManager = shopManager || require('./utils/economy/shopManager'));
+    return (suggestionManager =
+      suggestionManager || require('./utils/automation/suggestionManager'));
+  if (name === 'shopManager')
+    return (shopManager = shopManager || require('./utils/economy/shopManager'));
   if (name === 'afkManager') return (afkManager = afkManager || require('./utils/afkManager'));
   if (name === 'voiceRewardsManager')
     return (voiceRewardsManager = voiceRewardsManager || require('./utils/voiceRewardsManager'));
@@ -474,7 +480,6 @@ loadHandlers().then(() => {
       initTier2Managers().catch((err) => {
         console.error('Error initializing tier 2 managers:', err);
       });
-
 
       // ── Non-critical ready tasks (don't block each other) ──
 

@@ -109,7 +109,9 @@ class DatabaseManager {
     const id = document._id || document.id || Date.now().toString();
 
     const data = { ...document, _id: id };
-    const stmt = this.sqliteDb.prepare(`INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`);
+    const stmt = this.sqliteDb.prepare(
+      `INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`
+    );
     stmt.run(id, JSON.stringify(data));
 
     return { insertedId: id };
@@ -126,7 +128,9 @@ class DatabaseManager {
     for (const id in data) {
       if (data[id][key] === query[key]) {
         const updatedData = { ...data[id], ...update };
-        const stmt = this.sqliteDb.prepare(`INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`);
+        const stmt = this.sqliteDb.prepare(
+          `INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`
+        );
         stmt.run(id, JSON.stringify(updatedData));
         return { modifiedCount: 1 };
       }
@@ -155,7 +159,9 @@ class DatabaseManager {
       _id: documentId,
     };
 
-    const stmt = this.sqliteDb.prepare(`INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`);
+    const stmt = this.sqliteDb.prepare(
+      `INSERT OR REPLACE INTO ${tableName} (key, data) VALUES (?, ?)`
+    );
     stmt.run(documentId, JSON.stringify(finalData));
 
     return {
@@ -218,9 +224,9 @@ class DatabaseManager {
   async exportToJSON(filePath) {
     if (!this.sqliteDb) throw new Error('SQLite not initialized');
 
-    const tables = this.sqliteDb.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_meta%'"
-    ).all();
+    const tables = this.sqliteDb
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_meta%'")
+      .all();
 
     const exportData = {};
     for (const table of tables) {

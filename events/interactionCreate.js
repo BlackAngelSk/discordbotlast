@@ -220,7 +220,8 @@ module.exports = {
                 displayName: commandName,
                 type: 'slash',
                 category,
-                description: command?.data?.description || command?.description || 'No description available',
+                description:
+                  command?.data?.description || command?.description || 'No description available',
                 usage: `/${commandName}`,
                 aliases: [],
                 accessLevel,
@@ -232,7 +233,8 @@ module.exports = {
           // Filter visible
           const visibleCatalog = catalog.filter((command) => {
             if (command.accessLevel === 'owner' && !accessContext.isOwner) return false;
-            if (command.accessLevel === 'admin' && !accessContext.isOwner && !accessContext.isAdmin) return false;
+            if (command.accessLevel === 'admin' && !accessContext.isOwner && !accessContext.isAdmin)
+              return false;
             return true;
           });
 

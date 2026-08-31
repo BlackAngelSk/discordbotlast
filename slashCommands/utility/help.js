@@ -209,9 +209,7 @@ function buildSearchButton() {
  * Creates the modal popup for command search
  */
 function buildSearchModal() {
-  const modal = new ModalBuilder()
-    .setCustomId('help_search_modal')
-    .setTitle('🔍 Search Commands');
+  const modal = new ModalBuilder().setCustomId('help_search_modal').setTitle('🔍 Search Commands');
 
   const searchInput = new TextInputBuilder()
     .setCustomId('help_search_query')

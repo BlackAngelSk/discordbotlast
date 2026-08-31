@@ -139,13 +139,12 @@ function buildCategoryRows(visibleCategories) {
  * Builds a select menu row for category selection (popup-style dropdown)
  */
 function buildCategorySelectMenu(visibleCategories) {
-  const options = visibleCategories.map(
-    (category) =>
-      new StringSelectMenuOptionBuilder()
-        .setLabel(category.label)
-        .setValue(category.key)
-        .setEmoji(category.emoji)
-        .setDescription(category.fieldValue)
+  const options = visibleCategories.map((category) =>
+    new StringSelectMenuOptionBuilder()
+      .setLabel(category.label)
+      .setValue(category.key)
+      .setEmoji(category.emoji)
+      .setDescription(category.fieldValue)
   );
 
   return new ActionRowBuilder().addComponents(

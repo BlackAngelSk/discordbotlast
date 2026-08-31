@@ -276,7 +276,10 @@ const SPECIAL_TRACKED_SOURCES = {
   },
 };
 
-function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0, timeout = REQUEST_TIMEOUT } = {}) {
+function httpsGet(
+  url,
+  { responseType = 'json', headers = {}, redirectCount = 0, timeout = REQUEST_TIMEOUT } = {}
+) {
   return new Promise((resolve, reject) => {
     const req = https.get(
       url,
@@ -297,7 +300,12 @@ function httpsGet(url, { responseType = 'json', headers = {}, redirectCount = 0,
 
             const nextUrl = new URL(res.headers.location, url).toString();
             return resolve(
-              httpsGet(nextUrl, { responseType, headers, timeout, redirectCount: redirectCount + 1 })
+              httpsGet(nextUrl, {
+                responseType,
+                headers,
+                timeout,
+                redirectCount: redirectCount + 1,
+              })
             );
           }
 
@@ -346,9 +354,10 @@ async function httpsGetTextWithRetry(url, options, attempts = FETCH_RETRY_ATTEMP
     } catch (error) {
       lastError = error;
       const message = String(error?.message || '').toLowerCase();
-      const isTransient = /timeout|timed out|econnreset|socket hang up|etimedout|enotfound|http\s+5\d{2}/i.test(
-        message
-      );
+      const isTransient =
+        /timeout|timed out|econnreset|socket hang up|etimedout|enotfound|http\s+5\d{2}/i.test(
+          message
+        );
       if (attempt >= attempts || !isTransient) {
         throw error;
       }

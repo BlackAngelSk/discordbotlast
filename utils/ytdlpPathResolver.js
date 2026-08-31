@@ -17,7 +17,7 @@ function resolveYtDlpPath() {
   // ── 1. Try system PATH ──────────────────────────────────────────────
   const lookupCommand = process.platform === 'win32' ? 'where' : 'which';
   const ytdlpFromPath = spawnSync(lookupCommand, ['yt-dlp'], { encoding: 'utf8' });
-  let ytdlpPath =
+  const ytdlpPath =
     ytdlpFromPath.status === 0 ? ytdlpFromPath.stdout.split(/\r?\n/).find(Boolean)?.trim() : '';
 
   if (ytdlpPath && fs.existsSync(ytdlpPath)) {
