@@ -45,7 +45,7 @@ function httpsGetJsonOnce(url) {
     const req = https.get(
       url,
       {
-        timeout: 15000,
+        timeout: 30000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0; +https://discord.com)',
           Accept: 'application/json',
@@ -370,7 +370,7 @@ async function steamHttpsGetJson(url) {
     const req = https.get(
       url,
       {
-        timeout: 15000,
+        timeout: 30000,
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -425,7 +425,7 @@ async function steamHttpsGetText(url) {
     const req = https.get(
       url,
       {
-        timeout: 15000,
+        timeout: 30000,
         headers,
       },
       (res) => {
