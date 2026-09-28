@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+.venv/
+venv/
 
 # Logs
 logs/
@@ -36,6 +38,7 @@ Thumbs.db
 
 # Misc
 .continue/
+.archive/
 
 # Large files that break when reformatted
 dashboard/server.js

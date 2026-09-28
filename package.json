@@ -14,6 +14,7 @@
     "test:slots": "node scripts/test-slots-logic.js",
     "test:steam-dates": "node scripts/test-steam-update-dates.js",
     "test": "node tests/run-all.js",
+    "build": "node scripts/verify-build.js",
     "test:jest": "jest",
     "test:coverage": "jest --coverage",
     "lint": "eslint .",
