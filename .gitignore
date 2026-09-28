@@ -67,3 +67,6 @@ math
 
 # Local recovery archive (stale-path migration, disabled legacy code)
 .archive/
+
+# Runtime lock file (created on start, must not be tracked)
+.discord-bot.lock
