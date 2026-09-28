@@ -4,7 +4,7 @@ const path = require('path');
 class ReminderManager {
   constructor(client) {
     this.client = client;
-    this.dataFile = path.join(__dirname, '../data/reminders.json');
+    this.dataFile = path.join(__dirname, '../../data/reminders.json');
     this.reminders = this.loadReminders();
     this.activeTimers = new Map();
     this.setupReminders();

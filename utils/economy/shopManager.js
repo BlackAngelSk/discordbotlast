@@ -3,7 +3,7 @@ const path = require('path');
 
 class ShopManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'shop.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'shop.json');
     this.data = {
       items: {}, // { guildId: { itemId: { name, price, type, roleId, duration } } }
       purchases: {}, // { guildId: { userId: [{ itemId, purchasedAt, expiresAt }] } }

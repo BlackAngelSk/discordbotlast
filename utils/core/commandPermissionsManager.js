@@ -3,7 +3,7 @@ const path = require('path');
 
 class CommandPermissionsManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'commandPermissions.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'commandPermissions.json');
     this.data = { guilds: {} };
     this.loaded = false;
   }
@@ -19,6 +19,7 @@ class CommandPermissionsManager {
     } catch (error) {
       if (error.code === 'ENOENT') {
         await this.save();
+        this.loaded = true;
       } else {
         console.error('Error loading command permissions:', error);
       }

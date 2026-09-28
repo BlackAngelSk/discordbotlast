@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 
-const INVITES_FILE = path.join(__dirname, '../data/invites.json');
+const INVITES_FILE = path.join(__dirname, '../../data/invites.json');
 
 // Load invites data
 async function loadInvites() {

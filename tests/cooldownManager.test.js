@@ -11,15 +11,27 @@ const CooldownManager = require('../utils/cooldownManager');
 let passed = 0;
 let failed = 0;
 
+// Async-aware harness. Tests whose callback is `async` must be awaited: the old
+// version called fn() and ignored the promise, so async assertions ran after the
+// summary had printed and failures were swallowed.
+const pending = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    console.log(`  ✅ ${name}`);
-    passed++;
-  } catch (err) {
-    console.error(`  ❌ ${name}: ${err.message}`);
-    failed++;
-  }
+  const run = Promise.resolve()
+    .then(() => fn())
+    .then(
+      () => {
+        passed++;
+        console.log(`  ✅ ${name}`);
+      },
+      (err) => {
+        failed++;
+        console.error(`  ❌ ${name}: ${err.message}`);
+      }
+    );
+
+  pending.push(run);
+  return run;
 }
 
 // Create a fresh manager for every group of tests to avoid state leaking
@@ -166,5 +178,7 @@ test('clears all entries on destroy', () => {
 });
 
 // ── Summary ────────────────────────────────────────────────────────────────────
-console.log(`\n${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+Promise.all(pending).then(() => {
+  console.log(`\n${passed} passed, ${failed} failed\n`);
+  if (failed > 0) process.exit(1);
+});

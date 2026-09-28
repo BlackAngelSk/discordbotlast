@@ -73,7 +73,7 @@ class ShutdownManager {
    */
   async saveAllData() {
     console.log('[SHUTDOWN] Saving all data...');
-    const dataDir = path.join(__dirname, '../data');
+    const dataDir = path.join(__dirname, '../../data');
 
     if (!fs.existsSync(dataDir)) {
       console.log('[SHUTDOWN] No data directory found, skipping data save');

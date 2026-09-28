@@ -4,7 +4,7 @@ const { PermissionsBitField } = require('discord.js');
 
 class RoleTemplateManager {
   constructor() {
-    this.dataFile = path.join(__dirname, '../data/roleTemplates.json');
+    this.dataFile = path.join(__dirname, '../../data/roleTemplates.json');
     this.templates = this.loadTemplates();
     this.defaultTemplates = this.getDefaultTemplates();
   }

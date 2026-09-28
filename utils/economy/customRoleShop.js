@@ -3,7 +3,7 @@ const path = require('path');
 
 class CustomRoleShop {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'customRoles.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'customRoles.json');
     this.rainbowRoles = new Set(); // Track rainbow roles
     this.pendingRainbowUpdate = new Map(); // roleId -> { guildId, roleId, color }
     this.lastAppliedRainbowColor = new Map(); // roleId -> color

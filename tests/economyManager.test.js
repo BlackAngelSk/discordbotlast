@@ -21,26 +21,31 @@ function reset() {
   economy.xpEvents = new Map();
 }
 
+// Async-aware harness. The old version called fn() and dropped the returned
+// promise, so `async` tests asserted after the summary and failures vanished.
+const pending = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    console.log(`  ✅ ${name}`);
-    passed++;
-  } catch (err) {
-    console.error(`  ❌ ${name}: ${err.message}`);
-    failed++;
-  }
+  const run = Promise.resolve()
+    .then(() => fn())
+    .then(
+      () => {
+        passed++;
+        console.log(`  ✅ ${name}`);
+      },
+      (err) => {
+        failed++;
+        console.error(`  ❌ ${name}: ${err.message}`);
+      }
+    );
+
+  pending.push(run);
+  return run;
 }
 
-async function testAsync(name, fn) {
-  try {
-    await fn();
-    console.log(`  ✅ ${name}`);
-    passed++;
-  } catch (err) {
-    console.error(`  ❌ ${name}: ${err.message}`);
-    failed++;
-  }
+// Kept for readability at call sites; identical semantics now that test() awaits.
+function testAsync(name, fn) {
+  return test(name, fn);
 }
 
 // ── getUserKey ─────────────────────────────────────────────────────────────────
@@ -479,7 +484,9 @@ console.log('\naddMoney / removeMoney');
   });
 
   // ── Summary ────────────────────────────────────────────────────────────────────
-})().then(() => {
+})().then(async () => {
+  // Drain any remaining (non-testAsync) tests before reporting.
+  await Promise.all(pending);
   console.log(`\n${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);
 });

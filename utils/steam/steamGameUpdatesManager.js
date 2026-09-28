@@ -6,7 +6,7 @@ const { fetchChannelSafe } = require('../core/discordFetch');
 const { toDateObject, toEpochMs } = require('../core/helpers');
 const settingsManager = require('../core/settingsManager');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'steamGameUpdates.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'steamGameUpdates.json');
 const APP_DETAILS_URL = 'https://store.steampowered.com/api/appdetails?l=en&appids=';
 const APP_NEWS_URL =
   'https://api.steampowered.com/ISteamNews/GetNewsForApp/v0002/?maxlength=0&format=json&count=25&appid=';
@@ -1864,13 +1864,31 @@ class SteamGameUpdatesManager {
     try {
       await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
       const raw = await fs.readFile(DATA_FILE, 'utf8');
-      this.data = JSON.parse(raw);
+      const parsed = raw.trim() ? JSON.parse(raw) : null;
+      if (parsed && typeof parsed === 'object') {
+        this.data = parsed;
+      } else {
+        // Empty or whitespace-only file: restore defaults instead of crashing
+        console.warn('Steam game updates config was empty – resetting to defaults.');
+        await this.save();
+      }
     } catch (error) {
       if (error.code === 'ENOENT') {
         await this.save();
       } else {
         console.error('Error loading Steam game updates config:', error);
+        // Corrupt file: fall back to defaults and repair it on disk so the
+        // next startup is clean instead of erroring forever.
+        this.data = { guilds: {} };
+        await this.save();
       }
+    }
+
+    if (!this.data || typeof this.data !== 'object') {
+      this.data = { guilds: {} };
+    }
+    if (!this.data.guilds || typeof this.data.guilds !== 'object') {
+      this.data.guilds = {};
     }
 
     for (const guildId of Object.keys(this.data.guilds || {})) {

@@ -5,7 +5,7 @@ class UptimeMonitor {
   constructor(client) {
     this.client = client;
     this.startTime = Date.now();
-    this.metricsFile = path.join(__dirname, '../logs/metrics.json');
+    this.metricsFile = path.join(__dirname, '../../logs/metrics.json');
     this.commandMetrics = new Map();
     this.memoryMetrics = [];
     this.responseMetrics = [];

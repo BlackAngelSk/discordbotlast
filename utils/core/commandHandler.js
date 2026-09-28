@@ -13,39 +13,87 @@ class CommandHandler {
   async loadCommands() {
     const commandsPath = path.join(__dirname, '..', '..', 'commands');
 
-    // Recursively load commands from all subdirectories
-    const loadCommandsRecursive = (dir) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+    // Pass 1: discover every command module (recursively), pass 2: register.
+    // Two passes are required so that a command's *alias* can never shadow
+    // another command's *real name* (e.g. `botprefix` aliasing `prefix` used to
+    // make the real `prefix` command unreachable).
+    const discovered = [];
 
-      for (const entry of entries) {
+    const collect = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const fullPath = path.join(dir, entry.name);
 
         if (entry.isDirectory()) {
-          // Recursively load from subdirectories
-          loadCommandsRecursive(fullPath);
-        } else if (entry.name.endsWith('.js')) {
-          const command = require(fullPath);
-
-          if ('name' in command && 'execute' in command) {
-            this.commands.set(command.name, command);
-            console.log(`✅ Loaded command: ${command.name}`);
-
-            // Load aliases if they exist
-            if (command.aliases) {
-              for (const alias of command.aliases) {
-                this.commands.set(alias, command);
-              }
-            }
-          } else {
-            console.warn(
-              `⚠️ Command at ${fullPath} is missing required "name" or "execute" property.`
-            );
+          // Skip conventional non-command directories (archive/disabled/vcs)
+          if (entry.name.startsWith('.') || entry.name.startsWith('_')) {
+            continue;
           }
+          collect(fullPath);
+        } else if (entry.name.endsWith('.js')) {
+          discovered.push({ fullPath, command: require(fullPath) });
         }
       }
     };
 
-    loadCommandsRecursive(commandsPath);
+    collect(commandsPath);
+
+    // ── Pass 1: real names win ───────────────────────────────────────────────
+    const aliasesToRegister = [];
+
+    for (const { fullPath, command } of discovered) {
+      if (!('name' in command) || !('execute' in command)) {
+        console.warn(`⚠️ Command at ${fullPath} is missing required "name" or "execute" property.`);
+        continue;
+      }
+
+      const existing = this.commands.get(command.name);
+      if (existing) {
+        // Same module object re-exported through another path (e.g. a thin
+        // `poker.js` -> `poker.multiplayer.v2.js` shim): not a clash.
+        if (existing === command) {
+          continue;
+        }
+
+        const existingPath = existing.__filePath || 'unknown file';
+        console.warn(
+          `⚠️ Duplicate command name "${command.name}": ${fullPath} is shadowed by ${existingPath}. ` +
+            `Rename or move one of them (see commands/_archive/).`
+        );
+        continue;
+      }
+
+      Object.defineProperty(command, '__filePath', {
+        value: fullPath,
+        enumerable: false,
+        configurable: true,
+      });
+      this.commands.set(command.name, command);
+      console.log(`✅ Loaded command: ${command.name}`);
+
+      if (command.aliases) {
+        aliasesToRegister.push({ command, aliases: command.aliases, fullPath });
+      }
+    }
+
+    // ── Pass 2: aliases only fill gaps ───────────────────────────────────────
+    for (const { command, aliases, fullPath } of aliasesToRegister) {
+      for (const alias of aliases) {
+        const taken = this.commands.get(alias);
+        if (taken) {
+          if (taken === command) {
+            continue;
+          }
+
+          console.warn(
+            `⚠️ Alias "${alias}" of ${fullPath} is ignored: it collides with ` +
+              `${taken.__filePath || `command "${taken.name}"`}. Real command names take precedence.`
+          );
+          continue;
+        }
+
+        this.commands.set(alias, command);
+      }
+    }
   }
 
   async handleCommand(message) {

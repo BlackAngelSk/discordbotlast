@@ -5,7 +5,7 @@ const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('../core/discordFetch');
 const settingsManager = require('../core/settingsManager');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'epicGamesAlerts.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'epicGamesAlerts.json');
 const API_URL =
   'https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US';
 const POLL_INTERVAL = 30 * 60 * 1000;

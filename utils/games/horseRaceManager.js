@@ -3,7 +3,7 @@ const path = require('path');
 const { EmbedBuilder, MessageFlags } = require('discord.js');
 const economyManager = require('../economy/economyManager');
 
-const FILE = path.join(__dirname, '..', 'data', 'horseRaces.json');
+const FILE = path.join(__dirname, '..', '..', 'data', 'horseRaces.json');
 
 class HorseRaceManager {
   constructor() {

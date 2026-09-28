@@ -11,7 +11,7 @@ const Database = require('better-sqlite3');
 
 class DatabaseManager {
   constructor() {
-    this.dbPath = path.join(__dirname, '..', 'data');
+    this.dbPath = path.join(__dirname, '..', '..', 'data');
     this.sqliteDb = null;
     this.sqlitePath = path.join(this.dbPath, 'bot.sqlite');
   }

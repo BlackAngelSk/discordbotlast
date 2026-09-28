@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const databaseManager = require('./databaseManager');
 
-const SETTINGS_FILE = path.join(__dirname, '..', 'data', 'settings.json');
+const SETTINGS_FILE = path.join(__dirname, '..', '..', 'data', 'settings.json');
 
 // Default settings for new servers
 const DEFAULT_SETTINGS = {

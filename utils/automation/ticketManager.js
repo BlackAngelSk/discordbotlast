@@ -3,7 +3,7 @@ const path = require('path');
 
 class TicketManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'tickets.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'tickets.json');
     this.data = {
       settings: {},
       tickets: {},
@@ -85,7 +85,7 @@ class TicketManager {
       return null;
     }
 
-    const transcriptsDir = path.join(__dirname, '..', 'data', 'transcripts');
+    const transcriptsDir = path.join(__dirname, '..', '..', 'data', 'transcripts');
     await fs.mkdir(transcriptsDir, { recursive: true });
 
     const filename = `${ticketId}.txt`;

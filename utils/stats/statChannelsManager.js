@@ -8,7 +8,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'statChannels.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'statChannels.json');
 
 const TEMPLATES = {
   members: (g) => `👥 Members: ${g.memberCount}`,

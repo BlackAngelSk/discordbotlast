@@ -3,7 +3,7 @@ const path = require('path');
 
 class ModerationManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'moderation.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'moderation.json');
     this.data = {
       warnings: {},
       modLogs: {},

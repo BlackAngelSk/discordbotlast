@@ -52,7 +52,7 @@ function calculateLevelFromXp(xp) {
 
 class HeistManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'heists.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'heists.json');
     this.data = {
       users: {},
       guilds: {},

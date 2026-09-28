@@ -14,16 +14,28 @@ const manager = require('../utils/steamGameUpdatesManager');
 let passed = 0;
 let failed = 0;
 
+// Async-aware harness: the previous version called `fn()` without awaiting, so
+// every `async` test's assertions were deferred past the summary and failures
+// surfaced only as an unhandled rejection after the process had printed "0 failed".
+const pending = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (error) {
-    failed++;
-    console.log(`  ❌ ${name}`);
-    console.log(`     ${error.message}`);
-  }
+  const run = Promise.resolve()
+    .then(() => fn())
+    .then(
+      () => {
+        passed++;
+        console.log(`  ✅ ${name}`);
+      },
+      (error) => {
+        failed++;
+        console.log(`  ❌ ${name}`);
+        console.log(`     ${error.message}`);
+      }
+    );
+
+  pending.push(run);
+  return run;
 }
 
 // ============================================================
@@ -85,20 +97,16 @@ test('Sample alert embed has correct structure', async () => {
   assert.ok(hasVersionField, 'Sample embed should have a Version field');
 });
 
-test('Sample alert embed has section-based description', async () => {
+test('Sample alert embed has section-based fields', async () => {
   const alerts = await manager.buildTestAlerts('test-guild-no-config');
   const embed = alerts[0].embeds[0];
   const data = embed.toJSON ? embed.toJSON() : embed;
 
-  // Should contain the [ NEW FEATURES ] and [ BUG FIXES ] section markers
-  assert.ok(
-    data.description.includes('NEW FEATURES') || data.description.includes('New Features'),
-    'Description should contain New Features section'
-  );
-  assert.ok(
-    data.description.includes('BUG FIXES') || data.description.includes('Bug Fixes'),
-    'Description should contain Bug Fixes section'
-  );
+  // The section markers live in embed fields (not the description), which is
+  // what the embed builder is asserted to do further down this file.
+  const fieldNames = (data.fields || []).map((f) => f.name.toUpperCase());
+  assert.ok(fieldNames.includes('NEW FEATURES'), 'Embed should have a NEW FEATURES field');
+  assert.ok(fieldNames.includes('BUG FIXES'), 'Embed should have a BUG FIXES field');
 });
 
 // ============================================================
@@ -129,7 +137,7 @@ test('Module source file contains SPECIAL_TRACKED_SOURCES', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(
-    path.join(__dirname, '..', 'utils', 'steamGameUpdatesManager.js'),
+    path.join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
     'utf8'
   );
 
@@ -164,7 +172,7 @@ test('Module source has MAX_TRACKED_GAMES = 25', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(
-    path.join(__dirname, '..', 'utils', 'steamGameUpdatesManager.js'),
+    path.join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
     'utf8'
   );
   assert.ok(source.includes('MAX_TRACKED_GAMES = 25'), 'MAX_TRACKED_GAMES should be 25');
@@ -174,7 +182,7 @@ test('Module source uses SPECIAL_PROVIDER_FETCHERS lookup table', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(
-    path.join(__dirname, '..', 'utils', 'steamGameUpdatesManager.js'),
+    path.join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
     'utf8'
   );
 
@@ -183,7 +191,13 @@ test('Module source uses SPECIAL_PROVIDER_FETCHERS lookup table', () => {
     'Should define SPECIAL_PROVIDER_FETCHERS'
   );
 
-  // Verify all providers are in the lookup table
+  // Verify all providers are in the lookup table. Assert on the table's own
+  // body rather than on a fixed indentation / fetch-function name, which the
+  // descriptive fetch* names no longer match.
+  const tableMatch = source.match(/const SPECIAL_PROVIDER_FETCHERS = \{([\s\S]*?)\n\};/);
+  assert.ok(tableMatch, 'SPECIAL_PROVIDER_FETCHERS should be an object literal');
+  const tableBody = tableMatch[1];
+
   const providers = [
     'minecraft',
     'league',
@@ -202,7 +216,10 @@ test('Module source uses SPECIAL_PROVIDER_FETCHERS lookup table', () => {
     'intel',
   ];
   for (const p of providers) {
-    assert.ok(source.includes(`    ${p}: fetch`), `SPECIAL_PROVIDER_FETCHERS should include ${p}`);
+    assert.ok(
+      new RegExp(`^\\s*${p}\\s*:`, 'm').test(tableBody),
+      `SPECIAL_PROVIDER_FETCHERS should include ${p}`
+    );
   }
 });
 
@@ -210,7 +227,7 @@ test('Module source has createGenericWebFetcher factory', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(
-    path.join(__dirname, '..', 'utils', 'steamGameUpdatesManager.js'),
+    path.join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
     'utf8'
   );
   assert.ok(
@@ -224,7 +241,7 @@ test('Module source embed builder uses fields for version and date', () => {
   const fs = require('fs');
   const path = require('path');
   const source = fs.readFileSync(
-    path.join(__dirname, '..', 'utils', 'steamGameUpdatesManager.js'),
+    path.join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
     'utf8'
   );
 
@@ -377,10 +394,14 @@ test('Dashboard supports up to 25 sources', () => {
 // Results
 // ============================================================
 
-console.log(`\n${'='.repeat(50)}`);
-console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
-console.log(`${'='.repeat(50)}`);
+// Wait for every (possibly async) test before reporting, otherwise the summary
+// would print while assertions are still in flight.
+Promise.all(pending).then(() => {
+  console.log(`\n${'='.repeat(50)}`);
+  console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
+  console.log(`${'='.repeat(50)}`);
 
-if (failed > 0) {
-  process.exit(1);
-}
+  if (failed > 0) {
+    process.exit(1);
+  }
+});

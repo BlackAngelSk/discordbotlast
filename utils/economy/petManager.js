@@ -5,7 +5,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'pets.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'pets.json');
 
 const PET_TYPES = {
   cat: { emoji: '🐱', name: 'Cat', hungerDrain: 1, happinessDrain: 1.5 },

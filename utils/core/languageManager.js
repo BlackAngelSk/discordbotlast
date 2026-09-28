@@ -1,4 +1,5 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 
 class LanguageManager {
@@ -10,10 +11,16 @@ class LanguageManager {
 
   async init() {
     try {
-      const languagesDir = path.join(__dirname, '..', 'languages');
+      // languages/ lives at the project root, two levels above utils/core
+      const languagesDir = path.join(__dirname, '..', '..', 'languages');
 
-      // Ensure languages directory exists
-      await fs.mkdir(languagesDir, { recursive: true });
+      // Do NOT create the directory: a wrong path used to be masked by
+      // mkdir(recursive) silently producing an empty dir and zero translations.
+      if (!fsSync.existsSync(languagesDir)) {
+        console.error(`❌ Languages directory not found: ${languagesDir}`);
+        this.loaded = true;
+        return;
+      }
 
       // Load all language files
       const files = await fs.readdir(languagesDir);

@@ -24,7 +24,7 @@ const path = require('path');
 
 class CustomCommandManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'customcommands.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'customcommands.json');
     /** @type {Object<string, Object<string, any>>} */
     this.data = {};
     /** @type {Object<string, Object<string, number>>} Cooldown expiry tracking (in-memory only) */

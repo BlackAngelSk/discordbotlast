@@ -10,7 +10,7 @@ const { fetchUserSafe, fetchChannelSafe } = require('../core/discordFetch');
 class NotificationManager {
   constructor(client) {
     this.client = client;
-    this.dataFile = path.join(__dirname, '..', 'data', 'notifications.json');
+    this.dataFile = path.join(__dirname, '..', '..', 'data', 'notifications.json');
     this.schedules = new Map();
     this.scheduleCheckRunning = false;
   }

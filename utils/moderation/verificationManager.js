@@ -6,7 +6,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'verification.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'verification.json');
 
 class VerificationManager {
   constructor() {

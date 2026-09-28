@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'roleMenus.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'roleMenus.json');
 
 class RoleMenuManager {
   constructor() {

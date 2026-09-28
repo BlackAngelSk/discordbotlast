@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 
-const CONFIG_FILE = path.join(__dirname, '..', 'data', 'seasonLeaderboardConfig.json');
+const CONFIG_FILE = path.join(__dirname, '..', '..', 'data', 'seasonLeaderboardConfig.json');
 
 const GAMBLING_GAMES = [
   {

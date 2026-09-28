@@ -3,7 +3,7 @@ const path = require('path');
 
 class StatsManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'stats.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'stats.json');
     this.data = {
       servers: {},
       users: {},

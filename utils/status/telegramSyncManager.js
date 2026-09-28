@@ -4,7 +4,7 @@ const https = require('https');
 const http = require('http');
 const { AttachmentBuilder, ChannelType } = require('discord.js');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'telegramSync.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'telegramSync.json');
 const REQUEST_TIMEOUT = 15000;
 const TELEGRAM_MAX_MESSAGE_LENGTH = 4096;
 const TELEGRAM_MAX_CAPTION_LENGTH = 1024;

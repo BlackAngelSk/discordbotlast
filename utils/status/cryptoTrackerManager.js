@@ -7,7 +7,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const https = require('https');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'cryptoTracker.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'cryptoTracker.json');
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const CACHE_TTL = 60 * 1000; // 1 minute price cache

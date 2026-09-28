@@ -5,7 +5,7 @@ const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('../core/discordFetch');
 const settingsManager = require('../core/settingsManager');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'steamFreeGamesAlerts.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'steamFreeGamesAlerts.json');
 const API_URL = 'https://www.gamerpower.com/api/giveaways?platform=steam&type=game';
 const STEAM_FEATURED_URL = 'https://store.steampowered.com/api/featuredcategories?cc=US&l=en';
 const STEAM_APPDETAILS_BASE =

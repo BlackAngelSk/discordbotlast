@@ -9,7 +9,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const https = require('https');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'liveAlerts.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'liveAlerts.json');
 
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const YOUTUBE_QUOTA_BACKOFF_MS = 60 * 60 * 1000; // 1 hour

@@ -5,7 +5,7 @@ const { fetchChannelSafe } = require('../core/discordFetch');
 
 class ScheduledMessagesManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'scheduledMessages.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'scheduledMessages.json');
     this.data = {
       messages: {}, // { guildId: { messageId: { channelId, content, schedule, lastSent, enabled } } }
     };

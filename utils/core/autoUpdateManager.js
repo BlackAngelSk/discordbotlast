@@ -3,7 +3,7 @@ const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
 
-const ROOT_DIR = path.join(__dirname, '..');
+const ROOT_DIR = path.join(__dirname, '..', '..');
 const DATA_FILE = path.join(ROOT_DIR, 'data', 'autoUpdateState.json');
 const UPDATER_PATH = path.join(ROOT_DIR, 'self updater', 'updater.py');
 const REPO = 'BlackAngelSk/discordbotlast';

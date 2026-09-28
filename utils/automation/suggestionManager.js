@@ -3,7 +3,7 @@ const path = require('path');
 
 class SuggestionManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'suggestions.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'suggestions.json');
     this.data = {
       settings: {}, // { guildId: { channelId, staffRoleId, enabled } }
       suggestions: {}, // { guildId: { suggestionId: { userId, content, status, votes, messageId } } }

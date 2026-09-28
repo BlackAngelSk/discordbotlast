@@ -3,7 +3,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { EmbedBuilder } = require('discord.js');
 
-const ROOT_DIR = path.join(__dirname, '..');
+const ROOT_DIR = path.join(__dirname, '..', '..');
 const DATA_FILE = path.join(ROOT_DIR, 'data', 'botUpdateState.json');
 const PACKAGE_FILE = path.join(ROOT_DIR, 'package.json');
 

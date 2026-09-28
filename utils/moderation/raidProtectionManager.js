@@ -3,7 +3,7 @@ const path = require('path');
 
 class RaidProtectionManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'raidProtection.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'raidProtection.json');
     this.data = {
       settings: {}, // { guildId: { enabled, joinRateLimit, accountAgeRequired, verificationEnabled } }
       joinLog: {}, // { guildId: [{ userId, timestamp }] }

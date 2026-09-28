@@ -24,7 +24,7 @@ const SUIT_FILE = {
   '♣': 'C',
 };
 
-const CARD_ASSET_DIR = path.join(__dirname, '..', 'assets', 'cards');
+const CARD_ASSET_DIR = path.join(__dirname, '..', '..', 'assets', 'cards');
 const cardImageDataCache = new Map();
 
 function isFaceRank(rank) {

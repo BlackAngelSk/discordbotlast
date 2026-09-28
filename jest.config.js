@@ -1,7 +1,11 @@
 module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/*.test.js'],
+  // NOTE: tests/*.test.js is written for the project's own runner
+  // (node tests/run-all.js) – those files define their own `test()` helper and
+  // call process.exit(), so Jest cannot execute them. Jest therefore owns only
+  // tests/jest/**, and `npm test` stays the authoritative full suite.
+  testMatch: ['<rootDir>/tests/jest/**/*.test.js'],
   collectCoverageFrom: [
     'utils/**/*.js',
     'commands/**/*.js',

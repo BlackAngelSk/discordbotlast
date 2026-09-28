@@ -35,7 +35,7 @@ function createDefaultUserData() {
 
 class EconomyManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'economy.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'economy.json');
     this.data = {
       users: {},
       shops: {},

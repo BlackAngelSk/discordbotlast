@@ -103,7 +103,8 @@ const DASHBOARD_SECTION_LABELS = {
     automod: 'Auto-Mod',
     safety: 'Safety Center',
     analytics: 'Analytics',
-    activity: 'Activity Center'
+    activity: 'Activity Center',
+    health: 'Bot Health'
 };
 
 const getDashboardSectionLabel = (sectionKey) => DASHBOARD_SECTION_LABELS[sectionKey] || sectionKey;
@@ -147,8 +148,15 @@ const readRecentErrorEntries = (limit = 20) => {
 
         const entries = [];
         for (const fileName of files) {
-            const content = JSON.parse(fs.readFileSync(path.join(logsDirectory, fileName), 'utf8'));
-            entries.push(...content);
+            // One corrupt/unreadable log file must not hide every other entry.
+            try {
+                const content = JSON.parse(fs.readFileSync(path.join(logsDirectory, fileName), 'utf8'));
+                if (Array.isArray(content)) {
+                    entries.push(...content);
+                }
+            } catch (fileError) {
+                console.error(`Failed to read error log ${fileName}:`, fileError.message);
+            }
         }
 
         return entries

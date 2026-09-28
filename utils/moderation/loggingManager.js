@@ -4,7 +4,7 @@ const path = require('path');
 const { EmbedBuilder, ChannelType } = require('discord.js');
 const settingsManager = require('../core/settingsManager');
 
-const LOGGING_SETTINGS_FILE = path.join(__dirname, '../data/logging.json');
+const LOGGING_SETTINGS_FILE = path.join(__dirname, '../../data/logging.json');
 
 // Load logging settings
 async function loadLoggingSettings() {

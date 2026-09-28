@@ -3,7 +3,7 @@ const path = require('path');
 
 class ServerMilestones {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'milestones.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'milestones.json');
     this.data = {
       milestones: {}, // guildId: { achieved: [milestoneIds], lastMemberCount }
       milestoneDefinitions: {

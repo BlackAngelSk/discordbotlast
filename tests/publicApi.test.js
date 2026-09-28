@@ -13,17 +13,28 @@ let passed = 0;
 let failed = 0;
 const suiteErrors = [];
 
+// Async-aware harness: an `async` callback's promise must be awaited, otherwise
+// its assertions run after the summary and any failure is silently swallowed.
+const pending = [];
+
 function test(name, fn) {
-  try {
-    fn();
-    passed++;
-    console.log(`  ✅ ${name}`);
-  } catch (err) {
-    failed++;
-    suiteErrors.push({ name, error: err });
-    console.log(`  ❌ ${name}`);
-    console.log(`     ${err.message}`);
-  }
+  const run = Promise.resolve()
+    .then(() => fn())
+    .then(
+      () => {
+        passed++;
+        console.log(`  ✅ ${name}`);
+      },
+      (err) => {
+        failed++;
+        suiteErrors.push({ name, error: err });
+        console.log(`  ❌ ${name}`);
+        console.log(`     ${err.message}`);
+      }
+    );
+
+  pending.push(run);
+  return run;
 }
 
 function assertEqual(actual, expected, msg = '') {
@@ -418,8 +429,10 @@ test('middleware module exports expected functions', () => {
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────
-console.log(`\n${'═'.repeat(60)}`);
-console.log(`${passed} passed, ${failed} failed`);
-console.log('═'.repeat(60));
+Promise.all(pending).then(() => {
+  console.log(`\n${'═'.repeat(60)}`);
+  console.log(`${passed} passed, ${failed} failed`);
+  console.log('═'.repeat(60));
 
-process.exit(failed > 0 ? 1 : 0);
+  process.exit(failed > 0 ? 1 : 0);
+});

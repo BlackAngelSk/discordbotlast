@@ -9,7 +9,7 @@ const path = require('path');
 
 class AnalyticsManager {
   constructor() {
-    this.dataFile = path.join(__dirname, '..', 'data', 'analytics.json');
+    this.dataFile = path.join(__dirname, '..', '..', 'data', 'analytics.json');
   }
 
   async init() {

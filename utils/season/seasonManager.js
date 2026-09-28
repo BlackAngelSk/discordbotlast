@@ -10,7 +10,7 @@ const { fetchUserSafe } = require('../core/discordFetch');
 
 class SeasonManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'seasons.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'seasons.json');
     this.data = {
       seasons: {},
       currentSeason: null,

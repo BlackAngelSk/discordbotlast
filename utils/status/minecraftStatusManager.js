@@ -3,7 +3,7 @@ const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 const { fetchMinecraftServerStatus, normalizeMinecraftStatusInput } = require('./minecraftStatus');
 
-const DATA_FILE = path.join(__dirname, '..', 'data', 'minecraftStatusEmbeds.json');
+const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'minecraftStatusEmbeds.json');
 const DEFAULT_INTERVAL_MINUTES = 5;
 const MIN_INTERVAL_MINUTES = 5;
 const MAX_INTERVAL_MINUTES = 120;

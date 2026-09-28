@@ -4,8 +4,8 @@ const path = require('path');
 class Logger {
   constructor(botClient) {
     this.client = botClient;
-    this.logDirectory = path.join(__dirname, '../logs');
-    this.dataDirectory = path.join(__dirname, '../data');
+    this.logDirectory = path.join(__dirname, '../../logs');
+    this.dataDirectory = path.join(__dirname, '../../data');
     this.logFile = path.join(
       this.logDirectory,
       `bot-${new Date().toISOString().split('T')[0]}.json`

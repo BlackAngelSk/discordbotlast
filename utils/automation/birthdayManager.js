@@ -3,7 +3,7 @@ const path = require('path');
 
 class BirthdayManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'birthdays.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'birthdays.json');
     this.data = {
       birthdays: {}, // guildId_userId: { month, day, year }
       lastCelebrated: {}, // guildId_userId: timestamp

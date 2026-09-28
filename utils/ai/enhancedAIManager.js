@@ -12,8 +12,8 @@ class AIManager {
     this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
     this.conversationHistory = new Map(); // in-memory cache
-    this.dataFile = path.join(__dirname, '..', 'data', 'ai.json');
-    this.personaFile = path.join(__dirname, '..', 'data', 'aiPersona.json');
+    this.dataFile = path.join(__dirname, '..', '..', 'data', 'ai.json');
+    this.personaFile = path.join(__dirname, '..', '..', 'data', 'aiPersona.json');
     this._personaCache = {};
   }
 

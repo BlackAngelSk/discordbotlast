@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const LOG_DIR = path.join(__dirname, '..', 'logs');
+const LOG_DIR = path.join(__dirname, '..', '..', 'logs');
 
 class ErrorLogManager {
   constructor(logDir = LOG_DIR) {

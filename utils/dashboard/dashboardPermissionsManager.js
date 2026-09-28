@@ -23,7 +23,7 @@ const SECTION_KEYS = [
 
 class DashboardPermissionsManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'dashboardPermissions.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'dashboardPermissions.json');
     this.data = { guilds: {} };
     this.loaded = false;
   }

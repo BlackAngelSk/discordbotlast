@@ -9,7 +9,7 @@ const play = require('play-dl');
 
 class MusicPlaylistManager {
   constructor() {
-    this.dataFile = path.join(__dirname, '..', 'data', 'playlists.json');
+    this.dataFile = path.join(__dirname, '..', '..', 'data', 'playlists.json');
   }
 
   async init() {

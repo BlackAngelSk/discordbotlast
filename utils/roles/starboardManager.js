@@ -3,7 +3,7 @@ const path = require('path');
 
 class StarboardManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'starboard.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'starboard.json');
     this.data = {};
   }
 

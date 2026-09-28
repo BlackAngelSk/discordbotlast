@@ -64,3 +64,6 @@ build/
 # Misc
 math
 .continue/
+
+# Local recovery archive (stale-path migration, disabled legacy code)
+.archive/

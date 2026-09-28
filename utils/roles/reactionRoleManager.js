@@ -3,7 +3,7 @@ const path = require('path');
 
 class ReactionRoleManager {
   constructor() {
-    this.dataPath = path.join(__dirname, '..', 'data', 'reactionroles.json');
+    this.dataPath = path.join(__dirname, '..', '..', 'data', 'reactionroles.json');
     this.data = {};
   }
 

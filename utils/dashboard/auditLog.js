@@ -3,7 +3,7 @@ const path = require('path');
 
 class AuditLog {
   constructor(options = {}) {
-    this.logsDir = path.join(__dirname, '../logs/audit');
+    this.logsDir = path.join(__dirname, '../../logs/audit');
     this.auditFile = path.join(
       this.logsDir,
       `audit-${new Date().toISOString().split('T')[0]}.json`

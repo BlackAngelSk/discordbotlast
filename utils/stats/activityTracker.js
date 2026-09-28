@@ -3,8 +3,8 @@ const path = require('path');
 
 class ActivityTracker {
   constructor() {
-    this.voiceDataPath = path.join(__dirname, '..', 'data', 'voiceActivity.json');
-    this.presenceDataPath = path.join(__dirname, '..', 'data', 'presenceActivity.json');
+    this.voiceDataPath = path.join(__dirname, '..', '..', 'data', 'voiceActivity.json');
+    this.presenceDataPath = path.join(__dirname, '..', '..', 'data', 'presenceActivity.json');
     this.voiceData = {
       sessions: {}, // guildId_userId: { totalMinutes, lastSession, streakDays }
       activeUsers: {}, // userId: { startTime, guildId, voiceChannelId }

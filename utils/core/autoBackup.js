@@ -4,7 +4,7 @@ const { execSync } = require('child_process');
 
 class AutoBackup {
   constructor(options = {}) {
-    this.dataDir = options.dataDir || path.join(__dirname, '../data');
+    this.dataDir = options.dataDir || path.join(__dirname, '../../data');
     this.backupDir = options.backupDir || path.join(this.dataDir, 'backups');
     this.maxBackups = options.maxBackups || 30; // Keep 30 backups
     this.schedules = options.schedules || {

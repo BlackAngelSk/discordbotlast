@@ -5,7 +5,7 @@ const { EmbedBuilder } = require('discord.js');
 class ErrorHandler {
   constructor(client) {
     this.client = client;
-    this.logDirectory = path.join(__dirname, '../logs');
+    this.logDirectory = path.join(__dirname, '../../logs');
     this.dmRecipientId = process.env.ERROR_DM_USER_ID || process.env.BOT_OWNER_ID || null;
     this.errorChannelId = process.env.ERROR_CHANNEL_ID || null;
     this.initializeLogDirectory();
