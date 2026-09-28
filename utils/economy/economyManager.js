@@ -70,6 +70,10 @@ class EconomyManager {
 
   async save() {
     try {
+      // The data directory can be missing if it was moved/cleaned while the bot
+      // is running; recreating it keeps a failed write from silently dropping
+      // the user's balance state.
+      await fs.mkdir(path.dirname(this.dataPath), { recursive: true });
       await fs.writeFile(this.dataPath, JSON.stringify(this.data, null, 2));
     } catch (error) {
       console.error('Error saving economy data:', error);
