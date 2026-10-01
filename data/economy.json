@@ -18,8 +18,8 @@
       ]
     },
     "396685113804587009": {
-      "balance": 7554,
-      "xp": 20129,
+      "balance": 7674,
+      "xp": 20729,
       "level": 15,
       "highestLevelReached": 15,
       "lastDaily": 1775915698104,
@@ -48,8 +48,8 @@
       ]
     },
     "195140009748201472": {
-      "balance": 100074,
-      "xp": 27416,
+      "balance": 100112,
+      "xp": 27606,
       "level": 17,
       "highestLevelReached": 17,
       "lastDaily": null,
@@ -63,8 +63,8 @@
       ]
     },
     "534769701297979392": {
-      "balance": 6604,
-      "xp": 33032,
+      "balance": 6743,
+      "xp": 33727,
       "level": 19,
       "highestLevelReached": 19,
       "lastDaily": null,
@@ -78,10 +78,10 @@
       ]
     },
     "349649557896036354": {
-      "balance": 735536,
-      "xp": 19515,
-      "level": 14,
-      "highestLevelReached": 14,
+      "balance": 735694,
+      "xp": 20305,
+      "level": 15,
+      "highestLevelReached": 15,
       "lastDaily": 1775919046103,
       "lastWeekly": 1774772508729,
       "inventory": [],
@@ -96,8 +96,8 @@
       ]
     },
     "373827871212568576": {
-      "balance": 1860,
-      "xp": 18089,
+      "balance": 1961,
+      "xp": 18594,
       "level": 14,
       "highestLevelReached": 14,
       "lastDaily": null,
@@ -831,10 +831,10 @@
       ]
     },
     "282957332089143297": {
-      "balance": 2775,
-      "xp": 13911,
-      "level": 12,
-      "highestLevelReached": 12,
+      "balance": 2990,
+      "xp": 14986,
+      "level": 13,
+      "highestLevelReached": 13,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -906,8 +906,8 @@
       ]
     },
     "277448148559855618": {
-      "balance": 331,
-      "xp": 1655,
+      "balance": 386,
+      "xp": 1930,
       "level": 5,
       "highestLevelReached": 5,
       "lastDaily": null,
@@ -936,10 +936,10 @@
       ]
     },
     "692862875865186344": {
-      "balance": 1831,
-      "xp": 9252,
-      "level": 10,
-      "highestLevelReached": 10,
+      "balance": 1999,
+      "xp": 10092,
+      "level": 11,
+      "highestLevelReached": 11,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -1161,10 +1161,10 @@
       ]
     },
     "1364265413982031973": {
-      "balance": 1146,
-      "xp": 5730,
-      "level": 8,
-      "highestLevelReached": 8,
+      "balance": 1324,
+      "xp": 6620,
+      "level": 9,
+      "highestLevelReached": 9,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
@@ -1315,6 +1315,21 @@
       "xp": 0,
       "level": 1,
       "highestLevelReached": 1,
+      "lastDaily": null,
+      "lastWeekly": null,
+      "inventory": [],
+      "dailyStreak": 0,
+      "streakBonusMultiplier": 1,
+      "seasonalCoins": 0,
+      "guilds": [
+        "421968526547353601"
+      ]
+    },
+    "338030704346791936": {
+      "balance": 153,
+      "xp": 765,
+      "level": 3,
+      "highestLevelReached": 3,
       "lastDaily": null,
       "lastWeekly": null,
       "inventory": [],
