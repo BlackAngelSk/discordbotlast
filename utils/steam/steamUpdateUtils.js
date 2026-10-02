@@ -4,8 +4,12 @@
  * Extracted from steamGameUpdatesManager.js (Phase 4). These are pure,
  * stateless helpers — no manager state, no Discord objects.
  */
+// @ts-check
 
 const https = require('https');
+// Node ≥22 supports require(esm); TS's CJS→ESM model doesn't yet. The
+// helpers.mjs.d.ts declares the module's exports for checking.
+// @ts-expect-error — require(esm) is valid at runtime on Node ≥22
 const { toEpochMs } = require('../core/helpers.mjs');
 
 const REQUEST_TIMEOUT = 20000;
@@ -15,6 +19,11 @@ const REQUEST_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (compatible; DiscordBot/1.0; +https://discord.com)',
 };
 
+/**
+ * @param {string} url
+ * @param {{ responseType?: 'json' | 'text', headers?: Record<string, string>, redirectCount?: number, timeout?: number }} [options]
+ * @returns {Promise<any>}
+ */
 function httpsGet(
   url,
   { responseType = 'json', headers = {}, redirectCount = 0, timeout = REQUEST_TIMEOUT } = {}
@@ -32,7 +41,8 @@ function httpsGet(
           data += chunk;
         });
         res.on('end', () => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          const statusCode = /** @type {number} */ (res.statusCode);
+          if (statusCode >= 300 && statusCode < 400 && res.headers.location) {
             if (redirectCount >= 5) {
               return reject(new Error('Too many redirects'));
             }
@@ -48,8 +58,8 @@ function httpsGet(
             );
           }
 
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            return reject(new Error(`HTTP ${res.statusCode}`));
+          if (statusCode < 200 || statusCode >= 300) {
+            return reject(new Error(`HTTP ${statusCode}`));
           }
 
           if (responseType === 'text') {
@@ -74,23 +84,38 @@ function httpsGet(
   });
 }
 
+/**
+ * @param {string} url
+ * @param {any} [options]
+ * @returns {Promise<any>}
+ */
 function httpsGetJson(url, options) {
   return httpsGet(url, { ...options, responseType: 'json' });
 }
 
+/**
+ * @param {string} url
+ * @param {any} [options]
+ * @returns {Promise<any>}
+ */
 function httpsGetText(url, options) {
   return httpsGet(url, { ...options, responseType: 'text' });
 }
 
 /**
  * Fetch text with retry on transient errors (timeout, ECONNRESET, etc.).
+ *
+ * @param {string} url
+ * @param {any} [options]
+ * @param {number} [attempts]
+ * @returns {Promise<any>}
  */
 async function httpsGetTextWithRetry(url, options, attempts = FETCH_RETRY_ATTEMPTS) {
-  let lastError = null;
+  let lastError = /** @type {any} */ (null);
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     try {
       return await httpsGetText(url, options);
-    } catch (error) {
+    } catch (/** @type {any} */ error) {
       lastError = error;
       const message = String(error?.message || '').toLowerCase();
       const isTransient =
@@ -106,6 +131,10 @@ async function httpsGetTextWithRetry(url, options, attempts = FETCH_RETRY_ATTEMP
   throw lastError;
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function stripHtml(value) {
   return String(value || '')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -115,6 +144,10 @@ function stripHtml(value) {
     .trim();
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function decodeEntities(value) {
   let result = String(value || '');
   const AMP = String.fromCharCode(38);
@@ -135,16 +168,30 @@ function decodeEntities(value) {
   return result;
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function sanitizeText(value) {
   return decodeEntities(stripHtml(value));
 }
 
+/**
+ * @param {string} value
+ * @param {number} maxLength
+ * @returns {string}
+ */
 function truncate(value, maxLength) {
   const safeValue = String(value || '').trim();
   if (!safeValue || safeValue.length <= maxLength) return safeValue;
   return `${safeValue.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`;
 }
 
+/**
+ * @param {string} clanId
+ * @param {string} imagePath
+ * @returns {string | null}
+ */
 function buildSteamClanImageUrl(clanId, imagePath) {
   const safeClanId = String(clanId || '').trim();
   const safeImagePath = String(imagePath || '')
@@ -155,6 +202,10 @@ function buildSteamClanImageUrl(clanId, imagePath) {
   return `https://clan.akamai.steamstatic.com/images/${safeClanId}/${safeImagePath}`;
 }
 
+/**
+ * @param {string} contents
+ * @returns {string | null}
+ */
 function extractSteamClanImageUrl(contents) {
   const raw = String(contents || '');
   if (!raw) return null;
@@ -176,6 +227,10 @@ function extractSteamClanImageUrl(contents) {
   return null;
 }
 
+/**
+ * @param {string} contents
+ * @returns {string}
+ */
 function removeSteamImageMarkup(contents) {
   const raw = String(contents || '');
   if (!raw) return '';
@@ -191,6 +246,10 @@ function removeSteamImageMarkup(contents) {
     .trim();
 }
 
+/**
+ * @param {any} article
+ * @returns {string}
+ */
 function formatChangelogSummary(article) {
   if (!article) return '';
 
@@ -227,12 +286,21 @@ function formatChangelogSummary(article) {
   return '';
 }
 
+/**
+ * @param {string | number | Date} value
+ * @returns {number | null}
+ */
 function toUnixTimestamp(value) {
   const timestamp =
     typeof value === 'number' ? value : Math.floor(new Date(value).getTime() / 1000);
   return Number.isFinite(timestamp) ? timestamp : null;
 }
 
+/**
+ * @param {string} provider
+ * @param {{ id?: string, url?: string, title?: string, date?: string | number | Date }} [meta]
+ * @returns {string}
+ */
 function buildProviderUpdateKey(provider, { id, url, title, date } = {}) {
   const normalizedProvider = String(provider || 'provider')
     .trim()
@@ -252,6 +320,10 @@ function buildProviderUpdateKey(provider, { id, url, title, date } = {}) {
   return parts.filter(Boolean).join(':');
 }
 
+/**
+ * @param {string} value
+ * @returns {string | null}
+ */
 function parseUsDateToIso(value) {
   const match = String(value || '')
     .trim()

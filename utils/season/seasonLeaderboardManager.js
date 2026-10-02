@@ -411,6 +411,14 @@ class SeasonLeaderboardManager {
     return this.config[guildId]?.indexMessageId || null;
   }
 
+  /**
+   * Find the current leaderboard message for the given guild/channel.
+   *
+   * @param {import('discord.js').TextBasedChannel} channel
+   * @param {string} guildId
+   * @param {string | null} [messageId] Known message id to reuse, if any
+   * @returns {Promise<import('discord.js').Message | null>}
+   */
   async findLeaderboardMessage(channel, guildId, messageId = null) {
     if (!channel?.isTextBased?.()) {
       return null;

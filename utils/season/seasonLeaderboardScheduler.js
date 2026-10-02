@@ -5,6 +5,7 @@
  * in-memory last-run tracking, message edit/create) plus the pagination
  * buttons for the leaderboard message.
  */
+// @ts-check
 
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { fetchMemberSafe, withTimeout } = require('../core/discordFetch');
@@ -42,10 +43,10 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
   }
 
   try {
-    const slm = lazyLoadManager('seasonLeaderboardManager');
-    const sm = lazyLoadManager('seasonManager');
-    const em = lazyLoadManager('economyManager');
-    const gsm = lazyLoadManager('gameStatsManager');
+    const slm = /** @type {any} */ (lazyLoadManager('seasonLeaderboardManager'));
+    const sm = /** @type {any} */ (lazyLoadManager('seasonManager'));
+    const em = /** @type {any} */ (lazyLoadManager('economyManager'));
+    const gsm = /** @type {any} */ (lazyLoadManager('gameStatsManager'));
 
     const guildConfigs = slm.config;
     let schedulerStateChanged = false;
@@ -143,14 +144,17 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
       }
 
       // Refresh season stats from live economy/game data
-      await sm.refreshSeasonStats(guildId, seasonName, (userId) => ({
+      await sm.refreshSeasonStats(guildId, seasonName, (/** @type {string} */ userId) =>
+        /** @type {Record<string, unknown>} */
+        ({
         username: guild.members.cache.get(userId)?.user.username || 'Unknown User',
         balance: em.getUserData(guildId, userId).balance,
         xp: em.getUserData(guildId, userId).xp,
         level: em.getUserData(guildId, userId).level,
         seasonalCoins: em.getUserData(guildId, userId).seasonalCoins,
-        gambling: gsm.getStats(userId),
-      }));
+        gambling: gsm.getStats(/** @type {any} */ (userId)),
+      })
+      );
 
       // Prune inactive players
       await sm.pruneInactivePlayers(guildId, seasonName, cfg.pruneDays || 30);
@@ -209,7 +213,7 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
             messageEdited = true;
             console.log(`✅ Edited existing leaderboard message ${msg.id} for guild ${guildId}`);
           }
-        } catch (error) {
+        } catch (/** @type {any} */ error) {
           console.warn(
             `Could not fetch/edit leaderboard message for guild ${guildId}: ${error.message}`
           );
@@ -218,7 +222,7 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
         // If couldn't edit, create new message
         if (!leaderboardMessage) {
           try {
-            leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+            leaderboardMessage = await channel.send({ embeds: [embeds[0]], components: /** @type {any} */ (components) });
             console.log(
               `✅ Created new leaderboard message ${leaderboardMessage.id} for guild ${guildId}`
             );
@@ -259,7 +263,11 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
   }
 }
 
-function buildLeaderboardPageComponents(guildId, page, totalPages) {
+function buildLeaderboardPageComponents(
+  /** @type {string} */ guildId,
+  /** @type {number} */ page,
+  /** @type {number} */ totalPages
+) {
   const prevPage = Math.max(0, page - 1);
   const nextPage = Math.min(totalPages - 1, page + 1);
   return new ActionRowBuilder().addComponents(

@@ -5,6 +5,7 @@
  * utilities used by the Dashboard class (and each other) but they do not
  * depend on any Dashboard instance state.
  */
+// @ts-check
 
 'use strict';
 
@@ -41,10 +42,11 @@ const {
     applyPreviewTemplate
 } = require('./helpers');
 
-const seasonLeaderboardGames = Array.isArray(seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES)
-    ? seasonLeaderboardManager.SEASON_LEADERBOARD_GAMES
+const seasonLeaderboardGames = /** @type {any} */ (seasonLeaderboardManager).SEASON_LEADERBOARD_GAMES
+    ? /** @type {any} */ (seasonLeaderboardManager).SEASON_LEADERBOARD_GAMES
     : [];
 
+/** @type {Record<string, string>} */
 const DASHBOARD_SECTION_LABELS = {
     settings: 'Server Settings',
     economy: 'Economy',
@@ -65,8 +67,17 @@ const DASHBOARD_SECTION_LABELS = {
     health: 'Bot Health'
 };
 
+/**
+ * @param {string} sectionKey
+ * @returns {string}
+ */
 const getDashboardSectionLabel = (sectionKey) => DASHBOARD_SECTION_LABELS[sectionKey] || sectionKey;
 
+/**
+ * Infer which dashboard section a request path belongs to.
+ * @param {string} requestPath
+ * @returns {string | null}
+ */
 const inferDashboardSectionKey = (requestPath) => {
     const pathValue = String(requestPath || '');
 
@@ -91,6 +102,11 @@ const inferDashboardSectionKey = (requestPath) => {
     return null;
 };
 
+/**
+ * Read the most recent error-log entries from the logs directory.
+ * @param {number} [limit]
+ * @returns {Array<Record<string, any>>}
+ */
 const readRecentErrorEntries = (limit = 20) => {
     try {
         const logsDirectory = path.join(__dirname, '..', 'logs');
@@ -104,6 +120,7 @@ const readRecentErrorEntries = (limit = 20) => {
             .reverse()
             .slice(0, 5);
 
+        /** @type {Array<Record<string, any>>} */
         const entries = [];
         for (const fileName of files) {
             // One corrupt/unreadable log file must not hide every other entry.
@@ -112,13 +129,13 @@ const readRecentErrorEntries = (limit = 20) => {
                 if (Array.isArray(content)) {
                     entries.push(...content);
                 }
-            } catch (fileError) {
+            } catch (/** @type {any} */ fileError) {
                 console.error(`Failed to read error log ${fileName}:`, fileError.message);
             }
         }
 
         return entries
-            .sort((left, right) => new Date(right.timestamp) - new Date(left.timestamp))
+            .sort((/** @type {any} */ left, /** @type {any} */ right) => Number(new Date(right.timestamp)) - Number(new Date(left.timestamp)))
             .slice(0, limit);
     } catch (error) {
         console.error('Failed to read recent error entries:', error);
@@ -126,6 +143,11 @@ const readRecentErrorEntries = (limit = 20) => {
     }
 };
 
+/**
+ * @param {string} guildId
+ * @param {import('discord.js').Client} client
+ * @returns {Promise<Record<string, any>>}
+ */
 const buildServerBackupPayload = async (guildId, client) => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
@@ -159,8 +181,8 @@ const buildServerBackupPayload = async (guildId, client) => {
         },
         moderation: {
             automod: { ...modSettings },
-            modLogChannel,
-            warnings: moderationManager.data?.warnings?.[guildId] || null
+            modLogChannel: /** @type {any} */ (modLogChannel),
+            warnings: (/** @type {any} */ (moderationManager.data?.warnings || {}))[guildId] || null
         },
         logging: {
             channelId: loggingChannel || null
@@ -169,10 +191,10 @@ const buildServerBackupPayload = async (guildId, client) => {
             suggestions: { ...suggestionSettings },
             reactionRoles: Object.entries(reactionRoleManager.data || {})
                 .filter(([key]) => key.startsWith(`${guildId}_`))
-                .reduce((result, [key, value]) => {
+                .reduce((/** @type {Record<string, any>} */ result, [key, value]) => {
                     result[key] = value;
                     return result;
-                }, {}),
+                }, /** @type {Record<string, any>} */ ({})),
             roleMenus: roleMenuManager.getMenus(guildId)
         },
         tickets: {
@@ -199,6 +221,12 @@ const buildServerBackupPayload = async (guildId, client) => {
     };
 };
 
+/**
+ * @param {string} guildId
+ * @param {import('discord.js').Client} client
+ * @param {Record<string, any>} [payload]
+ * @returns {Promise<{ applied: string[] }>}
+ */
 const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) {
@@ -325,6 +353,7 @@ const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
 
     if (payload.alerts?.liveAlerts) {
         const incoming = payload.alerts.liveAlerts;
+        /** @type {{ twitch: any[], youtube: any[] }} */
         const mapped = { twitch: [], youtube: [] };
 
         for (const entry of Array.isArray(incoming.twitch) ? incoming.twitch : []) {
@@ -356,14 +385,21 @@ const restoreServerBackupPayload = async (guildId, client, payload = {}) => {
             });
         }
 
-        liveAlertsManager.data[guildId] = mapped;
-        await liveAlertsManager.save();
+        if (mapped) {
+            /** @type {any} */ (liveAlertsManager.data)[guildId] = mapped;
+            await liveAlertsManager.save();
+        }
         applied.push('Live alerts');
     }
 
     return { applied };
 };
 
+/**
+ * @param {Record<string, any>} [body]
+ * @param {Record<string, any>} [existingConfig]
+ * @returns {Record<string, any>}
+ */
 const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) => {
     const defaultAppearance = typeof seasonLeaderboardManager.getDefaultAppearance === 'function'
         ? seasonLeaderboardManager.getDefaultAppearance()
@@ -421,6 +457,10 @@ const buildSeasonLeaderboardDashboardOptions = (body = {}, existingConfig = {}) 
     };
 };
 
+/**
+ * @param {import('discord.js').EmbedBuilder | Record<string, any> | null} embed
+ * @returns {Record<string, any>}
+ */
 const serializeEmbedPreview = (embed) => {
     const data = typeof embed?.toJSON === 'function' ? embed.toJSON() : (embed || {});
 
@@ -428,7 +468,7 @@ const serializeEmbedPreview = (embed) => {
         title: String(data.title || ''),
         description: String(data.description || ''),
         fields: Array.isArray(data.fields)
-            ? data.fields.map((field) => ({
+            ? data.fields.map((/** @type {any} */ field) => ({
                 name: String(field?.name || ''),
                 value: String(field?.value || ''),
                 inline: Boolean(field?.inline)
@@ -440,6 +480,11 @@ const serializeEmbedPreview = (embed) => {
     };
 };
 
+/**
+ * @param {Record<string, any>} [config]
+ * @param {string} [seasonName]
+ * @returns {import('discord.js').EmbedBuilder[]}
+ */
 const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-season') => {
     const compactMode = Boolean(config.compactMode);
     const intervalMinutes = Number(config.updateIntervalMinutes) || 15;
@@ -470,8 +515,8 @@ const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-seaso
         { medal: '6.', username: 'Astra', value: '19h 18m' }
     ].slice(0, playerCount);
 
-    const leaderboardToDescription = (players) => players
-        .map((player) => `${player.medal} **${player.username}** • **${player.value}**`)
+    const leaderboardToDescription = (/** @type {any[]} */ players) => players
+        .map((/** @type {any} */ player) => `${player.medal} **${player.username}** • **${player.value}**`)
         .join('\n');
 
     const headerEmbed = new EmbedBuilder()
@@ -564,7 +609,7 @@ const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-seaso
     }
 
     const enabledGames = new Set(Array.isArray(appearance.enabledGames) ? appearance.enabledGames : []);
-    const firstGame = seasonLeaderboardGames.find((game) => enabledGames.has(game.key));
+    const firstGame = /** @type {any[]} */ (seasonLeaderboardGames).find((/** @type {any} */ game) => enabledGames.has(game.key));
     if (appearance.showGambling !== false && firstGame) {
         const compactLines = layoutDensity === 'standard'
             ? [
@@ -595,6 +640,12 @@ const buildSampleSeasonPreviewEmbeds = (config = {}, seasonName = 'preview-seaso
     return embeds;
 };
 
+/**
+ * @param {string} guildId
+ * @param {import('discord.js').Client} client
+ * @param {Record<string, any> | null} [configOverride]
+ * @returns {Promise<{ mode: string, currentSeasonName: string | null, embeds: any[] }>}
+ */
 const buildSeasonLeaderboardPreviewPayload = async (guildId, client, configOverride = null) => {
     const currentSeasonName = seasonManager.getCurrentSeason(guildId);
     const previewConfig = configOverride
@@ -621,10 +672,15 @@ const buildSeasonLeaderboardPreviewPayload = async (guildId, client, configOverr
     };
 };
 
+/**
+ * @param {any} client
+ * @param {string} guildId
+ * @returns {Array<Record<string, any>>}
+ */
 const collectDashboardCommands = (client, guildId) => {
     const merged = new Map();
 
-    const upsert = (name, patch) => {
+    const upsert = (/** @type {string} */ name, /** @type {Record<string, any>} */ patch) => {
         const current = merged.get(name) || {
             name,
             description: '',
@@ -673,6 +729,12 @@ const collectDashboardCommands = (client, guildId) => {
         });
 };
 
+/**
+ * @param {string} guildId
+ * @param {number} page
+ * @param {number} totalPages
+ * @returns {import('discord.js').ActionRowBuilder}
+ */
 const buildLeaderboardPageComponents = (guildId, page, totalPages) => {
     const prevPage = Math.max(0, page - 1);
     const nextPage = Math.min(totalPages - 1, page + 1);
@@ -696,6 +758,10 @@ const buildLeaderboardPageComponents = (guildId, page, totalPages) => {
     );
 };
 
+/**
+ * @param {{ guild: any, guildId: string, client: import('discord.js').Client, seasonName: string }} args
+ * @returns {Promise<{ updated: boolean, reason: string, messageId?: string, embedCount?: number, channelId?: string }>}
+ */
 const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, seasonName }) => {
     if (!guild || !guildId || !seasonName) {
         return { updated: false, reason: 'missing-season-or-guild' };
@@ -732,15 +798,15 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
         : [];
     const existingMessageId = seasonLeaderboardManager.getLeaderboardMessage(guildId);
 
-    let leaderboardMessage;
+    let leaderboardMessage = /** @type {any} */ (null);
     try {
-        const message = await seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, existingMessageId);
+        const message = await seasonLeaderboardManager.findLeaderboardMessage(channel, guildId, /** @type {string | null} */ (existingMessageId));
         if (!message) {
             throw new Error('Existing leaderboard message not found');
         }
-        leaderboardMessage = await message.edit({ embeds: [embeds[0]], components });
+        leaderboardMessage = await message.edit({ embeds: [embeds[0]], components: /** @type {any} */ (components) });
     } catch (error) {
-        leaderboardMessage = await channel.send({ embeds: [embeds[0]], components });
+        leaderboardMessage = await channel.send({ embeds: [embeds[0]], components: /** @type {any} */ (components) });
     }
 
     await seasonLeaderboardManager.setLeaderboardMessage(guildId, leaderboardMessage.id);
@@ -754,6 +820,7 @@ const syncDashboardSeasonLeaderboardMessage = async ({ guild, guildId, client, s
 
     return {
         updated: true,
+        reason: 'Leaderboard message synced',
         messageId: leaderboardMessage.id,
         embedCount: embeds.length,
         channelId: channel.id

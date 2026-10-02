@@ -42,7 +42,6 @@ const { SlashCommandBuilder, EmbedBuilder, Colors, StringSelectMenuBuilder, Stri
 const settingsManager = require('../../utils/core/settingsManager');
 const loggingManager = require('../../utils/loggingManager');
 const moderationManager = require('../../utils/moderationManager');
-const welcomeManager = require('../../utils/welcomeMessageManager');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -52,11 +51,25 @@ const COMPONENT_TIMEOUT = 600_000; // 10 minutes of interactivity
 const VIEW_PAGE_SIZE = 8;           // settings rows per page in /setup view
 
 /**
+ * A single setting descriptor from the SETTINGS table below.
+ *
+ * @typedef {{
+ *   key: string;
+ *   kind: 'string' | 'channel' | 'toggle' | 'select' | 'modal-multi';
+ *   label: string;
+ *   hint?: string;
+ *   maxLength?: number;
+ *   minLength?: number;
+ *   choices?: Array<{ label: string; value: string; type?: 'boolean' | 'string' }>;
+ * }} SettingDescriptor
+ */
+
+/**
  * Category identifiers. These map 1:1 to the StringSelectMenu customId suffix
  * and to the switch() in renderCategory(). Add new categories here, then give
  * them a render branch, an inputs list and (if needed) a settings key list.
  *
- * @type {import('discord.js').JSONEncodable<string>[] & string[]}
+ * @type {string[]}
  */
 const CATEGORY_IDS = [
   'general',
@@ -67,7 +80,9 @@ const CATEGORY_IDS = [
   'serverprofile',
 ];
 
-/** Human-readable category names (labels for the picker). */
+/** Human-readable category names (labels for the picker).
+ * @type {Record<string, string>}
+ */
 const CATEGORY_LABELS = {
   general: 'General & Prefixes',
   welcome: 'Welcome',
@@ -138,7 +153,7 @@ const SETTINGS = {
  *
  * @param {string} category
  * @param {string} key
- * @returns {object | undefined}
+ * @returns {SettingDescriptor | undefined}
  */
 function getSetting(category, key) {
   const list = SETTINGS[category] || [];
@@ -199,7 +214,7 @@ function dec(segment) {
 /**
  * Read the current value of a setting from a guild's settings object.
  *
- * @param {object} settings
+ * @param {Record<string, unknown>} settings
  * @param {string} key
  * @returns {unknown}
  */
@@ -237,8 +252,8 @@ function formatValue(value) {
 /**
  * Build a "current value" line for a setting in the view/category embed.
  *
- * @param {object} settings
- * @param {object} setting
+ * @param {Record<string, unknown>} settings
+ * @param {SettingDescriptor} setting
  * @returns {string}
  */
 function valueLine(settings, setting) {
@@ -267,12 +282,13 @@ function toSingleLine(v, fallback = '') {
 /**
  * Build the /setup view embed with pagination.
  *
- * @param {import('discord.js').Guild} guild
- * @param {object} settings
+ * @param {import('discord.js').Guild | null} guild
+ * @param {Record<string, unknown>} settings
  * @param {number} page 0-indexed
  * @returns {{ embed: import('discord.js').EmbedBuilder, page: number, totalPages: number }}
  */
 function buildViewEmbed(guild, settings, page = 0) {
+  const resolvedGuild = /** @type {import('discord.js').Guild} */ (guild);
   const rows = [];
   for (const category of CATEGORY_IDS) {
     for (const setting of SETTINGS[category] || []) {
@@ -286,7 +302,7 @@ function buildViewEmbed(guild, settings, page = 0) {
 
   const embed = new EmbedBuilder()
     .setColor(Colors.Blurple)
-    .setAuthor({ name: 'Server Configuration', iconURL: guild.iconURL({ size: 64 }) ?? undefined })
+    .setAuthor({ name: 'Server Configuration', iconURL: resolvedGuild.iconURL({ size: 64 }) ?? undefined })
     .setTitle('⚙️ /setup view')
     .setDescription('Current server configuration. Use `/setup config` to change values.')
     .setFooter({ text: `Page ${safePage + 1}/${totalPages} · ${rows.length} settings` });
@@ -309,8 +325,8 @@ function buildViewEmbed(guild, settings, page = 0) {
 /**
  * Build the category picker (StringSelectMenu).
  *
- * @param {import('discord.js').Guild} guild
- * @param {object} settings
+ * @param {import('discord.js').Guild | null} guild
+ * @param {Record<string, unknown>} settings
  * @returns {import('discord.js').ActionRowBuilder}
  */
 function buildCategoryPicker(guild, settings) {
@@ -333,11 +349,11 @@ function buildCategoryPicker(guild, settings) {
  * Render a category's interactive view (embed + controls). The customIds are
  * generated with a per-interaction token for the actor checks.
  *
- * @param {import('discord.js').Guild} guild
- * @param {object} settings
+ * @param {import('discord.js').Guild | null} guild
+ * @param {Record<string, unknown>} settings
  * @param {string} category
  * @param {string} token
- * @returns {{ embed: import('discord.js').EmbedBuilder, components: import('discord.js').ActionRowBuilder[] }}
+ * @returns {{ embed: import('discord.js').EmbedBuilder, components: any[] }}
  */
 function renderCategory(guild, settings, category, token) {
   const cat = dec(category);
@@ -404,18 +420,19 @@ function renderCategory(guild, settings, category, token) {
 /**
  * Build a channel-select ActionRow for a channel setting.
  *
- * @param {import('discord.js').Guild} guild
+ * @param {import('discord.js').Guild | null} guild
  * @param {string} category
  * @param {string} key
  * @param {string} token
  * @returns {import('discord.js').ActionRowBuilder}
  */
 function buildChannelPicker(guild, category, key, token) {
+  const resolvedGuild = /** @type {import('discord.js').Guild} */ (guild);
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`setup:channel:${enc(category)}:${token}`)
     .setPlaceholder(`Choose a ${key} channel…`)
     .addOptions(
-      guild.channels.cache
+      resolvedGuild.channels.cache
         .filter((c) => c.type === ChannelType.GuildText)
         .sort((a, b) => a.position - b.position)
         .first(25)
@@ -433,7 +450,7 @@ function buildChannelPicker(guild, category, key, token) {
  *
  * @param {string} customId
  * @param {string} title
- * @param {object} setting
+ * @param {SettingDescriptor} setting
  * @param {unknown} current
  * @returns {import('discord.js').ModalBuilder}
  */
@@ -453,7 +470,7 @@ function buildTextModal(customId, title, setting, current) {
   return new ModalBuilder()
     .setCustomId(customId)
     .setTitle(title.slice(0, 45))
-    .addComponents(new ActionRowBuilder().addComponents(input));
+    .addComponents(/** @type {any} */ (new ActionRowBuilder().addComponents(input)));
 }
 
 /**
@@ -479,7 +496,7 @@ function buildToggleRow(category, key, current, token) {
  * Dispatch a "select a setting" interaction.
  *
  * @param {import('discord.js').SelectMenuInteraction} interaction
- * @param {object} settings
+ * @param {Record<string, unknown>} settings
  * @param {string} category
  * @param {string} token
  * @returns {Promise<void>}
@@ -501,8 +518,8 @@ async function handleCategorySelect(interaction, settings, category, token) {
 /**
  * Persist a string value for a setting (with validation) and confirm.
  *
- * @param {import('discord.js').Interaction} interaction
- * @param {object} settings
+ * @param {import('discord.js').CommandInteraction} interaction
+ * @param {Record<string, unknown>} settings
  * @param {string} category
  * @param {string} key
  * @param {unknown} value
@@ -547,12 +564,40 @@ async function saveString(interaction, settings, category, key, value, labelOver
   settingsManager.set(interaction.guildId, key, value);
 
   // Sync multi-value keys to the typed managers the dashboard uses.
-  if (key === 'welcomeChannel') {
-    await welcomeManager.setWelcomeChannel(interaction.guildId, String(value));
-  } else if (key === 'welcomeMessage') {
-    await welcomeManager.setWelcomeMessage(interaction.guildId, String(value));
-  } else if (key === 'welcomeEnabled') {
-    await welcomeManager.setWelcomeEnabled(interaction.guildId, Boolean(value));
+  if (key === 'welcomeChannel' || key === 'welcomeMessage' || key === 'welcomeEnabled') {
+    /**
+     * @type {import('../../utils/welcomeMessageManager') | undefined}
+     */
+    const welcomeManager = /** @type {any} */ (interaction.client)?.welcomeMessageManager;
+    const guildId = /** @type {string} */ (interaction.guildId);
+    const existing = /** @type {Record<string, unknown>} */ (
+      welcomeManager ? welcomeManager.getWelcomeConfig(guildId) : {}
+    );
+    const normalized = normalizeValues(settingsManager.get(guildId));
+    welcomeManager?.setWelcomeConfig(guildId, {
+      enabled:
+        key === 'welcomeEnabled'
+          ? Boolean(value)
+          : existing.enabled !== undefined
+            ? existing.enabled
+            : normalized.welcomeEnabled !== undefined
+              ? Boolean(normalized.welcomeEnabled)
+              : true,
+      channelId:
+        key === 'welcomeChannel'
+          ? String(value ?? '')
+          : String(existing.channelId || normalized.welcomeChannel || '') || null,
+      title: String(existing.title ?? ''),
+      description:
+        key === 'welcomeMessage'
+          ? String(value)
+          : String(existing.description || normalized.welcomeMessage || 'Welcome {USER}, enjoy your stay!'),
+      color: existing.color || '#0099ff',
+      includeAvatar: existing.includeAvatar !== undefined ? existing.includeAvatar : true,
+      includeCount: existing.includeCount !== undefined ? existing.includeCount : true,
+      dm: existing.dm !== undefined ? existing.dm : false,
+      dmMessage: existing.dmMessage,
+    });
   } else if (key === 'loggingChannel') {
     await loggingManager.setLoggingChannel(interaction.guildId, String(value));
   } else if (key === 'modLogChannel') {
@@ -607,7 +652,7 @@ module.exports = {
       return;
     }
 
-    const member = interaction.member;
+    const member = /** @type {import('discord.js').GuildMember | null} */ (interaction.member);
     if (!member || !member.permissions.has('ManageGuild')) {
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('No permission').setDescription('You need the **Manage Server** permission to use this command.')],
@@ -616,7 +661,7 @@ module.exports = {
       return;
     }
 
-    const subcommand = interaction.options.getSubcommand();
+    const subcommand = /** @type {any} */ (interaction).options.getSubcommand();
     const settings = settingsManager.get(interaction.guildId);
     const token = Math.random().toString(36).slice(2, 10); // per-invocation actor token
 
@@ -628,10 +673,11 @@ module.exports = {
         new ButtonBuilder().setCustomId(`setup:view-done:${token}`).setLabel('Close').setStyle(ButtonStyle.Danger)
       );
 
-      await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
+      await interaction.reply({ embeds: [embed], components: /** @type {any} */ ([row]), ephemeral: true });
 
       // Pagination handler
       try {
+        // @ts-expect-error — component interaction filter callback typing is loose in discord.js v14
         const filter = (i) => {
           if (i.customId !== `setup:pagination:${token}:prev` && i.customId !== `setup:pagination:${token}:next`) return false;
           return i.user.id === interaction.user.id;
@@ -645,7 +691,7 @@ module.exports = {
         while (true) {
           // Wait for next interaction
           const collected = await Promise.race([
-            interaction.channel.awaitMessageComponent({
+            /** @type {any} */ (interaction.channel).awaitMessageComponent({
               filter,
               time: COMPONENT_TIMEOUT,
               componentType: 2, // Button
@@ -681,14 +727,14 @@ module.exports = {
       );
 
       await interaction.reply({
-        embeds: [new EmbedBuilder().setColor(Colors.Danger).setTitle('Reset server configuration?').setDescription('This restores **all** settings to their defaults. This cannot be undone.')],
-        components: [row],
+        embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Reset server configuration?').setDescription('This restores **all** settings to their defaults. This cannot be undone.')],
+        components: /** @type {any} */ ([row]),
         ephemeral: true,
       });
 
       try {
-        const confirm = await interaction.channel.awaitMessageComponent({
-          filter: (i) => (i.customId === `setup:reset-confirm:${token}` || i.customId === `setup:reset-cancel:${token}`) && i.user.id === interaction.user.id,
+        const confirm = await /** @type {any} */ (interaction.channel).awaitMessageComponent({
+          filter: (/** @type {any} */ i) => (i.customId === `setup:reset-confirm:${token}` || i.customId === `setup:reset-cancel:${token}`) && i.user.id === interaction.user.id,
           time: COMPONENT_TIMEOUT,
         });
         if (confirm.customId.startsWith('setup:reset-confirm')) {
@@ -699,14 +745,14 @@ module.exports = {
           });
         } else {
           await confirm.update({
-            embeds: [new EmbedBuilder().setColor(Colors.Secondary).setTitle('Reset cancelled').setDescription('No changes were made.')],
+            embeds: [new EmbedBuilder().setColor(Colors.Grey).setTitle('Reset cancelled').setDescription('No changes were made.')],
             components: [],
           });
         }
       } catch {
         // timeout
         await interaction.editReply({
-          embeds: [new EmbedBuilder().setColor(Colors.Secondary).setTitle('Reset cancelled').setDescription('Timed out — no changes were made.')],
+          embeds: [new EmbedBuilder().setColor(Colors.Grey).setTitle('Reset cancelled').setDescription('Timed out — no changes were made.')],
           components: [],
         });
       }
@@ -724,17 +770,17 @@ module.exports = {
 
     await interaction.reply({
       embeds: [pickerEmbed2],
-      components: [buildCategoryPicker(interaction.guild, settings)],
+      components: /** @type {any} */ ([buildCategoryPicker(interaction.guild, settings)]),
       ephemeral: true,
     });
 
     try {
-      const select = await interaction.channel.awaitMessageComponent({
-        filter: (i) => i.customId === 'setup:select:__category__:token' && i.user.id === interaction.user.id,
+      const select = await /** @type {any} */ (interaction.channel).awaitMessageComponent({
+        filter: (/** @type {any} */ i) => i.customId === 'setup:select:__category__:token' && i.user.id === interaction.user.id,
         time: COMPONENT_TIMEOUT,
       });
 
-      const category = String(select.values[0]);
+      const category = String(/** @type {any} */ (select).values[0]);
       const { embed: catEmbed, components: catComponents } = renderCategory(interaction.guild, settings, category, token);
 
       await select.update({ embeds: [catEmbed], components: catComponents });
@@ -743,7 +789,7 @@ module.exports = {
       await handleCategoryActions(interaction, settings, category, token, client);
     } catch (err) {
       await interaction.editReply({
-        embeds: [new EmbedBuilder().setColor(Colors.Secondary).setTitle('Setup closed').setDescription('Setup timed out or was closed. Run `/setup config` again to continue.')],
+        embeds: [new EmbedBuilder().setColor(Colors.Grey).setTitle('Setup closed').setDescription('Setup timed out or was closed. Run `/setup config` again to continue.')],
         components: [],
       }).catch(() => {});
     }
@@ -754,7 +800,7 @@ module.exports = {
  * Drive the per-category action loop (buttons, toggles, channel picks).
  *
  * @param {import('discord.js').CommandInteraction} interaction
- * @param {object} settings
+ * @param {Record<string, unknown>} settings
  * @param {string} category
  * @param {string} token
  * @param {import('discord.js').Client} client
@@ -766,8 +812,8 @@ async function handleCategoryActions(interaction, settings, category, token, cli
 
   while (true) {
     const collected = await Promise.race([
-      interaction.channel.awaitMessageComponent({
-        filter: (i) => i.customId.startsWith(`setup:`) && i.user.id === interaction.user.id,
+      /** @type {any} */ (interaction.channel).awaitMessageComponent({
+        filter: (/** @type {any} */ i) => i.customId.startsWith(`setup:`) && i.user.id === interaction.user.id,
         time: COMPONENT_TIMEOUT,
       }),
       new Promise((resolve) => setTimeout(() => resolve(null), COMPONENT_TIMEOUT)),
@@ -806,7 +852,7 @@ async function handleCategoryActions(interaction, settings, category, token, cli
         });
       } else {
         await collected.update({
-          embeds: [new EmbedBuilder().setColor(Colors.Secondary).setTitle('Reset cancelled').setDescription('No changes were made.')],
+          embeds: [new EmbedBuilder().setColor(Colors.Grey).setTitle('Reset cancelled').setDescription('No changes were made.')],
           components: [],
         });
       }
@@ -902,7 +948,7 @@ async function handleCategoryActions(interaction, settings, category, token, cli
     // modal-cancel
     if (parts[1] === 'modal-cancel') {
       await collected.update({
-        embeds: [new EmbedBuilder().setColor(Colors.Secondary).setTitle('Cancelled').setDescription('No changes made.')],
+        embeds: [new EmbedBuilder().setColor(Colors.Grey).setTitle('Cancelled').setDescription('No changes made.')],
         components: [],
       });
       return;
