@@ -4,6 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ComponentType,
+  MessageFlags,
 } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 const gameStatsManager = require('../../utils/gameStatsManager');
@@ -502,7 +503,7 @@ async function playBlackjackWithBet(message, bet) {
       if (userVerify.balance < bet) {
         await interaction.reply({
           content: '❌ Not enough coins to double down!',
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -587,7 +588,7 @@ async function playBlackjackWithBet(message, bet) {
     } else if (interaction.customId === 'bj_split') {
       const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
       if (userVerify.balance < bet) {
-        await interaction.reply({ content: '❌ Not enough coins to split!', ephemeral: true });
+        await interaction.reply({ content: '❌ Not enough coins to split!', flags: MessageFlags.Ephemeral });
         return;
       }
       await economyManager.removeMoney(message.guild.id, message.author.id, bet);

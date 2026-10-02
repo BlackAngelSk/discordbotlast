@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { fetch } = require('undici');
 
 // Share the same cache as the prefix command if loaded in the same process
@@ -97,7 +97,7 @@ module.exports = {
         .setColor('#ed4245')
         .setTitle('❌ Invalid Currency Code')
         .setDescription('Currency codes must be 3-letter ISO codes (e.g., USD, EUR, GBP).');
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     if (from === to) {
@@ -105,7 +105,7 @@ module.exports = {
         .setColor('#ed4245')
         .setTitle('❌ Same Currency')
         .setDescription('Source and target currencies must be different.');
-      return interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }
 
     await interaction.deferReply();

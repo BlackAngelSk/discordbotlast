@@ -34,7 +34,7 @@
  * actor is the invoking user via an interaction token.
  */
 
-const { SlashCommandBuilder, EmbedBuilder, Colors, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, Colors, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags } = require('discord.js');
 
 // ---------------------------------------------------------------------------
 // Manager imports (the dashboard's own config surface — keep these in sync).
@@ -649,7 +649,7 @@ module.exports = {
     if (!interaction.inGuild() || !interaction.guildId) {
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Guild only').setDescription('This command can only be used inside a server.')],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -658,7 +658,7 @@ module.exports = {
     if (!member || !member.permissions.has('ManageGuild')) {
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('No permission').setDescription('You need the **Manage Server** permission to use this command.')],
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -675,7 +675,7 @@ module.exports = {
         new ButtonBuilder().setCustomId(`setup:view-done:${token}`).setLabel('Close').setStyle(ButtonStyle.Danger)
       );
 
-      await interaction.reply({ embeds: [embed], components: /** @type {any} */ ([row]), ephemeral: true });
+      await interaction.reply({ embeds: [embed], components: /** @type {any} */ ([row]), flags: MessageFlags.Ephemeral });
 
       // Pagination handler
       try {
@@ -731,7 +731,7 @@ module.exports = {
       await interaction.reply({
         embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Reset server configuration?').setDescription('This restores **all** settings to their defaults. This cannot be undone.')],
         components: /** @type {any} */ ([row]),
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
 
       try {
@@ -773,7 +773,7 @@ module.exports = {
     await interaction.reply({
       embeds: [pickerEmbed2],
       components: /** @type {any} */ ([buildCategoryPicker(interaction.guild, settings)]),
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
 
     try {
@@ -937,7 +937,7 @@ async function handleCategoryActions(interaction, settings, category, token, cli
       const value = collected.fields.getTextInputValue('value');
       const setting = list.find((s) => s.kind === 'modal-multi' || s.kind === 'string');
       if (!setting) {
-        await collected.reply({ embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription('Setting not found.')], components: [], ephemeral: true });
+        await collected.reply({ embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription('Setting not found.')], components: [], flags: MessageFlags.Ephemeral });
         return;
       }
       const ok = await saveString(collected, settings, cat, setting.key, value);
