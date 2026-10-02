@@ -21,6 +21,29 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+# Resolve a node binary that actually runs. A broken system node (e.g. a
+# partial-upgrade libsimdjson ABI mismatch) can make `command -v node` succeed
+# while launching it fails. Fall back to a known-good node on the machine.
+NODE_BIN="$(command -v node)"
+if ! "$NODE_BIN" -v >/dev/null 2>&1; then
+  echo "Warning: $NODE_BIN won't run (broken ABI?). Trying alternates..." >&2
+  for candidate in \
+    "$HOME/.hermes/tools"/*/bin/node \
+    "$HOME/.local/share/fnm"/*/installation/bin/node \
+    "$HOME/.nvm/versions/node"/*/bin/node \
+    /usr/local/bin/node; do
+    if [ -x "$candidate" ] && "$candidate" -v >/dev/null 2>&1; then
+      NODE_BIN="$candidate"
+      echo "Using $NODE_BIN ($("$NODE_BIN" -v))." >&2
+      break
+    fi
+  done
+fi
+if ! "$NODE_BIN" -v >/dev/null 2>&1; then
+  echo "No working node found. Fix /usr/bin/node: sudo pacman -S nodejs" >&2
+  exit 1
+fi
+
 if [ ! -d node_modules ]; then
   echo "Installing npm dependencies..."
   npm install
@@ -32,7 +55,7 @@ case "${1:-}" in
       echo "Bot already running (PID $(cat bot.pid))."
       exit 0
     fi
-    nohup node --no-deprecation index.js > bot.log 2>&1 &
+    nohup "$NODE_BIN" --no-deprecation index.js > bot.log 2>&1 &
     echo $! > bot.pid
     echo "Bot started in background — PID $(cat bot.pid), logs -> bot.log"
     ;;
@@ -58,6 +81,6 @@ case "${1:-}" in
     ;;
   *)
     echo "Starting bot in foreground (Ctrl-C to stop)..."
-    exec node --no-deprecation index.js
+    exec "$NODE_BIN" --no-deprecation index.js
     ;;
 esac
