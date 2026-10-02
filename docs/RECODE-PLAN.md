@@ -11,10 +11,16 @@ Gradual modernization, done in small verified phases. Each phase must leave
   redundant but harmless; revisit later), `ejs` (dashboard view engine),
   `cloudscraper` (used once — candidate for removal in a later phase).
 
-## Phase 2 — Music stack consolidation
-- Current: `play-dl` (4 files) + `ytsr` (2 files) + `@distube/yt-dlp` (1 file).
-- Goal: single retrieval path (likely `@distube/yt-dlp`), drop `ytsr`
-  (unmaintained) and `cloudscraper`.
+## Phase 2 — Music stack consolidation ✅
+- Single retrieval path: `utils/music/youtubeSearch.js` now resolves search,
+  video info, playlists and SoundCloud **all through yt-dlp** (removed the ytsr
+  fallback and the play-dl scrapers).
+- Dropped deps: `ytsr`, `play-dl`. `cloudscraper` was replaced with an undici
+  retry in `utils/steam/steamFreeGamesAlertsManager.js`.
+- Also committed the in-Discord `/setup` command (slashCommands/admin/setup.js)
+  that was pending from earlier work; it now requires the correct
+  `utils/moderationManager` path.
+- Verified: build OK (419 files), tests 15/15, live yt-dlp smoke test.
 
 ## Phase 3 — ES module migration (incremental)
 - Node ≥22 supports `require(esm)`, so leaf modules can convert file-by-file
