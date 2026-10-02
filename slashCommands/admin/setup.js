@@ -624,7 +624,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('setup')
     .setDescription('Configure this server from inside Discord.')
-    .setDefaultMemberPermissions('0x8') // ManageGuild (0x0000000000000020 = 32; 0x8 is admin — see below)
+    // Administrator permission (0x8). setDefaultMemberPermissions takes a bigint
+    // bitfield — passing the string '0x8' throws at load; use the bigint value.
+    .setDefaultMemberPermissions(0x8n)
     .addSubcommand((sub) =>
       sub
         .setName('view')
