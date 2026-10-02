@@ -234,7 +234,15 @@ test('Module source has createGenericWebFetcher factory', () => {
     source.includes('function createGenericWebFetcher'),
     'Should define createGenericWebFetcher'
   );
-  assert.ok(source.includes('function decodeEntities'), 'Should define decodeEntities');
+  // decodeEntities moved to steamUpdateUtils.js during the Phase 4 split.
+  const utilsSource = fs.readFileSync(
+    path.join(__dirname, '..', 'utils', 'steam', 'steamUpdateUtils.js'),
+    'utf8'
+  );
+  assert.ok(
+    utilsSource.includes('function decodeEntities') || source.includes('function decodeEntities'),
+    'Should define decodeEntities'
+  );
 });
 
 test('Module source embed builder uses fields for version and date', () => {
