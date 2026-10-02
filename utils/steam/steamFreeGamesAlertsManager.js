@@ -475,22 +475,24 @@ async function steamDbGetTextWithBypass(url) {
   const html = await steamHttpsGetText(url);
   if (!steamDbLooksBlocked(html)) return html;
 
-  // Fallback for Cloudflare challenges when direct HTTPS fetch returns anti-bot HTML.
+  // Fallback retry when direct HTTPS fetch returns anti-bot HTML.
+  // cloudscraper was removed (deprecated, dead) — retry through undici with
+  // browser-like headers instead; a modern Cloudflare challenge defeats both,
+  // so on failure we keep the original response just like before.
   try {
-    const cloudscraper = require('cloudscraper');
-    const response = await cloudscraper.get({
-      uri: url,
-      gzip: true,
+    const { fetch } = require('undici');
+    const response = await fetch(url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
         ...(STEAMDB_COOKIE ? { Cookie: STEAMDB_COOKIE } : {}),
       },
-      timeout: 15000,
+      signal: AbortSignal.timeout(15000),
     });
 
-    return String(response || '');
+    return await response.text();
   } catch {
     return html;
   }

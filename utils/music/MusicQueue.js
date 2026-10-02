@@ -631,23 +631,21 @@ class MusicQueue {
     if (!this.currentSong || !this.currentSong.url) return;
 
     try {
-      const ytsr = require('ytsr');
-      // Search for related content based on current song title
-      const searchResults = await ytsr(this.currentSong.title, { limit: 5 });
-      const videos = searchResults.items.filter((item) => item.type === 'video');
+      // Autoplay — search a related track by the current song's title.
+      const { searchYouTube } = require('./youtubeSearch');
+      const related = await searchYouTube(this.currentSong.title, { limit: 5 });
 
       // Get a random video from results (not the same as current)
-      const relatedVideos = videos.filter((v) => v.url !== this.currentSong.url);
+      const relatedVideos = related.filter((v) => v.url !== this.currentSong.url);
       if (relatedVideos.length === 0) return;
 
       const randomVideo = relatedVideos[Math.floor(Math.random() * relatedVideos.length)];
-      const { parseDuration } = require('../core/helpers');
 
       const song = {
         title: randomVideo.title,
         url: randomVideo.url,
-        duration: randomVideo.duration ? parseDuration(randomVideo.duration) : 0,
-        thumbnail: randomVideo.bestThumbnail?.url,
+        duration: randomVideo.durationInSec || 0,
+        thumbnail: randomVideo.thumbnails?.[0]?.url,
         requester: 'Autoplay',
       };
 

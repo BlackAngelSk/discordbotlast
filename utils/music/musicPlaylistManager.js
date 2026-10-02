@@ -5,7 +5,6 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const play = require('play-dl');
 
 class MusicPlaylistManager {
   constructor() {

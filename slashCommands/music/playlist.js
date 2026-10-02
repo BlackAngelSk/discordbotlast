@@ -5,10 +5,9 @@
 
 const { SlashCommandBuilder } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
-const play = require('play-dl');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
-const { searchYouTube } = require('../../utils/youtubeSearch');
+const { searchYouTube, getVideoInfo, validateYoutubeUrl } = require('../../utils/youtubeSearch');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -384,9 +383,9 @@ module.exports = {
 async function resolveSongFromQuery(query, requesterTag) {
   try {
     const isYoutubeUrl = query.includes('youtube.com') || query.includes('youtu.be');
-    if (isYoutubeUrl && play.yt_validate(query) === 'video') {
-      const info = await play.video_info(query);
-      const video = info.video_details;
+    if (isYoutubeUrl && validateYoutubeUrl(query) === 'video') {
+      const video = await getVideoInfo(query);
+      if (!video) return null;
 
       return {
         title: video.title,

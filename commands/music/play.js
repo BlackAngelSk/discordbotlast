@@ -1,12 +1,11 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
-const play = require('play-dl');
+const { joinVoiceChannel } = require('@discordjs/voice');
 const https = require('https');
 const MusicQueue = require('../../utils/MusicQueue');
 const queues = require('../../utils/queues');
 const achievementManager = require('../../utils/achievementManager');
-const { searchYouTube } = require('../../utils/youtubeSearch');
-const { parseDuration, formatDuration } = require('../../utils/helpers');
+const { searchYouTube, getVideoInfo, getPlaylistInfo } = require('../../utils/youtubeSearch');
+const { formatDuration } = require('../../utils/helpers');
 
 module.exports = {
   name: 'play',
@@ -126,11 +125,11 @@ module.exports = {
       }
 
       if (isUrl && isPlaylist) {
-        // Handle playlist with play-dl
+        // Handle playlist with yt-dlp
         try {
           let playlistInfo;
           try {
-            playlistInfo = await play.playlist_info(query, { incomplete: true });
+            playlistInfo = await getPlaylistInfo(query, 50);
           } catch (playlistErr) {
             const isLayoutChange =
               playlistErr.message &&
@@ -148,18 +147,11 @@ module.exports = {
             throw playlistErr;
           }
 
-          if (!playlistInfo) {
+          if (!playlistInfo || playlistInfo.entries.length === 0) {
             return message.reply('❌ Could not fetch playlist information!');
           }
 
-          let videos;
-          try {
-            videos = await playlistInfo.all_videos();
-          } catch (videosErr) {
-            return message.reply(
-              '❌ Failed to load playlist videos. Try a direct video link instead.'
-            );
-          }
+          const videos = playlistInfo.entries;
 
           if (videos.length === 0) {
             return message.reply('❌ No videos found in playlist!');
@@ -257,37 +249,15 @@ module.exports = {
       }
 
       if (isUrl) {
-        // Validate YouTube URL with play-dl
-        const isValid = play.yt_validate(query);
-        if (isValid === 'video') {
-          videoUrl = query;
-          try {
-            const info = await play.video_info(query);
-            const video = info.video_details;
-            songInfo = {
-              title: video.title,
-              duration: video.durationInSec || 0,
-              thumbnail: video.thumbnails?.[0]?.url,
-            };
-          } catch (videoError) {
-            console.error('Error getting video info:', videoError);
-
-            // Handle age-restricted content
-            if (videoError.message && videoError.message.includes('Sign in to confirm your age')) {
-              return message.reply(
-                '❌ This video is age-restricted and cannot be played through this bot. Please provide a different video.'
-              );
-            }
-
-            // Handle other video errors
-            if (videoError.message && videoError.message.includes('This video is unavailable')) {
-              return message.reply(
-                '❌ This video is unavailable (may be deleted or region-locked).'
-              );
-            }
-
-            throw videoError;
-          }
+        // Validate YouTube URL via yt-dlp
+        const video = await getVideoInfo(query);
+        if (video) {
+          videoUrl = video.url;
+          songInfo = {
+            title: video.title,
+            duration: video.durationInSec || 0,
+            thumbnail: video.thumbnails?.[0]?.url,
+          };
         } else {
           return message.reply('❌ Invalid YouTube URL!');
         }

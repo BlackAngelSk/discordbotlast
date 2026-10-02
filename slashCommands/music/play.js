@@ -6,13 +6,17 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
-const play = require('play-dl');
 const https = require('https');
 const queues = require('../../utils/queues');
 const MusicQueue = require('../../utils/MusicQueue');
 const achievementManager = require('../../utils/achievementManager');
-const { searchYouTube } = require('../../utils/youtubeSearch');
-const { parseDuration } = require('../../utils/helpers');
+const {
+  searchYouTube,
+  getVideoInfo,
+  getPlaylistInfo,
+  validateYoutubeUrl,
+  isSoundCloudUrl,
+} = require('../../utils/youtubeSearch');
 
 const createMusicControls = (disabled = false) => {
   const row1 = new ActionRowBuilder().addComponents(
@@ -171,14 +175,17 @@ module.exports = {
 
 async function handleYouTubeVideo(url, queue, interaction) {
   try {
-    const isValid = play.yt_validate(url);
+    const isValid = validateYoutubeUrl(url);
     if (isValid !== 'video') {
       await interaction.editReply('❌ Invalid YouTube video URL!');
       return;
     }
 
-    const info = await play.video_info(url);
-    const video = info.video_details;
+    const video = await getVideoInfo(url);
+    if (!video) {
+      await interaction.editReply('❌ Could not fetch video information!');
+      return;
+    }
 
     const song = {
       title: video.title,
@@ -238,11 +245,11 @@ async function handleYouTubePlaylist(url, queue, interaction) {
 
   let playlistInfo;
   try {
-    playlistInfo = await play.playlist_info(url, { incomplete: true });
+    playlistInfo = await getPlaylistInfo(url, 50);
   } catch (err) {
-    console.error('play-dl playlist_info error:', err.message);
+    console.error('yt-dlp playlist extraction error:', err.message);
     await interaction.editReply(
-      "❌ YouTube playlists are currently unavailable due to layout changes on YouTube's side.\n\n" +
+      "❌ YouTube playlists are currently unavailable due to changes on YouTube's side.\n\n" +
         'Try one of these instead:\n' +
         '• Use a direct YouTube video link\n' +
         '• Search by song name\n' +
@@ -251,22 +258,12 @@ async function handleYouTubePlaylist(url, queue, interaction) {
     return;
   }
 
-  if (!playlistInfo) {
+  if (!playlistInfo || playlistInfo.entries.length === 0) {
     await interaction.editReply('❌ Could not fetch playlist information!');
     return;
   }
 
-  let videos;
-  try {
-    videos = await playlistInfo.all_videos();
-  } catch (err) {
-    console.error('play-dl all_videos error:', err.message);
-    await interaction.editReply(
-      '❌ Failed to load playlist videos. YouTube may have changed its layout. Try a direct video link instead.'
-    );
-    return;
-  }
-
+  const videos = playlistInfo.entries;
   const maxSongs = Math.min(videos.length, 50);
 
   for (let i = 0; i < maxSongs; i++) {
@@ -375,18 +372,20 @@ async function handleSpotify(url, queue, interaction) {
 
 async function handleSoundCloud(url, queue, interaction) {
   try {
-    const isValid = play.so_validate(url);
-    if (!isValid) {
+    if (!isSoundCloudUrl(url)) {
       return interaction.editReply('❌ Invalid SoundCloud URL!');
     }
 
-    const info = await play.soundcloud(url);
+    const info = await getVideoInfo(url);
+    if (!info) {
+      return interaction.editReply('❌ Could not fetch SoundCloud track!');
+    }
 
     const song = {
-      title: info.name,
+      title: info.title,
       url: info.url,
       duration: info.durationInSec,
-      thumbnail: info.thumbnail,
+      thumbnail: info.thumbnails?.[0]?.url,
       requester: interaction.user.tag,
     };
 
