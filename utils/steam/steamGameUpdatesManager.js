@@ -3,7 +3,7 @@ const path = require('path');
 const https = require('https');
 const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('../core/discordFetch');
-const { toDateObject, toEpochMs } = require('../core/helpers');
+const { toDateObject, toEpochMs } = require('../core/helpers.mjs');
 const settingsManager = require('../core/settingsManager');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'steamGameUpdates.json');

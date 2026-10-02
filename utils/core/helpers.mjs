@@ -1,5 +1,5 @@
 // Helper function to parse duration from string (e.g., "3:45" to seconds)
-function parseDuration(duration) {
+export function parseDuration(duration) {
   const parts = duration.split(':').map(Number);
   if (parts.length === 2) {
     return parts[0] * 60 + parts[1]; // MM:SS
@@ -10,7 +10,7 @@ function parseDuration(duration) {
 }
 
 // Helper function to format duration
-function formatDuration(seconds) {
+export function formatDuration(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
@@ -22,7 +22,7 @@ function formatDuration(seconds) {
 }
 
 // Helper function to format large numbers (K/M/B/T/Q)
-function formatNumber(num) {
+export function formatNumber(num) {
   if (typeof num !== 'number' || num < 0) return '0';
 
   const tiers = [
@@ -45,7 +45,7 @@ function formatNumber(num) {
   return num.toString();
 }
 
-function parseFlexibleDate(value) {
+export function parseFlexibleDate(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value;
   }
@@ -71,7 +71,7 @@ function parseFlexibleDate(value) {
   return null;
 }
 
-function toDateObject(value, fallback = Date.now()) {
+export function toDateObject(value, fallback = Date.now()) {
   const parsed = parseFlexibleDate(value);
   if (parsed) return parsed;
 
@@ -79,21 +79,11 @@ function toDateObject(value, fallback = Date.now()) {
   return fallbackDate || new Date();
 }
 
-function toEpochMs(value, fallback = 0) {
+export function toEpochMs(value, fallback = 0) {
   return toDateObject(value, fallback).getTime();
 }
 
-function formatDateLabel(value, { fallbackLabel = 'Not available', locale, formatOptions } = {}) {
+export function formatDateLabel(value, { fallbackLabel = 'Not available', locale, formatOptions } = {}) {
   const parsed = parseFlexibleDate(value);
   return parsed ? parsed.toLocaleString(locale, formatOptions) : fallbackLabel;
 }
-
-module.exports = {
-  parseDuration,
-  formatDuration,
-  formatNumber,
-  parseFlexibleDate,
-  toDateObject,
-  toEpochMs,
-  formatDateLabel,
-};

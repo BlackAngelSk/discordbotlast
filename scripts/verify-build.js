@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { spawnSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -46,7 +47,7 @@ function walk(dir, out = []) {
       // `_`-prefixed dirs hold disabled/archived code and are not shipped.
       if (entry.name.startsWith('_')) continue;
       walk(full, out);
-    } else if (entry.name.endsWith('.js')) {
+    } else if (entry.name.endsWith('.js') || entry.name.endsWith('.mjs')) {
       out.push(full);
     }
   }
@@ -79,6 +80,17 @@ const files = [
 for (const file of files) {
   checkedFiles++;
   const source = fs.readFileSync(file, 'utf8');
+
+  if (file.endsWith('.mjs')) {
+    // ESM syntax cannot be parsed by vm.Script; `node --check` parses without
+    // executing the module.
+    const check = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+    if (check.status !== 0) {
+      failures.push(`${path.relative(ROOT, file)}: ${(check.stderr || '').trim().split('\n').pop()}`);
+    }
+    continue;
+  }
+
   try {
     // Parse only — never execute, so no DB connections or timers are started.
     new vm.Script(source, { filename: file });
@@ -87,8 +99,9 @@ for (const file of files) {
   }
 }
 
-// ── 3. Every relative require resolves ──────────────────────────────────────
-const REQUIRE_RE = /require\(\s*['"](\.[^'"]+)['"]\s*\)/g;
+// ── 3. Every relative require/import resolves ───────────────────────────────
+const REQUIRE_RE = /(?:require\(\s*['"]|import\s*['"]|import\s+[^'"]*?\s+from\s*['"])(\.[^'"]+)['"]/g;
+const RESOLVE_EXTS = ['.js', '.json', '.mjs', '.node'];
 
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
@@ -99,7 +112,11 @@ for (const file of files) {
     checkedRequires++;
     const spec = match[1];
     const base = path.resolve(dir, spec);
-    const candidates = [base, `${base}.js`, `${base}.json`, path.join(base, 'index.js')];
+    const candidates = [
+      base,
+      ...RESOLVE_EXTS.map((ext) => `${base}${ext}`),
+      path.join(base, 'index.js'),
+    ];
 
     if (!candidates.some((c) => fs.existsSync(c))) {
       failures.push(`${path.relative(ROOT, file)}: cannot resolve require('${spec}')`);
