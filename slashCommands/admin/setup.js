@@ -473,6 +473,30 @@ function renderCategory(guild, category, token) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Acknowledge a component/modal interaction and render the given payload.
+ * Component & modal interactions must be acked with update() (repo's editReply
+ * throws InteractionNotReplied on a fresh, un-deferred interaction -> Discord
+ * times out with "did not respond"). Slash-command interactions use editReply.
+ *
+ * @param {any} interaction
+ * @param {any} payload
+ * @returns {Promise<void>}
+ */
+async function safeAck(interaction, payload) {
+  try {
+    if (interaction.isModalSubmit && interaction.isModalSubmit()) {
+      await interaction.update(payload);
+    } else if (interaction.isMessageComponent && interaction.isMessageComponent()) {
+      await interaction.update(payload);
+    } else {
+      await interaction.editReply(payload);
+    }
+  } catch (e) {
+    console.error('[setup] ack failed:', e && /** @type {any} */ (e).message);
+  }
+}
+
+/**
  * @param {import('discord.js').ModalSubmitInteraction | import('discord.js').CommandInteraction} interaction
  * @param {string} category
  * @param {string} key
@@ -484,7 +508,7 @@ async function saveSetting(interaction, category, key, value) {
   const list = SETTINGS[catId] || [];
   const s = list.find((x) => x.key === key);
   if (!s) {
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription('Setting not found.')], components: [] }).catch(() => {});
+    await safeAck(interaction, { embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription('Setting not found.')], components: [] });
     return false;
   }
   const guildId = String(interaction.guildId);
@@ -503,20 +527,16 @@ async function saveSetting(interaction, category, key, value) {
         await wm.setWelcomeConfig(guildId, {
           ...cfg,
           enabled: cfg.enabled !== undefined ? cfg.enabled : true,
-          // welcomeMessageManager uses one channelId; the dashboard historically
-          // stored welcome & leave separately on settingsManager. Keep the
-          // manager's channelId synced only for the welcome channel to avoid
-          // clobbering — leave is read from settings via events.lookup.
           channelId: isLeave ? cfg.channelId : String(value || cfg.channelId || ''),
         });
       }
     }
 
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('Setting updated').setDescription(`**${s.label}** set to:\n${formatValue(value)}`)], components: [] }).catch(() => {});
+    await safeAck(interaction, { embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('Setting updated').setDescription(`**${s.label}** set to:\n${formatValue(value)}`)], components: [] });
     return true;
   } catch (err) {
     const msg = /** @type {any} */ (err)?.message || 'Unknown error';
-    await interaction.editReply({ embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription(`Could not save **${s.label}**: ${msg}`)], components: [] }).catch(() => {});
+    await safeAck(interaction, { embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Error').setDescription(`Could not save **${s.label}**: ${msg}`)], components: [] });
     return false;
   }
 }
