@@ -473,7 +473,7 @@ function renderCategory(guild, category, token) {
 // ---------------------------------------------------------------------------
 
 /**
- * @param {import('discord.js').CommandInteraction} interaction
+ * @param {import('discord.js').ModalSubmitInteraction | import('discord.js').CommandInteraction} interaction
  * @param {string} category
  * @param {string} key
  * @param {unknown} value
@@ -526,6 +526,27 @@ async function saveSetting(interaction, category, key, value) {
 // ---------------------------------------------------------------------------
 
 /**
+ * Await a modal submission on the interaction that opened the modal.
+ * channel.awaitMessageComponent does NOT yield modal submissions — they must
+ * be awaited via the opening interaction's awaitModalSubmit.
+ *
+ * @param {any} opener interaction that called showModal
+ * @param {string} customId the modal's customId
+ * @param {string} userId actor id to filter on
+ * @returns {Promise<import('discord.js').ModalSubmitInteraction | null>}
+ */
+async function awaitModal(opener, customId, userId) {
+  try {
+    return await opener.awaitModalSubmit({
+      filter: (/** @type {any} */ i) => i.customId === customId && i.user.id === userId,
+      time: COMPONENT_TIMEOUT,
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {import('discord.js').CommandInteraction} interaction
  * @param {string} categoryId
  * @param {string} token
@@ -574,19 +595,20 @@ async function categoryLoop(interaction, categoryId, token) {
           /** @type {any} */ (new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('response').setLabel('Response text').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(2000)))
         );
       await collected.showModal(modal);
-      continue;
-    }
-    if (kind === 'cmd-create') {
-      const name = String(collected.fields.getTextInputValue('name') || '').toLowerCase().trim();
-      const response = String(collected.fields.getTextInputValue('response') || '');
-      if (!name || !response) { await collected.reply({ content: 'Name and response are required.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
+      // Modals are awaited on the interaction that opened them, NOT via
+      // channel.awaitMessageComponent. Await the submit inline.
+      const modalSubmit = await awaitModal(collected, `setup:cmd-create:${token}`, userId);
+      if (!modalSubmit) continue;
+      const name = String(modalSubmit.fields.getTextInputValue('name') || '').toLowerCase().trim();
+      const response = String(modalSubmit.fields.getTextInputValue('response') || '');
+      if (!name || !response) { await modalSubmit.reply({ content: 'Name and response are required.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
       let exists = false;
       try { exists = !!customCommandManager.getCommand && !!customCommandManager.getCommand(String(interaction.guildId), name); } catch { exists = false; }
-      if (exists) { await collected.reply({ content: `Command **${name}** already exists.`, flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
+      if (exists) { await modalSubmit.reply({ content: `Command **${name}** already exists.`, flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
       try {
         await customCommandManager.addCommand(String(interaction.guildId), name, response);
-        await collected.reply({ content: `✅ Custom command **${name}** created.`, flags: MessageFlags.Ephemeral }).catch(() => {});
-      } catch (e) { await collected.reply({ content: `Error: ${/** @type {any} */ (e)?.message || e}`, flags: MessageFlags.Ephemeral }).catch(() => {}); }
+        await modalSubmit.reply({ content: `✅ Custom command **${name}** created.`, flags: MessageFlags.Ephemeral }).catch(() => {});
+      } catch (e) { await modalSubmit.reply({ content: `Error: ${/** @type {any} */ (e)?.message || e}`, flags: MessageFlags.Ephemeral }).catch(() => {}); }
       const rc = renderCategory(guild, catId, token);
       await collected.editReply({ embeds: [rc.embed], components: rc.components }).catch(() => {});
       continue;
@@ -646,25 +668,27 @@ async function categoryLoop(interaction, categoryId, token) {
     }
 
     if ((kind === 'string' || kind === 'number' || kind === 'json' || kind === 'text') && s) {
-      if (collected.isModalSubmit()) {
-        const raw = String(collected.fields.getTextInputValue('value') || '');
-        let value = /** @type {any} */ (raw);
-        if (kind === 'number') {
-          const n = Number(raw);
-          if (!Number.isFinite(n)) { await collected.reply({ content: 'Please enter a valid number.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
-          const mn = s.min !== undefined ? s.min : Number.NEGATIVE_INFINITY;
-          const mx = s.max !== undefined ? s.max : Number.POSITIVE_INFINITY;
-          if (n < mn || n > mx) { await collected.reply({ content: `Number must be between ${mn} and ${mx}.`, flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
-          value = n;
-        } else if (kind === 'json') {
-          try { JSON.parse(raw); } catch { await collected.reply({ content: 'Invalid JSON. Please check your input.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
-        }
-        const ok = await saveSetting(collected, catId, key, value);
-        if (ok) { const rc = renderCategory(guild, catId, token); await collected.editReply({ embeds: [rc.embed], components: rc.components }).catch(() => {}); }
-      } else {
-        const modal = buildValueModal(`setup:${kind}:${encC(catId)}:${key}:${token}`, `Edit ${s.label}`, s, readSetting(s, String(interaction.guildId)));
-        await collected.showModal(modal);
+      const modalCustomId = `setup:${kind}:${encC(catId)}:${key}:${token}`;
+      const modal = buildValueModal(modalCustomId, `Edit ${s.label}`, s, readSetting(s, String(interaction.guildId)));
+      await collected.showModal(modal);
+      // Await the modal submit inline — channel.awaitMessageComponent never
+      // yields modal submissions.
+      const submit = await awaitModal(collected, modalCustomId, userId);
+      if (!submit) continue;
+      const raw = String(submit.fields.getTextInputValue('value') || '');
+      let value = /** @type {any} */ (raw);
+      if (kind === 'number') {
+        const n = Number(raw);
+        if (!Number.isFinite(n)) { await submit.reply({ content: 'Please enter a valid number.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
+        const mn = s.min !== undefined ? s.min : Number.NEGATIVE_INFINITY;
+        const mx = s.max !== undefined ? s.max : Number.POSITIVE_INFINITY;
+        if (n < mn || n > mx) { await submit.reply({ content: `Number must be between ${mn} and ${mx}.`, flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
+        value = n;
+      } else if (kind === 'json') {
+        try { JSON.parse(raw); } catch { await submit.reply({ content: 'Invalid JSON. Please check your input.', flags: MessageFlags.Ephemeral }).catch(() => {}); continue; }
       }
+      const ok = await saveSetting(submit, catId, key, value);
+      if (ok) { const rc = renderCategory(guild, catId, token); await submit.editReply({ embeds: [rc.embed], components: rc.components }).catch(() => {}); }
       continue;
     }
 
