@@ -51,7 +51,6 @@ const suggestionManager = require('../../utils/automation/suggestionManager');
 const epicGamesAlertsManager = require('../../utils/steam/epicGamesAlertsManager');
 const steamFreeGamesAlertsManager = require('../../utils/steam/steamFreeGamesAlertsManager');
 const steamGameUpdatesManager = require('../../utils/steam/steamGameUpdatesManager');
-const telegramSyncManager = require('../../utils/telegramSyncManager');
 const customCommandManager = require('../../utils/customCommandManager');
 
 // ---------------------------------------------------------------------------
@@ -81,7 +80,7 @@ const VIEW_PAGE_SIZE = 8;           // settings rows per page in /setup view
  */
 const CATEGORY_IDS = [
   'general', 'welcome', 'leave', 'logging', 'moderation', 'automod',
-  'safety', 'voice', 'tickets', 'suggestions', 'alerts', 'telegram',
+  'safety', 'voice', 'tickets', 'suggestions', 'alerts',
   'commands', 'serverprofile',
 ];
 
@@ -99,8 +98,7 @@ const CATEGORY_LABELS = {
   voice: 'Voice & TempVC',
   tickets: 'Tickets',
   suggestions: 'Suggestions',
-  alerts: 'Alerts (Epic / Steam / Telegram)',
-  telegram: 'Telegram Sync',
+  alerts: 'Alerts (Epic / Steam)',
   commands: 'Custom Commands',
   serverprofile: 'Server Profile',
 };
@@ -264,23 +262,6 @@ const SETTINGS = {
     { key: 'steamUpdateChannel', kind: 'channel', label: 'Steam updates channel', hint: 'Game update alerts. Empty = disabled.', emoji: '🆙',
       read: (g) => steamGameUpdatesManager.getGuildConfig(g)?.channelId,
       write: async (g, v) => { await steamGameUpdatesManager.updateGuildConfig(g, v || null, undefined, { enabled: !!v }); } },
-  ],
-  telegram: [
-    { key: 'tgEnabled', kind: 'toggle', label: 'Telegram sync', hint: 'Bridge Discord <-> Telegram.', emoji: '✈️',
-      read: (g) => telegramSyncManager.getGuildConfig(g)?.enabled === true,
-      write: async (g, v) => { const c = telegramSyncManager.getGuildConfig(g) || {}; await telegramSyncManager.updateGuildConfig(g, { ...c, enabled: !!v }); } },
-    { key: 'tgChannel', kind: 'channel', label: 'Discord channel', hint: 'Discord channel bridged to Telegram.', emoji: '💬',
-      read: (g) => telegramSyncManager.getGuildConfig(g)?.discordChannelId,
-      write: async (g, v) => { const c = telegramSyncManager.getGuildConfig(g) || {}; await telegramSyncManager.updateGuildConfig(g, { ...c, discordChannelId: v || null }); } },
-    { key: 'tgChatId', kind: 'string', label: 'Telegram chat ID', hint: 'Telegram chat to bridge (numeric or @username).', emoji: '📲',
-      read: (g) => telegramSyncManager.getGuildConfig(g)?.telegramChatId,
-      write: async (g, v) => { const c = telegramSyncManager.getGuildConfig(g) || {}; await telegramSyncManager.updateGuildConfig(g, { ...c, telegramChatId: String(v || '') }); } },
-    { key: 'tgToDiscord', kind: 'toggle', label: 'Telegram -> Discord', hint: 'Forward Telegram messages to Discord.', emoji: '⬇️',
-      read: (g) => telegramSyncManager.getGuildConfig(g)?.syncTelegramToDiscord === true,
-      write: async (g, v) => { const c = telegramSyncManager.getGuildConfig(g) || {}; await telegramSyncManager.updateGuildConfig(g, { ...c, syncTelegramToDiscord: !!v }); } },
-    { key: 'tgToTelegram', kind: 'toggle', label: 'Discord -> Telegram', hint: 'Forward Discord messages to Telegram.', emoji: '⬆️',
-      read: (g) => telegramSyncManager.getGuildConfig(g)?.syncDiscordToTelegram === true,
-      write: async (g, v) => { const c = telegramSyncManager.getGuildConfig(g) || {}; await telegramSyncManager.updateGuildConfig(g, { ...c, syncDiscordToTelegram: !!v }); } },
   ],
   commands: [
     { key: '_commands_list', kind: 'commandlist', label: 'Custom commands', hint: 'Manage custom commands (add / remove).', emoji: '⌨️' },

@@ -18,6 +18,9 @@ const TELEGRAM_MAX_MEDIA_PER_MESSAGE = getPositiveInteger(
   4
 );
 const RETRY_ATTEMPTS = 3;
+// Telegram integration is disabled in this build. Set to true (and provide
+// TELEGRAM_BOT_TOKEN) to re-enable the bridge.
+const TELEGRAM_SYNC_ENABLED = false;
 const POLL_DELAY_MS = 1200;
 const POLL_INFLIGHT_DELAY_MS = 1500;
 const POLL_CONFLICT_INITIAL_BACKOFF_MS = 15000;
@@ -418,6 +421,11 @@ class TelegramSyncManager {
   }
 
   async init(client) {
+    if (!TELEGRAM_SYNC_ENABLED) {
+      console.log('Telegram sync is disabled in this build; bridge not started.');
+      return;
+    }
+
     this.client = client;
 
     try {
@@ -474,6 +482,10 @@ class TelegramSyncManager {
   }
 
   async updateGuildConfig(guildId, updates = {}) {
+    if (!TELEGRAM_SYNC_ENABLED) {
+      updates = { ...updates, enabled: false };
+    }
+
     const config = this.getGuildConfig(guildId);
 
     if (Object.prototype.hasOwnProperty.call(updates, 'discordChannelId')) {
@@ -533,6 +545,7 @@ class TelegramSyncManager {
   }
 
   async relayDiscordMessage(message) {
+    if (!TELEGRAM_SYNC_ENABLED) return;
     if (!message?.guildId) return;
 
     const config = this.getGuildConfig(message.guildId);
@@ -577,6 +590,10 @@ class TelegramSyncManager {
   }
 
   async sendTestToTelegram(guildId, requestedBy = 'Dashboard User') {
+    if (!TELEGRAM_SYNC_ENABLED) {
+      throw new Error('Telegram sync is disabled in this build');
+    }
+
     const config = this.getGuildConfig(guildId);
     if (!config.telegramChatId) {
       throw new Error('Telegram chat ID is not configured');

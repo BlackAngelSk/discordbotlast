@@ -1517,7 +1517,6 @@ class Dashboard {
                     liveAlerts: await ensureTextChannel({ name: 'live-alerts', categoryId: botCommunityCategory.id }),
                     epicGames: await ensureTextChannel({ name: 'epic-games', categoryId: botCommunityCategory.id }),
                     steamUpdates: await ensureTextChannel({ name: 'steam-updates', categoryId: botCommunityCategory.id }),
-                    telegramSync: await ensureTextChannel({ name: 'telegram-sync', categoryId: botCommunityCategory.id }),
                     ticketLogs: await ensureTextChannel({ name: 'ticket-logs', categoryId: ticketsCategory.id }),
                     tempVoiceHub: await ensureVoiceChannel({ name: 'Create Channel', categoryId: botVoiceCategory.id })
                 };
