@@ -4,6 +4,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
 `npm test` and `npm run build` green before committing.
 
 ## Phase 1 — Dependency cleanup ✅
+
 - Removed 6 unused/broken deps: `@discordjs/opus` (native build broken — fails
   to load; `opusscript` is the working opus backend), `@distube/ytdl-core`,
   `ytdl-core`, `youtube-dl-exec`, `socket.io`, `@snazzah/davey`.
@@ -12,6 +13,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
   `cloudscraper` (used once — candidate for removal in a later phase).
 
 ## Phase 2 — Music stack consolidation ✅
+
 - Single retrieval path: `utils/music/youtubeSearch.js` now resolves search,
   video info, playlists and SoundCloud **all through yt-dlp** (removed the ytsr
   fallback and the play-dl scrapers).
@@ -23,6 +25,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
 - Verified: build OK (419 files), tests 15/15, live yt-dlp smoke test.
 
 ## Phase 3 — ES module migration ✅ (batch 1; incremental approach proven)
+
 - Node ≥22 supports `require(esm)`, so leaf modules can convert file-by-file
   without a flag day. Order: `utils/` leaves → managers → `commands/` →
   `events/` → `index.js` → `dashboard/server.js`.
@@ -38,6 +41,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
   can proceed the same way whenever a file is touched.
 
 ## Phase 4 — Split the monsters ✅
+
 - `dashboard/server.js` (4384 → ~3680 lines): 13 standalone helpers extracted
   verbatim into `dashboard/serverHelpers.js` (scripted slice, zero
   transcription errors).
@@ -48,6 +52,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
 - Each extraction verified: build OK, tests 15/15, runtime smoke of exports.
 
 ## Phase 5 — TypeScript check gate for new code ✅
+
 - `typescript@^7.0.2` devDep + `tsconfig.json` (strict, checkJs, noEmit; scoped
   `include`: setup.js + the new Phase 3/4 modules). `npm run typecheck`
   = `tsc --noEmit`.
@@ -60,6 +65,7 @@ Gradual modernization, done in small verified phases. Each phase must leave
 - Expand `tsconfig.json` `include` in future phases as more files get types.
 
 ## Rules
+
 - Never modify another profile's or live runtime data (`data/*.json`) in a
   recode commit.
 - Every phase: tests + build green, then one commit per logical change.

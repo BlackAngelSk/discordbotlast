@@ -86,7 +86,9 @@ for (const file of files) {
     // executing the module.
     const check = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
     if (check.status !== 0) {
-      failures.push(`${path.relative(ROOT, file)}: ${(check.stderr || '').trim().split('\n').pop()}`);
+      failures.push(
+        `${path.relative(ROOT, file)}: ${(check.stderr || '').trim().split('\n').pop()}`
+      );
     }
     continue;
   }
@@ -100,7 +102,8 @@ for (const file of files) {
 }
 
 // ── 3. Every relative require/import resolves ───────────────────────────────
-const REQUIRE_RE = /(?:require\(\s*['"]|import\s*['"]|import\s+[^'"]*?\s+from\s*['"])(\.[^'"]+)['"]/g;
+const REQUIRE_RE =
+  /(?:require\(\s*['"]|import\s*['"]|import\s+[^'"]*?\s+from\s*['"])(\.[^'"]+)['"]/g;
 const RESOLVE_EXTS = ['.js', '.json', '.mjs', '.node'];
 
 for (const file of files) {
