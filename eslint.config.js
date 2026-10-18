@@ -152,6 +152,12 @@ module.exports = [
     },
   },
   {
+    files: ['**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+    },
+  },
+  {
     ignores: [
       'node_modules/',
       'dist/',

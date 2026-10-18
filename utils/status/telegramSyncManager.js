@@ -482,10 +482,6 @@ class TelegramSyncManager {
   }
 
   async updateGuildConfig(guildId, updates = {}) {
-    if (!TELEGRAM_SYNC_ENABLED) {
-      updates = { ...updates, enabled: false };
-    }
-
     const config = this.getGuildConfig(guildId);
 
     if (Object.prototype.hasOwnProperty.call(updates, 'discordChannelId')) {
@@ -517,6 +513,10 @@ class TelegramSyncManager {
 
     if (Object.prototype.hasOwnProperty.call(updates, 'includeAttachments')) {
       config.includeAttachments = parseBoolean(updates.includeAttachments, true);
+    }
+
+    if (!TELEGRAM_SYNC_ENABLED) {
+      config.enabled = false;
     }
 
     if (config.enabled && !config.discordChannelId) {

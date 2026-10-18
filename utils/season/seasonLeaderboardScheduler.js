@@ -144,16 +144,19 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
       }
 
       // Refresh season stats from live economy/game data
-      await sm.refreshSeasonStats(guildId, seasonName, (/** @type {string} */ userId) =>
-        /** @type {Record<string, unknown>} */
-        ({
-        username: guild.members.cache.get(userId)?.user.username || 'Unknown User',
-        balance: em.getUserData(guildId, userId).balance,
-        xp: em.getUserData(guildId, userId).xp,
-        level: em.getUserData(guildId, userId).level,
-        seasonalCoins: em.getUserData(guildId, userId).seasonalCoins,
-        gambling: gsm.getStats(/** @type {any} */ (userId)),
-      })
+      await sm.refreshSeasonStats(
+        guildId,
+        seasonName,
+        (/** @type {string} */ userId) =>
+          /** @type {Record<string, unknown>} */
+          ({
+            username: guild.members.cache.get(userId)?.user.username || 'Unknown User',
+            balance: em.getUserData(guildId, userId).balance,
+            xp: em.getUserData(guildId, userId).xp,
+            level: em.getUserData(guildId, userId).level,
+            seasonalCoins: em.getUserData(guildId, userId).seasonalCoins,
+            gambling: gsm.getStats(/** @type {any} */ (userId)),
+          })
       );
 
       // Prune inactive players
@@ -222,7 +225,10 @@ async function updateSeasonLeaderboards(client, { lazyLoadManager, devModeEnable
         // If couldn't edit, create new message
         if (!leaderboardMessage) {
           try {
-            leaderboardMessage = await channel.send({ embeds: [embeds[0]], components: /** @type {any} */ (components) });
+            leaderboardMessage = await channel.send({
+              embeds: [embeds[0]],
+              components: /** @type {any} */ (components),
+            });
             console.log(
               `✅ Created new leaderboard message ${leaderboardMessage.id} for guild ${guildId}`
             );

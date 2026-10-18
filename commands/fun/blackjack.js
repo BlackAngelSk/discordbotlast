@@ -588,7 +588,10 @@ async function playBlackjackWithBet(message, bet) {
     } else if (interaction.customId === 'bj_split') {
       const userVerify = economyManager.getUserData(message.guild.id, message.author.id);
       if (userVerify.balance < bet) {
-        await interaction.reply({ content: '❌ Not enough coins to split!', flags: MessageFlags.Ephemeral });
+        await interaction.reply({
+          content: '❌ Not enough coins to split!',
+          flags: MessageFlags.Ephemeral,
+        });
         return;
       }
       await economyManager.removeMoney(message.guild.id, message.author.id, bet);

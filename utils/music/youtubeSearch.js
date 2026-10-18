@@ -128,7 +128,7 @@ async function getPlaylistInfo(url, limit = 50) {
  * @returns {'video' | 'playlist' | null}
  */
 function validateYoutubeUrl(url) {
-  if (typeof url !== 'string' || !url.includes('youtube.com') && !url.includes('youtu.be')) {
+  if (typeof url !== 'string' || (!url.includes('youtube.com') && !url.includes('youtu.be'))) {
     return null;
   }
   if (url.includes('list=')) {

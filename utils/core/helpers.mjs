@@ -83,7 +83,10 @@ export function toEpochMs(value, fallback = 0) {
   return toDateObject(value, fallback).getTime();
 }
 
-export function formatDateLabel(value, { fallbackLabel = 'Not available', locale, formatOptions } = {}) {
+export function formatDateLabel(
+  value,
+  { fallbackLabel = 'Not available', locale, formatOptions } = {}
+) {
   const parsed = parseFlexibleDate(value);
   return parsed ? parsed.toLocaleString(locale, formatOptions) : fallbackLabel;
 }
