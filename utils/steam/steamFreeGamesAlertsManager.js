@@ -4,6 +4,7 @@ const https = require('https');
 const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('../core/discordFetch');
 const settingsManager = require('../core/settingsManager');
+const steamSaleDeals = require('./steamSaleDeals');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'steamFreeGamesAlerts.json');
 const API_URL = 'https://www.gamerpower.com/api/giveaways?platform=steam&type=game';
@@ -19,6 +20,9 @@ const STEAM_PROMO_CANDIDATE_LIMIT = 140;
 const STEAM_PROMO_CONCURRENCY = 8;
 const STEAM_KEEP_CANDIDATE_LIMIT = 80;
 const STEAM_KEEP_CONCURRENCY = 8;
+const DEAL_SAMPLE_LIMIT = 300;
+const ANNOUNCED_DEAL_TTL_MS = 21 * 24 * 60 * 60 * 1000;
+const ANNOUNCED_DEAL_MAX_ENTRIES = 3000;
 
 function withTimeout(promise, timeoutMs, label, timeoutCode = 'STEAM_OPERATION_TIMEOUT') {
   return new Promise((resolve, reject) => {
@@ -300,6 +304,138 @@ function createPromoEmbed(giveaway) {
 
   if (giveaway.imageUrl) {
     embed.setImage(giveaway.imageUrl);
+  }
+
+  return embed;
+}
+
+function clampSetting(value, min, max, fallback) {
+  const numeric = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function resolveDealSettings(config = {}) {
+  const defaults = steamSaleDeals.DEFAULT_DEAL_SETTINGS;
+
+  return {
+    salesEnabled: config?.salesEnabled !== false,
+    promosEnabled: config?.promosEnabled !== false,
+    minDiscountPercent: clampSetting(
+      config?.minDiscountPercent,
+      1,
+      100,
+      defaults.minDiscountPercent
+    ),
+    minReviewCount: clampSetting(config?.minReviewCount, 0, 1000000, defaults.minReviewCount),
+    minReviewPercent: clampSetting(config?.minReviewPercent, 0, 100, defaults.minReviewPercent),
+    maxDealsPerMessage: clampSetting(
+      config?.maxDealsPerMessage,
+      1,
+      10,
+      defaults.maxDealsPerMessage
+    ),
+    dealPostIntervalHours: clampSetting(
+      config?.dealPostIntervalHours,
+      1,
+      24,
+      defaults.dealPostIntervalHours
+    ),
+  };
+}
+
+/**
+ * Keep only the tunable deal fields from an untrusted patch (dashboard/command input).
+ */
+function sanitizeDealSettings(patch = {}) {
+  const sanitized = {};
+
+  if (typeof patch.salesEnabled === 'boolean') sanitized.salesEnabled = patch.salesEnabled;
+  if (typeof patch.promosEnabled === 'boolean') sanitized.promosEnabled = patch.promosEnabled;
+
+  if (patch.minDiscountPercent !== undefined && patch.minDiscountPercent !== null) {
+    sanitized.minDiscountPercent = clampSetting(patch.minDiscountPercent, 1, 100, undefined);
+  }
+
+  if (patch.minReviewCount !== undefined && patch.minReviewCount !== null) {
+    sanitized.minReviewCount = clampSetting(patch.minReviewCount, 0, 1000000, undefined);
+  }
+
+  if (patch.maxDealsPerMessage !== undefined && patch.maxDealsPerMessage !== null) {
+    sanitized.maxDealsPerMessage = clampSetting(patch.maxDealsPerMessage, 1, 10, undefined);
+  }
+
+  if (patch.dealPostIntervalHours !== undefined && patch.dealPostIntervalHours !== null) {
+    sanitized.dealPostIntervalHours = clampSetting(patch.dealPostIntervalHours, 1, 24, undefined);
+  }
+
+  return Object.fromEntries(Object.entries(sanitized).filter(([, value]) => value !== undefined));
+}
+
+/** Drop stale entries and cap the announced-deal map so the JSON file stays small. */
+function pruneAnnouncedDeals(announced, now = Date.now()) {
+  const entries = Object.entries(announced && typeof announced === 'object' ? announced : {})
+    .filter(([, meta]) => {
+      const at = Date.parse(meta?.at || '');
+      if (!Number.isFinite(at)) return false;
+      return now - at <= ANNOUNCED_DEAL_TTL_MS;
+    })
+    .sort((left, right) => Date.parse(right[1]?.at || 0) - Date.parse(left[1]?.at || 0))
+    .slice(0, ANNOUNCED_DEAL_MAX_ENTRIES);
+
+  return Object.fromEntries(entries);
+}
+
+function formatCompactCount(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) return null;
+  if (numeric >= 1000000) return `${(numeric / 1000000).toFixed(1)}M`;
+  if (numeric >= 1000) return `${Math.round(numeric / 1000)}k`;
+  return String(numeric);
+}
+
+function formatDealLine(deal) {
+  const discount = `**-${Number(deal.discountPercent)}%**`;
+  const prices =
+    deal.priceOriginal && deal.priceFinal
+      ? ` ~~${deal.priceOriginal}~~ → **${deal.priceFinal}**`
+      : deal.priceFinal
+        ? ` → **${deal.priceFinal}**`
+        : '';
+
+  const meta = [];
+  const reviewCount = formatCompactCount(deal.reviewCount);
+  if (deal.reviewPercent) {
+    meta.push(`👍 ${deal.reviewPercent}%${reviewCount ? ` (${reviewCount})` : ''}`);
+  } else if (deal.reviewSummary) {
+    meta.push(deal.reviewSummary);
+  }
+
+  const endUnix = toUnixTimestamp(deal.endsAt);
+  if (endUnix) meta.push(`ends <t:${endUnix}:R>`);
+
+  const suffix = meta.length > 0 ? ` · ${meta.join(' · ')}` : '';
+
+  return `**[${deal.title}](${deal.url})** · ${discount}${prices}${suffix}`;
+}
+
+function createDealsEmbed(deals, { index = 1, total = 1, minDiscountPercent = 50 } = {}) {
+  const titleSuffix = total > 1 ? ` (${index}/${total})` : '';
+  const footerCount = deals.length === 1 ? '1 deal' : `${deals.length} deals`;
+  const onlyCheapShark = deals.every((deal) => deal?.source === 'cheapshark');
+  const priceLabel = onlyCheapShark ? 'CheapShark prices (USD)' : 'live Steam prices';
+
+  const embed = new EmbedBuilder()
+    .setColor(0x66c0f4)
+    .setTitle(`🔥 Steam Deals — ${minDiscountPercent}%+ off${titleSuffix}`)
+    .setURL('https://store.steampowered.com/specials')
+    .setDescription(deals.map(formatDealLine).join('\n\n'))
+    .setFooter({ text: `Steam sale alerts • ${footerCount} • ${priceLabel}` })
+    .setTimestamp();
+
+  const heroDeal = deals.find((deal) => deal.imageUrl);
+  if (heroDeal?.imageUrl) {
+    embed.setImage(heroDeal.imageUrl);
   }
 
   return embed;
@@ -1304,6 +1440,7 @@ class SteamFreeGamesAlertsManager {
     this._snapshotCache = null;
     this._snapshotCachedAt = 0;
     this._snapshotInFlight = null;
+    this._dealsCache = { deals: [], at: 0, source: null };
   }
 
   async init(client) {
@@ -1338,12 +1475,22 @@ class SteamFreeGamesAlertsManager {
     return (this.data.promoGuilds ?? {})[guildId] || null;
   }
 
+  getPromoDealSettings(guildId) {
+    return resolveDealSettings(this.getPromoGuildConfig(guildId) || {});
+  }
+
   isFeatureEnabled(guildId) {
     const settings = settingsManager.get(guildId);
     return settings.features?.steamFreeGamesAlerts !== false;
   }
 
-  async enablePromoAlerts(guildId, channelId) {
+  /**
+   * Enable (or reconfigure) promo-game alerts for a guild.
+   *
+   * Existing deal settings are preserved so saving the channel from the dashboard
+   * never resets a guild's discount filters.
+   */
+  async enablePromoAlerts(guildId, channelId, options = {}) {
     const snapshot = await this.fetchSnapshot().catch((error) => {
       console.error('Steam promo snapshot fetch failed while enabling alerts:', error.message);
       return null;
@@ -1351,17 +1498,78 @@ class SteamFreeGamesAlertsManager {
 
     if (!this.data.promoGuilds) this.data.promoGuilds = {};
 
+    const existing = this.data.promoGuilds[guildId] || {};
+    const dealSettings = {
+      ...resolveDealSettings({ ...existing, ...sanitizeDealSettings(options) }),
+    };
+    const isFirstSetup = !existing.channelId || !existing.announcedDeals;
+
     this.data.promoGuilds[guildId] = {
+      ...existing,
       channelId,
-      announcedIds: snapshot ? snapshot.promoGiveaways.map((g) => g.id) : [],
-      announcedMeta: snapshot
-        ? snapshot.promoGiveaways.map((g) => ({ id: g.id, title: g.title }))
-        : [],
+      ...dealSettings,
+      announcedIds: Array.isArray(existing.announcedIds)
+        ? existing.announcedIds
+        : snapshot
+          ? snapshot.promoGiveaways.map((g) => g.id)
+          : [],
+      announcedMeta: Array.isArray(existing.announcedMeta)
+        ? existing.announcedMeta
+        : snapshot
+          ? snapshot.promoGiveaways.map((g) => ({ id: g.id, title: g.title }))
+          : [],
+      announcedDeals: this.buildDealSeed(existing, snapshot, dealSettings, {
+        keepTopUnannounced: isFirstSetup,
+      }),
       lastCheckedAt: new Date().toISOString(),
+      lastDealsPostedAt: existing.lastDealsPostedAt || null,
     };
 
     await this.save();
     return snapshot;
+  }
+
+  /**
+   * Seed the announced-deal map. On a first-time setup the top deals are left
+   * unannounced so the next poll posts one real digest immediately, while the rest
+   * of the sale backlog stays silent (no wall of messages).
+   */
+  buildDealSeed(existing, snapshot, dealSettings, { keepTopUnannounced = false } = {}) {
+    const previous =
+      existing?.announcedDeals && typeof existing.announcedDeals === 'object'
+        ? existing.announcedDeals
+        : {};
+    const seeded = { ...previous };
+    const deals = Array.isArray(snapshot?.deals) ? snapshot.deals : [];
+    const nowIso = new Date().toISOString();
+    const skip = keepTopUnannounced ? dealSettings.maxDealsPerMessage : 0;
+
+    steamSaleDeals
+      .selectDeals(deals, { ...dealSettings, limit: DEAL_SAMPLE_LIMIT })
+      .slice(skip)
+      .forEach((deal) => {
+        if (seeded[deal.appId]) return;
+        seeded[deal.appId] = { discount: Number(deal.discountPercent), at: nowIso };
+      });
+
+    return pruneAnnouncedDeals(seeded);
+  }
+
+  async updatePromoConfig(guildId, patch = {}) {
+    if (!this.data.promoGuilds) this.data.promoGuilds = {};
+
+    const current = this.data.promoGuilds[guildId];
+    if (!current) return null;
+
+    const sanitized = sanitizeDealSettings(patch);
+    this.data.promoGuilds[guildId] = {
+      ...current,
+      ...sanitized,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.save();
+    return this.data.promoGuilds[guildId];
   }
 
   async disablePromoAlerts(guildId) {
@@ -1377,6 +1585,38 @@ class SteamFreeGamesAlertsManager {
         { embeds: [createPromoSummaryEmbed(giveaways)] },
         ...giveaways.map((g) => ({ embeds: [createPromoEmbed(g)] })),
       ],
+    };
+  }
+
+  /**
+   * Build the sale digest message(s) for the given deals.
+   *
+   * @param {Array<any>} deals
+   * @param {any} [settings]
+   * @param {{ totalAvailable?: number }} [options]
+   */
+  buildDealAlert(deals, settings = {}, { totalAvailable = 0 } = {}) {
+    if (!Array.isArray(deals) || deals.length === 0) return null;
+
+    const resolved = resolveDealSettings(settings);
+    const perMessage = resolved.maxDealsPerMessage;
+    const chunks = [];
+
+    for (let index = 0; index < deals.length; index += perMessage) {
+      chunks.push(deals.slice(index, index + perMessage));
+    }
+
+    return {
+      messages: chunks.map((chunk, index) => ({
+        embeds: [
+          createDealsEmbed(chunk, {
+            index: index + 1,
+            total: chunks.length,
+            minDiscountPercent: resolved.minDiscountPercent,
+          }),
+        ],
+      })),
+      totalAvailable,
     };
   }
 
@@ -1482,10 +1722,37 @@ class SteamFreeGamesAlertsManager {
     });
 
     // Steam store promos (100%-off paid games = free weekends / events)
-    const steamStorePromosResult = await fetchSteamStorePromos();
+    const [steamStorePromosResult, dealsResult] = await Promise.all([
+      fetchSteamStorePromos(),
+      steamSaleDeals.fetchSteamStoreDeals({ pages: 2, perPage: 100 }).catch((error) => {
+        console.warn('Steam sale deals fetch failed:', error.message);
+        return {
+          deals: [],
+          region: null,
+          totalDiscounted: null,
+          sampledCount: 0,
+          featuredCount: 0,
+          failedRequests: 1,
+        };
+      }),
+    ]);
     const steamStorePromos = Array.isArray(steamStorePromosResult?.promos)
       ? steamStorePromosResult.promos
       : [];
+    const freshDeals = Array.isArray(dealsResult?.deals) ? dealsResult.deals : [];
+    let deals = freshDeals;
+    let dealsStale = false;
+
+    if (freshDeals.length > 0) {
+      this._dealsCache = { deals: freshDeals, at: Date.now(), source: dealsResult?.sources || [] };
+    } else if (
+      this._dealsCache.deals.length > 0 &&
+      Date.now() - this._dealsCache.at < 24 * 60 * 60 * 1000
+    ) {
+      // Steam/CheapShark outage — keep alerting on the last known good list.
+      deals = this._dealsCache.deals;
+      dealsStale = true;
+    }
 
     // Promo stream includes both temporary GamerPower giveaways and Steam play-for-free events
     const promoGiveaways = [...gpPromos, ...steamStorePromos].sort((a, b) => {
@@ -1499,6 +1766,18 @@ class SteamFreeGamesAlertsManager {
       giveaways,
       freeToKeepGiveaways,
       promoGiveaways,
+      deals,
+      dealsSource: {
+        region: dealsResult?.region || null,
+        totalDiscounted: dealsResult?.totalDiscounted || null,
+        sampledCount: Number(dealsResult?.sampledCount || 0),
+        featuredCount: Number(dealsResult?.featuredCount || 0),
+        failedRequests: Number(dealsResult?.failedRequests || 0),
+        sources: dealsResult?.sources || [],
+        steamBlocked: Boolean(dealsResult?.steamBlocked),
+        stale: dealsStale,
+        cachedAgeMs: dealsStale ? Date.now() - this._dealsCache.at : 0,
+      },
       sourceHealth: {
         steamDbFreeToKeepAvailable: Boolean(steamDbFreeToKeepResult.available),
         steamDbFreeToKeepReason: steamDbFreeToKeepResult.reason || null,
@@ -1510,6 +1789,9 @@ class SteamFreeGamesAlertsManager {
         steamStorePromoFallbackCount: Number(
           steamStorePromosResult?.source?.steamStorePromoFallbackCount || 0
         ),
+        dealCount: deals.length,
+        dealTotalDiscounted: dealsResult?.totalDiscounted || null,
+        dealRegion: dealsResult?.region || null,
       },
     };
   }
@@ -1582,6 +1864,81 @@ class SteamFreeGamesAlertsManager {
     }
   }
 
+  /**
+   * Post a digest of the best *new* sales, throttled per guild.
+   *
+   * Every eligible deal is marked as announced once a digest is sent, so a huge
+   * Steam sale posts one ranked summary instead of hundreds of trickled messages.
+   */
+  async postDealDigest(config, channel, snapshot, dealSettings = resolveDealSettings(config)) {
+    const allDeals = Array.isArray(snapshot?.deals) ? snapshot.deals : [];
+    if (allDeals.length === 0) return [];
+
+    const eligible = steamSaleDeals.selectDeals(allDeals, {
+      ...dealSettings,
+      limit: DEAL_SAMPLE_LIMIT,
+    });
+    if (eligible.length === 0) return [];
+
+    const announced =
+      config.announcedDeals && typeof config.announcedDeals === 'object'
+        ? config.announcedDeals
+        : {};
+    const fresh = eligible.filter(
+      (deal) => Number(announced[deal.appId]?.discount || 0) < Number(deal.discountPercent)
+    );
+    if (fresh.length === 0) return [];
+
+    const lastPostedAt = Date.parse(config.lastDealsPostedAt || '');
+    const intervalMs = dealSettings.dealPostIntervalHours * 60 * 60 * 1000;
+    if (Number.isFinite(lastPostedAt) && Date.now() - lastPostedAt < intervalMs) return [];
+
+    const toPost = fresh.slice(0, Math.max(1, dealSettings.maxDealsPerMessage));
+    const payload = this.buildDealAlert(toPost, dealSettings, { totalAvailable: eligible.length });
+    if (!payload) return [];
+
+    for (const messagePayload of payload.messages) {
+      await channel.send(messagePayload).catch(() => {});
+    }
+
+    const postedAt = new Date().toISOString();
+    for (const deal of fresh) {
+      announced[deal.appId] = { discount: Number(deal.discountPercent), at: postedAt };
+    }
+
+    config.announcedDeals = pruneAnnouncedDeals(announced);
+    config.lastDealsPostedAt = postedAt;
+
+    return toPost;
+  }
+
+  /**
+   * Current top deals for a guild (used by `!steampromos deals` and the dashboard).
+   */
+  async getCurrentDeals(guildId, { limit = 10, minDiscountPercent = null } = {}) {
+    const snapshot = await this.fetchSnapshot();
+    const settings = {
+      ...this.getPromoDealSettings(guildId),
+      limit,
+      ...(minDiscountPercent ? { minDiscountPercent } : {}),
+    };
+
+    const allDeals = Array.isArray(snapshot?.deals) ? snapshot.deals : [];
+    const matching = steamSaleDeals.selectDeals(allDeals, {
+      ...settings,
+      limit: DEAL_SAMPLE_LIMIT,
+    });
+
+    return {
+      deals: matching.slice(0, Math.max(1, limit)),
+      matchingCount: matching.length,
+      settings,
+      totalCount: allDeals.length,
+      dealsSource: snapshot?.dealsSource || null,
+      snapshot,
+    };
+  }
+
   async poll() {
     if (this._pollPromise) {
       return this._pollPromise;
@@ -1625,6 +1982,7 @@ class SteamFreeGamesAlertsManager {
         const channel = await fetchChannelSafe(this.client, config.channelId);
         if (!channel || !channel.isTextBased()) continue;
 
+        const dealSettings = resolveDealSettings(config);
         const announcedIds = Array.isArray(config.announcedIds)
           ? config.announcedIds.map(String)
           : [];
@@ -1635,35 +1993,41 @@ class SteamFreeGamesAlertsManager {
         );
         const removedPromoIds = announcedIds.filter((id) => !currentPromoIdSet.has(String(id)));
 
-        if (newPromos.length > 0) {
-          const payload = this.buildPromoAlert(snapshot, newPromos);
-          if (payload) {
-            for (const messagePayload of payload.messages) {
-              await channel.send(messagePayload).catch(() => {});
+        if (dealSettings.promosEnabled) {
+          if (newPromos.length > 0) {
+            const payload = this.buildPromoAlert(snapshot, newPromos);
+            if (payload) {
+              for (const messagePayload of payload.messages) {
+                await channel.send(messagePayload).catch(() => {});
+              }
             }
+          } else if (removedPromoIds.length > 0) {
+            const removedTitleMap = new Map(
+              announcedMeta
+                .map((entry) => [String(entry?.id || ''), entry?.title])
+                .filter(([id, title]) => id && title)
+            );
+
+            const removedTitles = removedPromoIds
+              .map(
+                (id) =>
+                  removedTitleMap.get(String(id)) ||
+                  `Steam App ${String(id).replace(/^steam_store_/, '')}`
+              )
+              .slice(0, 8);
+
+            const rotationEmbed = createPromoRotationEmbed(snapshot.promoGiveaways, removedTitles);
+            await channel.send({ embeds: [rotationEmbed] }).catch(() => {});
           }
-        } else if (removedPromoIds.length > 0) {
-          const removedTitleMap = new Map(
-            announcedMeta
-              .map((entry) => [String(entry?.id || ''), entry?.title])
-              .filter(([id, title]) => id && title)
-          );
-
-          const removedTitles = removedPromoIds
-            .map(
-              (id) =>
-                removedTitleMap.get(String(id)) ||
-                `Steam App ${String(id).replace(/^steam_store_/, '')}`
-            )
-            .slice(0, 8);
-
-          const rotationEmbed = createPromoRotationEmbed(snapshot.promoGiveaways, removedTitles);
-          await channel.send({ embeds: [rotationEmbed] }).catch(() => {});
         }
 
         config.announcedIds = currentPromoIds;
         config.announcedMeta = snapshot.promoGiveaways.map((g) => ({ id: g.id, title: g.title }));
         config.lastCheckedAt = snapshot.fetchedAt;
+
+        if (dealSettings.salesEnabled) {
+          await this.postDealDigest(config, channel, snapshot, dealSettings);
+        }
       }
 
       await this.save();

@@ -60,7 +60,7 @@ setbalance.js        Set user balance
 setreportchannel.js  Report channel config
 statchannel.js       Stats display channel
 steamfreegames.js    Steam free games alerts
-steampromos.js       Steam promo alerts
+steampromos.js       Steam sale + promo game alerts
 steamupdates.js      Steam update alerts
 xpevent.js           XP event configuration
 ```

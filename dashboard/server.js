@@ -2097,7 +2097,11 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const config = steamFreeGamesAlertsManager.getPromoGuildConfig(guildId);
+                const dealSettings = steamFreeGamesAlertsManager.getPromoDealSettings(guildId);
                 const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot().catch(() => null);
+                const currentDeals = await steamFreeGamesAlertsManager
+                    .getCurrentDeals(guildId, { limit: 12 })
+                    .catch(() => ({ deals: [] }));
 
                 res.json({
                     success: true,
@@ -2105,6 +2109,10 @@ class Dashboard {
                         ...config,
                         channelName: config.channelId ? (guild?.channels?.cache?.get(config.channelId)?.name || `Unknown (${config.channelId})`) : null
                     } : null,
+                    dealSettings,
+                    deals: currentDeals?.deals || [],
+                    dealMatchCount: currentDeals?.matchingCount || 0,
+                    dealsSource: snapshot?.dealsSource || null,
                     promoGiveaways: snapshot?.promoGiveaways || [],
                     freeGiveaways: snapshot?.freeToKeepGiveaways || [],
                     sourceHealth: snapshot?.sourceHealth || null
@@ -2119,7 +2127,7 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
-                const { channelId } = req.body;
+                const { channelId, salesEnabled, promosEnabled, minDiscountPercent, maxDealsPerMessage, dealPostIntervalHours, minReviewCount } = req.body;
 
                 if (!guild) {
                     return res.status(404).json({ success: false, error: 'Guild not found' });
@@ -2134,11 +2142,20 @@ class Dashboard {
                     return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
                 }
 
-                const snapshot = await steamFreeGamesAlertsManager.enablePromoAlerts(guildId, channelId);
+                const options = {};
+                if (typeof salesEnabled === 'boolean') options.salesEnabled = salesEnabled;
+                if (typeof promosEnabled === 'boolean') options.promosEnabled = promosEnabled;
+                if (minDiscountPercent !== undefined) options.minDiscountPercent = minDiscountPercent;
+                if (minReviewCount !== undefined) options.minReviewCount = minReviewCount;
+                if (maxDealsPerMessage !== undefined) options.maxDealsPerMessage = maxDealsPerMessage;
+                if (dealPostIntervalHours !== undefined) options.dealPostIntervalHours = dealPostIntervalHours;
+
+                const snapshot = await steamFreeGamesAlertsManager.enablePromoAlerts(guildId, channelId, options);
                 res.json({
                     success: true,
-                    message: 'Steam promo alert channel saved successfully',
+                    message: 'Steam alert channel saved successfully',
                     config: steamFreeGamesAlertsManager.getPromoGuildConfig(guildId),
+                    dealSettings: steamFreeGamesAlertsManager.getPromoDealSettings(guildId),
                     giveaways: snapshot?.promoGiveaways || []
                 });
             } catch (error) {
@@ -2179,16 +2196,37 @@ class Dashboard {
                 }
 
                 const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot();
+                const current = await steamFreeGamesAlertsManager.getCurrentDeals(guildId, {
+                    limit: steamFreeGamesAlertsManager.getPromoDealSettings(guildId).maxDealsPerMessage
+                }).catch(() => ({ deals: [], settings: {}, totalCount: 0 }));
+
+                let sent = 0;
+
+                if (current.deals.length > 0) {
+                    const dealPayload = steamFreeGamesAlertsManager.buildDealAlert(
+                        current.deals,
+                        current.settings,
+                        { totalAvailable: current.totalCount }
+                    );
+                    for (const messagePayload of dealPayload.messages) {
+                        await channel.send(messagePayload);
+                        sent += 1;
+                    }
+                }
+
                 const payload = steamFreeGamesAlertsManager.buildPromoAlert(snapshot);
-                if (!payload) {
-                    return res.status(400).json({ success: false, error: 'No Steam promo games are available right now.' });
+                if (payload) {
+                    for (const messagePayload of payload.messages) {
+                        await channel.send(messagePayload);
+                        sent += 1;
+                    }
                 }
 
-                for (const messagePayload of payload.messages) {
-                    await channel.send(messagePayload);
+                if (sent === 0) {
+                    return res.status(400).json({ success: false, error: 'No Steam deals or promos are available right now.' });
                 }
 
-                res.json({ success: true, message: `Steam promo test alert sent to #${channel.name}` });
+                res.json({ success: true, message: `Sent ${sent} Steam test message(s) to #${channel.name}` });
             } catch (error) {
                 console.error('Error sending Steam promo test alert:', error);
                 res.status(500).json({ success: false, error: error.message });
@@ -2206,14 +2244,17 @@ class Dashboard {
                 const snapshot = await steamFreeGamesAlertsManager.forceCheckNow();
                 const promoCount = snapshot?.promoGiveaways?.length || 0;
                 const freeCount = snapshot?.freeToKeepGiveaways?.length || 0;
+                const dealCount = snapshot?.deals?.length || 0;
 
                 return res.json({
                     success: true,
-                    message: `Steam promo force check complete. ${promoCount} promo and ${freeCount} free-to-keep game(s) detected.`,
+                    message: `Steam force check complete. ${dealCount} discounted game(s) sampled, ${promoCount} promo and ${freeCount} free-to-keep game(s) detected.`,
                     counts: {
+                        deals: dealCount,
                         promos: promoCount,
                         freeToKeep: freeCount
                     },
+                    dealsSource: snapshot?.dealsSource || null,
                     sourceHealth: snapshot?.sourceHealth || null
                 });
             } catch (error) {
@@ -3260,11 +3301,19 @@ class Dashboard {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
                 const config = steamFreeGamesAlertsManager.getPromoGuildConfig(guildId);
+                const dealSettings = steamFreeGamesAlertsManager.getPromoDealSettings(guildId);
                 const snapshot = await steamFreeGamesAlertsManager.fetchSnapshot().catch(() => null);
+                const currentDeals = await steamFreeGamesAlertsManager
+                    .getCurrentDeals(guildId, { limit: 12 })
+                    .catch(() => ({ deals: [] }));
 
                 res.render('steam-promos', {
                     guild,
                     config: config || null,
+                    dealSettings,
+                    deals: currentDeals?.deals || [],
+                    dealMatchCount: currentDeals?.matchingCount || 0,
+                    dealsSource: snapshot?.dealsSource || null,
                     channels: Array.from(guild.channels.cache.values()).filter(c => c.type === 0),
                     promoGiveaways: snapshot?.promoGiveaways || [],
                     freeGiveaways: snapshot?.freeToKeepGiveaways || [],

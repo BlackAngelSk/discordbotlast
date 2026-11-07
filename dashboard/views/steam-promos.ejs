@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= guild.name %> — Steam Promo Games</title>
+    <title><%= guild.name %> — Steam Deals &amp; Promos</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous">
 </head>
@@ -12,21 +12,38 @@
     <%- include('partials/dashboard-sidebar', { guild, currentPath }) %>
 
     <div class="main-wrapper">
-        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Promo Games' }) %>
+        <%- include('partials/dashboard-topbar', { guild, user, topbarTitle: 'Steam Deals & Promos' }) %>
 
         <main class="content">
+            <% const sourceInfo = typeof sourceHealth === 'undefined' ? {} : (sourceHealth || {}); %>
+            <% const dealConf = typeof dealSettings === 'undefined' || !dealSettings ? { salesEnabled: true, promosEnabled: true, minDiscountPercent: 50, maxDealsPerMessage: 8, dealPostIntervalHours: 3 } : dealSettings; %>
+            <% const dealList = typeof deals === 'undefined' ? [] : (deals || []); %>
+            <% const dealMatches = typeof dealMatchCount === 'undefined' ? dealList.length : dealMatchCount; %>
+            <% const dealSource = typeof dealsSource === 'undefined' ? {} : (dealsSource || {}); %>
+
             <div class="page-header">
-                <h1><i class="fab fa-steam" style="color:#f4a318;margin-right:8px"></i>Steam Promo Game Alerts</h1>
-                <p>Get notified when Steam games are available <strong>free to play for a limited time</strong> — free weekends, trials, and temporary promos.</p>
-                <% const sourceInfo = typeof sourceHealth === 'undefined' ? {} : (sourceHealth || {}); %>
-                <% if (sourceInfo.steamDbPromoAvailable === false) { %>
+                <h1><i class="fab fa-steam" style="color:#66c0f4;margin-right:8px"></i>Steam Deals &amp; Promo Alerts</h1>
+                <p>Posts the games that are <strong>actually on sale right now</strong> — ranked by discount and player reviews — plus any limited-time free-play promos.</p>
+                <% if (config?.channelId && dealConf.salesEnabled === false) { %>
+                    <p style="margin-top:8px;color:#f4a318;background:rgba(244,163,24,0.12);border:1px solid rgba(244,163,24,0.35);border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%">
+                        <i class="fas fa-triangle-exclamation"></i> Sale alerts are currently <strong>off</strong> — only free-play promos will be posted.
+                    </p>
+                <% } %>
+                <% if ((dealSource.totalDiscounted || 0) > 0) { %>
+                    <p style="margin-top:8px;color:var(--text-secondary);font-size:0.9rem">
+                        <i class="fas fa-store"></i>
+                        Steam lists <strong><%= dealSource.totalDiscounted.toLocaleString() %></strong> discounted products in region <strong><%= (dealSource.region || 'sk').toUpperCase() %></strong>; the bot samples the best <%= dealSource.sampledCount || 0 %> for alerts.
+                    </p>
+                <% } %>
+                <% if (Array.isArray(dealSource.sources) && dealSource.sources.length > 0 && !dealSource.sources.includes('steam_search')) { %>
                     <p style="margin-top:8px;color:#f4a318;background:rgba(244,163,24,0.12);border:1px solid rgba(244,163,24,0.35);border-radius:8px;padding:8px 10px;display:inline-block;max-width:100%">
                         <i class="fas fa-triangle-exclamation"></i>
-                        SteamDB promo source is currently unavailable.
-                        Showing fallback Steam Store results instead.
-                        <% if ((sourceInfo.steamStorePromoFallbackCount || 0) > 0) { %>
-                            Detected <strong><%= sourceInfo.steamStorePromoFallbackCount %></strong> fallback promo game<%= sourceInfo.steamStorePromoFallbackCount === 1 ? '' : 's' %>.
-                        <% } %>
+                        Steam's store endpoint is rate-limiting the bot — deals are coming from <strong>CheapShark</strong> (USD prices) until it clears.
+                    </p>
+                <% } %>
+                <% if (dealSource.stale) { %>
+                    <p style="margin-top:8px;color:var(--text-secondary);font-size:0.9rem">
+                        <i class="fas fa-clock-rotate-left"></i> Showing the last successful deal fetch (all sources unavailable right now).
                     </p>
                 <% } %>
             </div>
@@ -35,7 +52,7 @@
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Status</span><div class="stat-card-icon <%= config?.channelId ? 'green' : 'yellow' %>"><i class="fas fa-bell"></i></div></div>
                     <div class="stat-card-value"><%= config?.channelId ? 'On' : 'Off' %></div>
-                    <div class="stat-card-change"><i class="fas fa-clock"></i> Limited-time promos only</div>
+                    <div class="stat-card-change"><i class="fas fa-tags"></i> <%= dealConf.salesEnabled === false ? 'Free promos only' : 'Sales + free promos' %></div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Alert Channel</span><div class="stat-card-icon blue"><i class="fas fa-hashtag"></i></div></div>
@@ -43,9 +60,14 @@
                     <div class="stat-card-change"><i class="fas fa-message"></i> Destination channel</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card-header"><span class="stat-card-label">Free Weekends</span><div class="stat-card-icon orange"><i class="fab fa-steam"></i></div></div>
+                    <div class="stat-card-header"><span class="stat-card-label">Deals Found</span><div class="stat-card-icon orange"><i class="fas fa-fire"></i></div></div>
+                    <div class="stat-card-value"><%= dealMatches %></div>
+                    <div class="stat-card-change"><i class="fas fa-percent"></i> Matching filter (<%= dealConf.minDiscountPercent %>%+, <%= dealConf.minReviewCount || 100 %>+ reviews)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Free Play</span><div class="stat-card-icon orange"><i class="fas fa-stopwatch"></i></div></div>
                     <div class="stat-card-value"><%= promoGiveaways.length %></div>
-                    <div class="stat-card-change"><i class="fas fa-stopwatch"></i> Temporarily free (removed after)</div>
+                    <div class="stat-card-change"><i class="fas fa-clock"></i> Limited-time promos</div>
                 </div>
             </div>
 
@@ -53,7 +75,7 @@
                 <div class="card-header">
                     <div>
                         <div class="card-title"><i class="fas fa-sliders"></i> Alert Setup</div>
-                        <div class="card-subtitle">Choose a channel to post limited-time Steam promo alerts, then save. Use the test button to preview an alert.</div>
+                        <div class="card-subtitle">Pick a channel and how aggressive the deal filter should be. Use the test button to preview a real alert.</div>
                     </div>
                 </div>
 
@@ -67,12 +89,63 @@
                                     <option value="<%= channel.id %>" <%= config?.channelId === channel.id ? 'selected' : '' %>>#<%= channel.name %></option>
                                 <% }) %>
                             </select>
-                            <div class="form-hint">The bot will post new limited-time Steam free weekend and trial alerts here.</div>
+                            <div class="form-hint">Steam deal digests and free-weekend alerts are posted here.</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Minimum discount</label>
+                            <select name="minDiscountPercent" class="form-control">
+                                <% [30, 40, 50, 60, 70, 80].forEach(percent => { %>
+                                    <option value="<%= percent %>" <%= Number(dealConf.minDiscountPercent) === percent ? 'selected' : '' %>><%= percent %>% off or more</option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">Lower = more deals, higher = only deep cuts.</div>
                         </div>
                     </div>
 
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Deals per message</label>
+                            <select name="maxDealsPerMessage" class="form-control">
+                                <% [4, 6, 8, 10].forEach(count => { %>
+                                    <option value="<%= count %>" <%= Number(dealConf.maxDealsPerMessage) === count ? 'selected' : '' %>><%= count %> games</option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Digest interval</label>
+                            <select name="dealPostIntervalHours" class="form-control">
+                                <% [1, 2, 3, 6, 12, 24].forEach(hours => { %>
+                                    <option value="<%= hours %>" <%= Number(dealConf.dealPostIntervalHours) === hours ? 'selected' : '' %>>Every <%= hours %>h at most</option>
+                                <% }) %>
+                            </select>
+                            <div class="form-hint">Throttle so a Steam sale doesn't flood the channel.</div>
+                        </div>
+                    </div>
+
+                    <div class="toggle-group">
+                        <div class="toggle-info">
+                            <h4>Steam sale alerts</h4>
+                            <p>Post games that are on sale right now (discount + price + review score).</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="salesEnabled" <%= dealConf.salesEnabled === false ? '' : 'checked' %>>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="toggle-group">
+                        <div class="toggle-info">
+                            <h4>Free-play promos</h4>
+                            <p>Also post free weekends / temporary play-for-free events (rare).</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="promosEnabled" <%= dealConf.promosEnabled === false ? '' : 'checked' %>>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
                     <div class="form-actions" style="justify-content:flex-start">
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Channel</button>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
                         <button type="button" class="btn btn-secondary" id="refreshSteamPromosBtn"><i class="fas fa-rotate"></i> Force Check Now</button>
                         <button type="button" class="btn btn-secondary" id="testSteamPromosBtn"><i class="fas fa-flask"></i> Send Test Alert</button>
                         <button type="button" class="btn btn-danger" id="clearSteamPromosBtn"><i class="fas fa-trash"></i> Disable Alerts</button>
@@ -80,7 +153,51 @@
                 </form>
             </div>
 
-            <%# Section 1: Steam Free Weekend / Promo Play events %>
+            <%# Section 1: games on sale right now %>
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-fire" style="color:#66c0f4"></i> On Sale Right Now</div>
+                        <div class="card-subtitle">Best current discounts that pass this server's filter — this is what the bot posts.</div>
+                    </div>
+                </div>
+
+                <% if (dealList.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+                        <% dealList.forEach(deal => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2);border-left:3px solid #66c0f4">
+                                <% if (deal.imageUrl) { %>
+                                    <img src="<%= deal.imageUrl %>" alt="<%= deal.title %>" loading="lazy" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px">
+                                    <span style="background:#66c0f4;color:#0b1a24;border-radius:6px;padding:1px 7px;font-size:0.8rem;margin-right:6px">-<%= deal.discountPercent %>%</span>
+                                    <%= deal.title %>
+                                </div>
+                                <div class="form-hint" style="margin-bottom:10px">
+                                    <% if (deal.priceOriginal) { %>
+                                        <span style="text-decoration:line-through;opacity:0.7"><%= deal.priceOriginal %></span>
+                                    <% } %>
+                                    <% if (deal.priceFinal) { %>
+                                        &nbsp;→&nbsp;<strong style="color:#66c0f4"><%= deal.priceFinal %></strong>
+                                    <% } %>
+                                    <% if (deal.reviewPercent) { %>
+                                        &nbsp;·&nbsp;<i class="fas fa-thumbs-up"></i> <%= deal.reviewPercent %>%
+                                        <% if (deal.reviewCount) { %>(<%= deal.reviewCount.toLocaleString() %>)<% } %>
+                                    <% } %>
+                                    <% if (deal.endsAt) { %>
+                                        &nbsp;·&nbsp;<i class="fas fa-stopwatch"></i> ends <%= new Date(deal.endsAt).toLocaleString() %>
+                                    <% } %>
+                                </div>
+                                <a href="<%= deal.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> View on Steam</a>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fas fa-fire"></i> No deals match the current filter. Lower the minimum discount or press Force Check Now.</div>
+                <% } %>
+            </div>
+
+            <%# Section 2: Steam free weekend / promo play events %>
             <div class="card" style="margin-bottom:20px">
                 <div class="card-header">
                     <div>
@@ -115,7 +232,7 @@
                         <% }) %>
                     </div>
                 <% } else { %>
-                    <div class="table-empty"><i class="fas fa-stopwatch"></i> No Steam free weekends or play events are active right now. The bot will alert when one starts.</div>
+                    <div class="table-empty"><i class="fas fa-stopwatch"></i> No Steam free weekends or play events are active right now.</div>
                 <% } %>
             </div>
 
@@ -146,13 +263,13 @@ refreshButton.addEventListener('click', async () => {
 
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to force check Steam promos');
+            throw new Error(result.error || 'Failed to force check Steam deals');
         }
 
-        dashboardUI.showToast(result.message || 'Steam promos force check completed.', 'success');
+        dashboardUI.showToast(result.message || 'Steam force check completed.', 'success');
         setTimeout(() => location.reload(), 700);
     } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to force check Steam promos.', 'error');
+        dashboardUI.showToast(error.message || 'Failed to force check Steam deals.', 'error');
     } finally {
         refreshButton.disabled = false;
         refreshButton.innerHTML = original;
@@ -166,19 +283,28 @@ form.addEventListener('submit', async (event) => {
     saveButton.innerHTML = '<span class="spinner"></span> Saving...';
 
     try {
+        const payload = {
+            channelId: channelSelect.value,
+            salesEnabled: form.querySelector('input[name="salesEnabled"]').checked,
+            promosEnabled: form.querySelector('input[name="promosEnabled"]').checked,
+            minDiscountPercent: Number(form.querySelector('select[name="minDiscountPercent"]').value),
+            maxDealsPerMessage: Number(form.querySelector('select[name="maxDealsPerMessage"]').value),
+            dealPostIntervalHours: Number(form.querySelector('select[name="dealPostIntervalHours"]').value)
+        };
+
         const response = await fetch(`/api/steam-promos/${guildId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channelId: channelSelect.value })
+            body: JSON.stringify(payload)
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to save Steam promo alert channel');
+            throw new Error(result.error || 'Failed to save Steam alert settings');
         }
-        dashboardUI.showToast('Steam promo alert channel saved.', 'success');
+        dashboardUI.showToast('Steam alert settings saved.', 'success');
         setTimeout(() => location.reload(), 600);
     } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to save Steam promo alert channel.', 'error');
+        dashboardUI.showToast(error.message || 'Failed to save Steam alert settings.', 'error');
     } finally {
         saveButton.disabled = false;
         saveButton.innerHTML = original;
@@ -198,11 +324,11 @@ testButton.addEventListener('click', async () => {
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to send Steam promo test alert');
+            throw new Error(result.error || 'Failed to send Steam test alert');
         }
-        dashboardUI.showToast(result.message || 'Steam promo test alert sent.', 'success');
+        dashboardUI.showToast(result.message || 'Steam test alert sent.', 'success');
     } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to send Steam promo test alert.', 'error');
+        dashboardUI.showToast(error.message || 'Failed to send Steam test alert.', 'error');
     } finally {
         testButton.disabled = false;
         testButton.innerHTML = original;
@@ -210,7 +336,7 @@ testButton.addEventListener('click', async () => {
 });
 
 clearButton.addEventListener('click', async () => {
-    if (!confirm('Disable Steam promo game alerts for this server?')) {
+    if (!confirm('Disable Steam deal and promo alerts for this server?')) {
         return;
     }
 
@@ -225,12 +351,12 @@ clearButton.addEventListener('click', async () => {
         });
         const result = await response.json();
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Failed to disable Steam promo alerts');
+            throw new Error(result.error || 'Failed to disable Steam alerts');
         }
-        dashboardUI.showToast('Steam promo game alerts disabled.', 'success');
+        dashboardUI.showToast('Steam deal and promo alerts disabled.', 'success');
         setTimeout(() => location.reload(), 500);
     } catch (error) {
-        dashboardUI.showToast(error.message || 'Failed to disable Steam promo alerts.', 'error');
+        dashboardUI.showToast(error.message || 'Failed to disable Steam alerts.', 'error');
     } finally {
         clearButton.disabled = false;
         clearButton.innerHTML = original;
