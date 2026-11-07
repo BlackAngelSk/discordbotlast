@@ -72,16 +72,16 @@ Not every feature is available in both styles, but most major systems support on
 
 ## Owner and Operations Commands
 
-| Command                              | Purpose                                                    |
-| ------------------------------------ | ---------------------------------------------------------- |
-| `/mongodb-space`                     | Check MongoDB storage usage                                |
-| `/mongodb-sync status`               | View sync configuration                                    |
-| `/mongodb-sync schedule`             | Switch between manual and timed updates                    |
-| `/mongodb-sync run`                  | Trigger a sync immediately                                 |
-| `/force-update-check [apply_update]` | Force-check GitHub for updates now (optionally check-only) |
+| Command                              | Purpose                                                        |
+| ------------------------------------ | -------------------------------------------------------------- |
+| `/mongodb-space`                     | Check MongoDB storage usage                                    |
+| `/mongodb-sync status`               | View sync configuration                                        |
+| `/mongodb-sync schedule`             | Switch between manual and timed updates                        |
+| `/mongodb-sync run`                  | Trigger a sync immediately                                     |
+| `/force-update-check [apply_update]` | Force-check GitHub for updates now (optionally check-only)     |
 | `/testcommands`                      | Simulate every slash command; posts progress and a .txt report |
-| `/system-stats`                      | Show CPU and memory information                            |
-| `/botstatus`                         | Review bot health and status                               |
+| `/system-stats`                      | Show CPU and memory information                                |
+| `/botstatus`                         | Review bot health and status                                   |
 
 ## Command Discovery
 
