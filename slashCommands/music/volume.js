@@ -14,11 +14,22 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    const queue = interaction.client.queues.get(interaction.guild.id);
+    const queues = interaction.client.queues;
+    const queue = queues?.get?.(interaction.guild.id);
 
     if (!queue || !queue.connection) {
       return interaction.reply({
         content: '❌ There is no music playing!',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    // A queue can outlive its audio resource (track ended, player destroyed).
+    // Without a live resource there is nothing to change the volume on.
+    const volumeController = queue.resource?.volume;
+    if (!volumeController || typeof volumeController.setVolume !== 'function') {
+      return interaction.reply({
+        content: '❌ There is no music playing right now — start a track first.',
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -42,7 +53,7 @@ module.exports = {
 
     const volume = interaction.options.getInteger('level');
     queue.volume = volume;
-    queue.resource.volume.setVolume(volume / 100);
+    volumeController.setVolume(volume / 100);
 
     const embed = new EmbedBuilder()
       .setColor(0x5865f2)

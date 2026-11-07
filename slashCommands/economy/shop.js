@@ -7,14 +7,31 @@ const {
 } = require('discord.js');
 const economyManager = require('../../utils/economyManager');
 
+// Discord hard limits: 25 options per select menu, 100 chars per label/description.
+const MAX_SHOP_OPTIONS = 25;
+const MAX_OPTION_TEXT = 100;
+const MAX_EMBED_DESCRIPTION = 4000;
+
+function shorten(value, maxLength = MAX_OPTION_TEXT) {
+  const text = String(value ?? '');
+  return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('shop')
     .setDescription('View and purchase items from the server shop'),
 
   async execute(interaction) {
-    const shopItems = economyManager.getShopItems(interaction.guildId);
+    const shopItems = economyManager.getShopItems(interaction.guildId) || [];
     const userData = economyManager.getUserData(interaction.guildId, interaction.user.id);
+
+    if (shopItems.length === 0) {
+      return interaction.reply({
+        content: '🛒 The server shop is empty right now.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
     const itemsList = shopItems
       .map(
@@ -26,19 +43,32 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor('#00FFFF')
       .setTitle('🛒 Server Shop')
-      .setDescription(itemsList)
+      .setDescription(shorten(itemsList, MAX_EMBED_DESCRIPTION))
       .addFields({ name: 'Your Balance', value: `💵 ${userData.balance} coins` })
       .setFooter({ text: 'Use the menu below to purchase items' })
       .setTimestamp();
+
+    // A select menu can only hold 25 options with unique values — dedupe ids and cap.
+    const menuItems = [];
+    const seenIds = new Set();
+
+    for (const [index, item] of shopItems.entries()) {
+      const id = String(item?.id ?? `item_${index}`);
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      menuItems.push(item);
+      if (menuItems.length >= MAX_SHOP_OPTIONS) break;
+    }
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId('shop_purchase')
       .setPlaceholder('Select an item to purchase')
       .addOptions(
-        shopItems.map((item) => ({
-          label: item.name,
-          description: `${item.price} coins`,
-          value: item.id,
+        menuItems.map((item, index) => ({
+          label: shorten(item.name || `Item ${index + 1}`),
+          description: shorten(`${item.price} coins`),
+          // values must be unique and non-empty
+          value: shorten(item.id || `item_${index}`, MAX_OPTION_TEXT),
           emoji: item.type === 'role' ? '🎭' : '🏅',
         }))
       );

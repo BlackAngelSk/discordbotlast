@@ -99,8 +99,12 @@ module.exports = {
       }
 
       const lines = names.slice(0, 30).map((cmd) => {
-        const value = commands[cmd] || '';
-        return `**!${cmd}** - ${value.substring(0, 60)}${value.length > 60 ? '...' : ''}`;
+        const entry = commands[cmd];
+        // Commands are stored as objects ({ response, cooldown, ... }) since the
+        // 2.0 schema — older data may still be a plain string.
+        const value = typeof entry === 'string' ? entry : String(entry?.response ?? '');
+        const preview = value.substring(0, 60);
+        return `**!${cmd}** - ${preview}${value.length > 60 ? '...' : ''}`;
       });
 
       const embed = new EmbedBuilder()

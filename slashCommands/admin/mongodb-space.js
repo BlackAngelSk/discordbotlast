@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const {
   MONGODB_STORAGE_LIMIT,
+  isMongoDriverAvailable,
   validateMongoUri,
   connectMongoWithRetry,
 } = require('../../check-mongodb-space');
@@ -36,6 +37,14 @@ module.exports = {
     try {
       const mongoUri = process.env.MONGODB_URI;
       const dbName = process.env.MONGODB_DBNAME || 'discord-bot';
+
+      if (!isMongoDriverAvailable()) {
+        return interaction.editReply({
+          content:
+            '⚠️ MongoDB support is not installed.\n' +
+            'The bot stores data in SQLite by default — run `npm install mongodb` if you still want this check.',
+        });
+      }
 
       const uriError = validateMongoUri(mongoUri);
       if (uriError) {
@@ -152,6 +161,10 @@ module.exports = {
       embed.setTimestamp();
       return interaction.editReply({ embeds: [embed] });
     } catch (error) {
+      if (error?.code === 'MONGO_DRIVER_MISSING') {
+        return interaction.editReply({ content: `⚠️ ${error.message}` });
+      }
+
       const isBadAuth =
         error?.code === 8000 || /bad auth|authentication failed/i.test(error?.message || '');
       if (isBadAuth) {

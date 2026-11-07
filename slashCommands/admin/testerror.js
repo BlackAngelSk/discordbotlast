@@ -12,6 +12,10 @@ module.exports = {
         .addChoices({ name: 'console', value: 'console' }, { name: 'handler', value: 'handler' })
     ),
 
+  // /testcommands must not run this — throwing an error is the whole point.
+  skipInSimulation: true,
+  simulationSkipReason: 'emits an intentional test error',
+
   async execute(interaction) {
     const ownerId = process.env.BOT_OWNER_ID;
     if (!ownerId || interaction.user.id !== ownerId) {

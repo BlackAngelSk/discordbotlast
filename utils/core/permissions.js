@@ -78,8 +78,22 @@ function requireDJ(execute) {
   };
 }
 
+/**
+ * Boolean DJ check used by music commands (`await isDJ(member)` works too).
+ * Returns false instead of throwing when member data is incomplete.
+ */
+function isDJ(member) {
+  try {
+    if (!member?.guild || !member?.roles?.cache) return false;
+    return hasDJPermission(member);
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
   hasDJPermission,
+  isDJ,
   requireDJ,
   hasBotWatcherPermission,
   requireBotWatcher,
