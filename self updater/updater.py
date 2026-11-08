@@ -604,7 +604,7 @@ def _run_update_with_snapshot(
     return changed
 
 
-def _summarize_error_body(raw: Any) -> str:
+def _summarize_error_body(raw: Any, limit: int = ERROR_BODY_PREVIEW_CHARS) -> str:
     """Turn GitHub's HTML error page into one readable line (never dump 40 KB)."""
     text = raw.decode("utf-8", errors="ignore") if isinstance(raw, (bytes, bytearray)) else str(raw or "")
     text = re.sub(r"<script[\s\S]*?</script>", " ", text, flags=re.I)
@@ -614,8 +614,8 @@ def _summarize_error_body(raw: Any) -> str:
 
     if not text:
         return ""
-    if len(text) > ERROR_BODY_PREVIEW_CHARS:
-        return f"{text[:ERROR_BODY_PREVIEW_CHARS]}…"
+    if len(text) > limit:
+        return f"{text[:limit]}…"
     return text
 
 
@@ -1436,7 +1436,7 @@ def redo_fixed_repo_loop(
                 health_cmd=health_cmd,
             )
         except UpdaterError as e:
-            _print(f"Cycle error: {e}")
+            _print(f"Cycle error: {_summarize_error_body(e, limit=400)}")
 
         _print(f"Waiting {interval} seconds for next check.")
         time.sleep(interval)
@@ -1530,7 +1530,7 @@ def update_from_github_loop(
                 health_cmd=health_cmd,
             )
         except UpdaterError as e:
-            _print(f"Cycle error: {e}")
+            _print(f"Cycle error: {_summarize_error_body(e, limit=400)}")
 
         _print(f"Waiting {interval} seconds for next check.")
         time.sleep(interval)
@@ -1696,7 +1696,7 @@ def run_ui() -> None:
                             )
                             log("Cycle done")
                         except UpdaterError as e:
-                            log(f"Cycle error: {e}")
+                            log(f"Cycle error: {_summarize_error_body(e, limit=400)}")
 
                         if worker["stop"].wait(interval):
                             break
