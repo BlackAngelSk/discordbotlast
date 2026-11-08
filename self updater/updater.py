@@ -29,8 +29,10 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import hashlib
+import html
 import json
 import os
+import re
 import socket
 import shlex
 import shutil
@@ -71,6 +73,11 @@ RELEASE_CHANNEL_TAGS: Dict[str, str] = {
 
 NETWORK_RETRY_ATTEMPTS = 3
 NETWORK_RETRY_BASE_DELAY_SECONDS = 2
+# GitHub (and its CDN) throws transient 5xx pages during incidents — retry those.
+RETRY_HTTP_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+ERROR_BODY_PREVIEW_CHARS = 180
+ZIP_MAGIC = b"PK\x03\x04"
+CODELOAD_URL = "https://codeload.github.com"
 
 LOG_JSON = False
 LOG_FILE: Optional[Path] = None
@@ -597,6 +604,41 @@ def _run_update_with_snapshot(
     return changed
 
 
+def _summarize_error_body(raw: Any) -> str:
+    """Turn GitHub's HTML error page into one readable line (never dump 40 KB)."""
+    text = raw.decode("utf-8", errors="ignore") if isinstance(raw, (bytes, bytearray)) else str(raw or "")
+    text = re.sub(r"<script[\s\S]*?</script>", " ", text, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(r"\s+", " ", html.unescape(text)).strip()
+
+    if not text:
+        return ""
+    if len(text) > ERROR_BODY_PREVIEW_CHARS:
+        return f"{text[:ERROR_BODY_PREVIEW_CHARS]}…"
+    return text
+
+
+def _retry_after_seconds(headers: Any, attempt: int) -> float:
+    """Honour Retry-After when GitHub sends it, otherwise linear backoff."""
+    if headers is not None:
+        try:
+            retry_after = headers.get("Retry-After")
+        except Exception:
+            retry_after = None
+        if retry_after:
+            try:
+                return max(1.0, float(retry_after))
+            except (TypeError, ValueError):
+                pass
+    return NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+
+
+def _is_html_payload(payload: bytes) -> bool:
+    head = payload[:512].lstrip().lower()
+    return head.startswith(b"<!doctype html") or head.startswith(b"<html")
+
+
 def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
     headers = {
         "Accept": "application/vnd.github+json",
@@ -614,8 +656,19 @@ def _request_json(url: str, token: Optional[str] = None) -> Dict[str, Any]:
                 data = resp.read().decode("utf-8")
             break
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="ignore")
-            raise UpdaterError(f"GitHub API HTTP {e.code}: {body or e.reason}") from e
+            body = e.read()
+            e.close()
+            if e.code in RETRY_HTTP_STATUSES and attempt < NETWORK_RETRY_ATTEMPTS:
+                delay = _retry_after_seconds(e.headers, attempt)
+                _print(
+                    f"GitHub API HTTP {e.code}, retrying in {delay:g}s "
+                    f"(attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})"
+                )
+                time.sleep(delay)
+                continue
+
+            detail = _summarize_error_body(body) or str(e.reason)
+            raise UpdaterError(f"GitHub API HTTP {e.code}: {detail}") from e
         except urllib.error.URLError as e:
             if isinstance(e.reason, ssl.SSLCertVerificationError):
                 raise UpdaterError(_cert_error_hint()) from e
@@ -659,20 +712,48 @@ def _request_json_conditional(
     if etag:
         headers["If-None-Match"] = etag
 
-    req = urllib.request.Request(url, headers=headers)
-    try:
-        with urllib.request.urlopen(req, timeout=30, context=_build_ssl_context()) as resp:
-            data = resp.read().decode("utf-8")
-            new_etag = resp.headers.get("ETag")
-    except urllib.error.HTTPError as e:
-        if e.code == 304:
-            return None, etag, True
-        body = e.read().decode("utf-8", errors="ignore")
-        raise UpdaterError(f"GitHub API HTTP {e.code}: {body or e.reason}") from e
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ssl.SSLCertVerificationError):
-            raise UpdaterError(_cert_error_hint()) from e
-        raise UpdaterError(f"Network error while calling GitHub API: {e.reason}") from e
+    last_error: Optional[Exception] = None
+
+    for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=30, context=_build_ssl_context()) as resp:
+                data = resp.read().decode("utf-8")
+                new_etag = resp.headers.get("ETag")
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 304:
+                e.close()
+                return None, etag, True
+
+            body = e.read()
+            e.close()
+
+            if e.code in RETRY_HTTP_STATUSES and attempt < NETWORK_RETRY_ATTEMPTS:
+                delay = _retry_after_seconds(e.headers, attempt)
+                _print(
+                    f"GitHub API HTTP {e.code}, retrying in {delay:g}s "
+                    f"(attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})"
+                )
+                time.sleep(delay)
+                continue
+
+            detail = _summarize_error_body(body) or str(e.reason)
+            raise UpdaterError(f"GitHub API HTTP {e.code}: {detail}") from e
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ssl.SSLCertVerificationError):
+                raise UpdaterError(_cert_error_hint()) from e
+
+            last_error = e
+            is_timeout = isinstance(e.reason, TimeoutError) or isinstance(e.reason, socket.timeout)
+            if not is_timeout or attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise UpdaterError(f"Network error while calling GitHub API: {e.reason}") from e
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"GitHub API timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
+    else:
+        raise UpdaterError("GitHub API request failed after retries") from last_error
 
     try:
         return json.loads(data), new_etag, False
@@ -680,7 +761,13 @@ def _request_json_conditional(
         raise UpdaterError("Invalid JSON response from GitHub API") from e
 
 
-def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Path:
+def _download_to_file(
+    url: str,
+    output: Path,
+    token: Optional[str] = None,
+    *,
+    expect_zip: bool = False,
+) -> Path:
     if DRY_RUN:
         _dry_run_note("download file", url=url, output=str(output))
         return output
@@ -691,17 +778,44 @@ def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Pa
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
-    req = urllib.request.Request(url, headers=headers)
     last_error: Optional[Exception] = None
 
     for attempt in range(1, NETWORK_RETRY_ATTEMPTS + 1):
+        req = urllib.request.Request(url, headers=headers)
         try:
-            with urllib.request.urlopen(req, timeout=120, context=_build_ssl_context()) as resp, output.open("wb") as f:
-                shutil.copyfileobj(resp, f)
-            break
+            with urllib.request.urlopen(req, timeout=120, context=_build_ssl_context()) as resp:
+                payload = resp.read()
+
+            if not payload:
+                raise UpdaterError("Downloaded file is empty")
+
+            # GitHub serves "Unicorn!" HTML error pages with a 200-ish body during
+            # incidents, and codeload can return an HTML login page; never install those.
+            if expect_zip and not payload.startswith(ZIP_MAGIC):
+                if _is_html_payload(payload):
+                    raise UpdaterError(
+                        f"Download returned an HTML error page instead of a ZIP archive: "
+                        f"{_summarize_error_body(payload) or 'unknown GitHub error'}"
+                    )
+                raise UpdaterError("Downloaded file is not a valid ZIP archive")
+
+            output.write_bytes(payload)
+            return output
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", errors="ignore")
-            raise UpdaterError(f"Download failed (HTTP {e.code}): {body or e.reason}") from e
+            body = e.read()
+            e.close()
+            detail = _summarize_error_body(body) or str(e.reason)
+
+            if e.code in RETRY_HTTP_STATUSES and attempt < NETWORK_RETRY_ATTEMPTS:
+                delay = _retry_after_seconds(e.headers, attempt)
+                _print(
+                    f"Download failed (HTTP {e.code}), retrying in {delay:g}s "
+                    f"(attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})"
+                )
+                time.sleep(delay)
+                continue
+
+            raise UpdaterError(f"Download failed (HTTP {e.code}): {detail}") from e
         except urllib.error.URLError as e:
             if isinstance(e.reason, ssl.SSLCertVerificationError):
                 raise UpdaterError(_cert_error_hint()) from e
@@ -714,6 +828,15 @@ def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Pa
             delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
             _print(f"Download timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
             time.sleep(delay)
+        except UpdaterError as e:
+            # HTML error page / truncated archive — retry, GitHub incidents are brief.
+            last_error = e
+            if attempt >= NETWORK_RETRY_ATTEMPTS:
+                raise
+
+            delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
+            _print(f"{e} — retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
+            time.sleep(delay)
         except (TimeoutError, socket.timeout) as e:
             last_error = e
             if attempt >= NETWORK_RETRY_ATTEMPTS:
@@ -722,11 +845,13 @@ def _download_to_file(url: str, output: Path, token: Optional[str] = None) -> Pa
             delay = NETWORK_RETRY_BASE_DELAY_SECONDS * attempt
             _print(f"Download timeout, retrying in {delay}s (attempt {attempt}/{NETWORK_RETRY_ATTEMPTS})")
             time.sleep(delay)
+        finally:
+            # Never leave a half-written archive behind for the extractor.
+            if output.exists() and output.stat().st_size == 0:
+                output.unlink(missing_ok=True)
+
     else:
         raise UpdaterError("Download failed after retries") from last_error
-
-    if output.stat().st_size == 0:
-        raise UpdaterError("Downloaded file is empty")
 
     return output
 
@@ -772,6 +897,23 @@ def _get_release_data_conditional(
     return _request_json_conditional(url, token=token, etag=etag)
 
 
+def _source_archive_urls(owner: str, name: str, ref: str) -> list[str]:
+    """Mirrors for the same archive; GitHub's API/CDN can 5xx independently."""
+    safe_owner = urllib.parse.quote(owner)
+    safe_name = urllib.parse.quote(name)
+    safe_ref = urllib.parse.quote(ref)
+
+    return [
+        # API endpoint (redirects to codeload, supports Authorization)
+        f"{GITHUB_API}/repos/{safe_owner}/{safe_name}/zipball/{safe_ref}",
+        # codeload direct — what the API redirects to
+        f"{CODELOAD_URL}/{safe_owner}/{safe_name}/zip/{safe_ref}",
+        # public archive links (branch + tag variants)
+        f"https://github.com/{safe_owner}/{safe_name}/archive/refs/heads/{safe_ref}.zip",
+        f"https://github.com/{safe_owner}/{safe_name}/archive/refs/tags/{safe_ref}.zip",
+    ]
+
+
 def download_repo_source_archive(
     repo: str,
     output: Path,
@@ -779,13 +921,28 @@ def download_repo_source_archive(
     token: Optional[str] = None,
 ) -> Path:
     repo = _ensure_fixed_repo(repo)
+    if "/" not in repo:
+        raise UpdaterError("--repo must be in format owner/repo")
+
     owner, name = repo.split("/", 1)
-    safe_owner = urllib.parse.quote(owner)
-    safe_name = urllib.parse.quote(name)
-    safe_ref = urllib.parse.quote(ref)
-    url = f"{GITHUB_API}/repos/{safe_owner}/{safe_name}/zipball/{safe_ref}"
+    urls = _source_archive_urls(owner, name, ref)
+
     _print(f"Downloading source archive: {repo}@{ref}")
-    return _download_to_file(url, output, token=token)
+
+    failures: list[str] = []
+
+    for index, url in enumerate(urls, start=1):
+        try:
+            return _download_to_file(url, output, token=token, expect_zip=True)
+        except UpdaterError as e:
+            failures.append(f"{urllib.parse.urlsplit(url).netloc}: {e}")
+            if index < len(urls):
+                _print(f"Archive source {index}/{len(urls)} failed, trying fallback…")
+
+    raise UpdaterError(
+        "Source archive download failed from every mirror:\n"
+        + "\n".join(f"  - {failure}" for failure in failures)
+    )
 
 
 def get_repo_commit_sha(repo: str, ref: str = "main", token: Optional[str] = None) -> str:
