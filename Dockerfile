@@ -7,6 +7,10 @@ WORKDIR /app
 # Copy package.json and package-lock.json
 COPY package.json package-lock.json ./
 
+# System FFmpeg: ffmpeg-static is an optional dependency and its glibc binary
+# doesn't run on Alpine, so the player falls back to this one.
+RUN apk add --no-cache ffmpeg
+
 # Install dependencies
 RUN npm ci --only=production
 

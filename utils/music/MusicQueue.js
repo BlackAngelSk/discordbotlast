@@ -5,7 +5,27 @@ const {
   VoiceConnectionStatus,
   NoSubscriberBehavior,
 } = require('@discordjs/voice');
+const fs = require('fs');
 const { resolveYtDlpPath } = require('../ytdlpPathResolver');
+
+/**
+ * Resolve the FFmpeg binary.
+ *
+ * `ffmpeg-static` is an optional dependency: the download can fail (offline CI,
+ * GitHub incidents, unsupported architectures), in which case npm skips it. Fall
+ * back to a system `ffmpeg` on PATH instead of crashing playback.
+ */
+function resolveFfmpegBinary() {
+  try {
+    const staticPath = require('ffmpeg-static');
+    if (staticPath && fs.existsSync(staticPath)) return staticPath;
+  } catch {
+    // Optional dependency missing — handled by the fallback below.
+  }
+
+  console.warn('ffmpeg-static binary is unavailable — falling back to system "ffmpeg" from PATH.');
+  return 'ffmpeg';
+}
 
 class MusicQueue {
   constructor(guildId) {
@@ -305,8 +325,7 @@ class MusicQueue {
 
       // Resolve FFmpeg path once to avoid blocking event loop each song
       if (!this.ffmpegPath) {
-        const staticPath = require('ffmpeg-static');
-        this.ffmpegPath = staticPath || 'ffmpeg';
+        this.ffmpegPath = resolveFfmpegBinary();
       }
       const ffmpegPath = this.ffmpegPath;
 
@@ -660,3 +679,4 @@ class MusicQueue {
 }
 
 module.exports = MusicQueue;
+module.exports.resolveFfmpegBinary = resolveFfmpegBinary;
