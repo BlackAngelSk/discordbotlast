@@ -140,6 +140,39 @@ function keepGame(id, title, endDate = null) {
     assert.strictEqual(channel.sent.length, 0);
   });
 
+  await test('stays silent when steamfreegames already posts to that channel', async () => {
+    const channel = makeChannel();
+    const config = { channelId: '555', announcedKeepIds: [] };
+    const snapshot = { freeToKeepGiveaways: [keepGame('20', 'Owned Elsewhere')] };
+
+    manager.data.guilds.dupGuild = { channelId: '555' };
+    const posted = await manager.postFreeToKeepAlerts(config, channel, snapshot, {
+      guildId: 'dupGuild',
+    });
+
+    assert.strictEqual(posted.length, 0, 'no duplicate post');
+    assert.strictEqual(channel.sent.length, 0);
+    assert.deepStrictEqual(config.announcedKeepIds, ['20'], 'still marked as seen');
+
+    delete manager.data.guilds.dupGuild;
+  });
+
+  await test('posts when the channels differ', async () => {
+    const channel = makeChannel();
+    const config = { channelId: '777', announcedKeepIds: [] };
+    const snapshot = { freeToKeepGiveaways: [keepGame('21', 'Fresh Game')] };
+
+    manager.data.guilds.otherGuild = { channelId: '555' };
+    const posted = await manager.postFreeToKeepAlerts(config, channel, snapshot, {
+      guildId: 'otherGuild',
+    });
+
+    assert.strictEqual(posted.length, 1);
+    assert.strictEqual(channel.sent.length, 2, 'summary + one game embed');
+
+    delete manager.data.guilds.otherGuild;
+  });
+
   // ── Summary ─────────────────────────────────────────────────────────────────
   console.log(`\n${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);

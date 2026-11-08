@@ -1839,8 +1839,11 @@ class SteamFreeGamesAlertsManager {
   /**
    * Post newly-seen free-to-keep games into a guild's alert channel.
    * Used by the combined promo alerts so everything lands in one channel.
+   *
+   * If the legacy `steamfreegames` feature already posts free-to-keep games into
+   * the same channel, this stays silent to avoid duplicates.
    */
-  async postFreeToKeepAlerts(config, channel, snapshot) {
+  async postFreeToKeepAlerts(config, channel, snapshot, { guildId = null } = {}) {
     const giveaways = Array.isArray(snapshot?.freeToKeepGiveaways)
       ? snapshot.freeToKeepGiveaways
       : [];
@@ -1854,6 +1857,15 @@ class SteamFreeGamesAlertsManager {
     config.announcedKeepIds = giveaways.map((giveaway) => giveaway.id);
 
     if (fresh.length === 0) return [];
+
+    const standaloneFreeGames = guildId ? this.data.guilds?.[guildId] : null;
+    if (
+      standaloneFreeGames?.channelId &&
+      String(standaloneFreeGames.channelId) === String(config.channelId)
+    ) {
+      // `steamfreegames` posts the same giveaways here already.
+      return [];
+    }
 
     const payload = this.buildCurrentAlert(snapshot, fresh, { freeToKeep: true });
     if (!payload) return [];
@@ -2080,7 +2092,7 @@ class SteamFreeGamesAlertsManager {
         }
 
         if (dealSettings.freeToKeepEnabled) {
-          await this.postFreeToKeepAlerts(config, channel, snapshot);
+          await this.postFreeToKeepAlerts(config, channel, snapshot, { guildId });
         }
       }
 
