@@ -458,7 +458,7 @@ function createGiveawayEmbed(giveaway, { freeToKeep = false } = {}) {
 
   if (freeToKeep) {
     details.push(
-      '**This is free to KEEP** — add it to your library while the offer lasts and it stays yours forever.'
+      '**This is free to KEEP on Steam** — add it to your library while the offer lasts and it stays yours forever.'
     );
   }
 
@@ -1166,6 +1166,48 @@ async function fetchSteamStorePromosFallback() {
   }
 }
 
+const STEAM_STORE_HOST_PATTERN = /(^|\.)steampowered\.com$/i;
+
+/** True when a giveaway is claimed on Steam itself (store.steampowered.com). */
+function isSteamStoreUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return STEAM_STORE_HOST_PATTERN.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Free-to-keep alerts are Steam-only: third-party key giveaways (GamerPower,
+ * Alienware, Humble, …) and unverifiable listings are dropped.
+ *
+ * A candidate survives only if its link points at the Steam store AND Steam's own
+ * price API confirms a 100%-off paid game right now.
+ *
+ * @param {any} giveaway
+ * @param {{ verifyApp?: (appId: string) => Promise<any> }} [deps]
+ */
+async function confirmSteamFreeToKeep(giveaway, { verifyApp = checkSteamAppForFreeToKeep } = {}) {
+  const url = giveaway?.url;
+  if (!isSteamStoreUrl(url)) return null;
+
+  const appId = extractAppIdFromString(url);
+  if (!appId) return null;
+
+  const verified = await verifyApp(appId).catch(() => null);
+  if (!verified) return null;
+
+  return {
+    ...verified,
+    // Keep the original wording when Steam's metadata is generic.
+    title:
+      verified.title && !/^steam app \d+$/i.test(verified.title)
+        ? verified.title
+        : giveaway.title || verified.title,
+  };
+}
+
 async function checkSteamAppForFreeToKeep(appId) {
   try {
     const details = await steamHttpsGetJson(`${STEAM_APPDETAILS_BASE}${appId}&cc=US`);
@@ -1732,8 +1774,19 @@ class SteamFreeGamesAlertsManager {
       ? []
       : await fetchSteamStoreFreeToKeepFallback();
 
+    // Steam-only rule: third-party key giveaways are not free-to-keep alerts for
+    // this bot. A candidate must live on store.steampowered.com and be confirmed
+    // by Steam's own price API (100% off a paid game) before it is announced.
+    const keepCandidates = mergeUniqueGiveawaysByAppOrTitle(
+      gamerPowerFreeToKeep,
+      steamDbFreeToKeep
+    ).filter((giveaway) => isSteamStoreUrl(giveaway.url));
+    const verifiedKeepGiveaways = (
+      await mapWithConcurrency(keepCandidates, 4, (giveaway) => confirmSteamFreeToKeep(giveaway))
+    ).filter(Boolean);
+
     const freeToKeepGiveaways = mergeUniqueGiveawaysByAppOrTitle(
-      mergeUniqueGiveawaysByAppOrTitle(gamerPowerFreeToKeep, steamDbFreeToKeep),
+      verifiedKeepGiveaways,
       steamStoreKeepFallback
     ).sort((left, right) => {
       const leftEnd = new Date(left.endDate || 0).getTime();
@@ -2108,3 +2161,6 @@ class SteamFreeGamesAlertsManager {
 }
 
 module.exports = new SteamFreeGamesAlertsManager();
+// Exposed for tests and reuse
+module.exports.isSteamStoreUrl = isSteamStoreUrl;
+module.exports.confirmSteamFreeToKeep = confirmSteamFreeToKeep;
