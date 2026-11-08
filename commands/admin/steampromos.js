@@ -5,6 +5,7 @@ const USAGE = [
   '!steampromos list',
   '!steampromos set #channel',
   '!steampromos sales on|off',
+  '!steampromos freekeep on|off',
   '!steampromos min 50',
   '!steampromos interval 3',
   '!steampromos deals [count]',
@@ -79,6 +80,11 @@ module.exports = {
           inline: true,
         },
         {
+          name: 'Free to keep',
+          value: dealSettings.freeToKeepEnabled ? '✅ On' : '❌ Off',
+          inline: true,
+        },
+        {
           name: 'Last checked',
           value: config.lastCheckedAt
             ? `<t:${Math.floor(new Date(config.lastCheckedAt).getTime() / 1000)}:R>`
@@ -131,6 +137,7 @@ module.exports = {
       return message.reply(
         `✅ Steam alerts enabled in ${channel}.\n` +
           `• Sales: **${settings.minDiscountPercent}%+ off** — ${dealCount} discounted games in the current sample\n` +
+          `• Free to keep: posted here whenever a game goes permanently free\n` +
           `• The first digest with the best deals goes out on the next check.`
       );
     }
@@ -156,6 +163,30 @@ module.exports = {
         enabled
           ? '✅ Steam **sales** alerts are on — games on sale will be posted again.'
           : '✅ Steam **sales** alerts are off. Free-play promos stay unchanged.'
+      );
+    }
+
+    if (subcommand === 'freekeep' || subcommand === 'freetokeep' || subcommand === 'keep') {
+      if (!config?.channelId) {
+        return message.reply(
+          '❌ Steam alerts are not enabled yet. Use `!steampromos set #channel` first.'
+        );
+      }
+
+      const mode = String(args[1] || '').toLowerCase();
+      if (!['on', 'off', 'enable', 'disable'].includes(mode)) {
+        return message.reply('❌ Use `!steampromos freekeep on` or `!steampromos freekeep off`.');
+      }
+
+      const enabled = mode === 'on' || mode === 'enable';
+      await steamFreeGamesAlertsManager.updatePromoConfig(message.guild.id, {
+        freeToKeepEnabled: enabled,
+      });
+
+      return message.reply(
+        enabled
+          ? '✅ Free-to-keep alerts are on — new permanently-free Steam games will post here too.'
+          : '✅ Free-to-keep alerts are off. Sale digests and free-play promos stay unchanged.'
       );
     }
 
@@ -258,6 +289,19 @@ module.exports = {
       const promoPayload = steamFreeGamesAlertsManager.buildPromoAlert(current.snapshot);
       if (promoPayload) {
         for (const messagePayload of promoPayload.messages) {
+          await channel.send(messagePayload);
+          sent += 1;
+        }
+      }
+
+      const keepGiveaways = current.snapshot?.freeToKeepGiveaways || [];
+      if (keepGiveaways.length > 0) {
+        const keepPayload = steamFreeGamesAlertsManager.buildCurrentAlert(
+          current.snapshot,
+          keepGiveaways,
+          { freeToKeep: true }
+        );
+        for (const messagePayload of keepPayload.messages) {
           await channel.send(messagePayload);
           sent += 1;
         }

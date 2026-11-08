@@ -2127,7 +2127,7 @@ class Dashboard {
             try {
                 const guildId = req.params.guildId;
                 const guild = this.client.guilds.cache.get(guildId);
-                const { channelId, salesEnabled, promosEnabled, minDiscountPercent, maxDealsPerMessage, dealPostIntervalHours, minReviewCount } = req.body;
+                const { channelId, salesEnabled, promosEnabled, freeToKeepEnabled, minDiscountPercent, maxDealsPerMessage, dealPostIntervalHours, minReviewCount } = req.body;
 
                 if (!guild) {
                     return res.status(404).json({ success: false, error: 'Guild not found' });
@@ -2145,6 +2145,7 @@ class Dashboard {
                 const options = {};
                 if (typeof salesEnabled === 'boolean') options.salesEnabled = salesEnabled;
                 if (typeof promosEnabled === 'boolean') options.promosEnabled = promosEnabled;
+                if (typeof freeToKeepEnabled === 'boolean') options.freeToKeepEnabled = freeToKeepEnabled;
                 if (minDiscountPercent !== undefined) options.minDiscountPercent = minDiscountPercent;
                 if (minReviewCount !== undefined) options.minReviewCount = minReviewCount;
                 if (maxDealsPerMessage !== undefined) options.maxDealsPerMessage = maxDealsPerMessage;

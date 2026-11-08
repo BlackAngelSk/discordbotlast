@@ -16,7 +16,7 @@
 
         <main class="content">
             <% const sourceInfo = typeof sourceHealth === 'undefined' ? {} : (sourceHealth || {}); %>
-            <% const dealConf = typeof dealSettings === 'undefined' || !dealSettings ? { salesEnabled: true, promosEnabled: true, minDiscountPercent: 50, maxDealsPerMessage: 8, dealPostIntervalHours: 3 } : dealSettings; %>
+            <% const dealConf = typeof dealSettings === 'undefined' || !dealSettings ? { salesEnabled: true, promosEnabled: true, freeToKeepEnabled: true, minDiscountPercent: 50, maxDealsPerMessage: 8, dealPostIntervalHours: 3 } : dealSettings; %>
             <% const dealList = typeof deals === 'undefined' ? [] : (deals || []); %>
             <% const dealMatches = typeof dealMatchCount === 'undefined' ? dealList.length : dealMatchCount; %>
             <% const dealSource = typeof dealsSource === 'undefined' ? {} : (dealsSource || {}); %>
@@ -63,6 +63,11 @@
                     <div class="stat-card-header"><span class="stat-card-label">Deals Found</span><div class="stat-card-icon orange"><i class="fas fa-fire"></i></div></div>
                     <div class="stat-card-value"><%= dealMatches %></div>
                     <div class="stat-card-change"><i class="fas fa-percent"></i> Matching filter (<%= dealConf.minDiscountPercent %>%+, <%= dealConf.minReviewCount || 100 %>+ reviews)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Free to Keep</span><div class="stat-card-icon green"><i class="fas fa-gift"></i></div></div>
+                    <div class="stat-card-value"><%= freeGiveaways.length %></div>
+                    <div class="stat-card-change"><i class="fas fa-check"></i> Claimable right now</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card-header"><span class="stat-card-label">Free Play</span><div class="stat-card-icon orange"><i class="fas fa-stopwatch"></i></div></div>
@@ -144,6 +149,17 @@
                         </label>
                     </div>
 
+                    <div class="toggle-group">
+                        <div class="toggle-info">
+                            <h4>Free-to-keep alerts</h4>
+                            <p>Post a message here whenever a Steam game goes permanently free (claim it and it stays yours).</p>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" name="freeToKeepEnabled" <%= dealConf.freeToKeepEnabled === false ? '' : 'checked' %>>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
                     <div class="form-actions" style="justify-content:flex-start">
                         <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Settings</button>
                         <button type="button" class="btn btn-secondary" id="refreshSteamPromosBtn"><i class="fas fa-rotate"></i> Force Check Now</button>
@@ -197,7 +213,46 @@
                 <% } %>
             </div>
 
-            <%# Section 2: Steam free weekend / promo play events %>
+            <%# Section 2: free to keep giveaways %>
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-gift" style="color:#57f287"></i> Free to Keep</div>
+                        <div class="card-subtitle">Games that are permanently free right now — claim before the offer ends and they stay in your library.</div>
+                    </div>
+                </div>
+
+                <% if (freeGiveaways.length > 0) { %>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+                        <% freeGiveaways.forEach(giveaway => { %>
+                            <article class="card" style="margin:0;background:var(--bg-card-2);border-left:3px solid #57f287">
+                                <% if (giveaway.imageUrl) { %>
+                                    <img src="<%= giveaway.imageUrl %>" alt="<%= giveaway.title %>" loading="lazy" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:12px">
+                                <% } %>
+                                <div class="card-title" style="margin-bottom:8px"><%= giveaway.title %></div>
+                                <div class="form-hint" style="margin-bottom:10px">
+                                    <% if (giveaway.worth && !/^n\/a$/i.test(giveaway.worth)) { %>
+                                        <span style="color:#57f287"><i class="fas fa-tag"></i> <%= giveaway.worth %></span>
+                                    <% } else { %>
+                                        <span style="color:#57f287"><i class="fas fa-tag"></i> Free forever</span>
+                                    <% } %>
+                                    <% if (giveaway.endDate) { %>
+                                        &nbsp;·&nbsp;<i class="fas fa-stopwatch"></i> Ends <%= new Date(giveaway.endDate).toLocaleString() %>
+                                    <% } %>
+                                </div>
+                                <% if (giveaway.description) { %>
+                                    <p style="margin:0 0 12px;color:var(--text-secondary);font-size:0.88rem"><%= giveaway.description %></p>
+                                <% } %>
+                                <a href="<%= giveaway.url %>" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm"><i class="fas fa-up-right-from-square"></i> Claim on Steam</a>
+                            </article>
+                        <% }) %>
+                    </div>
+                <% } else { %>
+                    <div class="table-empty"><i class="fas fa-gift"></i> No free-to-keep giveaways are active right now — the bot will post here when one shows up.</div>
+                <% } %>
+            </div>
+
+            <%# Section 3: Steam free weekend / promo play events %>
             <div class="card" style="margin-bottom:20px">
                 <div class="card-header">
                     <div>
@@ -287,6 +342,7 @@ form.addEventListener('submit', async (event) => {
             channelId: channelSelect.value,
             salesEnabled: form.querySelector('input[name="salesEnabled"]').checked,
             promosEnabled: form.querySelector('input[name="promosEnabled"]').checked,
+            freeToKeepEnabled: form.querySelector('input[name="freeToKeepEnabled"]').checked,
             minDiscountPercent: Number(form.querySelector('select[name="minDiscountPercent"]').value),
             maxDealsPerMessage: Number(form.querySelector('select[name="maxDealsPerMessage"]').value),
             dealPostIntervalHours: Number(form.querySelector('select[name="dealPostIntervalHours"]').value)

@@ -201,17 +201,25 @@ function formatGiveawayLine(giveaway) {
   return `${parts.join(' - ')}\n${giveaway.url}`;
 }
 
-function createSummaryEmbed(giveaways) {
+function createSummaryEmbed(giveaways, { freeToKeep = false } = {}) {
+  const title = freeToKeep
+    ? giveaways.length > 1
+      ? '🎁 Free to Keep on Steam — claim them now'
+      : '🎁 Free to Keep on Steam — claim it now'
+    : giveaways.length > 1
+      ? '🎮 Free Steam Games Available Now'
+      : '🎮 Free Steam Game Available Now';
+
   return new EmbedBuilder()
-    .setColor(0x1b2838)
-    .setTitle(
-      giveaways.length > 1
-        ? '🎮 Free Steam Games Available Now'
-        : '🎮 Free Steam Game Available Now'
-    )
+    .setColor(freeToKeep ? 0x57f287 : 0x1b2838)
+    .setTitle(title)
     .setURL('https://store.steampowered.com/')
     .setDescription(giveaways.map(formatGiveawayLine).join('\n\n'))
-    .setFooter({ text: 'Steam free game alerts' })
+    .setFooter({
+      text: freeToKeep
+        ? 'Steam free-to-keep alerts • add to library before it expires'
+        : 'Steam free game alerts',
+    })
     .setTimestamp();
 }
 
@@ -321,6 +329,7 @@ function resolveDealSettings(config = {}) {
   return {
     salesEnabled: config?.salesEnabled !== false,
     promosEnabled: config?.promosEnabled !== false,
+    freeToKeepEnabled: config?.freeToKeepEnabled !== false,
     minDiscountPercent: clampSetting(
       config?.minDiscountPercent,
       1,
@@ -352,6 +361,9 @@ function sanitizeDealSettings(patch = {}) {
 
   if (typeof patch.salesEnabled === 'boolean') sanitized.salesEnabled = patch.salesEnabled;
   if (typeof patch.promosEnabled === 'boolean') sanitized.promosEnabled = patch.promosEnabled;
+  if (typeof patch.freeToKeepEnabled === 'boolean') {
+    sanitized.freeToKeepEnabled = patch.freeToKeepEnabled;
+  }
 
   if (patch.minDiscountPercent !== undefined && patch.minDiscountPercent !== null) {
     sanitized.minDiscountPercent = clampSetting(patch.minDiscountPercent, 1, 100, undefined);
@@ -441,8 +453,14 @@ function createDealsEmbed(deals, { index = 1, total = 1, minDiscountPercent = 50
   return embed;
 }
 
-function createGiveawayEmbed(giveaway) {
+function createGiveawayEmbed(giveaway, { freeToKeep = false } = {}) {
   const details = [];
+
+  if (freeToKeep) {
+    details.push(
+      '**This is free to KEEP** — add it to your library while the offer lasts and it stays yours forever.'
+    );
+  }
 
   if (giveaway.description) {
     details.push(giveaway.description);
@@ -469,8 +487,8 @@ function createGiveawayEmbed(giveaway) {
   }
 
   const embed = new EmbedBuilder()
-    .setColor(0x1b2838)
-    .setTitle(`🎁 ${giveaway.title}`)
+    .setColor(freeToKeep ? 0x57f287 : 0x1b2838)
+    .setTitle(freeToKeep ? `🎁 ${giveaway.title} — Free to Keep` : `🎁 ${giveaway.title}`)
     .setURL(giveaway.url)
     .setDescription(details.join('\n\n') || giveaway.url)
     .addFields(
@@ -1518,6 +1536,8 @@ class SteamFreeGamesAlertsManager {
         : snapshot
           ? snapshot.promoGiveaways.map((g) => ({ id: g.id, title: g.title }))
           : [],
+      // Empty on first setup: the next poll announces whatever is free to keep right now.
+      announcedKeepIds: Array.isArray(existing.announcedKeepIds) ? existing.announcedKeepIds : [],
       announcedDeals: this.buildDealSeed(existing, snapshot, dealSettings, {
         keepTopUnannounced: isFirstSetup,
       }),
@@ -1803,16 +1823,46 @@ class SteamFreeGamesAlertsManager {
 
   buildCurrentAlert(
     snapshot,
-    giveaways = snapshot?.freeToKeepGiveaways || snapshot?.giveaways || []
+    giveaways = snapshot?.freeToKeepGiveaways || snapshot?.giveaways || [],
+    options = {}
   ) {
     if (!Array.isArray(giveaways) || giveaways.length === 0) return null;
 
     return {
       messages: [
-        { embeds: [createSummaryEmbed(giveaways)] },
-        ...giveaways.map((giveaway) => ({ embeds: [createGiveawayEmbed(giveaway)] })),
+        { embeds: [createSummaryEmbed(giveaways, options)] },
+        ...giveaways.map((giveaway) => ({ embeds: [createGiveawayEmbed(giveaway, options)] })),
       ],
     };
+  }
+
+  /**
+   * Post newly-seen free-to-keep games into a guild's alert channel.
+   * Used by the combined promo alerts so everything lands in one channel.
+   */
+  async postFreeToKeepAlerts(config, channel, snapshot) {
+    const giveaways = Array.isArray(snapshot?.freeToKeepGiveaways)
+      ? snapshot.freeToKeepGiveaways
+      : [];
+    if (giveaways.length === 0) return [];
+
+    const announced = Array.isArray(config.announcedKeepIds)
+      ? config.announcedKeepIds.map(String)
+      : [];
+    const fresh = giveaways.filter((giveaway) => !announced.includes(String(giveaway.id)));
+
+    config.announcedKeepIds = giveaways.map((giveaway) => giveaway.id);
+
+    if (fresh.length === 0) return [];
+
+    const payload = this.buildCurrentAlert(snapshot, fresh, { freeToKeep: true });
+    if (!payload) return [];
+
+    for (const messagePayload of payload.messages) {
+      await channel.send(messagePayload).catch(() => {});
+    }
+
+    return fresh;
   }
 
   startPolling() {
@@ -2027,6 +2077,10 @@ class SteamFreeGamesAlertsManager {
 
         if (dealSettings.salesEnabled) {
           await this.postDealDigest(config, channel, snapshot, dealSettings);
+        }
+
+        if (dealSettings.freeToKeepEnabled) {
+          await this.postFreeToKeepAlerts(config, channel, snapshot);
         }
       }
 
