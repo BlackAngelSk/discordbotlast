@@ -40,6 +40,7 @@ const epicGamesAlertsManager = require('../steam/epicGamesAlertsManager');
 const steamFreeGamesAlertsManager = require('../steam/steamFreeGamesAlertsManager');
 const steamGameUpdatesManager = require('../steam/steamGameUpdatesManager');
 const telegramSyncManager = require('../status/telegramSyncManager');
+const seasonLeaderboardManager = require('../season/seasonLeaderboardManager');
 const customCommandManager = require('../customCommandManager');
 
 // ---------------------------------------------------------------------------
@@ -83,6 +84,7 @@ const CATEGORY_IDS = [
   'serverprofile',
   'steam',
   'telegram',
+  'season',
 ];
 
 /**
@@ -104,6 +106,7 @@ const CATEGORY_LABELS = {
   serverprofile: 'Server Profile',
   steam: 'Steam Deal Filters',
   telegram: 'Telegram Sync',
+  season: 'Season Leaderboard',
 };
 
 /**
@@ -812,6 +815,67 @@ const SETTINGS = {
       read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).dealPostIntervalHours,
       write: async (g, v) => {
         await updateSteamDealSetting(g, 'dealPostIntervalHours', v);
+      },
+    },
+  ],
+  season: [
+    {
+      key: 'seasonEnabled',
+      kind: 'toggle',
+      label: 'Enable season leaderboard',
+      hint: 'Auto-updating leaderboard message.',
+      emoji: '🏆',
+      read: (g) => seasonLeaderboardManager.getGuildConfig(g).enabled,
+      write: async (g, v) => {
+        await seasonLeaderboardManager.setLeaderboardOptions(g, { enabled: v });
+      },
+    },
+    {
+      key: 'seasonChannel',
+      kind: 'channel',
+      label: 'Leaderboard channel',
+      hint: 'Where the season message lives. Empty = detached.',
+      emoji: '📍',
+      read: (g) => seasonLeaderboardManager.getGuildConfig(g).channelId,
+      write: async (g, v) => {
+        await seasonLeaderboardManager.setLeaderboardChannel(g, v || null);
+      },
+    },
+    {
+      key: 'seasonInterval',
+      kind: 'number',
+      label: 'Update interval (minutes)',
+      hint: '5-1440 minutes between refreshes.',
+      min: 5,
+      max: 1440,
+      emoji: '⏱️',
+      read: (g) => seasonLeaderboardManager.getGuildConfig(g).updateIntervalMinutes,
+      write: async (g, v) => {
+        await seasonLeaderboardManager.setLeaderboardOptions(g, { updateIntervalMinutes: v });
+      },
+    },
+    {
+      key: 'seasonCompact',
+      kind: 'toggle',
+      label: 'Compact mode',
+      hint: 'Shorter leaderboard card.',
+      emoji: '📐',
+      read: (g) => seasonLeaderboardManager.getGuildConfig(g).compactMode,
+      write: async (g, v) => {
+        await seasonLeaderboardManager.setLeaderboardOptions(g, { compactMode: v });
+      },
+    },
+    {
+      key: 'seasonPruneDays',
+      kind: 'number',
+      label: 'Prune after (days)',
+      hint: '0 = never prune old season entries.',
+      min: 0,
+      max: 3650,
+      emoji: '🧹',
+      read: (g) => seasonLeaderboardManager.getGuildConfig(g).pruneDays,
+      write: async (g, v) => {
+        await seasonLeaderboardManager.setLeaderboardOptions(g, { pruneDays: v });
       },
     },
   ],

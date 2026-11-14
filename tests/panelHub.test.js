@@ -45,11 +45,12 @@ const guild = {
 console.log('\n=== Settings engine ===');
 
 test('engine exposes the full category catalog', () => {
-  assert.strictEqual(engine.CATEGORY_IDS.length, 15);
+  assert.strictEqual(engine.CATEGORY_IDS.length, 16);
   assert.ok(engine.CATEGORY_IDS.includes('welcome'));
   assert.ok(engine.CATEGORY_IDS.includes('alerts'));
   assert.ok(engine.CATEGORY_IDS.includes('steam'));
   assert.ok(engine.CATEGORY_IDS.includes('telegram'));
+  assert.ok(engine.CATEGORY_IDS.includes('season'));
 });
 
 test('every category has settings with unique keys', () => {
@@ -97,11 +98,12 @@ test('hub embed names the server and lists the panels', () => {
   assert.ok(labels.includes('📡 Gateway'));
 });
 
-test('hub menu offers every settings category', () => {
+test('hub menu offers every settings category plus custom panels', () => {
   const rows = hub.buildHubRows(guild, 'tok');
   const menu = rows[0].components[0];
   const options = menu.options.map((o) => o.data.value);
-  assert.deepStrictEqual(options.sort(), [...engine.CATEGORY_IDS].sort());
+  const expected = [...engine.CATEGORY_IDS, ...hub.CUSTOM_PANELS.map((p) => p.value)];
+  assert.deepStrictEqual(options.sort(), expected.sort());
   assert.ok(menu.options.length <= 25, 'Discord caps select menus at 25 options');
 });
 
@@ -117,10 +119,11 @@ test('hub buttons cover view, refresh and close', () => {
 
 test('panel ids are unique and resolvable', () => {
   const panels = hub.listPanels();
-  const ids = panels.map((p) => p.id);
+  const ids = panels.map((p) => p.value);
   assert.strictEqual(new Set(ids).size, ids.length);
   for (const panel of panels) {
-    assert.ok(engine.CATEGORY_IDS.includes(panel.id), `unknown panel ${panel.id}`);
+    const custom = String(panel.value).startsWith('custom:');
+    assert.ok(custom || engine.CATEGORY_IDS.includes(panel.value), `unknown panel ${panel.value}`);
     assert.ok(panel.emoji && panel.label && panel.description);
   }
 });
@@ -177,6 +180,66 @@ test('/setup no longer carries its own settings catalog', () => {
   assert.ok(source.length < 20000, `setup.js is ${source.length} bytes — catalog not extracted`);
   assert.ok(source.includes("require('../../utils/panel/settingsEngine')"));
   assert.ok(source.includes("require('../../utils/panel/hub')"));
+});
+
+console.log('\n=== Economy panel ===');
+
+test('economy embed shows the leaderboard and season status', () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const json = economyPanel.buildMainEmbed(guild).toJSON();
+
+  assert.strictEqual(json.title, '💰 Economy');
+  assert.ok(json.description.length > 0);
+  const names = json.fields.map((f) => f.name);
+  assert.ok(names.includes('🏆 Season board'));
+  assert.ok(names.includes('⏱️ Refresh'));
+  assert.ok(names.includes('📐 Mode'));
+});
+
+test('economy buttons cover give, take, season, refresh and back', () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const row = economyPanel.buildMainRows('tok')[0];
+  const ids = row.components.map((b) => b.data.custom_id);
+  assert.deepStrictEqual(ids, [
+    'econ:give:tok',
+    'econ:take:tok',
+    'econ:season:tok',
+    'econ:refresh:tok',
+    'econ:back:tok',
+  ]);
+});
+
+test('economy uses a user picker and an amount modal', () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const picker = economyPanel.buildUserPicker('give', 'tok');
+  const select = picker.components[0].components[0];
+  assert.strictEqual(select.data.custom_id, 'econ:user:give:tok');
+  assert.strictEqual(select.data.max_values, 1);
+
+  const modal = economyPanel.buildAmountModal('take', 'tok').toJSON();
+  assert.strictEqual(modal.custom_id, 'econ:amount:take:tok');
+  assert.strictEqual(modal.components[0].components[0].custom_id, 'amount');
+});
+
+test('season settings patch the leaderboard config', async () => {
+  const seasonMgr = require('../utils/seasonLeaderboardManager');
+  const originalOptions = seasonMgr.setLeaderboardOptions;
+  const originalChannel = seasonMgr.setLeaderboardChannel;
+  const calls = [];
+  seasonMgr.setLeaderboardOptions = async (guildId, options) => calls.push(options);
+  seasonMgr.setLeaderboardChannel = async (guildId, channelId) => calls.push({ channelId });
+
+  try {
+    await engine.SETTINGS.season.find((s) => s.key === 'seasonInterval').write('guild-123', 30);
+    await engine.SETTINGS.season
+      .find((s) => s.key === 'seasonChannel')
+      .write('guild-123', 'chan-9');
+    assert.deepStrictEqual(calls[0], { updateIntervalMinutes: 30 });
+    assert.deepStrictEqual(calls[1], { channelId: 'chan-9' });
+  } finally {
+    seasonMgr.setLeaderboardOptions = originalOptions;
+    seasonMgr.setLeaderboardChannel = originalChannel;
+  }
 });
 
 console.log('\n=== Steam deal filters ===');

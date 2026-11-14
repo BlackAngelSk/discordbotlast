@@ -24,6 +24,17 @@ const {
 } = require('discord.js');
 
 const engine = require('./settingsEngine');
+const economyPanel = require('./economyPanel');
+
+/** Panels that are not settings categories (custom flows). */
+const CUSTOM_PANELS = [
+  {
+    value: 'custom:economy',
+    label: 'Economy',
+    emoji: '💰',
+    description: 'Balances, leaderboard, season board',
+  },
+];
 
 const HUB_TIMEOUT = engine.COMPONENT_TIMEOUT;
 
@@ -41,6 +52,7 @@ const CATEGORY_EMOJI = {
   alerts: '🔔',
   commands: '⌨️',
   serverprofile: '🏷️',
+  season: '🏆',
   steam: '🎮',
   telegram: '📨',
 };
@@ -59,12 +71,14 @@ function randomToken() {
  * @returns {{ id: string, label: string, description: string, emoji: string }[]}
  */
 function listPanels() {
-  return engine.CATEGORY_IDS.map((id) => ({
-    id,
+  const settings = engine.CATEGORY_IDS.map((id) => ({
+    value: id,
     label: engine.CATEGORY_LABELS[id] || id,
     description: `Configure ${(engine.CATEGORY_LABELS[id] || id).toLowerCase()}`,
     emoji: CATEGORY_EMOJI[id] || '⚙️',
   }));
+
+  return [...settings, ...CUSTOM_PANELS];
 }
 
 /**
@@ -116,7 +130,7 @@ function buildHubRows(guild, token) {
         .map((panel) =>
           new StringSelectMenuOptionBuilder()
             .setLabel(panel.label)
-            .setValue(panel.id)
+            .setValue(panel.value)
             .setDescription(panel.description)
             .setEmoji(panel.emoji)
         )
@@ -289,6 +303,26 @@ async function openHub(interaction) {
         continue;
       }
 
+      if (category === 'custom:economy') {
+        const result = await economyPanel.runEconomyPanel({
+          interaction,
+          guild,
+          userId,
+          token,
+          firstUpdate: collected,
+        });
+
+        if (result === 'timeout') return;
+
+        await interaction
+          .editReply({
+            embeds: [buildHubEmbed(guild, interaction.client)],
+            components: /** @type {any} */ (buildHubRows(guild, token)),
+          })
+          .catch(() => {});
+        continue;
+      }
+
       const { embed, components } = engine.renderCategory(guild, category, token);
       await collected.update({ embeds: [embed], components }).catch(() => {});
       const result = await engine.categoryLoop(interaction, category, token, {
@@ -383,6 +417,7 @@ async function openHub(interaction) {
 
 module.exports = {
   CATEGORY_EMOJI,
+  CUSTOM_PANELS,
   listPanels,
   buildHubEmbed,
   buildHubRows,
