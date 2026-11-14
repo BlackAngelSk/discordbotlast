@@ -70,3 +70,7 @@ math
 
 # Runtime lock file (created on start, must not be tracked)
 .discord-bot.lock
+
+# start.sh --bg artifacts
+bot.pid
+bot.log
