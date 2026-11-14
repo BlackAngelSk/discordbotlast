@@ -136,6 +136,15 @@ Owner-only sync controls are available through:
 
 Set `DASHBOARD_ENABLED=true` and provide the Discord OAuth values in `.env` if you want the web dashboard enabled.
 
+The same panels — settings, economy, safety, server builder, insights, community, live alerts and the owner panel — are available inside Discord with `/dashboard`: no OAuth app, web port or session secret needed.
+
+### Public API
+
+`/api/v1` runs as its own Express app (`api/`), independent of the web dashboard. Set `PUBLIC_API_ENABLED=true` to start it; requests go to `PUBLIC_API_HOST:PUBLIC_API_PORT` (default `127.0.0.1:3001`).
+
+- API keys live in `data/apiKeys.json`.
+- `GET /api/v1/health` and `GET /api/v1/docs` need no key; every other endpoint takes `Authorization: Bearer <key>`.
+
 ### Auto Update
 
 Set `AUTO_UPDATE_ENABLED=true` to let the bot check GitHub for new commits and install updates automatically.

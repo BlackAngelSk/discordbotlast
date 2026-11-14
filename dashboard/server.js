@@ -78,7 +78,7 @@ const {
 } = require('./setupManager');
 
 const { runDashboardTestAction } = require('./testActions');
-const { registerPublicApiRoutes } = require('./api/routes');
+const { registerPublicApiRoutes } = require('../api/routes');
 
 const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');
 const DASHBOARD_AUDIT_FILE = path.join(__dirname, '..', 'data', 'dashboardAudit.json');

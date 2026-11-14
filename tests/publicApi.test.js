@@ -254,7 +254,7 @@ console.log('\nAPI Middleware');
 
 // Test authenticate middleware logic (unit-style, no Express)
 test('authenticate returns 401 when no key provided', () => {
-  const { authenticate } = require('../dashboard/api/middleware');
+  const { authenticate } = require('../api/middleware');
   const req = { headers: {}, query: {} };
   let statusCode = null;
   let jsonBody = null;
@@ -276,7 +276,7 @@ test('authenticate returns 401 when no key provided', () => {
 });
 
 test('authenticate returns 403 for invalid key', () => {
-  const { authenticate } = require('../dashboard/api/middleware');
+  const { authenticate } = require('../api/middleware');
   const req = { headers: { authorization: 'Bearer dbot_invalid' }, query: {} };
   let statusCode = null;
   let jsonBody = null;
@@ -299,7 +299,7 @@ test('authenticate returns 403 for invalid key', () => {
 
 // Test requireScope middleware
 test('requireScope blocks when scope missing', () => {
-  const { requireScope } = require('../dashboard/api/middleware');
+  const { requireScope } = require('../api/middleware');
   const req = { apiKeyData: { scopes: ['read'] } };
   let statusCode = null;
   let jsonBody = null;
@@ -324,7 +324,7 @@ test('requireScope blocks when scope missing', () => {
 });
 
 test('requireScope calls next when scope present', () => {
-  const { requireScope } = require('../dashboard/api/middleware');
+  const { requireScope } = require('../api/middleware');
   const req = { apiKeyData: { scopes: ['read', 'moderation'] } };
   let called = false;
   const next = () => {
@@ -338,7 +338,7 @@ test('requireScope calls next when scope present', () => {
 
 // Test asyncHandler
 test('asyncHandler wraps function and catches errors', async () => {
-  const { asyncHandler } = require('../dashboard/api/middleware');
+  const { asyncHandler } = require('../api/middleware');
   let caughtError = null;
   const errorHandler = (err) => {
     caughtError = err;
@@ -360,7 +360,7 @@ test('asyncHandler wraps function and catches errors', async () => {
 
 // Test rateLimiter
 test('rateLimiter allows requests within limit', () => {
-  const { rateLimiter } = require('../dashboard/api/middleware');
+  const { rateLimiter } = require('../api/middleware');
   const limiter = rateLimiter({ windowMs: 60000, maxRequests: 3 });
   const req = { apiKeyData: { key: 'test-rate-key-1' } };
   let allowed = true;
@@ -378,7 +378,7 @@ test('rateLimiter allows requests within limit', () => {
 });
 
 test('rateLimiter blocks requests over limit', () => {
-  const { rateLimiter } = require('../dashboard/api/middleware');
+  const { rateLimiter } = require('../api/middleware');
   const limiter = rateLimiter({ windowMs: 60000, maxRequests: 2 });
   const req = { apiKeyData: { key: 'test-rate-key-2' } };
   const res = { set() {} };
@@ -403,12 +403,12 @@ test('rateLimiter blocks requests over limit', () => {
 console.log('\nAPI Route Logic');
 
 test('registerPublicApiRoutes is a function', () => {
-  const { registerPublicApiRoutes } = require('../dashboard/api/routes');
+  const { registerPublicApiRoutes } = require('../api/routes');
   assertEqual(typeof registerPublicApiRoutes, 'function');
 });
 
 test('apiKeys module exports expected methods', () => {
-  const apiKeys = require('../dashboard/api/apiKeys');
+  const apiKeys = require('../api/apiKeys');
   assertEqual(typeof apiKeys.generateKey, 'function');
   assertEqual(typeof apiKeys.validate, 'function');
   assertEqual(typeof apiKeys.recordUsage, 'function');
@@ -419,7 +419,7 @@ test('apiKeys module exports expected methods', () => {
 });
 
 test('middleware module exports expected functions', () => {
-  const middleware = require('../dashboard/api/middleware');
+  const middleware = require('../api/middleware');
   assertEqual(typeof middleware.rateLimiter, 'function');
   assertEqual(typeof middleware.authenticate, 'function');
   assertEqual(typeof middleware.requireScope, 'function');

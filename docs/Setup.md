@@ -160,6 +160,8 @@ If you want the dashboard enabled:
 2. Add `CLIENT_ID`, `CLIENT_SECRET`, `DASHBOARD_CALLBACK`, and `SESSION_SECRET`
 3. Start the bot and open `http://localhost:3000`
 
+Every dashboard panel is also available in Discord through `/dashboard`, which needs no OAuth setup. The public REST API is independent of the dashboard: set `PUBLIC_API_ENABLED=true` to serve `/api/v1` on `PUBLIC_API_PORT` (default 3001).
+
 ## Verification Checklist
 
 After startup, confirm the following:

@@ -432,6 +432,28 @@ ttt.js               Tic Tac Toe
 
 ---
 
+## 🌐 Public API (`api/`)
+
+Runs as its own Express app, so `/api/v1` works with the web dashboard disabled.
+
+- `server.js` - standalone app (`PUBLIC_API_ENABLED=true`, `PUBLIC_API_PORT`, default 3001)
+- `routes.js` - `/api/v1` endpoints
+- `middleware.js` - API-key auth, scopes, rate limiting
+- `apiKeys.js` - key store in `data/apiKeys.json`
+
+---
+
+## 🛠 In-Discord dashboard (`utils/panel/`, `/dashboard`)
+
+- `hub.js` - panel menu and routing (settings categories + custom panels)
+- `settingsEngine.js` - settings catalog and edit flows (`setup:*` customIds)
+- `economyPanel.js`, `safetyPanel.js`, `serverBuilderPanel.js`, `insightsPanel.js`,
+  `communityPanel.js`, `liveAlertsPanel.js`, `ownerPanel.js` - standalone panels
+- `alertTestActions.js` - shared Epic/Steam test-alert senders
+- `componentAwait.js` - timer-safe component/modal awaits
+
+---
+
 ## 🧪 Tests & Scripts
 
 ### Tests (`tests/`)

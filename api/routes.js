@@ -29,7 +29,7 @@ const {
   errorHandler,
 } = require('./middleware');
 const apiKeys = require('./apiKeys');
-const errorLogManager = require('../../utils/errorLogManager');
+const errorLogManager = require('../utils/errorLogManager');
 
 /**
  * Register all public API v1 routes on the given Express app.
@@ -206,7 +206,7 @@ function registerPublicApiRoutes(app, client) {
         return res.status(404).json({ error: 'Guild not found' });
       }
 
-      const settingsManager = require('../../utils/settingsManager');
+      const settingsManager = require('../utils/settingsManager');
       const settings = settingsManager.get(guildId);
 
       res.json({
@@ -233,7 +233,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const settingsManager = require('../../utils/settingsManager');
+    const settingsManager = require('../utils/settingsManager');
     const settings = settingsManager.get(guildId);
     res.json({ guildId, settings });
   });
@@ -244,7 +244,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const economyManager = require('../../utils/economyManager');
+    const economyManager = require('../utils/economyManager');
     const allData = economyManager.data || {};
     let totalBalance = 0;
     let totalUsers = 0;
@@ -277,7 +277,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const economyManager = require('../../utils/economyManager');
+    const economyManager = require('../utils/economyManager');
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
     const type = req.query.type === 'level' ? 'level' : 'balance';
 
@@ -295,7 +295,7 @@ function registerPublicApiRoutes(app, client) {
       const guild = client?.guilds?.cache?.get(guildId);
       if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-      const moderationManager = require('../../utils/moderationManager');
+      const moderationManager = require('../utils/moderationManager');
       const { userId } = req.query;
 
       const warnings = [];
@@ -321,7 +321,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const customCommandManager = require('../../utils/customCommandManager');
+    const customCommandManager = require('../utils/customCommandManager');
     const commands = customCommandManager.getCommands(guildId);
     const commandList = Object.entries(commands).map(([name, data]) => ({
       name,
@@ -341,7 +341,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const suggestionManager = require('../../utils/suggestionManager');
+    const suggestionManager = require('../utils/suggestionManager');
     const allSuggestions = suggestionManager.getGuildSuggestions(guildId);
     const { status } = req.query;
 
@@ -359,7 +359,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const petManager = require('../../utils/petManager');
+    const petManager = require('../utils/petManager');
     const pet = petManager.getPet(userId, guildId);
 
     if (!pet) {
@@ -375,7 +375,7 @@ function registerPublicApiRoutes(app, client) {
     const guild = client?.guilds?.cache?.get(guildId);
     if (!guild) return res.status(404).json({ error: 'Guild not found' });
 
-    const afkManager = require('../../utils/afkManager');
+    const afkManager = require('../utils/afkManager');
     const afkData = afkManager.isAFK(userId, guildId);
 
     res.json({ guildId, userId, afk: afkData });

@@ -156,6 +156,7 @@ let raidProtectionManager, scheduledMessagesManager, birthdayManager;
 let customRoleShop, activityTracker, serverMilestones, seasonManager;
 let seasonLeaderboardManager, autoUpdateManager;
 let Dashboard; // Lazy-loaded only when DASHBOARD_ENABLED=true
+let publicApiServer = null; // Lazy-started only when PUBLIC_API_ENABLED=true
 
 function lazyLoadManager(name) {
   if (name === 'economyManager')
@@ -436,6 +437,11 @@ shutdownManager.onShutdown(async () => {
     }
   }
 
+  if (publicApiServer) {
+    await new Promise((resolve) => publicApiServer.close(() => resolve(null)));
+    logger.info('Public API server closed');
+  }
+
   await databaseManager.close();
   logger.info('Database manager closed');
 });
@@ -523,6 +529,17 @@ loadHandlers().then(() => {
           dashboard.start();
         } catch (error) {
           console.error('Error starting dashboard:', error);
+        }
+      }
+
+      // Public REST API — independent of the web dashboard
+      if (process.env.PUBLIC_API_ENABLED === 'true') {
+        try {
+          const { startPublicApi } = require('./api/server');
+          const api = startPublicApi({ client });
+          publicApiServer = api.server;
+        } catch (error) {
+          console.error('Error starting public API:', error);
         }
       }
 

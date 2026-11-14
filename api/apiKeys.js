@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const KEYS_FILE = path.join(__dirname, '..', '..', 'data', 'apiKeys.json');
+const KEYS_FILE = path.join(__dirname, '..', 'data', 'apiKeys.json');
 
 class ApiKeyManager {
   constructor() {
