@@ -27,6 +27,7 @@ const engine = require('./settingsEngine');
 const economyPanel = require('./economyPanel');
 const safetyPanel = require('./safetyPanel');
 const serverBuilderPanel = require('./serverBuilderPanel');
+const insightsPanel = require('./insightsPanel');
 const { awaitComponentSafe } = require('./componentAwait');
 
 /** Panels that are not settings categories (custom flows). */
@@ -48,6 +49,12 @@ const CUSTOM_PANELS = [
     label: 'Server builder',
     emoji: '🏗️',
     description: 'Create categories, channels, roles',
+  },
+  {
+    value: 'custom:insights',
+    label: 'Insights',
+    emoji: '📊',
+    description: 'Usage, activity and bot health',
   },
 ];
 
@@ -308,6 +315,26 @@ async function openHub(interaction) {
       const category = String(collected.values?.[0] || '');
       if (!category) {
         await collected.deferUpdate().catch(() => {});
+        continue;
+      }
+
+      if (category === 'custom:insights') {
+        const result = await insightsPanel.runInsightsPanel({
+          interaction,
+          guild,
+          userId,
+          token,
+          firstUpdate: collected,
+        });
+
+        if (result === 'timeout') return;
+
+        await interaction
+          .editReply({
+            embeds: [buildHubEmbed(guild, interaction.client)],
+            components: /** @type {any} */ (buildHubRows(guild, token)),
+          })
+          .catch(() => {});
         continue;
       }
 

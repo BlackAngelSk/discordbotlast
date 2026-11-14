@@ -389,6 +389,87 @@ test('builder sanitizes names and colours', () => {
   assert.strictEqual(builder.parseColor('nope'), null);
 });
 
+console.log('\n=== Insights panel ===');
+
+test('insights renders three distinct views', async () => {
+  const insights = require('../utils/panel/insightsPanel');
+  const analytics = require('../utils/analyticsManager');
+  const original = analytics.getDashboardData;
+  analytics.getDashboardData = async () => ({
+    overview: { messages: 1200, commands: 88, members: 40 },
+    topCommands: [
+      { command: 'daily', count: 30 },
+      { command: 'play', count: 12 },
+    ],
+    engagement: { score: 99, trend: 'up' },
+    dailyActivity: {},
+  });
+
+  try {
+    const client = { uptime: 3 * 3600 * 1000, ws: { ping: 12 }, guilds: { cache: { size: 2 } } };
+
+    const overview = (await insights.buildEmbed(guild, 'overview', client)).toJSON();
+    assert.strictEqual(overview.title, '📊 Server insights');
+    assert.ok(overview.fields.some((f) => f.name === '💬 Messages' && f.value === '1,200'));
+    assert.ok(overview.fields.some((f) => /daily/.test(f.value)));
+
+    const activity = (await insights.buildEmbed(guild, 'activity', client)).toJSON();
+    assert.strictEqual(activity.title, '📈 Message activity');
+    assert.ok(activity.fields.some((f) => f.name === '📅 Last 7 days'));
+
+    const health = (await insights.buildEmbed(guild, 'health', client)).toJSON();
+    assert.strictEqual(health.title, '🩺 Bot health');
+    assert.ok(health.fields.some((f) => f.name === '⏱️ Uptime' && f.value === '3h 0m'));
+    assert.ok(health.fields.some((f) => f.name === '🏠 Servers' && f.value === '2'));
+  } finally {
+    analytics.getDashboardData = original;
+  }
+});
+
+test('insights never shows the random engagement score', async () => {
+  const insights = require('../utils/panel/insightsPanel');
+  const analytics = require('../utils/analyticsManager');
+  const original = analytics.getDashboardData;
+  analytics.getDashboardData = async () => ({
+    overview: {},
+    topCommands: [],
+    engagement: { score: 97, trend: 'up' },
+  });
+
+  try {
+    const json = (await insights.buildEmbed(guild, 'overview', {})).toJSON();
+    assert.ok(
+      !JSON.stringify(json).includes('Engagement'),
+      'random engagement leaked into the panel'
+    );
+  } finally {
+    analytics.getDashboardData = original;
+  }
+});
+
+test('insights helper maths', () => {
+  const insights = require('../utils/panel/insightsPanel');
+  assert.strictEqual(insights.formatUptime(90 * 60 * 1000), '1h 30m');
+  assert.strictEqual(insights.formatUptime(26 * 3600 * 1000), '1d 2h');
+  const days = insights.recentDays({}, 7);
+  assert.strictEqual(days.length, 7);
+  assert.ok(days.every((d) => d.count === 0));
+});
+
+test('insights buttons disable the active view', () => {
+  const insights = require('../utils/panel/insightsPanel');
+  const rows = insights.buildRows('activity', 'tok');
+  const ids = rows[0].components.map((b) => b.data.custom_id);
+  assert.deepStrictEqual(ids, [
+    'insights:overview:tok',
+    'insights:activity:tok',
+    'insights:health:tok',
+    'insights:back:tok',
+  ]);
+  const activity = rows[0].components.find((b) => b.data.custom_id === 'insights:activity:tok');
+  assert.strictEqual(activity.data.disabled, true);
+});
+
 console.log('\n=== Steam deal filters ===');
 
 test('steam filter writes are blocked until a deals channel exists', async () => {
