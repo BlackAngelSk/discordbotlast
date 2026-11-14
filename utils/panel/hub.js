@@ -26,6 +26,7 @@ const {
 const engine = require('./settingsEngine');
 const economyPanel = require('./economyPanel');
 const safetyPanel = require('./safetyPanel');
+const serverBuilderPanel = require('./serverBuilderPanel');
 const { awaitComponentSafe } = require('./componentAwait');
 
 /** Panels that are not settings categories (custom flows). */
@@ -41,6 +42,12 @@ const CUSTOM_PANELS = [
     label: 'Safety actions',
     emoji: '🚨',
     description: 'Lockdown, raid posture, starboard',
+  },
+  {
+    value: 'custom:builder',
+    label: 'Server builder',
+    emoji: '🏗️',
+    description: 'Create categories, channels, roles',
   },
 ];
 
@@ -301,6 +308,26 @@ async function openHub(interaction) {
       const category = String(collected.values?.[0] || '');
       if (!category) {
         await collected.deferUpdate().catch(() => {});
+        continue;
+      }
+
+      if (category === 'custom:builder') {
+        const result = await serverBuilderPanel.runServerBuilderPanel({
+          interaction,
+          guild,
+          userId,
+          token,
+          firstUpdate: collected,
+        });
+
+        if (result === 'timeout') return;
+
+        await interaction
+          .editReply({
+            embeds: [buildHubEmbed(guild, interaction.client)],
+            components: /** @type {any} */ (buildHubRows(guild, token)),
+          })
+          .catch(() => {});
         continue;
       }
 

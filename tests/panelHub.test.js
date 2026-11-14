@@ -7,6 +7,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const { Collection } = require('discord.js');
 
 const hub = require('../utils/panel/hub');
 const engine = require('../utils/panel/settingsEngine');
@@ -333,6 +334,59 @@ test('safety panel writes lockdown through the raid manager', async () => {
     raid.isLocked = originalLocked;
     raid.setLockdown = originalSet;
   }
+});
+
+console.log('\n=== Server builder panel ===');
+
+test('builder embed counts resources and shows permissions', () => {
+  const builder = require('../utils/panel/serverBuilderPanel');
+  const guildWithChannels = {
+    ...guild,
+    channels: {
+      cache: new Collection([
+        ['1', { type: 4 }], // category
+        ['2', { type: 0 }], // text
+      ]),
+    },
+    roles: { cache: new Collection([['guild-123', { id: 'guild-123' }]]) },
+    members: { me: { permissions: { has: () => true } } },
+  };
+  const json = builder.buildMainEmbed(guildWithChannels).toJSON();
+  const names = json.fields.map((f) => f.name);
+  assert.ok(names.includes('📁 Categories'));
+  assert.ok(names.includes('💬 Text channels'));
+  assert.ok(names.includes('🏷️ Roles'));
+  assert.ok(json.fields.find((f) => f.name === '📁 Categories').value === '1');
+});
+
+test('builder disables buttons without bot permissions', () => {
+  const builder = require('../utils/panel/serverBuilderPanel');
+  const noPerms = { ...guild, members: { me: { permissions: { has: () => false } } } };
+  const buttons = builder.buildMainRows(noPerms, 'tok')[0].components;
+  const byId = Object.fromEntries(buttons.map((b) => [b.data.custom_id, b.data.disabled]));
+  assert.strictEqual(byId['build:category:tok'], true);
+  assert.strictEqual(byId['build:channel:tok'], true);
+  assert.strictEqual(byId['build:role:tok'], true);
+  assert.strictEqual(byId['build:back:tok'], undefined);
+});
+
+test('builder modals ask for a name and an optional role colour', () => {
+  const builder = require('../utils/panel/serverBuilderPanel');
+  const roleModal = builder.buildCreateModal('role', 'tok').toJSON();
+  assert.strictEqual(roleModal.custom_id, 'build:create:role:tok');
+  assert.strictEqual(roleModal.components.length, 2);
+  assert.strictEqual(roleModal.components[1].components[0].custom_id, 'color');
+
+  const channelModal = builder.buildCreateModal('channel', 'tok').toJSON();
+  assert.strictEqual(channelModal.components.length, 1);
+});
+
+test('builder sanitizes names and colours', () => {
+  const builder = require('../utils/panel/serverBuilderPanel');
+  assert.strictEqual(builder.sanitizeName('  Event  Chat  ', 'channel'), 'Event-Chat');
+  assert.strictEqual(builder.sanitizeName('  Event  Chat  ', 'category'), 'Event Chat');
+  assert.strictEqual(builder.parseColor('#5865F2'), 0x5865f2);
+  assert.strictEqual(builder.parseColor('nope'), null);
 });
 
 console.log('\n=== Steam deal filters ===');
