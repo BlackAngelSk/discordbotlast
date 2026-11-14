@@ -17,6 +17,8 @@ const {
   ButtonBuilder,
   ButtonStyle,
   UserSelectMenuBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
   ModalBuilder,
   TextInputBuilder,
   TextInputStyle,
@@ -37,6 +39,117 @@ const MEDALS = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
  */
 function formatCoins(value) {
   return Number(value || 0).toLocaleString('en-US');
+}
+
+/**
+ * @param {import('discord.js').Guild} guild
+ * @returns {EmbedBuilder}
+ */
+function buildShopEmbed(guild) {
+  const items = economyManager.getShopItems(String(guild.id)) || [];
+  const lines = items
+    .slice(0, 20)
+    .map(
+      (item) =>
+        `• **${item.name}** — ${formatCoins(item.price)} coins · \`${item.type || 'item'}\` · id \`${item.id}\``
+    );
+
+  return new EmbedBuilder()
+    .setColor(0x9b59b6)
+    .setAuthor({ name: 'Economy', iconURL: guild.iconURL({ size: 64 }) ?? undefined })
+    .setTitle('🛍️ Shop items')
+    .setDescription(lines.length ? lines.join('\n').slice(0, 4000) : '*No shop items yet.*')
+    .setFooter({ text: `${items.length} item(s) · /shop sells these` })
+    .setTimestamp();
+}
+
+/**
+ * @param {string} token
+ * @returns {any[]}
+ */
+function buildShopRows(token) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`econ:shopadd:${token}`)
+        .setLabel('Add item')
+        .setStyle(ButtonStyle.Success)
+        .setEmoji('➕'),
+      new ButtonBuilder()
+        .setCustomId(`econ:shopremove:${token}`)
+        .setLabel('Remove item')
+        .setStyle(ButtonStyle.Danger)
+        .setEmoji('🗑️')
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`econ:shopback:${token}`)
+        .setLabel('Back to economy')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('↩️')
+    ),
+  ];
+}
+
+/**
+ * @param {string} token
+ * @returns {ModalBuilder}
+ */
+function buildShopItemModal(token) {
+  const field = (
+    /** @type {string} */ id,
+    /** @type {string} */ label,
+    /** @type {string} */ placeholder,
+    style
+  ) => {
+    const input = new TextInputBuilder()
+      .setCustomId(id)
+      .setLabel(label)
+      .setStyle(style)
+      .setRequired(id !== 'description')
+      .setMaxLength(id === 'description' ? 200 : 60)
+      .setPlaceholder(placeholder.slice(0, 100));
+    return /** @type {any} */ (new ActionRowBuilder().addComponents(input));
+  };
+
+  return new ModalBuilder()
+    .setCustomId(`econ:shopcreate:${token}`)
+    .setTitle('Add shop item')
+    .addComponents(
+      field('name', 'Item name', 'VIP Role', TextInputStyle.Short),
+      field('price', 'Price (coins)', '10000', TextInputStyle.Short),
+      field('itemId', 'Item ID', 'vip_role', TextInputStyle.Short),
+      field('type', 'Type (role / badge / item)', 'role', TextInputStyle.Short),
+      field(
+        'description',
+        'Description (optional)',
+        'What the buyer gets…',
+        TextInputStyle.Paragraph
+      )
+    );
+}
+
+/**
+ * @param {any[]} items
+ * @param {string} token
+ * @returns {any}
+ */
+function buildShopItemSelect(items, token) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`econ:shopdelete:${token}`)
+      .setPlaceholder('Choose an item to remove…')
+      .addOptions(
+        items.slice(0, 25).map((item) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(String(item.name || item.id).slice(0, 100))
+            .setDescription(
+              `${formatCoins(item.price)} coins · ${item.type || 'item'}`.slice(0, 100)
+            )
+            .setValue(String(item.id).slice(0, 100))
+        )
+      )
+  );
 }
 
 /**
@@ -102,13 +215,70 @@ function buildMainRows(token) {
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('🏆'),
       new ButtonBuilder()
+        .setCustomId(`econ:shop:${token}`)
+        .setLabel('Shop items')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🛍️')
+    ),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
         .setCustomId(`econ:refresh:${token}`)
         .setLabel('Refresh')
         .setStyle(ButtonStyle.Secondary)
         .setEmoji('🔄'),
       new ButtonBuilder()
+        .setCustomId(`econ:global:${token}`)
+        .setLabel('Global board')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🌍'),
+      new ButtonBuilder()
         .setCustomId(`econ:back:${token}`)
         .setLabel('Dashboard')
+        .setStyle(ButtonStyle.Primary)
+        .setEmoji('↩️')
+    ),
+  ];
+}
+
+/**
+ * @returns {EmbedBuilder}
+ */
+function buildGlobalEmbed() {
+  const top = economyManager.getGlobalLeaderboard('balance', 10);
+  const board = top.length
+    ? top
+        .map(
+          (user, index) =>
+            `${MEDALS[index] || `**${index + 1}.**`} <@${user.userId}> — **${formatCoins(
+              user.balance
+            )}** coins`
+        )
+        .join('\n')
+    : '*No balances yet.*';
+
+  return new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle('🌍 Global leaderboard')
+    .setDescription(board)
+    .setFooter({ text: 'Every server the bot is in' })
+    .setTimestamp();
+}
+
+/**
+ * @param {string} token
+ * @returns {any[]}
+ */
+function buildGlobalRows(token) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`econ:globalrefresh:${token}`)
+        .setLabel('Refresh')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🔄'),
+      new ButtonBuilder()
+        .setCustomId(`econ:globalback:${token}`)
+        .setLabel('Back to economy')
         .setStyle(ButtonStyle.Primary)
         .setEmoji('↩️')
     ),
@@ -237,6 +407,145 @@ async function runEconomyPanel(ctx) {
       continue;
     }
 
+    if (id === `econ:global:${token}` || id === `econ:globalrefresh:${token}`) {
+      await collected
+        .update({ embeds: [buildGlobalEmbed()], components: buildGlobalRows(token) })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:globalback:${token}`) {
+      await collected
+        .update({ embeds: [buildMainEmbed(guild)], components: buildMainRows(token) })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:shop:${token}`) {
+      await collected
+        .update({ embeds: [buildShopEmbed(guild)], components: buildShopRows(token) })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:shopback:${token}`) {
+      await collected
+        .update({ embeds: [buildMainEmbed(guild)], components: buildMainRows(token) })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:shopadd:${token}`) {
+      const modalId = `econ:shopcreate:${token}`;
+      await collected.showModal(buildShopItemModal(token)).catch(() => {});
+      const submit = await awaitAmountModal(collected, modalId, userId);
+      if (!submit) return 'timeout';
+
+      const name = String(submit.fields.getTextInputValue('name') || '').trim();
+      const price = Number(
+        String(submit.fields.getTextInputValue('price') || '').replace(/[^\d]/g, '')
+      );
+      const itemId = String(submit.fields.getTextInputValue('itemId') || '').trim();
+      const type = String(submit.fields.getTextInputValue('type') || 'item')
+        .trim()
+        .toLowerCase();
+      const description =
+        String(submit.fields.getTextInputValue('description') || '').trim() || 'No description';
+
+      /** @type {string | null} */
+      let error = null;
+      if (!name) error = 'The item needs a name.';
+      else if (!Number.isFinite(price) || price <= 0)
+        error = 'The price must be a positive number.';
+      else if (!/^[A-Za-z0-9_-]{1,40}$/.test(itemId))
+        error = 'The item ID must be 1-40 characters (letters, numbers, - or _).';
+      else if (!['role', 'badge', 'item'].includes(type))
+        error = 'The type must be `role`, `badge` or `item`.';
+      else if (
+        (economyManager.getShopItems(guildId) || []).some((item) => String(item.id) === itemId)
+      )
+        error = `An item with ID \`${itemId}\` already exists.`;
+
+      if (error) {
+        await submit
+          .reply({ content: `❌ ${error}`, flags: MessageFlags.Ephemeral })
+          .catch(() => {});
+      } else {
+        try {
+          await economyManager.addShopItem(guildId, { id: itemId, name, price, type, description });
+          await submit
+            .reply({
+              content: `✅ **${name}** added to the shop for **${formatCoins(price)}** coins (id \`${itemId}\`).`,
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
+        } catch (err) {
+          await submit
+            .reply({
+              content: `❌ Could not add the item: ${/** @type {any} */ (err)?.message || err}`,
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
+        }
+      }
+
+      await interaction
+        .editReply({ embeds: [buildShopEmbed(guild)], components: buildShopRows(token) })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:shopremove:${token}`) {
+      const items = economyManager.getShopItems(guildId) || [];
+      if (!items.length) {
+        await collected
+          .reply({ content: 'No shop items to remove.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
+        continue;
+      }
+
+      await collected
+        .update({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(Colors.Red)
+              .setTitle('🗑️ Remove a shop item')
+              .setDescription('Pick the item to delete. Purchases already made are not refunded.'),
+          ],
+          components: [
+            buildShopItemSelect(items, token),
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId(`econ:shop:${token}`)
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary)
+            ),
+          ],
+        })
+        .catch(() => {});
+      continue;
+    }
+
+    if (id === `econ:shopdelete:${token}`) {
+      const itemId = String(collected.values?.[0] || '');
+      const items = economyManager.getShopItems(guildId) || [];
+      const item = items.find((candidate) => String(candidate.id) === itemId);
+      const removed = itemId ? await economyManager.removeShopItem(guildId, itemId) : false;
+
+      await collected
+        .update({ embeds: [buildShopEmbed(guild)], components: buildShopRows(token) })
+        .catch(() => {});
+      await collected
+        .followUp({
+          content: removed
+            ? `✅ Removed **${item?.name || itemId}** from the shop.`
+            : '❌ Item not found — it may already be gone.',
+          flags: MessageFlags.Ephemeral,
+        })
+        .catch(() => {});
+      continue;
+    }
+
     if (id === `econ:give:${token}` || id === `econ:take:${token}`) {
       const mode = id.startsWith('econ:give:') ? 'give' : 'take';
       const prompt = buildUserPicker(mode, token);
@@ -328,5 +637,11 @@ module.exports = {
   buildMainRows,
   buildUserPicker,
   buildAmountModal,
+  buildShopEmbed,
+  buildShopRows,
+  buildShopItemModal,
+  buildShopItemSelect,
+  buildGlobalEmbed,
+  buildGlobalRows,
   runEconomyPanel,
 };

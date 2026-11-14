@@ -217,17 +217,77 @@ test('economy embed shows the leaderboard and season status', () => {
   assert.ok(names.includes('📐 Mode'));
 });
 
-test('economy buttons cover give, take, season, refresh and back', () => {
+test('economy buttons cover give, take, season, shop, global, refresh and back', () => {
   const economyPanel = require('../utils/panel/economyPanel');
-  const row = economyPanel.buildMainRows('tok')[0];
-  const ids = row.components.map((b) => b.data.custom_id);
+  const ids = economyPanel
+    .buildMainRows('tok')
+    .flatMap((row) => row.components.map((b) => b.data.custom_id));
   assert.deepStrictEqual(ids, [
     'econ:give:tok',
     'econ:take:tok',
     'econ:season:tok',
+    'econ:shop:tok',
     'econ:refresh:tok',
+    'econ:global:tok',
     'econ:back:tok',
   ]);
+});
+
+test('economy global board renders the cross-server top list', () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const econManager = require('../utils/economyManager');
+  const original = econManager.getGlobalLeaderboard;
+  econManager.getGlobalLeaderboard = () => [
+    { userId: 'u1', balance: 12345 },
+    { userId: 'u2', balance: 900 },
+  ];
+
+  try {
+    const json = economyPanel.buildGlobalEmbed().toJSON();
+    assert.strictEqual(json.title, '🌍 Global leaderboard');
+    assert.ok(json.description.includes('<@u1>'));
+    assert.ok(json.description.includes('12,345'));
+    const ids = economyPanel.buildGlobalRows('tok')[0].components.map((b) => b.data.custom_id);
+    assert.deepStrictEqual(ids, ['econ:globalrefresh:tok', 'econ:globalback:tok']);
+  } finally {
+    econManager.getGlobalLeaderboard = original;
+  }
+});
+
+test('economy shop view lists items and offers add/remove', () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const econManager = require('../utils/economyManager');
+  const original = econManager.getShopItems;
+  econManager.getShopItems = () => [
+    { id: 'vip', name: 'VIP Role', price: 10000, type: 'role', description: 'VIP' },
+  ];
+
+  try {
+    const json = economyPanel.buildShopEmbed(guild).toJSON();
+    assert.strictEqual(json.title, '🛍️ Shop items');
+    assert.ok(json.description.includes('VIP Role'));
+    assert.ok(json.description.includes('vip'));
+
+    const ids = economyPanel
+      .buildShopRows('tok')
+      .flatMap((row) => row.components.map((b) => b.data.custom_id));
+    assert.deepStrictEqual(ids, ['econ:shopadd:tok', 'econ:shopremove:tok', 'econ:shopback:tok']);
+
+    const modal = economyPanel.buildShopItemModal('tok').toJSON();
+    assert.strictEqual(modal.custom_id, 'econ:shopcreate:tok');
+    assert.deepStrictEqual(
+      modal.components.map((row) => row.components[0].custom_id),
+      ['name', 'price', 'itemId', 'type', 'description']
+    );
+
+    const select = economyPanel.buildShopItemSelect(econManager.getShopItems('g'), 'tok');
+    assert.deepStrictEqual(
+      select.components[0].options.map((o) => o.data.value),
+      ['vip']
+    );
+  } finally {
+    econManager.getShopItems = original;
+  }
 });
 
 test('economy uses a user picker and an amount modal', () => {
@@ -876,6 +936,82 @@ test('owner panel sends the test DM and returns to the hub', async () => {
   } finally {
     if (originalOwner === undefined) delete process.env.BOT_OWNER_ID;
     else process.env.BOT_OWNER_ID = originalOwner;
+  }
+});
+
+test('economy panel adds and removes shop items', async () => {
+  const economyPanel = require('../utils/panel/economyPanel');
+  const econManager = require('../utils/economyManager');
+  const original = {
+    get: econManager.getShopItems,
+    add: econManager.addShopItem,
+    remove: econManager.removeShopItem,
+  };
+
+  let items = [];
+  const calls = [];
+  econManager.getShopItems = () => items;
+  econManager.addShopItem = async (guildId, item) => {
+    calls.push(['add', guildId, item]);
+    items = [...items, item];
+  };
+  econManager.removeShopItem = async (guildId, itemId) => {
+    calls.push(['remove', guildId, itemId]);
+    const before = items.length;
+    items = items.filter((item) => item.id !== itemId);
+    return items.length < before;
+  };
+
+  const answers = {
+    name: 'Sword',
+    price: '500',
+    itemId: 'sword',
+    type: 'item',
+    description: 'A sharp sword',
+  };
+  const modalSubmit = {
+    customId: 'econ:shopcreate:tok',
+    user: { id: 'admin' },
+    fields: { getTextInputValue: (key) => answers[key] ?? '' },
+    reply: async () => {},
+  };
+
+  const steps = [
+    makeClick('econ:shop:tok'),
+    makeClick('econ:shopadd:tok', [], { modalSubmit }),
+    makeClick('econ:shopremove:tok'),
+    makeClick('econ:shopdelete:tok', ['sword']),
+    makeClick('econ:back:tok'),
+  ];
+  const interaction = {
+    guild,
+    guildId: guild.id,
+    channel: { awaitMessageComponent: async () => steps.shift() },
+    user: { id: 'admin' },
+    editReply: async () => {},
+  };
+
+  try {
+    const result = await economyPanel.runEconomyPanel({
+      interaction,
+      guild,
+      userId: 'admin',
+      token: 'tok',
+      firstUpdate: { update: async () => {} },
+    });
+
+    assert.strictEqual(result, 'back');
+    assert.deepStrictEqual(calls[0], [
+      'add',
+      'guild-123',
+      { id: 'sword', name: 'Sword', price: 500, type: 'item', description: 'A sharp sword' },
+    ]);
+    assert.deepStrictEqual(calls[1], ['remove', 'guild-123', 'sword']);
+    assert.deepStrictEqual(items, []);
+  } finally {
+    econManager.getShopItems = original.get;
+    econManager.addShopItem = original.add;
+    econManager.removeShopItem = original.remove;
   }
 });
 
