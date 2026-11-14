@@ -66,6 +66,9 @@ Not every feature is available in both styles, but most major systems support on
 | `/ping`                                 | Check bot latency                                  |
 | `/userinfo`, `/roleinfo`, `/serverinfo` | View information about users, roles, or the server |
 | `/birthday`                             | Manage birthday settings                           |
+| `/dashboard`                            | Open the in-Discord server dashboard               |
+| `/setup config`                         | Alias for `/dashboard`                             |
+| `/setup view`                           | Dump every configured value (paginated)            |
 | `/analytics`                            | View analytics information                         |
 | `/activity`                             | Review user activity summaries                     |
 | `!config ...`                           | Change server-specific settings                    |
