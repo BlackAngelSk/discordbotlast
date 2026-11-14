@@ -84,7 +84,7 @@ acquireSingleInstanceLock();
 // ── Environment variable validation ───────────────────────────────────────────
 (function validateEnv() {
   const REQUIRED = ['DISCORD_TOKEN'];
-  const OPTIONAL_WARN = ['CLIENT_ID', 'DASHBOARD_PORT', 'SESSION_SECRET'];
+  const OPTIONAL_WARN = ['BOT_OWNER_ID', 'GOOGLE_API_KEY'];
   const missing = REQUIRED.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     console.error(
@@ -141,7 +141,6 @@ const settingsManager = require('./utils/core/settingsManager');
 const languageManager = require('./utils/core/languageManager');
 const databaseManager = require('./utils/core/databaseManager');
 const commandPermissionsManager = require('./utils/core/commandPermissionsManager');
-const { dashboardPermissionsManager } = require('./utils/dashboard/dashboardPermissionsManager');
 const { isDevModeEnabled } = require('./utils/core/devMode');
 const { notifyOwnerIfUpdated } = require('./utils/core/updateNotifier');
 const { runLeaderboardUpdate } = require('./utils/season/seasonLeaderboardScheduler');
@@ -155,7 +154,6 @@ let suggestionManager, shopManager, afkManager, voiceRewardsManager;
 let raidProtectionManager, scheduledMessagesManager, birthdayManager;
 let customRoleShop, activityTracker, serverMilestones, seasonManager;
 let seasonLeaderboardManager, autoUpdateManager;
-let Dashboard; // Lazy-loaded only when DASHBOARD_ENABLED=true
 let publicApiServer = null; // Lazy-started only when PUBLIC_API_ENABLED=true
 
 function lazyLoadManager(name) {
@@ -342,7 +340,6 @@ async function loadHandlers() {
       runInitStep('Settings manager', () => settingsManager.init()),
       runInitStep('Language manager', () => languageManager.init()),
       runInitStep('Command permissions manager', () => commandPermissionsManager.init()),
-      runInitStep('Dashboard permissions manager', () => dashboardPermissionsManager.init()),
     ]);
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -520,17 +517,6 @@ loadHandlers().then(() => {
         .catch((error) => {
           console.error('Error registering slash commands:', error);
         });
-
-      // Dashboard (only if enabled)
-      if (process.env.DASHBOARD_ENABLED === 'true') {
-        try {
-          Dashboard = Dashboard || require('./dashboard/server');
-          const dashboard = new Dashboard(client);
-          dashboard.start();
-        } catch (error) {
-          console.error('Error starting dashboard:', error);
-        }
-      }
 
       // Public REST API — independent of the web dashboard
       if (process.env.PUBLIC_API_ENABLED === 'true') {

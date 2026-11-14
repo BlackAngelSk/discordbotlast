@@ -24,6 +24,19 @@ function createPublicApiApp(client) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
+
+  // Orchestrator probe (Docker HEALTHCHECK, reverse proxies). Not part of the
+  // documented /api/v1 surface, which keeps its own /health.
+  app.get('/health', (req, res) => {
+    res.json({
+      status: client?.isReady?.() ? 'ok' : 'starting',
+      uptime: Math.floor(process.uptime()),
+      guilds: client?.guilds?.cache?.size ?? 0,
+      ping: client?.ws?.ping ?? -1,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   registerPublicApiRoutes(app, client);
   return app;
 }

@@ -55,15 +55,12 @@ BOT_OWNER_ID=your_discord_user_id
 
 ## Optional Environment Variables
 
-Dashboard support:
+Public REST API support:
 
 ```env
-DASHBOARD_ENABLED=false
-DASHBOARD_PORT=3000
-DASHBOARD_URL=http://localhost:3000
-CLIENT_SECRET=your_application_secret
-DASHBOARD_CALLBACK=http://127.0.0.1:3000/callback
-SESSION_SECRET=generate_a_random_secret
+PUBLIC_API_ENABLED=false
+PUBLIC_API_HOST=127.0.0.1
+PUBLIC_API_PORT=3001
 ```
 
 MongoDB support:
@@ -152,15 +149,11 @@ Once the bot is online, a recommended setup sequence is:
 4. Set a moderation log channel with `/modlog`
 5. Test a few commands such as `/help`, `/play`, and `/balance`
 
-## Dashboard Setup
+## Dashboard and Public API
 
-If you want the dashboard enabled:
+The web dashboard has been retired. Every panel is available in Discord: run `/dashboard` for settings, economy (balances, shop items, global board), safety actions, server builder, insights, community, live alerts and the owner panel.
 
-1. Set `DASHBOARD_ENABLED=true`
-2. Add `CLIENT_ID`, `CLIENT_SECRET`, `DASHBOARD_CALLBACK`, and `SESSION_SECRET`
-3. Start the bot and open `http://localhost:3000`
-
-Every dashboard panel is also available in Discord through `/dashboard`, which needs no OAuth setup. The public REST API is independent of the dashboard: set `PUBLIC_API_ENABLED=true` to serve `/api/v1` on `PUBLIC_API_PORT` (default 3001).
+To expose the public REST API, set `PUBLIC_API_ENABLED=true` and optionally `PUBLIC_API_HOST` / `PUBLIC_API_PORT` (default `127.0.0.1:3001`). API keys live in `data/apiKeys.json`; `GET /api/v1/docs` lists the endpoints.
 
 ## Verification Checklist
 

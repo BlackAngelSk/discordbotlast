@@ -295,107 +295,24 @@ test('steamupdates command usage includes new game names', () => {
 });
 
 // ============================================================
-console.log('\n=== Dashboard View ===');
+console.log('\n=== In-Discord surface ===');
 // ============================================================
 
-test('Dashboard EJS includes all special source defaults', () => {
-  const fs = require('fs');
-  const path = require('path');
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dashboard', 'views', 'steam-updates.ejs'),
-    'utf8'
-  );
+test('settings engine exposes the Steam updates channel', () => {
+  const engine = require('../utils/panel/settingsEngine');
+  const setting = (engine.SETTINGS.alerts || []).find((s) => s.key === 'steamUpdateChannel');
 
-  assert.ok(source.includes('specialSourceDefaults'), 'Should define specialSourceDefaults');
-
-  const sources = [
-    'minecraft',
-    'osu',
-    'league',
-    'valorant',
-    'ffxiv',
-    'wow',
-    'poe',
-    'fortnite',
-    'helldivers2',
-    'diablo',
-    'overwatch',
-    'apex',
-    'cs2',
-    'dota2',
-    'valheim',
-    'rust',
-    'pubg',
-  ];
-  for (const s of sources) {
-    assert.ok(source.includes(`${s}:`), `Dashboard should have quick-add entry for ${s}`);
-  }
+  assert.ok(setting, 'steamUpdateChannel missing from the alerts category');
+  assert.strictEqual(setting.kind, 'channel');
 });
 
-test('Dashboard EJS escapeHtml uses split/join pattern', () => {
-  const fs = require('fs');
-  const path = require('path');
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dashboard', 'views', 'steam-updates.ejs'),
-    'utf8'
-  );
+test('alerts panel exposes a Steam update test action', () => {
+  const engine = require('../utils/panel/settingsEngine');
+  const action = (engine.SETTINGS.alerts || []).find((s) => s.key === 'previewSteamUpdates');
 
-  // The fix was to use split().join() instead of replaceAll() which isn't available in all envs
-  assert.ok(
-    source.includes('.split(AMP).join('),
-    'escapeHtml should use split/join pattern for ampersand'
-  );
-  assert.ok(
-    source.includes('.split(LT).join('),
-    'escapeHtml should use split/join pattern for less-than'
-  );
-});
-
-test('Dashboard EJS textarea placeholder includes all game names', () => {
-  const fs = require('fs');
-  const path = require('path');
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dashboard', 'views', 'steam-updates.ejs'),
-    'utf8'
-  );
-
-  const names = [
-    'minecraft',
-    'osu',
-    'lol',
-    'valorant',
-    'ffxiv',
-    'wow',
-    'poe',
-    'fortnite',
-    'helldivers2',
-    'diablo',
-    'overwatch',
-    'apex',
-    'cs2',
-    'dota2',
-    'valheim',
-    'rust',
-    'pubg',
-  ];
-  for (const name of names) {
-    assert.ok(source.includes(name), `Placeholder should include ${name}`);
-  }
-});
-
-test('Dashboard supports up to 25 sources', () => {
-  const fs = require('fs');
-  const path = require('path');
-  const source = fs.readFileSync(
-    path.join(__dirname, '..', 'dashboard', 'views', 'steam-updates.ejs'),
-    'utf8'
-  );
-  assert.ok(
-    source.includes('selectedGames.size >= 25') ||
-      source.includes('max.*25') ||
-      source.includes("'25'"),
-    'Dashboard should enforce 25 game limit'
-  );
+  assert.ok(action, 'previewSteamUpdates action missing');
+  assert.strictEqual(action.kind, 'action');
+  assert.strictEqual(typeof action.run, 'function');
 });
 
 // ============================================================

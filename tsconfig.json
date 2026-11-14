@@ -18,8 +18,7 @@
   "include": [
     "slashCommands/admin/setup.js",
     "utils/season/seasonLeaderboardScheduler.js",
-    "utils/steam/steamUpdateUtils.js",
-    "dashboard/serverHelpers.js"
+    "utils/steam/steamUpdateUtils.js"
   ],
   "exclude": ["node_modules", "data", "logs", "coverage", "backups", ".archive"]
 }

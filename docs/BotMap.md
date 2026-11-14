@@ -6,7 +6,8 @@
 - **Author:** BlackAngelSK
 - **Framework:** discord.js v14
 - **Database:** MongoDB
-- **Web Dashboard:** Express + EJS + Socket.IO
+- **In-Discord dashboard:** `/dashboard` panels (`utils/panel/`)
+- **Public API:** Express (`api/`)
 - **Languages:** English (en.json), Slovak (sk.json)
 
 ---
@@ -169,7 +170,7 @@ volume.js            Adjust volume
 achievements.js      Achievement display
 confess.js           Confession system
 config.js            Server configuration
-dashboard.js         Open web dashboard
+dashboard.js         Point to /dashboard
 giveaway.js          Giveaway system
 help.js              Help command
 invites.js           Invite tracking
@@ -342,7 +343,6 @@ ttt.js               Tic Tac Toe
 - `cardImageGenerator.js`, `cardBoardRenderer.js` - Card rendering
 - `customCommandManager.js` - Custom commands
 - `customRoleShop.js` - Role purchase shop
-- `dashboardPermissionsManager.js` - Dashboard auth
 - `discordFetch.js` - Discord API helpers
 - `helpCatalog.js` - Help command catalog
 - `helpers.js` - Utility functions
@@ -391,50 +391,9 @@ ttt.js               Tic Tac Toe
 
 ---
 
-## 🎨 Dashboard (`dashboard/`)
-
-### Server & Routes
-
-- `server.js` - Express server + Socket.IO (real-time updates)
-- `routes.js` - API endpoints & middleware
-
-### Views (26 EJS Templates in `views/`)
-
-| Template                    | Purpose                 |
-| --------------------------- | ----------------------- |
-| `dashboard.ejs`             | Main dashboard overview |
-| `server-profile.ejs`        | Server details page     |
-| `server-profile-public.ejs` | Public server profile   |
-| `economy.ejs`               | Economy settings        |
-| `moderation.ejs`            | Moderation config       |
-| `community.ejs`             | Community features      |
-| `steam-updates.ejs`         | Steam update alerts     |
-| `steam-promos.ejs`          | Steam promo alerts      |
-| `steam-free-games.ejs`      | Free games alerts       |
-| `live-alerts.ejs`           | Live event config       |
-| `voice-tools.ejs`           | Voice channel tools     |
-| `shop.ejs`                  | Custom role shop        |
-| `permissions.ejs`           | Permission settings     |
-| `automod.ejs`               | Auto-moderation         |
-| `safety.ejs`                | Safety features         |
-| `commands.ejs`              | Command config          |
-| `activity.ejs`              | Activity tracking       |
-| `analytics.ejs`             | Analytics dashboard     |
-| `global-leaderboard.ejs`    | Global rankings         |
-| `health.ejs`                | Health monitoring       |
-| `owner-settings.ejs`        | Owner controls          |
-| `telegram-sync.ejs`         | Telegram integration    |
-| `index.ejs`                 | Login page              |
-
-### Partials (`views/partials/`)
-
-- `dashboard-common-scripts.ejs` - Shared JavaScript
-
----
-
 ## 🌐 Public API (`api/`)
 
-Runs as its own Express app, so `/api/v1` works with the web dashboard disabled.
+Runs as its own Express app on its own port.
 
 - `server.js` - standalone app (`PUBLIC_API_ENABLED=true`, `PUBLIC_API_PORT`, default 3001)
 - `routes.js` - `/api/v1` endpoints
@@ -537,7 +496,7 @@ Standard playing card images (C2-C14, D2-D14, H2-H14, S2-S14)
 3. **Initialize Managers** - Database, settings, economy, etc.
 4. **Load Handlers** - Commands, events, slash commands
 5. **Register Slash Commands** - Discord API sync
-6. **Start Dashboard** - Web interface (if enabled)
+6. **Start Public API** - Optional HTTP service (if enabled)
 7. **Login to Discord** - Connect to bot gateway
 8. **Ready Tasks** - Season updates, notifications
 
@@ -545,13 +504,12 @@ Standard playing card images (C2-C14, D2-D14, H2-H14, S2-S14)
 
 ## 📊 Bot Features Summary
 
-| Category           | Count        |
-| ------------------ | ------------ |
-| Prefix Commands    | 121 files    |
-| Slash Commands     | 44 files     |
-| Utils/Managers     | ~80 files    |
-| Events             | 17 files     |
-| Dashboard Views    | 26 templates |
-| Games & Mini-games | 50+          |
+| Category           | Count     |
+| ------------------ | --------- |
+| Prefix Commands    | 121 files |
+| Slash Commands     | 44 files  |
+| Utils/Managers     | ~80 files |
+| Events             | 17 files  |
+| Games & Mini-games | 50+       |
 
 **Total:** 300+ files across a full-featured Discord bot ecosystem.

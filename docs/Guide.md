@@ -47,14 +47,14 @@ The music system supports queue-based playback with search and URL input. Common
 
 ### Dashboard and Administration
 
-If enabled, the dashboard provides browser-based access to analytics and management views. It is intended for administrators who prefer a visual workflow over command-line or Discord-only management.
+The server dashboard lives in Discord: `/dashboard` opens one ephemeral message with every panel — settings categories, economy (balances, shop items, global board), safety actions, server builder, insights, community and live alerts. The bot owner also gets an owner panel with runtime/storage state and a test notification.
 
-Typical dashboard uses include:
+Typical uses include:
 
-- reviewing server activity
+- reviewing server activity and health
 - checking member and economy data
-- inspecting moderation state
-- managing configuration in a central place
+- inspecting moderation and raid posture
+- managing configuration in one place
 
 ## Seasonal Systems
 

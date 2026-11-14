@@ -22,7 +22,12 @@ RUN mkdir -p data logs backups
 
 # Set environment variables
 ENV NODE_ENV=production
+# The public API is the container's only HTTP surface (no web dashboard), and it
+# is what the health check below talks to.
 ENV PORT=3000
+ENV PUBLIC_API_ENABLED=true
+ENV PUBLIC_API_HOST=0.0.0.0
+ENV PUBLIC_API_PORT=3000
 
 # Expose port
 EXPOSE 3000

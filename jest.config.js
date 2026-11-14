@@ -10,7 +10,6 @@ module.exports = {
     'utils/**/*.js',
     'commands/**/*.js',
     'events/**/*.js',
-    'dashboard/**/*.js',
     '!**/node_modules/**',
     '!**/tests/**',
     '!**/data/**',

@@ -1,6 +1,6 @@
 # Discord Bot 2.0
 
-A feature-rich Discord bot built with `discord.js` v14 for community management, music playback, moderation, engagement systems, and server automation. The project supports both slash commands and prefix commands, includes an optional web dashboard, and can run on either JSON storage or MongoDB.
+A feature-rich Discord bot built with `discord.js` v14 for community management, music playback, moderation, engagement systems, and server automation. The project supports both slash commands and prefix commands, includes an in-Discord dashboard, and can run on either JSON storage or MongoDB.
 
 ## Overview
 
@@ -15,14 +15,14 @@ This repository is designed for servers that want a single bot to handle day-to-
 | Economy and Levels | XP, levels, daily and weekly rewards, balance tracking, leaderboards, shop system                               |
 | Community Tools    | polls, profiles, invite tracking, birthdays, suggestions, reminders, activity tracking                          |
 | Automation         | welcome and leave messages, auto-role, scheduled messages, seasonal leaderboard updates                         |
-| Operations         | web dashboard, analytics, backups, health monitoring, MongoDB sync controls                                     |
+| Operations         | in-Discord dashboard, analytics, backups, health monitoring                                                     |
 
 ## Technology Stack
 
 - `Node.js` 20.16 or newer
 - `discord.js` v14
 - `@discordjs/voice` for voice features
-- `Express` and `EJS` for the dashboard
+- `Express` for the public REST API (`/api/v1`)
 - `MongoDB` for optional database-backed storage
 - JSON file storage as a built-in fallback
 
@@ -64,10 +64,8 @@ CLIENT_ID=your_application_id
 CLIENT_SECRET=your_application_secret
 BOT_OWNER_ID=your_discord_user_id
 
-DASHBOARD_ENABLED=false
-DASHBOARD_PORT=3000
-DASHBOARD_URL=http://localhost:3000
-DASHBOARD_CALLBACK=http://127.0.0.1:3000/callback
+PUBLIC_API_ENABLED=false
+PUBLIC_API_PORT=3001
 
 MONGODB_URI=
 MONGODB_DBNAME=discord-bot
@@ -114,7 +112,7 @@ After inviting the bot to your server, a typical initial setup looks like this:
 1. Run `/setup` or `!setup`
 2. Configure moderation with `/automod` and `/modlog`
 3. Adjust prefixes and server settings with `!config`
-4. Enable the dashboard if needed
+4. Open `/dashboard` in Discord for the server panels
 5. Configure MongoDB if you want database-backed persistence
 
 ## Configuration Notes
@@ -134,13 +132,11 @@ Owner-only sync controls are available through:
 
 ### Dashboard
 
-Set `DASHBOARD_ENABLED=true` and provide the Discord OAuth values in `.env` if you want the web dashboard enabled.
-
-The same panels — settings, economy, safety, server builder, insights, community, live alerts and the owner panel — are available inside Discord with `/dashboard`: no OAuth app, web port or session secret needed.
+There is no web dashboard: run `/dashboard` in Discord for settings, economy (balances, shop items, global board), safety actions, server builder, insights, community, live alerts and — for the bot owner — the owner panel. No OAuth app, web port or session secret is involved.
 
 ### Public API
 
-`/api/v1` runs as its own Express app (`api/`), independent of the web dashboard. Set `PUBLIC_API_ENABLED=true` to start it; requests go to `PUBLIC_API_HOST:PUBLIC_API_PORT` (default `127.0.0.1:3001`).
+`/api/v1` runs as its own Express app (`api/`). Set `PUBLIC_API_ENABLED=true` to start it; requests go to `PUBLIC_API_HOST:PUBLIC_API_PORT` (default `127.0.0.1:3001`).
 
 - API keys live in `data/apiKeys.json`.
 - `GET /api/v1/health` and `GET /api/v1/docs` need no key; every other endpoint takes `Authorization: Bearer <key>`.
@@ -229,7 +225,7 @@ discordbotlast/
 |-- slashCommands/     # Slash command definitions
 |-- events/            # Discord event handlers
 |-- utils/             # Managers, services, and shared helpers
-|-- dashboard/         # Optional web dashboard
+|-- api/               # Public REST API service (/api/v1)
 |-- data/              # JSON-based runtime data and backups
 |-- assets/            # Static bot assets
 |-- index.js           # Application entry point

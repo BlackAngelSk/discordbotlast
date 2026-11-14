@@ -173,8 +173,6 @@ module.exports = [
       '.venv/',
       'scripts/',
       'self updater/',
-      'dashboard/public/**/*.js',
-      'dashboard/server.js',
       'package-lock.json',
     ],
   },
