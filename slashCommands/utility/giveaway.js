@@ -1,11 +1,11 @@
-const {
-  SlashCommandBuilder,
-  EmbedBuilder,
-  PermissionFlagsBits,
-  MessageFlags,
-} = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const {
+  buildGiveawayEmbed,
+  buildGiveawayEndedEmbed,
+  buildGiveawayEmptyEmbed,
+} = require('../../utils/giveawayEmbeds');
 
 const giveawayFile = path.join(__dirname, '../../data/giveaways.json');
 
@@ -71,14 +71,14 @@ async function endGiveaway(client, giveaway) {
     const channel = await client.channels.fetch(giveaway.channelId);
     const message = await channel.messages.fetch(giveaway.messageId);
 
+    const guildIconUrl = channel.guild?.iconURL?.({ size: 128 }) || null;
     const reaction = message.reactions.cache.get('🎉');
     if (!reaction) {
-      const endEmbed = new EmbedBuilder()
-        .setColor('#FF0000')
-        .setTitle('🎉 Giveaway Ended')
-        .setDescription(`**Prize:** ${giveaway.prize}\n\n❌ No one entered the giveaway!`)
-        .setFooter({ text: 'Giveaway ended' })
-        .setTimestamp();
+      const endEmbed = buildGiveawayEmptyEmbed({
+        prize: giveaway.prize,
+        hostId: giveaway.hostId,
+        guildIconUrl,
+      });
 
       await message.edit({ embeds: [endEmbed] });
       return;
@@ -88,12 +88,11 @@ async function endGiveaway(client, giveaway) {
     const participants = users.filter((user) => !user.bot);
 
     if (participants.size === 0) {
-      const endEmbed = new EmbedBuilder()
-        .setColor('#FF0000')
-        .setTitle('🎉 Giveaway Ended')
-        .setDescription(`**Prize:** ${giveaway.prize}\n\n❌ No valid entries!`)
-        .setFooter({ text: 'Giveaway ended' })
-        .setTimestamp();
+      const endEmbed = buildGiveawayEmptyEmbed({
+        prize: giveaway.prize,
+        hostId: giveaway.hostId,
+        guildIconUrl,
+      });
 
       await message.edit({ embeds: [endEmbed] });
       return;
@@ -110,15 +109,20 @@ async function endGiveaway(client, giveaway) {
 
     const winnerMentions = winners.map((w) => `<@${w.id}>`).join(', ');
 
-    const endEmbed = new EmbedBuilder()
-      .setColor('#00FF00')
-      .setTitle('🎉 Giveaway Ended')
-      .setDescription(`**Prize:** ${giveaway.prize}\n\n**Winner(s):** ${winnerMentions}`)
-      .setFooter({ text: `Ended at` })
-      .setTimestamp();
+    const endEmbed = buildGiveawayEndedEmbed({
+      prize: giveaway.prize,
+      winners: winners.map((w) => `<@${w.id}>`),
+      entries: participants.size,
+      hostId: giveaway.hostId,
+      guildIconUrl,
+    });
 
     await message.edit({ embeds: [endEmbed] });
-    await message.reply(`🎊 Congratulations ${winnerMentions}! You won **${giveaway.prize}**!`);
+    await message.reply(
+      `🎊 Congratulations ${winnerMentions}! You won **${giveaway.prize}**! (${participants.size} ${
+        participants.size === 1 ? 'entry' : 'entries'
+      })`
+    );
   } catch (error) {
     console.error('Error ending giveaway:', error);
   }
@@ -168,14 +172,13 @@ module.exports = {
 
     const endTime = Date.now() + duration;
 
-    const giveawayEmbed = new EmbedBuilder()
-      .setColor('#FFD700')
-      .setTitle('🎉 GIVEAWAY 🎉')
-      .setDescription(
-        `**Prize:** ${prize}\n\n**Winners:** ${winnersCount}\n**Hosted by:** ${interaction.user}\n**Ends:** <t:${Math.floor(endTime / 1000)}:R>`
-      )
-      .setFooter({ text: 'React with 🎉 to enter!' })
-      .setTimestamp(endTime);
+    const giveawayEmbed = buildGiveawayEmbed({
+      prize,
+      winners: winnersCount,
+      hostId: interaction.user.id,
+      endTime,
+      guildIconUrl: interaction.guild?.iconURL?.({ size: 128 }) || null,
+    });
 
     try {
       const giveawayMessage = await channel.send({ embeds: [giveawayEmbed] });
