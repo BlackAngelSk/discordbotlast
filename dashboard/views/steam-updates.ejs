@@ -104,7 +104,7 @@
                     <div class="form-row">
                         <div class="form-group" style="width:100%">
                             <label class="form-label">Advanced Input</label>
-                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;lol&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;overwatch&#10;apex&#10;cs2&#10;dota2&#10;valheim&#10;rust&#10;pubg&#10;nvidia&#10;amd&#10;intel"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
+                            <textarea name="games" class="form-control" rows="8" placeholder="730&#10;minecraft&#10;osu&#10;league&#10;valorant&#10;ffxiv&#10;wow&#10;poe&#10;fortnite&#10;helldivers2&#10;diablo&#10;overwatch&#10;apex&#10;cs2&#10;dota2&#10;valheim&#10;rust&#10;pubg&#10;nvidia&#10;amd&#10;intel"><%= config?.rawGames || (config?.appIds || []).join('\n') %></textarea>
                             <div class="form-hint">Use Steam app IDs, Steam store URLs, or game names listed above.</div>
                         </div>
                     </div>
@@ -196,8 +196,18 @@ const specialSourceDefaults = {
     intel: { sourceId: 'intel', provider: 'intel', name: 'Intel GPU Drivers', tinyImage: 'https://www.intel.com/favicon.ico', imageUrl: 'https://www.intel.com/content/dam/www/central-libraries/us/en/images/intel-arc-a-series-graphics-card.jpg.rendition.intel.web.1648.927.jpg', storeUrl: 'https://www.intel.com/content/www/us/en/newsroom.html' }
 };
 
+// Friendly aliases accepted by the backend (utils/steam/steamGameUpdatesManager.js)
+const specialSourceAliases = { lol: 'league', mc: 'minecraft', 'leagueoflegends': 'league' };
+
+function resolveSpecialSourceKey(value) {
+    const normalized = String(value || '').toLowerCase().replace(/\s+/g, '');
+    if (specialSourceDefaults[normalized]) return normalized;
+    const alias = specialSourceAliases[normalized];
+    return alias && specialSourceDefaults[alias] ? alias : '';
+}
+
 // All source keys for the advanced textarea input
-const allSourceKeys = ['minecraft','osu','lol','valorant','ffxiv','wow','poe','fortnite','helldivers2','diablo','overwatch','apex','cs2','dota2','valheim','rust','pubg','nvidia','amd','intel'];
+const allSourceKeys = ['minecraft','osu','league','valorant','ffxiv','wow','poe','fortnite','helldivers2','diablo','overwatch','apex','cs2','dota2','valheim','rust','pubg','nvidia','amd','intel'];
 
 const form = document.getElementById('steamUpdatesForm');
 const channelSelect = form.querySelector('select[name="channelId"]');
@@ -306,7 +316,7 @@ function addSelectedGame(game) {
 }
 
 function renderQuickAddButtons() {
-    const quickGames = ['minecraft','lol','osu','valorant','cs2','dota2','fortnite','wow','ffxiv','poe','diablo','overwatch','apex','helldivers2','valheim','rust','pubg','nvidia','amd','intel'];
+    const quickGames = ['minecraft','league','osu','valorant','cs2','dota2','fortnite','wow','ffxiv','poe','diablo','overwatch','apex','helldivers2','valheim','rust','pubg','nvidia','amd','intel'];
     quickAddContainer.innerHTML = quickGames.map(key => {
         const def = specialSourceDefaults[key];
         if (!def || selectedGames.has(key)) return '';
@@ -319,12 +329,10 @@ function parseManualInput() {
     for (const entry of lines) {
         const normalizedEntry = entry.toLowerCase().replace(/\s+/g, '');
 
-        // Check all special sources
-        const specialDef = Object.values(specialSourceDefaults).find(def =>
-            def.sourceId === normalizedEntry || def.provider === normalizedEntry
-        );
-        if (specialDef && !selectedGames.has(specialDef.sourceId)) {
-            selectedGames.set(specialDef.sourceId, { ...specialDef });
+        // Check all special sources (including aliases like lol / mc)
+        const specialKey = resolveSpecialSourceKey(normalizedEntry);
+        if (specialKey && !selectedGames.has(specialKey)) {
+            selectedGames.set(specialKey, { ...specialSourceDefaults[specialKey] });
             continue;
         }
 
@@ -442,7 +450,7 @@ testButton.addEventListener('click', async () => {
 });
 
 clearButton.addEventListener('click', async () => {
-    if (!confirm('Disable game update alerts for this server?')) return;
+    if (!confirm('Disable game update alerts and forget the tracked games for this server?')) return;
     const original = clearButton.innerHTML;
     clearButton.disabled = true;
     clearButton.innerHTML = '<span class="spinner"></span> Removing...';

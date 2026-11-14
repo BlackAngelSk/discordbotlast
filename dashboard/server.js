@@ -2441,7 +2441,7 @@ class Dashboard {
                 res.json({
                     success: true,
                     message: result.wasTrimmed
-                        ? 'Game updates saved. Only the first 20 tracked sources were kept.'
+                        ? 'Game updates saved. Only the first 25 tracked sources were kept.'
                         : 'Game updates saved successfully',
                     config: result.config,
                     trackedGames: result.trackedGames,
@@ -2480,8 +2480,10 @@ class Dashboard {
                     return res.status(400).json({ success: false, error: 'Choose a channel first' });
                 }
 
-                const channel = guild.channels.cache.get(targetChannelId);
-                if (!channel || channel.type !== 0) {
+                const channel =
+                    guild.channels.cache.get(targetChannelId) ||
+                    (await guild.channels.fetch(targetChannelId).catch(() => null));
+                if (!channel || typeof channel.isTextBased !== 'function' || !channel.isTextBased()) {
                     return res.status(400).json({ success: false, error: 'Please choose a valid text channel' });
                 }
 

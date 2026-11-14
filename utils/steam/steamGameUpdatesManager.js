@@ -21,6 +21,8 @@ const {
   toUnixTimestamp,
   buildProviderUpdateKey,
   parseUsDateToIso,
+  parseRssFeed,
+  BROWSER_REQUEST_HEADERS,
 } = require('./steamUpdateUtils');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'steamGameUpdates.json');
@@ -33,14 +35,16 @@ const MINECRAFT_VERSION_MANIFEST_URL =
   'https://piston-meta.mojang.com/mc/game/version_manifest_v2.json';
 const LEAGUE_PATCH_NOTES_URL = 'https://www.leagueoflegends.com/en-us/news/tags/patch-notes/';
 const OSU_CHANGELOG_URL = 'https://osu.ppy.sh/home/changelog/lazer';
-const OSU_CHANGELOG_API_URL = 'https://osu.ppy.sh/api/v2/changelog/lazer';
+const OSU_RELEASES_API_URL = 'https://api.github.com/repos/ppy/osu/releases?per_page=10';
 const VALORANT_PATCH_NOTES_URL = 'https://playvalorant.com/en-us/news/';
 const FFXIV_PATCH_NOTES_URL = 'https://na.finalfantasyxiv.com/lodestone/news/';
-const WOW_PATCH_NOTES_URL = 'https://us.battle.net/news/en-us/wow/';
-const POE_NEWS_URL = 'https://www.pathofexile.com/en/news';
+const WOW_PATCH_NOTES_URL = 'https://worldofwarcraft.blizzard.com/en-us/news';
+const POE_NEWS_URL = 'https://www.pathofexile.com/news';
+const POE_NEWS_RSS_URL = 'https://www.pathofexile.com/news/rss';
+const FORTNITE_NEWS_API_URL = 'https://fortnite-api.com/v2/news';
 const FORTNITE_NEWS_URL = 'https://www.fortnite.com/?lang=en-US';
 const HELLDIVERS2_NEWS_URL = 'https://www.helldivers.com/';
-const DIABLO_NEWS_URL = 'https://diablo4.blizzard.com/en-us/news/';
+const DIABLO_NEWS_URL = 'https://news.blizzard.com/en-us/diablo4';
 const OVERWATCH_NEWS_URL = 'https://overwatch.blizzard.com/en-us/news/';
 const APEX_NEWS_URL = 'https://www.ea.com/games/apex-legends/news';
 const CS2_UPDATE_URL = 'https://blog.counter-strike.net/';
@@ -50,10 +54,14 @@ const RUST_NEWS_URL = 'https://rust.facepunch.com/news';
 const PUBG_NEWS_URL = 'https://www.pubg.com/en/news';
 const NVIDIA_DRIVERS_URL = 'https://www.nvidia.com/en-us/geforce/drivers/';
 const NVIDIA_BLOG_URL = 'https://www.nvidia.com/en-us/geforce/news/';
-const AMD_DRIVERS_URL =
-  'https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN.html';
-const AMD_NEWS_URL = 'https://www.amd.com/en/news.html';
-const INTEL_DRIVERS_URL = 'https://www.intel.com/content/www/us/en/download/center/home.html';
+const AMD_DRIVERS_URL = 'https://www.amd.com/en/support/download/drivers.html';
+const AMD_RELEASE_NOTES_URL =
+  'https://www.amd.com/en/resources/support-articles/release-notes.html';
+const AMD_RELEASE_NOTE_PREFIX =
+  'https://www.amd.com/en/resources/support-articles/release-notes/RN-RAD-WIN-';
+const AMD_NEWS_URL = 'https://www.amd.com/en/newsroom.html';
+const INTEL_DRIVERS_URL =
+  'https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html';
 const INTEL_NEWS_URL = 'https://www.intel.com/content/www/us/en/newsroom.html';
 
 const POLL_INTERVAL = 15 * 60 * 1000;
@@ -618,13 +626,61 @@ function resolveAbsoluteUrl(baseUrl, candidate) {
   }
 }
 
-function extractPreferredArticleUrl(
+/**
+ * Drop script/style/comment blocks so their inline JS and CSS cannot leak into
+ * anchor labels (Blizzard cards embed a <style> block inside the card link).
+ */
+function stripMarkupNoise(html) {
+  return String(html || '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+}
+
+/**
+ * Normalize an anchor label into a usable headline, or return '' when the label
+ * is really inline CSS/JS or otherwise unusable.
+ */
+function cleanAnchorLabel(value) {
+  let clean = sanitizeText(value)
+    .replace(/\b\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!clean || /[{}]|\/\*|document\.|innerHTML|window\.|function\s*\(/i.test(clean)) return '';
+
+  // Card links prepend the section label ("Game Updates VALORANT Patch Notes...").
+  const withoutSectionLabel = clean.replace(
+    /^(?:game updates?|news|articles?|updates?|latest news)\s*[-\u2013\u2014:|]?\s+(?=\S)/i,
+    ''
+  );
+  if (withoutSectionLabel.length >= 12) clean = withoutSectionLabel;
+
+  clean = clean.replace(/[\s\-\u2013\u2014:|,]+$/, '').trim();
+  if (!clean) return '';
+
+  if (clean.length > 160) {
+    const firstSentence = clean.split(/(?<=[.!?])\s+/)[0];
+    clean = firstSentence.length >= 20 ? firstSentence : truncate(clean, 160);
+  }
+
+  return clean;
+}
+
+/**
+ * Score every article-like link on a page and return them best-first.
+ *
+ * Returns `{ url, text, score }` entries; `text` is the cleaned anchor label,
+ * which is usually the real headline (page-level `og:title` is often just
+ * "News" on these hub pages).
+ */
+function collectArticleCandidates(
   html,
   baseUrl,
   { hrefPatterns = [], textPatterns = [], excludePatterns = [] } = {}
 ) {
-  const source = String(html || '');
-  if (!source) return baseUrl;
+  const source = stripMarkupNoise(html);
+  if (!source) return [];
 
   const baseHost = normalizeComparableHost(new URL(baseUrl).hostname);
   const candidates = [];
@@ -632,7 +688,7 @@ function extractPreferredArticleUrl(
   const pushCandidate = (url, text = '') => {
     if (!url) return;
 
-    const normalizedText = sanitizeText(text);
+    const normalizedText = cleanAnchorLabel(text);
     const normalizedUrl = String(url).trim();
     if (!normalizedUrl) return;
     if (isBlockedSourceUrl(normalizedUrl)) return;
@@ -664,7 +720,7 @@ function extractPreferredArticleUrl(
       score += 1;
 
     if (score > 0) {
-      candidates.push({ key, url: normalizedUrl, score });
+      candidates.push({ key, url: normalizedUrl, text: normalizedText, score });
     }
   };
 
@@ -682,8 +738,20 @@ function extractPreferredArticleUrl(
     pushCandidate(resolved, match[2]);
   }
 
-  candidates.sort((left, right) => right.score - left.score || left.url.length - left.url.length);
-  return candidates[0]?.url || baseUrl;
+  candidates.sort(
+    (left, right) =>
+      right.score - left.score ||
+      left.url.length - right.url.length ||
+      left.url.localeCompare(right.url)
+  );
+  return candidates;
+}
+
+/**
+ * Best single article link for a page (falls back to the page itself).
+ */
+function extractPreferredArticleUrl(html, baseUrl, options) {
+  return collectArticleCandidates(html, baseUrl, options)[0]?.url || baseUrl;
 }
 
 function splitIntoHighlights(text, maxItems = 6) {
@@ -1073,69 +1141,99 @@ async function fetchLeagueUpdates() {
   ];
 }
 
-function buildOsuSections(entries) {
-  const grouped = new Map();
-
-  for (const entry of entries || []) {
-    const category = sanitizeText(entry.category) || 'Highlights';
-    if (!grouped.has(category)) {
-      grouped.set(category, []);
-    }
-
-    const items = grouped.get(category);
-    if (items.length < 5) {
-      items.push(truncate(sanitizeText(entry.title), 220));
-    }
-  }
-
-  return Array.from(grouped.entries())
-    .map(([title, items]) => ({ title, items }))
-    .filter((section) => section.items.length > 0)
-    .slice(0, 4);
-}
-
-function buildOsuSummary(build) {
-  const entries = Array.isArray(build?.changelog_entries) ? build.changelog_entries : [];
-  const majorEntries = entries.filter((entry) => entry.major).slice(0, 2);
-  const summarySource =
-    majorEntries[0]?.message_html || majorEntries[0]?.title || entries[0]?.title;
-  if (summarySource) {
-    return truncate(sanitizeText(summarySource), 280);
-  }
-
-  return `A new osu! ${build?.update_stream?.display_name || 'lazer'} build is now live.`;
-}
-
 async function fetchOsuUpdates() {
-  const build = await httpsGetJson(OSU_CHANGELOG_API_URL);
-  const sections = buildOsuSections(build.changelog_entries);
-  const imageUrl = build.youtube_id
-    ? `https://i.ytimg.com/vi/${encodeURIComponent(build.youtube_id)}/hqdefault.jpg`
-    : SPECIAL_TRACKED_SOURCES.osu.imageUrl;
+  // osu!ppy's public changelog API requires OAuth and 403s anonymous calls, and
+  // the /home/changelog page is bot-walled. The lazer release feed on GitHub is
+  // the same data and needs no auth.
+  const releases = await httpsGetJson(OSU_RELEASES_API_URL, {
+    headers: { Accept: 'application/vnd.github+json' },
+  });
+  const source = SPECIAL_TRACKED_SOURCES.osu;
+  const items = Array.isArray(releases) ? releases.filter((r) => !r?.draft) : [];
 
-  return [
-    {
-      key: `osu:${build.id || build.version}`,
+  if (items.length === 0) {
+    throw new Error('osu! release feed returned no items');
+  }
+
+  return items.slice(0, 10).map((release) => {
+    const body = String(release.body || '');
+    const highlights = body
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^[\s*#>-]+/, '').trim())
+      .filter((line) => line.length > 12)
+      .slice(0, 6);
+
+    return {
+      key: buildProviderUpdateKey('osu', {
+        id: String(release.id || release.tag_name || ''),
+        url: release.html_url,
+        title: release.name || release.tag_name,
+        date: release.published_at,
+      }),
       provider: 'osu',
       providerLabel: 'osu!',
       gameName: 'osu!',
-      title: `${build.update_stream?.display_name || 'Lazer'} ${build.display_version || build.version}`,
-      summary: buildOsuSummary(build),
-      sections,
-      version: build.display_version || build.version || null,
-      url: `${OSU_CHANGELOG_URL}/${encodeURIComponent(build.version || build.display_version || '')}`,
-      date: build.created_at || Date.now(),
-      imageUrl,
-      tinyImage: SPECIAL_TRACKED_SOURCES.osu.tinyImage,
-      color: SPECIAL_TRACKED_SOURCES.osu.color,
+      title: truncate(`osu! lazer ${release.name || release.tag_name || ''}`, 256),
+      summary:
+        truncate(sanitizeText(highlights[0] || body), 280) || 'A new osu! lazer build is now live.',
+      sections: highlights.length > 0 ? [{ title: 'Changelog', items: highlights }] : [],
+      version: String(release.tag_name || release.name || '') || null,
+      url: release.html_url || OSU_CHANGELOG_URL,
+      date: release.published_at || Date.now(),
+      imageUrl: source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
       storeUrl: OSU_CHANGELOG_URL,
-    },
-  ];
+    };
+  });
+}
+
+const GENERIC_HEADLINE_PATTERN =
+  /^(news|news\s*(?:&|and)?\s*updates?|updates?|latest(?:\s+news)?|articles?|home|blog|all\s+news)$/i;
+
+/**
+ * Page-level titles on game news hubs are frequently filler ("News",
+ * "News & Updates"). Treat those as unusable so the anchor label of the
+ * article link wins instead.
+ */
+function isGenericHeadline(value) {
+  const clean = sanitizeText(value);
+  if (clean.length < 8) return true;
+  return GENERIC_HEADLINE_PATTERN.test(clean);
+}
+
+/**
+ * Turn a URL's trailing path segment into a readable headline
+ * ("diablo-iv-patch-notes-3-1" → "Diablo IV Patch Notes 3 1"). Used when a
+ * listing renders its article links as image cards with no anchor text.
+ */
+function humanizeUrlSlug(url) {
+  try {
+    const pathname = new URL(url).pathname.replace(/\/+$/, '');
+    const segment = pathname.split('/').filter(Boolean).pop() || '';
+    const cleaned = decodeURIComponent(segment)
+      .replace(/\.(?:html?|php|aspx?)$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (cleaned.length < 8 || !/[a-z]/i.test(cleaned)) return '';
+
+    return cleaned
+      .split(' ')
+      .map((word) => {
+        if (!word) return word;
+        if (/^(?:ii|iii|iv|vi|vii|viii|ix|xi|xii)$/i.test(word)) return word.toUpperCase();
+        return word.length > 2 ? word.charAt(0).toUpperCase() + word.slice(1) : word;
+      })
+      .join(' ');
+  } catch {
+    return '';
+  }
 }
 
 /**
  * Generic HTML-based update fetcher for non-Steam sources.
- * Extracts title, summary, changelog URL, and published date from a news page.
+ * Extracts headlines, changelog URLs, summary, and published date from a news page.
  */
 function createGenericWebFetcher({
   providerKey,
@@ -1143,27 +1241,14 @@ function createGenericWebFetcher({
   urlPatterns = {},
   textPatterns = [],
   excludePatterns = [],
+  maxArticles = 3,
 }) {
   return async function fetchGenericUpdates() {
     try {
       const html = await httpsGetText(pageUrl);
       const source = SPECIAL_TRACKED_SOURCES[providerKey];
 
-      const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) || html.match(/<h2[^>]*>(.*?)<\/h2>/i);
-      const title = titleMatch
-        ? sanitizeText(titleMatch[1])
-        : `${source?.name || providerKey} Update`;
-      const descMatch =
-        html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i) ||
-        html.match(/<p[^>]*>(.*?)<\/p>/i);
-      const summary = truncate(
-        descMatch
-          ? sanitizeText(descMatch[1])
-          : `New ${source?.name || providerKey} updates and news.`,
-        280
-      );
-
-      const changelogUrl = extractPreferredArticleUrl(html, pageUrl, {
+      const listing = collectArticleCandidates(html, pageUrl, {
         hrefPatterns: urlPatterns.href || [
           /\/news\//i,
           /patch/i,
@@ -1172,44 +1257,82 @@ function createGenericWebFetcher({
           /changelog/i,
         ],
         textPatterns:
-          urlPatterns.text || textPatterns.length > 0
-            ? textPatterns
-            : [/patch/i, /notes/i, /changelog/i, /update/i, /hotfix/i],
+          urlPatterns.text && urlPatterns.text.length > 0
+            ? urlPatterns.text
+            : textPatterns.length > 0
+              ? textPatterns
+              : [/patch/i, /notes/i, /changelog/i, /update/i, /hotfix/i],
         excludePatterns:
-          urlPatterns.exclude || excludePatterns.length > 0
-            ? excludePatterns
-            : [/shop|account|support|privacy|terms|store|buy/i],
+          urlPatterns.exclude && urlPatterns.exclude.length > 0
+            ? urlPatterns.exclude
+            : excludePatterns.length > 0
+              ? excludePatterns
+              : [/shop|account|support|privacy|terms|store|buy/i],
       });
+
+      const pageTitle = sanitizeText(
+        extractMetaContent(html, 'og:title') || extractMetaContent(html, 'twitter:title') || ''
+      );
+      const headingCandidate =
+        sanitizeText((html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || [])[1] || '') ||
+        sanitizeText((html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i) || [])[1] || '');
+      const description = truncate(
+        sanitizeText(
+          extractMetaContent(html, 'description') ||
+            extractMetaContent(html, 'og:description') ||
+            (html.match(/<p[^>]*>([\s\S]*?)<\/p>/i) || [])[1] ||
+            ''
+        ),
+        280
+      );
 
       const publishedAt =
         extractMetaContent(html, 'article:published_time') ||
         extractMetaContent(html, 'og:updated_time') ||
         null;
 
-      // Try to extract version from title
-      const versionMatch = title.match(/(?:v?(\d+(?:\.\d+){1,3}))/);
+      const entries =
+        listing.length > 0 ? listing.slice(0, maxArticles) : [{ url: pageUrl, text: '' }];
 
-      return [
-        {
-          key: buildProviderUpdateKey(providerKey, { url: changelogUrl, title, date: publishedAt }),
+      return entries.map((entry, index) => {
+        const label = sanitizeText(entry.text);
+        // Long labels are card blurbs ("Diablo IV Patch Notes Diablo IV We will
+        // continually update..."); the URL slug makes a cleaner headline there.
+        const titleCandidates = [];
+        if (label && label.length <= 90) titleCandidates.push(label);
+        titleCandidates.push(humanizeUrlSlug(entry.url), pageTitle, headingCandidate, label);
+        const title =
+          titleCandidates
+            .map((value) => sanitizeText(value))
+            .find((value) => value && !isGenericHeadline(value)) ||
+          `${source?.name || providerKey} Update`;
+
+        // Try to extract version from title
+        const versionMatch = title.match(/(?:v?(\d+(?:\.\d+){1,3}))/);
+
+        return {
+          key: buildProviderUpdateKey(providerKey, { url: entry.url, title, date: publishedAt }),
           provider: providerKey,
           providerLabel: source?.providerLabel || providerKey,
           gameName: source?.name || providerKey,
-          title,
-          summary,
+          title: truncate(title, 256),
+          summary:
+            index === 0 && description
+              ? description
+              : `A new ${source?.name || providerKey} update has been published. Open the changelog for the full details.`,
           sections: [],
           version: versionMatch?.[1] || null,
-          url: changelogUrl,
+          url: entry.url,
           date: publishedAt || Date.now(),
           imageUrl: source?.imageUrl || null,
           tinyImage: source?.tinyImage || null,
           color: source?.color || 0xf59e0b,
           storeUrl: source?.storeUrl || pageUrl,
-        },
-      ];
+        };
+      });
     } catch (error) {
-      console.error(`Error fetching ${providerKey} updates:`, error);
-      return [];
+      console.error(`Error fetching ${providerKey} updates:`, error.message || error);
+      throw error; // Re-throw so the caller can log/disable this provider
     }
   };
 }
@@ -1244,7 +1367,7 @@ async function fetchWoWUpdates() {
     providerKey: 'wow',
     pageUrl: WOW_PATCH_NOTES_URL,
     urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /hotfix/i],
+      href: [/\/news\/\d+/i, /patch/i, /notes/i, /hotfix/i],
       text: [/patch/i, /notes/i, /hotfix/i, /update/i],
       exclude: [/shop|account|support|privacy|terms/i],
     },
@@ -1252,39 +1375,128 @@ async function fetchWoWUpdates() {
 }
 
 async function fetchPoEUpdates() {
-  return createGenericWebFetcher({
-    providerKey: 'poe',
-    pageUrl: POE_NEWS_URL,
-    urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /changelog/i],
-      text: [/patch/i, /notes/i, /changelog/i, /update/i],
-      exclude: [/forum|account|support|privacy|terms/i],
-    },
-  })();
+  try {
+    const xml = await httpsGetText(POE_NEWS_RSS_URL);
+    const items = parseRssFeed(xml).slice(0, 10);
+    const source = SPECIAL_TRACKED_SOURCES.poe;
+
+    if (items.length === 0) {
+      throw new Error('Path of Exile news feed returned no items');
+    }
+
+    return items.map((item) => ({
+      key: buildProviderUpdateKey('poe', { url: item.link, title: item.title, date: item.pubDate }),
+      provider: 'poe',
+      providerLabel: source.providerLabel,
+      gameName: source.name,
+      title: truncate(item.title, 256),
+      summary: item.description || `A new ${source.name} news post has been published.`,
+      sections: [],
+      version: null,
+      url: item.link || POE_NEWS_URL,
+      date: item.pubDate || Date.now(),
+      imageUrl: source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
+      storeUrl: source.storeUrl,
+    }));
+  } catch (error) {
+    console.error('Error fetching PoE updates:', error.message || error);
+    throw error;
+  }
 }
 
 async function fetchFortniteUpdates() {
-  return createGenericWebFetcher({
-    providerKey: 'fortnite',
-    pageUrl: FORTNITE_NEWS_URL,
-    urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /changelog/i],
-      text: [/patch/i, /notes/i, /changelog/i, /update/i],
-      exclude: [/creative|festival|shop|support|privacy|terms/i],
-    },
-  })();
+  try {
+    const payload = await httpsGetJson(FORTNITE_NEWS_API_URL, {
+      headers: BROWSER_REQUEST_HEADERS,
+    });
+    const source = SPECIAL_TRACKED_SOURCES.fortnite;
+    const br = payload?.data?.br;
+    const motds = Array.isArray(br?.motds) ? br.motds : [];
+    const broadcastDate = br?.date || null;
+    const hash = br?.hash || '';
+
+    if (motds.length === 0) {
+      throw new Error('Fortnite news feed returned no items');
+    }
+
+    return motds.slice(0, 10).map((motd) => ({
+      key: buildProviderUpdateKey('fortnite', {
+        id: String(motd.id || ''),
+        url: FORTNITE_NEWS_URL,
+        title: motd.title || motd.tabTitle,
+        date: broadcastDate,
+      }),
+      provider: 'fortnite',
+      providerLabel: source.providerLabel,
+      gameName: source.name,
+      title: truncate(sanitizeText(motd.title || motd.tabTitle || 'Fortnite Update'), 256),
+      summary: truncate(sanitizeText(motd.body || ''), 280) || 'Fortnite news has been updated.',
+      sections: [],
+      version: null,
+      url: FORTNITE_NEWS_URL,
+      date: broadcastDate || Date.now(),
+      imageUrl: motd.image || source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
+      storeUrl: source.storeUrl,
+      hash,
+    }));
+  } catch (error) {
+    console.error('Error fetching Fortnite updates:', error.message || error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch a special source's patch notes from its Steam news feed.
+ *
+ * Used for games whose own news pages block bots or render client-side
+ * (Apex Legends, Helldivers 2) but whose Steam hub posts the same changelogs.
+ */
+async function fetchSpecialFromSteamApp(providerKey, appId, { maxItems = 10 } = {}) {
+  const source = SPECIAL_TRACKED_SOURCES[providerKey];
+  const payload = await httpsGetJson(`${APP_NEWS_URL}${encodeURIComponent(appId)}`);
+  const items = Array.isArray(payload?.appnews?.newsitems) ? payload.appnews.newsitems : [];
+
+  if (items.length === 0) {
+    throw new Error(`${source?.name || providerKey} Steam news feed returned no items`);
+  }
+
+  const game = {
+    name: source?.name || providerKey,
+    imageUrl: source?.imageUrl || null,
+    tinyImage: source?.tinyImage || null,
+    color: source?.color,
+    storeUrl: source?.storeUrl,
+  };
+
+  // Steam news feeds interleave third-party aggregator posts (PlayGround.ru,
+  // GamingOnLinux, SteamDB); prefer the game's own announcements when it has any.
+  const official = items.filter(
+    (article) =>
+      /steam_community_announcements/i.test(String(article?.feedname || '')) ||
+      /externalpost\/steam_community_announcements/i.test(String(article?.url || ''))
+  );
+  const pool = official.length > 0 ? official : items;
+
+  return pool
+    .slice(0, maxItems)
+    .map((article) => {
+      const update = buildSteamUpdate(appId, article, game);
+      return {
+        ...update,
+        provider: providerKey,
+        providerLabel: source?.providerLabel || providerKey,
+        gameName: source?.name || providerKey,
+      };
+    })
+    .sort((left, right) => Number(right.date) - Number(left.date));
 }
 
 async function fetchHelldivers2Updates() {
-  return createGenericWebFetcher({
-    providerKey: 'helldivers2',
-    pageUrl: HELLDIVERS2_NEWS_URL,
-    urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /update/i],
-      text: [/patch/i, /notes/i, /changelog/i, /update/i],
-      exclude: [/store|buy|support|privacy|terms/i],
-    },
-  })();
+  return fetchSpecialFromSteamApp('helldivers2', '553850');
 }
 
 async function fetchDiabloUpdates() {
@@ -1292,7 +1504,7 @@ async function fetchDiabloUpdates() {
     providerKey: 'diablo',
     pageUrl: DIABLO_NEWS_URL,
     urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /update/i],
+      href: [/\/en-us\/article\/\d+/i, /patch/i, /notes/i, /update/i],
       text: [/patch/i, /notes/i, /hotfix/i, /update/i],
       exclude: [/shop|account|support|privacy|terms/i],
     },
@@ -1312,15 +1524,7 @@ async function fetchOverwatchUpdates() {
 }
 
 async function fetchApexUpdates() {
-  return createGenericWebFetcher({
-    providerKey: 'apex',
-    pageUrl: APEX_NEWS_URL,
-    urlPatterns: {
-      href: [/\/news\//i, /patch/i, /notes/i, /update/i],
-      text: [/patch/i, /notes/i, /update/i, /season/i],
-      exclude: [/shop|account|support|privacy|terms/i],
-    },
-  })();
+  return fetchSpecialFromSteamApp('apex', '1172470');
 }
 
 /**
@@ -1439,39 +1643,48 @@ async function fetchNvidiaUpdates() {
  */
 async function fetchAmdUpdates() {
   try {
-    let html;
-    try {
-      html = await httpsGetTextWithRetry(AMD_DRIVERS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
-    } catch {
-      // Fallback to AMD news page if release notes page times out
-      html = await httpsGetTextWithRetry(AMD_NEWS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
-    }
     const source = SPECIAL_TRACKED_SOURCES.amd;
+    let html = null;
 
-    // Extract version from the driver release notes page
-    const versionMatch = html.match(
-      /(?:Adrenalin|Radeon|AMD)\s+(?:Software\s+)?(?:Edition\s+)?(?:WHQL\s+)?v?(\d{2}\.\d{1,2}\.\d{1,2})/i
+    // AMD's release-notes hub is a JS search app and the legacy RN-RAD-WIN.html
+    // landing page 404s, but the driver download page still lists the current
+    // Adrenalin build in its installer links.
+    try {
+      html = await httpsGetTextWithRetry(AMD_DRIVERS_URL, {
+        timeout: DRIVER_FETCH_TIMEOUT_MS,
+        headers: BROWSER_REQUEST_HEADERS,
+      });
+    } catch (error) {
+      console.error('AMD driver download page unavailable:', error.message || error);
+    }
+
+    if (!html) {
+      html = await httpsGetTextWithRetry(AMD_RELEASE_NOTES_URL, {
+        timeout: DRIVER_FETCH_TIMEOUT_MS,
+        headers: BROWSER_REQUEST_HEADERS,
+      });
+    }
+
+    const filenameMatch = html.match(
+      /adrenalin(?:-edition)?(?:-pro)?-(?:whql-)?(\d{2}\.\d{1,2}\.\d{1,2})/i
     );
-    const version = versionMatch?.[1] || extractDriverVersion(html) || null;
+    const inlineMatch = html.match(/(?:Adrenalin|Radeon)[^<]{0,40}?(\d{2}\.\d{1,2}\.\d{1,2})\b/i);
+    const version = filenameMatch?.[1] || inlineMatch?.[1] || extractDriverVersion(html) || null;
 
-    const title =
-      extractMetaContent(html, 'og:title') ||
-      (version ? `AMD Radeon Software Adrenalin ${version}` : 'AMD Radeon Driver Update');
+    const changelogUrl = version
+      ? `${AMD_RELEASE_NOTE_PREFIX}${version.replace(/\./g, '-')}.html`
+      : AMD_RELEASE_NOTES_URL;
+
+    const title = version
+      ? `AMD Software: Adrenalin Edition ${version}`
+      : extractMetaContent(html, 'og:title') || 'AMD Radeon Driver Update';
     const summary = truncate(
       extractMetaContent(html, 'og:description') ||
         (version
-          ? `AMD Radeon Software Adrenalin Edition version ${version} is now available. This update includes optimizations, bug fixes, and support for the latest titles.`
+          ? `AMD Software: Adrenalin Edition version ${version} is now available. This update includes optimizations, bug fixes, and support for the latest titles.`
           : 'A new AMD Radeon driver update is available. Check the release notes for supported hardware and fixes.'),
       280
     );
-    const imageUrl = extractMetaContent(html, 'og:image') || source.imageUrl;
-
-    const changelogUrl = extractPreferredArticleUrl(html, AMD_DRIVERS_URL, {
-      hrefPatterns: [/\/release-notes\//i, /driver/i, /adrenalin/i],
-      textPatterns: [/release/i, /driver/i, /adrenalin/i],
-      excludePatterns: [/shop|buy|account|support|privacy|terms/i],
-    });
-
     const publishedAt =
       extractMetaContent(html, 'article:published_time') ||
       extractMetaContent(html, 'og:updated_time') ||
@@ -1489,14 +1702,14 @@ async function fetchAmdUpdates() {
           ? [
               {
                 title: 'Driver Info',
-                items: [`Version: ${version}`, 'AMD Radeon Software Adrenalin Edition'],
+                items: [`Version: ${version}`, 'AMD Software: Adrenalin Edition'],
               },
             ]
           : [],
         version,
         url: changelogUrl,
         date: publishedAt || Date.now(),
-        imageUrl,
+        imageUrl: extractMetaContent(html, 'og:image') || source.imageUrl,
         tinyImage: source.tinyImage,
         color: source.color,
         storeUrl: AMD_DRIVERS_URL,
@@ -1513,29 +1726,38 @@ async function fetchAmdUpdates() {
  */
 async function fetchIntelUpdates() {
   try {
-    const html = await httpsGetText(INTEL_NEWS_URL);
     const source = SPECIAL_TRACKED_SOURCES.intel;
+    let html = null;
 
-    // Look for graphics driver related news
-    const articleUrl = extractPreferredArticleUrl(html, INTEL_NEWS_URL, {
-      hrefPatterns: [/\/news\//i, /graphics/i, /driver/i, /arc/i, /gpu/i],
-      textPatterns: [/driver/i, /graphics/i, /arc/i, /gpu/i, /xe/i],
-      excludePatterns: [/shop|buy|account|support|privacy|terms|career/i],
-    });
-
-    // Try to find version info on the driver download page
-    let version = null;
+    // The newsroom page carries corporate news, not graphics drivers; the Arc /
+    // Iris Xe download page always lists the current driver build.
     try {
-      const driverHtml = await httpsGetText(INTEL_DRIVERS_URL);
-      const versionMatch = driverHtml.match(/(\d{2,4}\.\d{1,4}\.\d{1,5}\.\d{1,5})/);
-      version = versionMatch?.[1] || null;
-    } catch {
-      // Driver page may not be accessible, that's okay
+      html = await httpsGetText(INTEL_DRIVERS_URL);
+    } catch (error) {
+      console.error('Intel driver download page unavailable:', error.message || error);
+      html = await httpsGetText(INTEL_NEWS_URL);
     }
 
-    const title =
-      extractMetaContent(html, 'og:title') ||
-      (version ? `Intel Graphics Driver ${version}` : 'Intel GPU Driver Update');
+    const versionMatches = String(html).match(/\b\d{2,4}\.\d{1,4}\.\d{1,5}\.\d{1,5}\b/g) || [];
+    const version =
+      versionMatches
+        .map((value) => ({
+          value,
+          score: value.split('.').reduce((acc, part) => acc * 10000 + Number(part), 0),
+        }))
+        .sort((left, right) => right.score - left.score)[0]?.value || null;
+
+    const title = version
+      ? `Intel Arc & Iris Xe Graphics Driver ${version}`
+      : extractMetaContent(html, 'og:title') || 'Intel GPU Driver Update';
+    const summary = truncate(
+      extractMetaContent(html, 'description') ||
+        extractMetaContent(html, 'og:description') ||
+        (version
+          ? `Intel Graphics Driver version ${version} is now available with performance optimizations and bug fixes for Intel Arc and Intel Iris Xe GPUs.`
+          : 'A new Intel GPU driver update is available. Check the release notes for supported hardware and game optimizations.'),
+      280
+    );
     const publishedAt =
       extractMetaContent(html, 'article:published_time') ||
       extractMetaContent(html, 'og:updated_time') ||
@@ -1544,7 +1766,7 @@ async function fetchIntelUpdates() {
     return [
       {
         key: buildProviderUpdateKey('intel', {
-          url: articleUrl || INTEL_NEWS_URL,
+          url: INTEL_DRIVERS_URL,
           title,
           date: publishedAt,
         }),
@@ -1552,19 +1774,17 @@ async function fetchIntelUpdates() {
         providerLabel: 'Intel',
         gameName: source.name,
         title: truncate(title, 256),
-        summary: version
-          ? `Intel Graphics Driver version ${version} is now available with performance optimizations and bug fixes for Intel Arc and Intel Xe GPUs.`
-          : 'A new Intel GPU driver update is available. Check the release notes for supported hardware and game optimizations.',
+        summary,
         sections: version
           ? [
               {
                 title: 'Driver Info',
-                items: [`Version: ${version}`, 'Intel Arc / Intel Xe Graphics'],
+                items: [`Version: ${version}`, 'Intel Arc / Intel Iris Xe Graphics'],
               },
             ]
           : [],
         version,
-        url: articleUrl || INTEL_DRIVERS_URL,
+        url: INTEL_DRIVERS_URL,
         date: publishedAt || Date.now(),
         imageUrl: source.imageUrl,
         tinyImage: source.tinyImage,
@@ -1859,9 +2079,43 @@ class SteamGameUpdatesManager {
   }
 
   async updateGuildConfig(guildId, channelId, rawGames, options = {}) {
-    const { trackedGames, wasTrimmed } = await this.resolveTrackedGames(rawGames);
-    const lastSeenArticles = {};
+    const current = this.data.guilds[guildId] || null;
+    const hasGamesArg =
+      rawGames !== undefined && rawGames !== null && String(rawGames).trim().length > 0;
+    const currentGames = Array.isArray(current?.trackedGames)
+      ? current.trackedGames
+          .map((game) => (game.provider === 'steam' ? game.appId : game.sourceId))
+          .filter(Boolean)
+          .join('\n')
+      : '';
     const enabled = options.enabled !== undefined ? Boolean(options.enabled) : true;
+
+    // Channel-only updates (the /setup wizard writes just a channel) must not
+    // throw "add at least one game" and must not wipe the tracked list.
+    if (!hasGamesArg && !currentGames) {
+      this.data.guilds[guildId] = {
+        ...(current || {}),
+        enabled,
+        channelId,
+        appIds: Array.isArray(current?.appIds) ? current.appIds : [],
+        trackedGames: Array.isArray(current?.trackedGames) ? current.trackedGames : [],
+        rawGames: current?.rawGames || '',
+        lastSeenArticles: current?.lastSeenArticles || {},
+        lastCheckedAt: current?.lastCheckedAt || null,
+      };
+      await this.save();
+
+      return {
+        config: this.getGuildConfig(guildId),
+        trackedGames: this.data.guilds[guildId].trackedGames,
+        wasTrimmed: false,
+        previews: [],
+      };
+    }
+
+    const gamesInput = hasGamesArg ? rawGames : currentGames;
+    const { trackedGames, wasTrimmed } = await this.resolveTrackedGames(gamesInput);
+    const lastSeenArticles = {};
 
     for (const game of trackedGames) {
       const articles = await this.fetchUpdatesForGame(game).catch(() => []);
@@ -1877,7 +2131,7 @@ class SteamGameUpdatesManager {
       channelId,
       appIds,
       trackedGames,
-      rawGames: buildRawGamesValue(rawGames, trackedGames),
+      rawGames: buildRawGamesValue(gamesInput, trackedGames),
       lastSeenArticles,
       lastCheckedAt: new Date().toISOString(),
     };
@@ -2003,9 +2257,25 @@ class SteamGameUpdatesManager {
       }
 
       const articleCache = new Map();
+      const failedSources = new Set();
       for (const [sourceKey, game] of uniqueGames.entries()) {
-        const articles = await this.fetchUpdatesForGame(game).catch(() => []);
-        articleCache.set(sourceKey, articles);
+        try {
+          const articles = await this.fetchUpdatesForGame(game);
+          articleCache.set(sourceKey, articles);
+        } catch (error) {
+          failedSources.add(sourceKey);
+          console.error(
+            `Game update fetch failed for ${game.provider || sourceKey}:`,
+            error.message || error
+          );
+          articleCache.set(sourceKey, []);
+        }
+      }
+
+      if (uniqueGames.size > 0) {
+        console.log(
+          `Game updates poll: checked ${uniqueGames.size} source(s), ${failedSources.size} failed.`
+        );
       }
 
       for (const [guildId, config] of Object.entries(this.data.guilds)) {
@@ -2022,7 +2292,12 @@ class SteamGameUpdatesManager {
         }
 
         const channel = await fetchChannelSafe(this.client, config.channelId);
-        if (!channel || !channel.isTextBased()) continue;
+        if (!channel || !channel.isTextBased()) {
+          console.warn(
+            `Game update alerts skipped for guild ${guildId}: channel ${config.channelId} is not a usable text channel.`
+          );
+          continue;
+        }
 
         if (!config.lastSeenArticles || typeof config.lastSeenArticles !== 'object') {
           config.lastSeenArticles = {};
@@ -2041,11 +2316,23 @@ class SteamGameUpdatesManager {
 
           unseen.reverse();
 
+          let deliveryFailed = false;
           for (const article of unseen) {
-            await channel.send(this.buildArticleAlert(article)).catch(() => {});
+            try {
+              await channel.send(this.buildArticleAlert(article));
+            } catch (error) {
+              deliveryFailed = true;
+              console.error(
+                `Game update post failed in guild ${guildId} (${game.name || sourceKey}):`,
+                error.message || error
+              );
+              break;
+            }
           }
 
-          if (articles[0]) {
+          // Only advance the marker once everything was delivered — otherwise a
+          // missing permission or API hiccup would silently drop the update.
+          if (!deliveryFailed && articles[0]) {
             config.lastSeenArticles[sourceKey] = articles[0].key;
           }
         }

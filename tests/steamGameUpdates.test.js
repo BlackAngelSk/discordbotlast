@@ -399,6 +399,128 @@ test('Dashboard supports up to 25 sources', () => {
 });
 
 // ============================================================
+console.log('\n=== Provider Sources ===');
+// ============================================================
+
+const managerSource = require('fs').readFileSync(
+  require('path').join(__dirname, '..', 'utils', 'steam', 'steamGameUpdatesManager.js'),
+  'utf8'
+);
+
+test('Provider endpoints point at live pages', () => {
+  const live = [
+    'https://api.github.com/repos/ppy/osu/releases',
+    'https://fortnite-api.com/v2/news',
+    'https://www.pathofexile.com/news/rss',
+    'https://worldofwarcraft.blizzard.com/en-us/news',
+    'https://news.blizzard.com/en-us/diablo4',
+    'intel-arc-iris-xe-graphics-windows.html',
+  ];
+  for (const url of live) {
+    assert.ok(managerSource.includes(url), `Expected live endpoint ${url}`);
+  }
+});
+
+test('Dead provider endpoints are gone', () => {
+  const dead = [
+    'https://us.battle.net/news/en-us/wow/',
+    'https://www.pathofexile.com/en/news',
+    'https://diablo4.blizzard.com/en-us/news/',
+    'osu.ppy.sh/api/v2/changelog',
+    'release-notes/RN-RAD-WIN.html',
+  ];
+  for (const url of dead) {
+    assert.ok(!managerSource.includes(url), `Dead endpoint still referenced: ${url}`);
+  }
+});
+
+test('parseRssFeed extracts title, link and date from RSS items', () => {
+  const { parseRssFeed } = require('../utils/steam/steamUpdateUtils');
+  const xml = `<?xml version="1.0"?><rss version="2.0"><channel><title>Feed</title>
+    <item>
+      <title><![CDATA[Patch 3.26 Notes]]></title>
+      <link>https://example.com/news/326</link>
+      <description><![CDATA[<p>Balance changes &amp; fixes</p>]]></description>
+      <pubDate>Fri, 13 Nov 2026 19:07:06 +0000</pubDate>
+    </item>
+    <item>
+      <title>Second item</title>
+      <link>https://example.com/news/325</link>
+    </item>
+  </channel></rss>`;
+
+  const items = parseRssFeed(xml);
+  assert.strictEqual(items.length, 2);
+  assert.strictEqual(items[0].title, 'Patch 3.26 Notes');
+  assert.strictEqual(items[0].link, 'https://example.com/news/326');
+  assert.ok(items[0].description.includes('Balance changes & fixes'));
+  assert.strictEqual(items[0].pubDate, 'Fri, 13 Nov 2026 19:07:06 +0000');
+  assert.strictEqual(items[1].pubDate, null);
+});
+
+test('parseRssFeed returns [] for empty input', () => {
+  const { parseRssFeed } = require('../utils/steam/steamUpdateUtils');
+  assert.deepStrictEqual(parseRssFeed(''), []);
+  assert.deepStrictEqual(parseRssFeed('<html><body>not a feed</body></html>'), []);
+});
+
+// ============================================================
+console.log('\n=== Config Updates ===');
+// ============================================================
+
+test('Channel-only config update does not throw without tracked games', async () => {
+  const guildId = 'test-guild-channel-only';
+  const originalSave = manager.save;
+  manager.save = async () => {};
+
+  try {
+    const result = await manager.updateGuildConfig(guildId, '123456789', undefined, {
+      enabled: true,
+    });
+    assert.ok(result.config, 'Should return a config');
+    assert.strictEqual(result.config.channelId, '123456789');
+    assert.strictEqual(result.config.enabled, true);
+    assert.deepStrictEqual(result.trackedGames, []);
+  } finally {
+    delete manager.data.guilds[guildId];
+    manager.save = originalSave;
+  }
+});
+
+test('Channel-only update keeps previously tracked games', async () => {
+  const guildId = 'test-guild-keep-games';
+  const originalSave = manager.save;
+  const originalFetchDetails = manager.fetchGameDetails;
+  const originalFetchUpdates = manager.fetchUpdatesForGame;
+  manager.save = async () => {};
+  manager.fetchGameDetails = async (appId) => ({ provider: 'steam', appId, name: `App ${appId}` });
+  manager.fetchUpdatesForGame = async () => [];
+
+  try {
+    manager.data.guilds[guildId] = {
+      enabled: true,
+      channelId: '111',
+      appIds: ['730'],
+      trackedGames: [{ provider: 'steam', appId: '730', name: 'Counter-Strike 2' }],
+      rawGames: '730',
+      lastSeenArticles: { 'steam:730': 'abc' },
+      lastCheckedAt: null,
+    };
+
+    const result = await manager.updateGuildConfig(guildId, '222', undefined, { enabled: true });
+    assert.strictEqual(result.config.channelId, '222');
+    assert.strictEqual(result.config.trackedGames.length, 1);
+    assert.strictEqual(result.config.trackedGames[0].appId, '730');
+    assert.deepStrictEqual(result.config.appIds, ['730']);
+  } finally {
+    delete manager.data.guilds[guildId];
+    manager.save = originalSave;
+    manager.fetchGameDetails = originalFetchDetails;
+    manager.fetchUpdatesForGame = originalFetchUpdates;
+  }
+});
+
+// ============================================================
 // Results
 // ============================================================
 
