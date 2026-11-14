@@ -44,6 +44,7 @@ const { awaitComponentSafe } = require('./componentAwait');
 const seasonLeaderboardManager = require('../season/seasonLeaderboardManager');
 const customCommandManager = require('../customCommandManager');
 const alertTestActions = require('./alertTestActions');
+const testActions = require('./testActions');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -64,7 +65,7 @@ const VIEW_PAGE_SIZE = 8; // settings rows per page in /setup view
  *   emoji?: string;
  *   read?: (guildId: string) => unknown;
  *   write?: (guildId: string, value: unknown, guild: any) => Promise<unknown> | unknown;
- *   run?: (ctx: { guild: import('discord.js').Guild, guildId: string }) => Promise<string> | string;
+ *   run?: (ctx: { guild: import('discord.js').Guild, guildId: string, member?: any }) => Promise<string> | string;
  * }} SettingDescriptor
  */
 
@@ -218,6 +219,21 @@ const SETTINGS = {
       maxLength: 1000,
       emoji: '✍️',
     },
+    {
+      key: 'previewWelcome',
+      kind: 'action',
+      label: 'Send test welcome',
+      hint: 'Posts the welcome message with you as the sample member.',
+      emoji: '🧪',
+      run: ({ guild, guildId, member }) =>
+        testActions.runDashboardTestAction({
+          guildId,
+          guild,
+          member,
+          type: 'welcome',
+          client: guild.client,
+        }),
+    },
   ],
   leave: [
     {
@@ -242,6 +258,21 @@ const SETTINGS = {
       maxLength: 1000,
       emoji: '✍️',
     },
+    {
+      key: 'previewLeave',
+      kind: 'action',
+      label: 'Send test goodbye',
+      hint: 'Posts the goodbye message with you as the sample member.',
+      emoji: '🧪',
+      run: ({ guild, guildId, member }) =>
+        testActions.runDashboardTestAction({
+          guildId,
+          guild,
+          member,
+          type: 'leave',
+          client: guild.client,
+        }),
+    },
   ],
   logging: [
     {
@@ -261,6 +292,21 @@ const SETTINGS = {
       write: async (g, v) => {
         await loggingManager.setLoggingChannel(g, v || null);
       },
+    },
+    {
+      key: 'previewLogging',
+      kind: 'action',
+      label: 'Send test log entry',
+      hint: 'Posts a sample audit-log entry to the logging channel.',
+      emoji: '🧪',
+      run: ({ guild, guildId, member }) =>
+        testActions.runDashboardTestAction({
+          guildId,
+          guild,
+          member,
+          type: 'logging',
+          client: guild.client,
+        }),
     },
   ],
   moderation: [
@@ -663,6 +709,21 @@ const SETTINGS = {
         const s = suggestionManager.getSettings(g) || {};
         await suggestionManager.updateSettings(g, { ...s, staffRoleId: v || null });
       },
+    },
+    {
+      key: 'previewSuggestion',
+      kind: 'action',
+      label: 'Send test suggestion',
+      hint: 'Posts a sample suggestion to the suggestions channel.',
+      emoji: '🧪',
+      run: ({ guild, guildId, member }) =>
+        testActions.runDashboardTestAction({
+          guildId,
+          guild,
+          member,
+          type: 'suggestions',
+          client: guild.client,
+        }),
     },
   ],
   alerts: [
@@ -1648,7 +1709,11 @@ async function categoryLoop(interaction, categoryId, token, options = {}) {
       await collected.deferUpdate().catch(() => {});
       let content;
       try {
-        content = await s.run({ guild, guildId: String(interaction.guildId) });
+        content = await s.run({
+          guild,
+          guildId: String(interaction.guildId),
+          member: /** @type {any} */ (interaction).member,
+        });
       } catch (error) {
         content = `❌ ${/** @type {any} */ (error)?.message || error || 'Action failed.'}`;
       }

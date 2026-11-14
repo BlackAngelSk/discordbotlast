@@ -1,13 +1,43 @@
 /**
- * Dashboard Test Actions
- * Handles test actions (welcome, leave, logging, suggestions) triggered from the dashboard.
+ * Preview actions — welcome, leave, logging and suggestion test posts.
+ *
+ * Originally the web dashboard's "send test" buttons; the panels call the same
+ * functions so an admin can preview a message without the web UI.
  */
 
 const { EmbedBuilder } = require('discord.js');
-const settingsManager = require('../utils/settingsManager');
-const loggingManager = require('../utils/loggingManager');
-const suggestionManager = require('../utils/suggestionManager');
-const { resolveStoredTextChannel, replaceMemberTemplateTokens } = require('./helpers');
+const settingsManager = require('../settingsManager');
+const loggingManager = require('../loggingManager');
+const suggestionManager = require('../suggestionManager');
+
+/**
+ * @param {any} guild
+ * @param {any} storedValue
+ * @returns {any | null}
+ */
+const resolveStoredTextChannel = (guild, storedValue) => {
+  const normalizedValue = String(storedValue || '').trim();
+  if (!guild || !normalizedValue) return null;
+
+  return (
+    guild.channels.cache.get(normalizedValue) ||
+    guild.channels.cache.find(
+      (/** @type {any} */ channel) => channel.type === 0 && channel.name === normalizedValue
+    ) ||
+    null
+  );
+};
+
+/**
+ * @param {any} template
+ * @param {any} member
+ * @param {any} guild
+ * @returns {string}
+ */
+const replaceMemberTemplateTokens = (template, member, guild) =>
+  String(template || '')
+    .replaceAll('{user}', member ? `<@${member.id}>` : 'Test User')
+    .replaceAll('{server}', guild?.name || 'Server');
 
 /**
  * Runs a dashboard test action (welcome, leave, logging, suggestions).

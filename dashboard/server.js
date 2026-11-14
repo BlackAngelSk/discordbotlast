@@ -77,7 +77,7 @@ const {
     getUserAdminGuildsInBot
 } = require('./setupManager');
 
-const { runDashboardTestAction } = require('./testActions');
+const { runDashboardTestAction } = require('../utils/panel/testActions');
 const { registerPublicApiRoutes } = require('../api/routes');
 
 const GIVEAWAYS_FILE = path.join(__dirname, '..', 'data', 'giveaways.json');

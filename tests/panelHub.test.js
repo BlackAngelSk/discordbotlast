@@ -701,6 +701,45 @@ test('test actions call the shared senders', async () => {
   }
 });
 
+test('message categories expose preview actions that use the caller', async () => {
+  const actions = require('../utils/panel/testActions');
+  const original = actions.runDashboardTestAction;
+  const calls = [];
+  actions.runDashboardTestAction = async (args) => {
+    calls.push(args);
+    return 'sent';
+  };
+
+  const member = { id: 'member-1' };
+  const guildWithClient = { ...guild, client: { fake: true } };
+  const cases = [
+    ['welcome', 'welcome'],
+    ['leave', 'leave'],
+    ['logging', 'logging'],
+    ['suggestions', 'suggestions'],
+  ];
+
+  try {
+    for (const [category, type] of cases) {
+      const setting = engine.SETTINGS[category].find((s) => s.kind === 'action');
+      assert.ok(setting, `${category} has no preview action`);
+      const result = await setting.run({ guild: guildWithClient, guildId: 'guild-123', member });
+      assert.strictEqual(result, 'sent');
+      const call = calls[calls.length - 1];
+      assert.strictEqual(call.type, type);
+      assert.strictEqual(call.member, member);
+      assert.strictEqual(call.guildId, 'guild-123');
+      assert.strictEqual(call.client, guildWithClient.client);
+    }
+
+    const { embed } = engine.renderCategory(guild, 'welcome', 'tok');
+    const names = embed.toJSON().fields.map((f) => f.name);
+    assert.ok(names.includes('🧪 Send test welcome'));
+  } finally {
+    actions.runDashboardTestAction = original;
+  }
+});
+
 console.log('\n=== Live alerts panel ===');
 
 test('live alerts embed lists watches, target and API status', () => {
