@@ -39,6 +39,7 @@ const suggestionManager = require('../automation/suggestionManager');
 const epicGamesAlertsManager = require('../steam/epicGamesAlertsManager');
 const steamFreeGamesAlertsManager = require('../steam/steamFreeGamesAlertsManager');
 const steamGameUpdatesManager = require('../steam/steamGameUpdatesManager');
+const telegramSyncManager = require('../status/telegramSyncManager');
 const customCommandManager = require('../customCommandManager');
 
 // ---------------------------------------------------------------------------
@@ -80,6 +81,8 @@ const CATEGORY_IDS = [
   'alerts',
   'commands',
   'serverprofile',
+  'steam',
+  'telegram',
 ];
 
 /**
@@ -99,6 +102,8 @@ const CATEGORY_LABELS = {
   alerts: 'Alerts (Epic / Steam)',
   commands: 'Custom Commands',
   serverprofile: 'Server Profile',
+  steam: 'Steam Deal Filters',
+  telegram: 'Telegram Sync',
 };
 
 /**
@@ -687,8 +692,10 @@ const SETTINGS = {
       emoji: '🏷️',
       read: (g) => steamFreeGamesAlertsManager.getPromoGuildConfig(g)?.channelId,
       write: async (g, v) => {
+        // disablePromoAlerts, not disableAlerts — the latter wipes the
+        // free-games channel config.
         if (v) await steamFreeGamesAlertsManager.enablePromoAlerts(g, String(v));
-        else await steamFreeGamesAlertsManager.disableAlerts(g);
+        else await steamFreeGamesAlertsManager.disablePromoAlerts(g);
       },
     },
     {
@@ -722,7 +729,178 @@ const SETTINGS = {
       emoji: '🖥️',
     },
   ],
+  steam: [
+    {
+      key: 'steamPromoDealsChannel',
+      kind: 'channel',
+      label: 'Steam deals channel',
+      hint: 'Deals, promos and free-to-keep posts. Empty = disabled.',
+      emoji: '🏷️',
+      read: (g) => steamFreeGamesAlertsManager.getPromoGuildConfig(g)?.channelId,
+      write: async (g, v) => {
+        if (v) await steamFreeGamesAlertsManager.enablePromoAlerts(g, String(v));
+        else await steamFreeGamesAlertsManager.disablePromoAlerts(g);
+      },
+    },
+    {
+      key: 'salesEnabled',
+      kind: 'toggle',
+      label: 'Post Steam sales',
+      hint: 'Discount-driven sale posts.',
+      emoji: '💸',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).salesEnabled,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'salesEnabled', v);
+      },
+    },
+    {
+      key: 'promosEnabled',
+      kind: 'toggle',
+      label: 'Post Steam promos',
+      hint: 'Giveaways and promo events.',
+      emoji: '🎁',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).promosEnabled,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'promosEnabled', v);
+      },
+    },
+    {
+      key: 'freeToKeepEnabled',
+      kind: 'toggle',
+      label: 'Post free-to-keep',
+      hint: 'Paid games going 100% off (Steam-verified only).',
+      emoji: '🆓',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).freeToKeepEnabled,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'freeToKeepEnabled', v);
+      },
+    },
+    {
+      key: 'minDiscountPercent',
+      kind: 'number',
+      label: 'Minimum discount %',
+      hint: 'Deals below this discount are skipped (1-100).',
+      min: 1,
+      max: 100,
+      emoji: '📉',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).minDiscountPercent,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'minDiscountPercent', v);
+      },
+    },
+    {
+      key: 'maxDealsPerMessage',
+      kind: 'number',
+      label: 'Max deals per message',
+      hint: '1-10 deals grouped per post.',
+      min: 1,
+      max: 10,
+      emoji: '📦',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).maxDealsPerMessage,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'maxDealsPerMessage', v);
+      },
+    },
+    {
+      key: 'dealPostIntervalHours',
+      kind: 'number',
+      label: 'Deal post interval (hours)',
+      hint: 'How often deal batches may be posted (1-24).',
+      min: 1,
+      max: 24,
+      emoji: '⏱️',
+      read: (g) => steamFreeGamesAlertsManager.getPromoDealSettings(g).dealPostIntervalHours,
+      write: async (g, v) => {
+        await updateSteamDealSetting(g, 'dealPostIntervalHours', v);
+      },
+    },
+  ],
+  telegram: [
+    {
+      key: 'telegramEnabled',
+      kind: 'toggle',
+      label: 'Enable Telegram sync',
+      hint: 'Needs TELEGRAM_BOT_TOKEN in the environment.',
+      emoji: '📨',
+      read: (g) => telegramSyncManager.getGuildConfig(g).enabled,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { enabled: v });
+      },
+    },
+    {
+      key: 'telegramDiscordChannel',
+      kind: 'channel',
+      label: 'Discord bridge channel',
+      hint: 'Messages here are mirrored to Telegram.',
+      emoji: '💬',
+      read: (g) => telegramSyncManager.getGuildConfig(g).discordChannelId,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { discordChannelId: v || null });
+      },
+    },
+    {
+      key: 'telegramChatId',
+      kind: 'string',
+      label: 'Telegram chat ID',
+      hint: 'Numeric ID (e.g. -1001234567890) or public @username.',
+      maxLength: 120,
+      emoji: '🆔',
+      read: (g) => telegramSyncManager.getGuildConfig(g).telegramChatId,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { telegramChatId: v || null });
+      },
+    },
+    {
+      key: 'syncDiscordToTelegram',
+      kind: 'toggle',
+      label: 'Discord → Telegram',
+      hint: 'Forward Discord messages to the Telegram chat.',
+      emoji: '➡️',
+      read: (g) => telegramSyncManager.getGuildConfig(g).syncDiscordToTelegram,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { syncDiscordToTelegram: v });
+      },
+    },
+    {
+      key: 'syncTelegramToDiscord',
+      kind: 'toggle',
+      label: 'Telegram → Discord',
+      hint: 'Forward Telegram messages to the bridge channel.',
+      emoji: '⬅️',
+      read: (g) => telegramSyncManager.getGuildConfig(g).syncTelegramToDiscord,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { syncTelegramToDiscord: v });
+      },
+    },
+    {
+      key: 'includeAttachments',
+      kind: 'toggle',
+      label: 'Include attachments',
+      hint: 'Forward images and files as well as text.',
+      emoji: '📎',
+      read: (g) => telegramSyncManager.getGuildConfig(g).includeAttachments,
+      write: async (g, v) => {
+        await telegramSyncManager.updateGuildConfig(g, { includeAttachments: v });
+      },
+    },
+  ],
 };
+
+/**
+ * Deal filters only exist once the guild has a deals channel; surface a clear
+ * error instead of letting updatePromoConfig silently return null.
+ *
+ * @param {string} guildId
+ * @param {string} key
+ * @param {unknown} value
+ */
+async function updateSteamDealSetting(guildId, key, value) {
+  const existing = steamFreeGamesAlertsManager.getPromoGuildConfig(guildId);
+  if (!existing) {
+    throw new Error('Pick the Steam deals channel first');
+  }
+  await steamFreeGamesAlertsManager.updatePromoConfig(guildId, { [key]: value });
+}
 
 // ---------------------------------------------------------------------------
 // Read / format helpers

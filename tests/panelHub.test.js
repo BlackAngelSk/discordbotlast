@@ -45,9 +45,11 @@ const guild = {
 console.log('\n=== Settings engine ===');
 
 test('engine exposes the full category catalog', () => {
-  assert.strictEqual(engine.CATEGORY_IDS.length, 13);
+  assert.strictEqual(engine.CATEGORY_IDS.length, 15);
   assert.ok(engine.CATEGORY_IDS.includes('welcome'));
   assert.ok(engine.CATEGORY_IDS.includes('alerts'));
+  assert.ok(engine.CATEGORY_IDS.includes('steam'));
+  assert.ok(engine.CATEGORY_IDS.includes('telegram'));
 });
 
 test('every category has settings with unique keys', () => {
@@ -175,6 +177,70 @@ test('/setup no longer carries its own settings catalog', () => {
   assert.ok(source.length < 20000, `setup.js is ${source.length} bytes — catalog not extracted`);
   assert.ok(source.includes("require('../../utils/panel/settingsEngine')"));
   assert.ok(source.includes("require('../../utils/panel/hub')"));
+});
+
+console.log('\n=== Steam deal filters ===');
+
+test('steam filter writes are blocked until a deals channel exists', async () => {
+  const steamMgr = require('../utils/steam/steamFreeGamesAlertsManager');
+  const originalGet = steamMgr.getPromoGuildConfig;
+  steamMgr.getPromoGuildConfig = () => null;
+
+  try {
+    const setting = engine.SETTINGS.steam.find((s) => s.key === 'minDiscountPercent');
+    await assert.rejects(() => setting.write('guild-123', 40), /deals channel first/i);
+  } finally {
+    steamMgr.getPromoGuildConfig = originalGet;
+  }
+});
+
+test('steam filter writes patch the promo config', async () => {
+  const steamMgr = require('../utils/steam/steamFreeGamesAlertsManager');
+  const originalGet = steamMgr.getPromoGuildConfig;
+  const originalUpdate = steamMgr.updatePromoConfig;
+  const patches = [];
+  steamMgr.getPromoGuildConfig = () => ({ channelId: 'chan-1' });
+  steamMgr.updatePromoConfig = async (guildId, patch) => {
+    patches.push(patch);
+    return patch;
+  };
+
+  try {
+    const setting = engine.SETTINGS.steam.find((s) => s.key === 'minDiscountPercent');
+    await setting.write('guild-123', 40);
+    assert.deepStrictEqual(patches[0], { minDiscountPercent: 40 });
+  } finally {
+    steamMgr.getPromoGuildConfig = originalGet;
+    steamMgr.updatePromoConfig = originalUpdate;
+  }
+});
+
+test('steam channel clear only disables promo alerts', async () => {
+  const steamMgr = require('../utils/steam/steamFreeGamesAlertsManager');
+  const originalEnable = steamMgr.enablePromoAlerts;
+  const originalDisable = steamMgr.disablePromoAlerts;
+  const originalDisableAll = steamMgr.disableAlerts;
+  const calls = [];
+  steamMgr.enablePromoAlerts = async () => calls.push('enable');
+  steamMgr.disablePromoAlerts = async () => calls.push('disablePromo');
+  steamMgr.disableAlerts = async () => calls.push('disableAll');
+
+  try {
+    const setting = engine.SETTINGS.steam.find((s) => s.key === 'steamPromoDealsChannel');
+    await setting.write('guild-123', null);
+    assert.deepStrictEqual(calls, ['disablePromo']);
+  } finally {
+    steamMgr.enablePromoAlerts = originalEnable;
+    steamMgr.disablePromoAlerts = originalDisable;
+    steamMgr.disableAlerts = originalDisableAll;
+  }
+});
+
+test('telegram settings read the sync manager config', () => {
+  const telegram = require('../utils/status/telegramSyncManager');
+  const config = telegram.getGuildConfig('guild-123');
+  const setting = engine.SETTINGS.telegram.find((s) => s.key === 'telegramEnabled');
+  assert.strictEqual(setting.read('guild-123'), Boolean(config.enabled));
 });
 
 Promise.all(pending).then(() => {

@@ -41,6 +41,8 @@ const CATEGORY_EMOJI = {
   alerts: '🔔',
   commands: '⌨️',
   serverprofile: '🏷️',
+  steam: '🎮',
+  telegram: '📨',
 };
 
 /**
