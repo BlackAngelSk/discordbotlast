@@ -26,6 +26,7 @@ const {
 const economyManager = require('../economyManager');
 const seasonLeaderboardManager = require('../seasonLeaderboardManager');
 const engine = require('./settingsEngine');
+const { awaitComponentSafe, awaitModalSafe } = require('./componentAwait');
 
 const TIMEOUT = engine.COMPONENT_TIMEOUT;
 const MEDALS = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
@@ -168,18 +169,11 @@ function buildAmountModal(mode, token) {
  * @returns {Promise<any | null>}
  */
 async function awaitEconComponent(interaction, userId, time = TIMEOUT) {
-  try {
-    return await Promise.race([
-      interaction.channel.awaitMessageComponent({
-        filter: (/** @type {any} */ i) =>
-          String(i.customId).startsWith('econ:') && i.user.id === userId,
-        time,
-      }),
-      new Promise((resolve) => setTimeout(() => resolve(null), time)),
-    ]);
-  } catch {
-    return null;
-  }
+  return awaitComponentSafe(
+    interaction,
+    (/** @type {any} */ i) => String(i.customId).startsWith('econ:') && i.user.id === userId,
+    time
+  );
 }
 
 /**
@@ -189,14 +183,11 @@ async function awaitEconComponent(interaction, userId, time = TIMEOUT) {
  * @returns {Promise<any | null>}
  */
 async function awaitAmountModal(opener, customId, userId) {
-  try {
-    return await opener.awaitModalSubmit({
-      filter: (/** @type {any} */ i) => i.customId === customId && i.user.id === userId,
-      time: TIMEOUT,
-    });
-  } catch {
-    return null;
-  }
+  return awaitModalSafe(
+    opener,
+    (/** @type {any} */ i) => i.customId === customId && i.user.id === userId,
+    TIMEOUT
+  );
 }
 
 /**

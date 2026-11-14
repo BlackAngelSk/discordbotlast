@@ -22,6 +22,7 @@ const {
 
 const settingsManager = require('../../utils/core/settingsManager');
 const engine = require('../../utils/panel/settingsEngine');
+const { awaitComponentSafe } = require('../../utils/panel/componentAwait');
 const { openHub } = require('../../utils/panel/hub');
 
 const COMPONENT_TIMEOUT = engine.COMPONENT_TIMEOUT;
@@ -121,17 +122,14 @@ async function showConfigView(interaction) {
   let page = 0;
   try {
     while (true) {
-      const collected = await Promise.race([
-        /** @type {any} */ (interaction.channel).awaitMessageComponent({
-          filter: (/** @type {any} */ i) =>
-            (i.customId.startsWith(`setup:pagination:${token}`) ||
-              i.customId === `setup:view-done:${token}`) &&
-            i.user.id === interaction.user.id,
-          time: COMPONENT_TIMEOUT,
-          componentType: 2,
-        }),
-        new Promise((resolve) => setTimeout(() => resolve(null), COMPONENT_TIMEOUT)),
-      ]);
+      const collected = await awaitComponentSafe(
+        interaction,
+        (/** @type {any} */ i) =>
+          (i.customId.startsWith(`setup:pagination:${token}`) ||
+            i.customId === `setup:view-done:${token}`) &&
+          i.user.id === interaction.user.id,
+        COMPONENT_TIMEOUT
+      );
       if (!collected) break;
       if (collected.customId === `setup:view-done:${token}`) {
         await collected.deferUpdate().catch(() => {});

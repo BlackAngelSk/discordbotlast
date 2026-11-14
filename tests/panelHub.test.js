@@ -242,6 +242,99 @@ test('season settings patch the leaderboard config', async () => {
   }
 });
 
+console.log('\n=== Safety panel ===');
+
+test('safety embed shows raid, verification, starboard and lockdown', () => {
+  const safetyPanel = require('../utils/panel/safetyPanel');
+  const json = safetyPanel.buildMainEmbed(guild).toJSON();
+
+  assert.ok(/Safety|locked down/i.test(json.title), json.title);
+  const names = json.fields.map((f) => f.name);
+  for (const expected of ['🚨 Raid protection', '✅ Verification', '⭐ Starboard', '🔒 Lockdown']) {
+    assert.ok(names.includes(expected), `missing field ${expected}`);
+  }
+});
+
+test('safety buttons flip with the lockdown state', () => {
+  const raid = require('../utils/raidProtectionManager');
+  const original = raid.isLocked;
+  try {
+    raid.isLocked = () => false;
+    let labels = require('../utils/panel/safetyPanel')
+      .buildMainRows(guild, 'tok')[0]
+      .components.map((b) => b.data.label);
+    assert.ok(labels.includes('Start lockdown'), labels.join(','));
+
+    raid.isLocked = () => true;
+    labels = require('../utils/panel/safetyPanel')
+      .buildMainRows(guild, 'tok')[0]
+      .components.map((b) => b.data.label);
+    assert.ok(labels.includes('Lift lockdown'), labels.join(','));
+  } finally {
+    raid.isLocked = original;
+  }
+});
+
+test('safety panel writes lockdown through the raid manager', async () => {
+  const raid = require('../utils/raidProtectionManager');
+  const originalLocked = raid.isLocked;
+  const originalSet = raid.setLockdown;
+  const calls = [];
+  raid.isLocked = () => false;
+  raid.setLockdown = async (guildId, locked) => calls.push({ guildId, locked });
+
+  try {
+    const safetyPanel = require('../utils/panel/safetyPanel');
+    const updates = [];
+    const components = [];
+    const guildObj = { ...guild, id: 'guild-123' };
+
+    const fakeChannel = {
+      awaitMessageComponent: async () => {
+        if (components.length) return components.shift();
+        const lockedNow = calls.length > 0 ? calls[calls.length - 1].locked : false;
+        return {
+          customId: lockedNow ? 'safety:back:tok' : 'safety:lockdown:tok',
+          user: { id: 'admin' },
+          update: async (payload) => {
+            updates.push(payload);
+            components.push({
+              customId: 'safety:back:tok',
+              user: { id: 'admin' },
+              update: async () => {},
+              deferUpdate: async () => {},
+            });
+          },
+          deferUpdate: async () => {},
+          reply: async () => {},
+        };
+      },
+    };
+
+    const interaction = {
+      guild: guildObj,
+      guildId: 'guild-123',
+      channel: fakeChannel,
+      user: { id: 'admin' },
+      editReply: async () => {},
+    };
+
+    const result = await safetyPanel.runSafetyPanel({
+      interaction,
+      guild: guildObj,
+      userId: 'admin',
+      token: 'tok',
+      firstUpdate: { update: async () => {} },
+    });
+
+    assert.deepStrictEqual(calls, [{ guildId: 'guild-123', locked: true }]);
+    assert.strictEqual(result, 'back');
+  } finally {
+    raid.isLocked = originalLocked;
+    raid.setLockdown = originalSet;
+  }
+});
+
 console.log('\n=== Steam deal filters ===');
 
 test('steam filter writes are blocked until a deals channel exists', async () => {

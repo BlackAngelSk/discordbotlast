@@ -25,6 +25,8 @@ const {
 
 const engine = require('./settingsEngine');
 const economyPanel = require('./economyPanel');
+const safetyPanel = require('./safetyPanel');
+const { awaitComponentSafe } = require('./componentAwait');
 
 /** Panels that are not settings categories (custom flows). */
 const CUSTOM_PANELS = [
@@ -33,6 +35,12 @@ const CUSTOM_PANELS = [
     label: 'Economy',
     emoji: '💰',
     description: 'Balances, leaderboard, season board',
+  },
+  {
+    value: 'custom:safety',
+    label: 'Safety actions',
+    emoji: '🚨',
+    description: 'Lockdown, raid posture, starboard',
   },
 ];
 
@@ -257,18 +265,11 @@ function buildSettingsNav(token, page, totalPages) {
  * @returns {Promise<any | null>}
  */
 async function awaitHubComponent(interaction, userId, time = HUB_TIMEOUT) {
-  try {
-    return await Promise.race([
-      interaction.channel.awaitMessageComponent({
-        filter: (/** @type {any} */ i) =>
-          String(i.customId).startsWith('dashboard:') && i.user.id === userId,
-        time,
-      }),
-      new Promise((resolve) => setTimeout(() => resolve(null), time)),
-    ]);
-  } catch {
-    return null;
-  }
+  return awaitComponentSafe(
+    interaction,
+    (/** @type {any} */ i) => String(i.customId).startsWith('dashboard:') && i.user.id === userId,
+    time
+  );
 }
 
 /**
@@ -300,6 +301,26 @@ async function openHub(interaction) {
       const category = String(collected.values?.[0] || '');
       if (!category) {
         await collected.deferUpdate().catch(() => {});
+        continue;
+      }
+
+      if (category === 'custom:safety') {
+        const result = await safetyPanel.runSafetyPanel({
+          interaction,
+          guild,
+          userId,
+          token,
+          firstUpdate: collected,
+        });
+
+        if (result === 'timeout') return;
+
+        await interaction
+          .editReply({
+            embeds: [buildHubEmbed(guild, interaction.client)],
+            components: /** @type {any} */ (buildHubRows(guild, token)),
+          })
+          .catch(() => {});
         continue;
       }
 

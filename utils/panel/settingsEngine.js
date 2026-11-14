@@ -40,6 +40,7 @@ const epicGamesAlertsManager = require('../steam/epicGamesAlertsManager');
 const steamFreeGamesAlertsManager = require('../steam/steamFreeGamesAlertsManager');
 const steamGameUpdatesManager = require('../steam/steamGameUpdatesManager');
 const telegramSyncManager = require('../status/telegramSyncManager');
+const { awaitComponentSafe } = require('./componentAwait');
 const seasonLeaderboardManager = require('../season/seasonLeaderboardManager');
 const customCommandManager = require('../customCommandManager');
 
@@ -1342,13 +1343,11 @@ async function categoryLoop(interaction, categoryId, token, options = {}) {
   const catId = CATEGORY_IDS.find((c) => encC(c) === encC(categoryId)) || categoryId;
 
   while (true) {
-    const collected = await Promise.race([
-      channel.awaitMessageComponent({
-        filter: (/** @type {any} */ i) => i.customId.startsWith('setup:') && i.user.id === userId,
-        time: COMPONENT_TIMEOUT,
-      }),
-      new Promise((resolve) => setTimeout(() => resolve(null), COMPONENT_TIMEOUT)),
-    ]);
+    const collected = await awaitComponentSafe(
+      interaction,
+      (/** @type {any} */ i) => i.customId.startsWith('setup:') && i.user.id === userId,
+      COMPONENT_TIMEOUT
+    );
     if (!collected) return 'timeout';
 
     const parts = /** @type {string} */ (collected.customId).split(':');
