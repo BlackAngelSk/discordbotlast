@@ -29,6 +29,8 @@ const safetyPanel = require('./safetyPanel');
 const serverBuilderPanel = require('./serverBuilderPanel');
 const insightsPanel = require('./insightsPanel');
 const communityPanel = require('./communityPanel');
+const liveAlertsPanel = require('./liveAlertsPanel');
+const ownerPanel = require('./ownerPanel');
 const { awaitComponentSafe } = require('./componentAwait');
 
 /** Panels that are not settings categories (custom flows). */
@@ -63,7 +65,34 @@ const CUSTOM_PANELS = [
     emoji: '🎫',
     description: 'Tickets and suggestions',
   },
+  {
+    value: 'custom:live',
+    label: 'Live alerts',
+    emoji: '📡',
+    description: 'Twitch live + YouTube upload watches',
+  },
+  {
+    value: 'custom:owner',
+    label: 'Owner panel',
+    emoji: '👑',
+    description: 'Runtime, storage, owner notifications',
+    ownerOnly: true,
+  },
 ];
+
+/**
+ * Panels that run their own component loop. The hub only routes to them; each
+ * module owns its customIds and returns 'back' or 'timeout'.
+ */
+const PANEL_RUNNERS = {
+  'custom:economy': economyPanel.runEconomyPanel,
+  'custom:safety': safetyPanel.runSafetyPanel,
+  'custom:builder': serverBuilderPanel.runServerBuilderPanel,
+  'custom:insights': insightsPanel.runInsightsPanel,
+  'custom:community': communityPanel.runCommunityPanel,
+  'custom:live': liveAlertsPanel.runLiveAlertsPanel,
+  'custom:owner': ownerPanel.runOwnerPanel,
+};
 
 const HUB_TIMEOUT = engine.COMPONENT_TIMEOUT;
 
@@ -95,11 +124,13 @@ function randomToken() {
 
 /**
  * The panel menu. Settings categories are generated from the engine catalog;
- * future phases append standalone panels here.
+ * standalone panels live in CUSTOM_PANELS. Owner-only panels are filtered by
+ * user id so a non-owner never sees a button that would refuse them.
  *
- * @returns {{ id: string, label: string, description: string, emoji: string }[]}
+ * @param {string | null} [userId]
+ * @returns {{ value: string, label: string, description: string, emoji: string }[]}
  */
-function listPanels() {
+function listPanels(userId = null) {
   const settings = engine.CATEGORY_IDS.map((id) => ({
     value: id,
     label: engine.CATEGORY_LABELS[id] || id,
@@ -107,7 +138,9 @@ function listPanels() {
     emoji: CATEGORY_EMOJI[id] || '⚙️',
   }));
 
-  return [...settings, ...CUSTOM_PANELS];
+  const custom = CUSTOM_PANELS.filter((panel) => !panel.ownerOnly || ownerPanel.isOwner(userId));
+
+  return [...settings, ...custom];
 }
 
 /**
@@ -146,10 +179,11 @@ function buildHubEmbed(guild, client) {
 /**
  * @param {import('discord.js').Guild} guild
  * @param {string} token
+ * @param {string | null} [userId]
  * @returns {any[]}
  */
-function buildHubRows(guild, token) {
-  const panels = listPanels();
+function buildHubRows(guild, token, userId = null) {
+  const panels = listPanels(userId);
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`dashboard:panel:${token}`)
     .setPlaceholder('Open a settings panel…')
@@ -197,6 +231,7 @@ function buildSettingRows(guildId) {
 
   for (const category of engine.CATEGORY_IDS) {
     for (const setting of engine.SETTINGS[category] || []) {
+      if (setting.kind === 'action') continue;
       if (setting.kind === 'commandlist') {
         const commands = engine.getCustomCommands(guildId);
         rows.push({
@@ -307,7 +342,7 @@ async function openHub(interaction) {
   await interaction
     .reply({
       embeds: [buildHubEmbed(guild, interaction.client)],
-      components: /** @type {any} */ (buildHubRows(guild, token)),
+      components: /** @type {any} */ (buildHubRows(guild, token, userId)),
       flags: MessageFlags.Ephemeral,
     })
     .catch(() => {});
@@ -325,101 +360,16 @@ async function openHub(interaction) {
         continue;
       }
 
-      if (category === 'custom:community') {
-        const result = await communityPanel.runCommunityPanel({
-          interaction,
-          guild,
-          userId,
-          token,
-          firstUpdate: collected,
-        });
+      const runner = PANEL_RUNNERS[category];
+      if (runner) {
+        const result = await runner({ interaction, guild, userId, token, firstUpdate: collected });
 
         if (result === 'timeout') return;
 
         await interaction
           .editReply({
             embeds: [buildHubEmbed(guild, interaction.client)],
-            components: /** @type {any} */ (buildHubRows(guild, token)),
-          })
-          .catch(() => {});
-        continue;
-      }
-
-      if (category === 'custom:insights') {
-        const result = await insightsPanel.runInsightsPanel({
-          interaction,
-          guild,
-          userId,
-          token,
-          firstUpdate: collected,
-        });
-
-        if (result === 'timeout') return;
-
-        await interaction
-          .editReply({
-            embeds: [buildHubEmbed(guild, interaction.client)],
-            components: /** @type {any} */ (buildHubRows(guild, token)),
-          })
-          .catch(() => {});
-        continue;
-      }
-
-      if (category === 'custom:builder') {
-        const result = await serverBuilderPanel.runServerBuilderPanel({
-          interaction,
-          guild,
-          userId,
-          token,
-          firstUpdate: collected,
-        });
-
-        if (result === 'timeout') return;
-
-        await interaction
-          .editReply({
-            embeds: [buildHubEmbed(guild, interaction.client)],
-            components: /** @type {any} */ (buildHubRows(guild, token)),
-          })
-          .catch(() => {});
-        continue;
-      }
-
-      if (category === 'custom:safety') {
-        const result = await safetyPanel.runSafetyPanel({
-          interaction,
-          guild,
-          userId,
-          token,
-          firstUpdate: collected,
-        });
-
-        if (result === 'timeout') return;
-
-        await interaction
-          .editReply({
-            embeds: [buildHubEmbed(guild, interaction.client)],
-            components: /** @type {any} */ (buildHubRows(guild, token)),
-          })
-          .catch(() => {});
-        continue;
-      }
-
-      if (category === 'custom:economy') {
-        const result = await economyPanel.runEconomyPanel({
-          interaction,
-          guild,
-          userId,
-          token,
-          firstUpdate: collected,
-        });
-
-        if (result === 'timeout') return;
-
-        await interaction
-          .editReply({
-            embeds: [buildHubEmbed(guild, interaction.client)],
-            components: /** @type {any} */ (buildHubRows(guild, token)),
+            components: /** @type {any} */ (buildHubRows(guild, token, userId)),
           })
           .catch(() => {});
         continue;
@@ -436,7 +386,7 @@ async function openHub(interaction) {
       await interaction
         .editReply({
           embeds: [buildHubEmbed(guild, interaction.client)],
-          components: /** @type {any} */ (buildHubRows(guild, token)),
+          components: /** @type {any} */ (buildHubRows(guild, token, userId)),
         })
         .catch(() => {});
       continue;
@@ -463,7 +413,7 @@ async function openHub(interaction) {
           await nav
             .update({
               embeds: [buildHubEmbed(guild, interaction.client)],
-              components: /** @type {any} */ (buildHubRows(guild, token)),
+              components: /** @type {any} */ (buildHubRows(guild, token, userId)),
             })
             .catch(() => {});
           break;
@@ -492,7 +442,7 @@ async function openHub(interaction) {
       await collected
         .update({
           embeds: [buildHubEmbed(guild, interaction.client)],
-          components: /** @type {any} */ (buildHubRows(guild, token)),
+          components: /** @type {any} */ (buildHubRows(guild, token, userId)),
         })
         .catch(() => {});
       continue;

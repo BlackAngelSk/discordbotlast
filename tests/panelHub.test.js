@@ -103,9 +103,29 @@ test('hub menu offers every settings category plus custom panels', () => {
   const rows = hub.buildHubRows(guild, 'tok');
   const menu = rows[0].components[0];
   const options = menu.options.map((o) => o.data.value);
-  const expected = [...engine.CATEGORY_IDS, ...hub.CUSTOM_PANELS.map((p) => p.value)];
+  const expected = [
+    ...engine.CATEGORY_IDS,
+    ...hub.CUSTOM_PANELS.filter((p) => !p.ownerOnly).map((p) => p.value),
+  ];
   assert.deepStrictEqual(options.sort(), expected.sort());
   assert.ok(menu.options.length <= 25, 'Discord caps select menus at 25 options');
+});
+
+test('owner-only panels are listed only for BOT_OWNER_ID', () => {
+  const original = process.env.BOT_OWNER_ID;
+  process.env.BOT_OWNER_ID = 'owner-1';
+  try {
+    assert.ok(hub.listPanels('owner-1').some((p) => p.value === 'custom:owner'));
+    assert.ok(!hub.listPanels('member-1').some((p) => p.value === 'custom:owner'));
+
+    const ownerMenu = hub.buildHubRows(guild, 'tok', 'owner-1')[0].components[0];
+    assert.ok(ownerMenu.options.some((o) => o.data.value === 'custom:owner'));
+    const memberMenu = hub.buildHubRows(guild, 'tok', 'member-1')[0].components[0];
+    assert.ok(!memberMenu.options.some((o) => o.data.value === 'custom:owner'));
+  } finally {
+    if (original === undefined) delete process.env.BOT_OWNER_ID;
+    else process.env.BOT_OWNER_ID = original;
+  }
 });
 
 test('hub buttons cover view, refresh and close', () => {
@@ -574,6 +594,289 @@ test('telegram settings read the sync manager config', () => {
   const config = telegram.getGuildConfig('guild-123');
   const setting = engine.SETTINGS.telegram.find((s) => s.key === 'telegramEnabled');
   assert.strictEqual(setting.read('guild-123'), Boolean(config.enabled));
+});
+
+console.log('\n=== Alert test actions ===');
+
+test('alerts category exposes the four test-alert actions', () => {
+  const actions = engine.SETTINGS.alerts.filter((s) => s.kind === 'action');
+  assert.strictEqual(actions.length, 4);
+  for (const action of actions) {
+    assert.strictEqual(typeof action.run, 'function', `${action.key} has no run()`);
+    assert.ok(action.hint, `${action.key} needs a hint`);
+  }
+  assert.strictEqual(engine.readSetting(actions[0], 'guild-123'), undefined);
+
+  const { embed, components } = engine.renderCategory(guild, 'alerts', 'tok');
+  const names = embed.toJSON().fields.map((f) => f.name);
+  assert.ok(names.includes('🧪 Send test Epic alert'));
+  const ids = components.flatMap((row) => row.components.map((c) => c.data.custom_id));
+  assert.ok(ids.includes('setup:action:__cat__:previewEpic:tok'));
+  assert.ok(ids.includes('setup:back:tok'));
+});
+
+test('view-all skips actions but keeps real settings', () => {
+  const rows = hub.buildSettingRows('guild-123');
+  assert.ok(!rows.some((row) => /Send test/.test(row.label)), 'actions leaked into view all');
+  assert.ok(rows.some((row) => row.label === 'Epic Games alerts channel'));
+});
+
+test('test actions call the shared senders', async () => {
+  const actions = require('../utils/panel/alertTestActions');
+  const original = actions.sendEpicTest;
+  const calls = [];
+  actions.sendEpicTest = async (guildArg, guildId) => {
+    calls.push({ guildArg, guildId });
+    return 'sent';
+  };
+
+  try {
+    const setting = engine.SETTINGS.alerts.find((s) => s.key === 'previewEpic');
+    const result = await setting.run({ guild, guildId: 'guild-123' });
+    assert.strictEqual(result, 'sent');
+    assert.strictEqual(calls[0].guildId, 'guild-123');
+    assert.strictEqual(calls[0].guildArg, guild);
+  } finally {
+    actions.sendEpicTest = original;
+  }
+});
+
+console.log('\n=== Live alerts panel ===');
+
+test('live alerts embed lists watches, target and API status', () => {
+  const live = require('../utils/panel/liveAlertsPanel');
+  const mgr = require('../utils/liveAlertsManager');
+  const original = mgr.getAlerts;
+  mgr.getAlerts = () => ({
+    twitch: [{ username: 'streamer', channelId: 'chan-1', roleId: null }],
+    youtube: [{ channelId: 'UC123', channelName: 'Creator', discordChannelId: 'chan-1' }],
+  });
+
+  try {
+    const json = live.buildEmbed(guild, { channelId: 'chan-1', roleId: 'role-1' }).toJSON();
+    const fields = Object.fromEntries(json.fields.map((f) => [f.name, f.value]));
+    assert.ok(fields['🟣 Twitch'].includes('streamer'));
+    assert.ok(fields['🔴 YouTube'].includes('Creator'));
+    assert.ok(fields['🎯 Target'].includes('<#chan-1>'));
+    assert.ok(fields['🎯 Target'].includes('<@&role-1>'));
+    assert.ok(/Twitch/.test(fields['🔑 APIs']));
+
+    const options = live.listAlertOptions(guild);
+    assert.deepStrictEqual(
+      options.map((o) => `${o.platform}:${o.index}`),
+      ['twitch:0', 'youtube:0']
+    );
+  } finally {
+    mgr.getAlerts = original;
+  }
+});
+
+test('live alerts buttons cover add, test, remove and clear', () => {
+  const live = require('../utils/panel/liveAlertsPanel');
+  const ids = live.buildRows('tok').flatMap((row) => row.components.map((c) => c.data.custom_id));
+  assert.deepStrictEqual(ids, [
+    'live:channel:tok',
+    'live:role:tok',
+    'live:addtwitch:tok',
+    'live:addyoutube:tok',
+    'live:test:tok',
+    'live:remove:tok',
+    'live:clearrole:tok',
+    'live:refresh:tok',
+    'live:back:tok',
+  ]);
+});
+
+test('live alerts empty state renders without watches', () => {
+  const live = require('../utils/panel/liveAlertsPanel');
+  const json = live.buildEmbed(guild, {}).toJSON();
+  const fields = Object.fromEntries(json.fields.map((f) => [f.name, f.value]));
+  assert.strictEqual(fields['🟣 Twitch'], '*none yet*');
+  assert.strictEqual(fields['🔴 YouTube'], '*none yet*');
+  assert.strictEqual(fields['🎯 Target'], '*pick a channel below*');
+});
+
+console.log('\n=== Owner panel ===');
+
+test('owner panel formats sizes and uptime', () => {
+  const owner = require('../utils/panel/ownerPanel');
+  assert.strictEqual(owner.formatBytes(0), '0 B');
+  assert.strictEqual(owner.formatBytes(1536), '1.5 KB');
+  assert.strictEqual(owner.formatUptime(90 * 60), '1h 30m');
+  assert.strictEqual(owner.formatUptime(90061), '1d 1h 1m');
+});
+
+test('owner panel is gated on BOT_OWNER_ID', () => {
+  const owner = require('../utils/panel/ownerPanel');
+  const original = process.env.BOT_OWNER_ID;
+  process.env.BOT_OWNER_ID = 'owner-1';
+  try {
+    assert.strictEqual(owner.isOwner('owner-1'), true);
+    assert.strictEqual(owner.isOwner('member-1'), false);
+    assert.strictEqual(owner.isOwner(null), false);
+  } finally {
+    if (original === undefined) delete process.env.BOT_OWNER_ID;
+    else process.env.BOT_OWNER_ID = original;
+  }
+});
+
+test('owner panel shows storage, runtime and owner identity', () => {
+  const owner = require('../utils/panel/ownerPanel');
+  const client = {
+    ws: { ping: 21 },
+    guilds: { cache: new Map([['g', {}]]) },
+    users: { cache: new Map() },
+    user: { tag: 'Bot#1' },
+  };
+  const json = owner.buildEmbed(guild, client).toJSON();
+  const names = json.fields.map((f) => f.name);
+  for (const expected of ['🗄️ Storage', '🌐 Servers', '🩺 Runtime', '👤 Owner', '📁 Database']) {
+    assert.ok(names.includes(expected), `missing field ${expected}`);
+  }
+  const ids = owner.buildRows('tok')[0].components.map((b) => b.data.custom_id);
+  assert.deepStrictEqual(ids, ['owner:notify:tok', 'owner:refresh:tok', 'owner:back:tok']);
+});
+
+console.log('\n=== Panel component flows ===');
+
+/**
+ * Minimal fake of a message component for the panel loops.
+ *
+ * @param {string} customId
+ * @param {string[]} [values]
+ * @param {{ modalSubmit?: any }} [hooks]
+ * @returns {any}
+ */
+function makeClick(customId, values = [], hooks = {}) {
+  return {
+    customId,
+    values,
+    user: { id: 'admin' },
+    update: async () => {},
+    deferUpdate: async () => {},
+    reply: async () => {},
+    deferReply: async () => {},
+    editReply: async () => {},
+    followUp: async (payload) => {
+      hooks.followUps?.push(payload);
+    },
+    showModal: async (modal) => {
+      hooks.modals?.push(modal);
+    },
+    awaitModalSubmit: async () => hooks.modalSubmit || null,
+  };
+}
+
+test('live alerts panel adds and removes watches through the manager', async () => {
+  const live = require('../utils/panel/liveAlertsPanel');
+  const mgr = require('../utils/liveAlertsManager');
+  const original = {
+    add: mgr.addTwitchAlert,
+    remove: mgr.removeTwitchAlert,
+    get: mgr.getAlerts,
+  };
+
+  const calls = [];
+  let alerts = { twitch: [], youtube: [] };
+  mgr.getAlerts = () => alerts;
+  mgr.addTwitchAlert = async (guildId, username, channelId, roleId) => {
+    calls.push(['add', guildId, username, channelId, roleId]);
+    alerts = { twitch: [{ username, channelId, roleId }], youtube: [] };
+  };
+  mgr.removeTwitchAlert = async (guildId, username) => {
+    calls.push(['remove', guildId, username]);
+    alerts = { twitch: [], youtube: [] };
+  };
+
+  const modalSubmit = {
+    customId: 'live:modal:twitch:tok',
+    user: { id: 'admin' },
+    fields: { getTextInputValue: () => 'newbie' },
+    deferUpdate: async () => {},
+    followUp: async () => {},
+    editReply: async () => {},
+    reply: async () => {},
+  };
+
+  const steps = [
+    makeClick('live:channel:tok', ['chan-1']),
+    makeClick('live:role:tok', ['role-1']),
+    makeClick('live:addtwitch:tok', [], { modalSubmit }),
+    makeClick('live:remove:tok'),
+    makeClick('live:removal:tok', ['twitch:0']),
+    makeClick('live:back:tok'),
+  ];
+  const interaction = {
+    guild,
+    guildId: guild.id,
+    channel: { awaitMessageComponent: async () => steps.shift() },
+    user: { id: 'admin' },
+    editReply: async () => {},
+  };
+
+  try {
+    const result = await live.runLiveAlertsPanel({
+      interaction,
+      guild,
+      userId: 'admin',
+      token: 'tok',
+      firstUpdate: { update: async () => {} },
+    });
+
+    assert.strictEqual(result, 'back');
+    assert.deepStrictEqual(calls[0], ['add', 'guild-123', 'newbie', 'chan-1', 'role-1']);
+    assert.deepStrictEqual(calls[1], ['remove', 'guild-123', 'newbie']);
+    assert.deepStrictEqual(alerts.twitch, []);
+  } finally {
+    mgr.addTwitchAlert = original.add;
+    mgr.removeTwitchAlert = original.remove;
+    mgr.getAlerts = original.get;
+  }
+});
+
+test('owner panel sends the test DM and returns to the hub', async () => {
+  const owner = require('../utils/panel/ownerPanel');
+  const originalOwner = process.env.BOT_OWNER_ID;
+  process.env.BOT_OWNER_ID = 'admin';
+
+  const sent = [];
+  const client = {
+    ws: { ping: 3 },
+    guilds: { cache: new Map() },
+    users: {
+      cache: new Map(),
+      fetch: async () => ({ username: 'Owner', send: async (payload) => sent.push(payload) }),
+    },
+    user: { tag: 'Bot#1' },
+  };
+
+  const followUps = [];
+  const steps = [makeClick('owner:notify:tok', [], { followUps }), makeClick('owner:back:tok')];
+  const interaction = {
+    guild,
+    guildId: guild.id,
+    channel: { awaitMessageComponent: async () => steps.shift() },
+    user: { id: 'admin' },
+    client,
+    editReply: async () => {},
+  };
+
+  try {
+    const result = await owner.runOwnerPanel({
+      interaction,
+      guild,
+      userId: 'admin',
+      token: 'tok',
+      firstUpdate: { update: async () => {} },
+    });
+
+    assert.strictEqual(result, 'back');
+    assert.strictEqual(sent.length, 1);
+    assert.ok(/test notification/i.test(followUps[0].content), followUps[0].content);
+  } finally {
+    if (originalOwner === undefined) delete process.env.BOT_OWNER_ID;
+    else process.env.BOT_OWNER_ID = originalOwner;
+  }
 });
 
 Promise.all(pending).then(() => {

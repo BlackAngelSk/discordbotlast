@@ -43,6 +43,7 @@ const telegramSyncManager = require('../status/telegramSyncManager');
 const { awaitComponentSafe } = require('./componentAwait');
 const seasonLeaderboardManager = require('../season/seasonLeaderboardManager');
 const customCommandManager = require('../customCommandManager');
+const alertTestActions = require('./alertTestActions');
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -53,7 +54,7 @@ const VIEW_PAGE_SIZE = 8; // settings rows per page in /setup view
 /**
  * @typedef {{
  *   key: string;
- *   kind: 'string' | 'text' | 'channel' | 'category' | 'role' | 'toggle' | 'number' | 'select' | 'json' | 'commandlist';
+ *   kind: 'string' | 'text' | 'channel' | 'category' | 'role' | 'toggle' | 'number' | 'select' | 'json' | 'commandlist' | 'action';
  *   label: string;
  *   hint?: string;
  *   maxLength?: number;
@@ -63,6 +64,7 @@ const VIEW_PAGE_SIZE = 8; // settings rows per page in /setup view
  *   emoji?: string;
  *   read?: (guildId: string) => unknown;
  *   write?: (guildId: string, value: unknown, guild: any) => Promise<unknown> | unknown;
+ *   run?: (ctx: { guild: import('discord.js').Guild, guildId: string }) => Promise<string> | string;
  * }} SettingDescriptor
  */
 
@@ -713,6 +715,38 @@ const SETTINGS = {
         await steamGameUpdatesManager.updateGuildConfig(g, v || null, undefined, { enabled: !!v });
       },
     },
+    {
+      key: 'previewEpic',
+      kind: 'action',
+      label: 'Send test Epic alert',
+      hint: 'Posts the current Epic free-game offer to the configured channel.',
+      emoji: '🧪',
+      run: async ({ guild, guildId }) => alertTestActions.sendEpicTest(guild, guildId),
+    },
+    {
+      key: 'previewSteamFree',
+      kind: 'action',
+      label: 'Send test Steam free-game alert',
+      hint: 'Posts the current free-to-keep games to the configured channel.',
+      emoji: '🧪',
+      run: async ({ guild, guildId }) => alertTestActions.sendSteamFreeTest(guild, guildId),
+    },
+    {
+      key: 'previewSteamDeals',
+      kind: 'action',
+      label: 'Send test Steam deals alert',
+      hint: 'Posts the current deals and promos batch.',
+      emoji: '🧪',
+      run: async ({ guild, guildId }) => alertTestActions.sendSteamDealsTest(guild, guildId),
+    },
+    {
+      key: 'previewSteamUpdates',
+      kind: 'action',
+      label: 'Send test Steam update alert',
+      hint: 'Posts a recent update post for the tracked games.',
+      emoji: '🧪',
+      run: async ({ guild, guildId }) => alertTestActions.sendSteamUpdatesTest(guild, guildId),
+    },
   ],
   commands: [
     {
@@ -977,6 +1011,7 @@ async function updateSteamDealSetting(guildId, key, value) {
  * @returns {unknown}
  */
 function readSetting(setting, guildId) {
+  if (setting.kind === 'action') return undefined;
   if (typeof setting.read === 'function') {
     try {
       return setting.read(guildId);
@@ -1152,6 +1187,23 @@ function renderCategory(guild, category, token) {
             .setLabel('Remove command')
             .setStyle(ButtonStyle.Danger)
             .setEmoji('➖')
+        )
+      );
+    } else if (s.kind === 'action') {
+      embed.addFields([
+        {
+          name: `${s.emoji || '🧪'} ${s.label}`,
+          value: `> ${s.hint || 'Runs an action against the configured channel.'}`,
+          inline: false,
+        },
+      ]);
+      components.push(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(`setup:action:__cat__:${s.key}:${token}`)
+            .setLabel(s.label.length > 45 ? `${s.label.slice(0, 42)}…` : s.label)
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji(s.emoji || '🧪')
         )
       );
     } else {
@@ -1590,6 +1642,23 @@ async function categoryLoop(interaction, categoryId, token, options = {}) {
     // setup:KIND:CAT:KEY:TOKEN
     const key = parts[3] || '';
     const s = (SETTINGS[catId] || []).find((x) => x.key === key);
+
+    if (kind === 'action' && s) {
+      // Acknowledge immediately — Steam/Epic fetches can outlive the 3s window.
+      await collected.deferUpdate().catch(() => {});
+      let content;
+      try {
+        content = await s.run({ guild, guildId: String(interaction.guildId) });
+      } catch (error) {
+        content = `❌ ${/** @type {any} */ (error)?.message || error || 'Action failed.'}`;
+      }
+      await collected
+        .followUp({ content: String(content).slice(0, 1900), flags: MessageFlags.Ephemeral })
+        .catch(() => {});
+      const rc = renderCategory(guild, catId, token);
+      await collected.editReply({ embeds: [rc.embed], components: rc.components }).catch(() => {});
+      continue;
+    }
 
     if (kind === 'toggle' && s) {
       const current = Boolean(readSetting(s, String(interaction.guildId)));
