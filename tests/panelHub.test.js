@@ -470,6 +470,48 @@ test('insights buttons disable the active view', () => {
   assert.strictEqual(activity.data.disabled, true);
 });
 
+console.log('\n=== Community panel ===');
+
+test('community panel summarises tickets and suggestions', () => {
+  const community = require('../utils/panel/communityPanel');
+  const tickets = require('../utils/automation/ticketManager');
+  const suggestions = require('../utils/automation/suggestionManager');
+  const originalTickets = tickets.getGuildTickets;
+  const originalSuggestions = suggestions.getGuildSuggestions;
+
+  tickets.getGuildTickets = () => ({
+    1: { channelId: 'chan-1', status: 'open' },
+    2: { channelId: 'chan-2', status: 'closed' },
+  });
+  suggestions.getGuildSuggestions = () => [
+    { id: 'a1', content: 'Add a movie night', status: 'pending', upvotes: 5 },
+    { id: 'a2', content: 'More emojis', status: 'approved', upvotes: 2 },
+  ];
+
+  try {
+    const json = community.buildEmbed(guild).toJSON();
+    const fields = Object.fromEntries(json.fields.map((f) => [f.name, f.value]));
+    assert.strictEqual(fields['🎟️ Open tickets'], '1');
+    assert.strictEqual(fields['🗂️ Total tickets'], '2');
+    assert.ok(fields['📨 Suggestions'].includes('1 pending'));
+    assert.ok(fields['💡 Top suggestions'].includes('Add a movie night'));
+  } finally {
+    tickets.getGuildTickets = originalTickets;
+    suggestions.getGuildSuggestions = originalSuggestions;
+  }
+});
+
+test('community buttons link the settings categories', () => {
+  const community = require('../utils/panel/communityPanel');
+  const ids = community.buildRows('tok')[0].components.map((b) => b.data.custom_id);
+  assert.deepStrictEqual(ids, [
+    'community:tickets:tok',
+    'community:suggestions:tok',
+    'community:refresh:tok',
+    'community:back:tok',
+  ]);
+});
+
 console.log('\n=== Steam deal filters ===');
 
 test('steam filter writes are blocked until a deals channel exists', async () => {

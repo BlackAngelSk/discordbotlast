@@ -28,6 +28,7 @@ const economyPanel = require('./economyPanel');
 const safetyPanel = require('./safetyPanel');
 const serverBuilderPanel = require('./serverBuilderPanel');
 const insightsPanel = require('./insightsPanel');
+const communityPanel = require('./communityPanel');
 const { awaitComponentSafe } = require('./componentAwait');
 
 /** Panels that are not settings categories (custom flows). */
@@ -55,6 +56,12 @@ const CUSTOM_PANELS = [
     label: 'Insights',
     emoji: '📊',
     description: 'Usage, activity and bot health',
+  },
+  {
+    value: 'custom:community',
+    label: 'Community',
+    emoji: '🎫',
+    description: 'Tickets and suggestions',
   },
 ];
 
@@ -315,6 +322,26 @@ async function openHub(interaction) {
       const category = String(collected.values?.[0] || '');
       if (!category) {
         await collected.deferUpdate().catch(() => {});
+        continue;
+      }
+
+      if (category === 'custom:community') {
+        const result = await communityPanel.runCommunityPanel({
+          interaction,
+          guild,
+          userId,
+          token,
+          firstUpdate: collected,
+        });
+
+        if (result === 'timeout') return;
+
+        await interaction
+          .editReply({
+            embeds: [buildHubEmbed(guild, interaction.client)],
+            components: /** @type {any} */ (buildHubRows(guild, token)),
+          })
+          .catch(() => {});
         continue;
       }
 
