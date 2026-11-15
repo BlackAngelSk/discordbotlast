@@ -465,7 +465,7 @@ function getCategoryEmbed(prefix, category, accessContext) {
           {
             name: '🔒 Owner-only Slash Commands',
             value:
-              '\`/testcommands\` - Simulate all slash commands and report failures\n\`/force-update [ref] [restart] [delete_missing]\` - Force-update bot files now\n\`/force-update-check [apply_update]\` - Check GitHub for bot updates now\n\`/testerror [type]\` - Trigger a test error for DM alert validation\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync status\` - View the current sync schedule\n\`/mongodb-sync schedule\` - Choose automatic/manual MongoDB updates\n\`/mongodb-sync run\` - Sync JSON data to MongoDB now',
+              '\`/testcommands\` - Simulate all slash commands and report failures\n\`/force-update [ref] [restart] [delete_missing]\` - Force-update bot files now\n\`/force-update-check [apply_update]\` - Check GitHub for bot updates now\n\`/ytdlp status|update\` - Check or force-update the yt-dlp binary\n\`/testerror [type]\` - Trigger a test error for DM alert validation\n\`/mongodb-space\` - Check MongoDB storage usage\n\`/mongodb-sync status\` - View the current sync schedule\n\`/mongodb-sync schedule\` - Choose automatic/manual MongoDB updates\n\`/mongodb-sync run\` - Sync JSON data to MongoDB now',
           },
           {
             name: '🔧 Owner-only Prefix Commands',

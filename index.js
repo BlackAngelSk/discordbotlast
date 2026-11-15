@@ -376,6 +376,7 @@ async function initTier2Managers() {
   console.time('⏱️ Tier 2 managers init');
 
   const { minecraftStatusManager } = require('./utils/status/minecraftStatusManager');
+  const ytdlpUpdater = require('./utils/music/ytdlpUpdater');
 
   await Promise.all([
     runInitStep('Economy manager', () => lazyLoadManager('economyManager').init()),
@@ -390,6 +391,7 @@ async function initTier2Managers() {
     runInitStep('Raid protection manager', () => lazyLoadManager('raidProtectionManager').init()),
     runInitStep('Birthday manager', () => lazyLoadManager('birthdayManager').init()),
     runInitStep('Minecraft status manager', () => minecraftStatusManager.init(client)),
+    runInitStep('yt-dlp updater', () => ytdlpUpdater.start()),
     runInitStep('Achievement manager', () => lazyLoadManager('achievementManager').init()),
     runInitStep('Scheduled messages manager', () =>
       lazyLoadManager('scheduledMessagesManager').init(client)
