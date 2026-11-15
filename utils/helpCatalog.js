@@ -448,7 +448,7 @@ function getCategoryEmbed(prefix, category, accessContext) {
           },
           {
             name: '🧾 Audit Logs',
-            value: `\`/auditlog view\`\n\`/auditlog export\`\n\`/auditlogs\` - View logs`,
+            value: `\`/auditlog view|export\` - Discord audit log\n\`/auditlog recent|user|stats\` - Bot audit trail`,
           },
           {
             name: '🆕 New Admin',

@@ -4,6 +4,37 @@ const path = require('path');
 const commandPermissionsManager = require('./commandPermissionsManager');
 const activityTracker = require('../stats/activityTracker');
 
+// Discord hard limit: 100 global chat-input commands per application.
+const GLOBAL_SLASH_COMMAND_LIMIT = 100;
+// When the cap is hit, register the most useful categories first and drop games.
+const CATEGORY_PRIORITY = { admin: 0, moderation: 1, utility: 2, music: 3, economy: 4, fun: 5 };
+
+function resolveCommandLimit() {
+  const raw = Number(process.env.MAX_GLOBAL_SLASH_COMMANDS);
+  if (!Number.isFinite(raw) || raw <= 0) return GLOBAL_SLASH_COMMAND_LIMIT;
+  return Math.min(GLOBAL_SLASH_COMMAND_LIMIT, Math.floor(raw));
+}
+
+/**
+ * Pick which commands fit into Discord's limit. Deterministic: category priority
+ * first (fun last), then alphabetical, so a restart always registers the same set.
+ */
+function selectCommandsForRegistration(commands, limit = resolveCommandLimit()) {
+  const entries = Array.from(commands.values());
+
+  const sorted = entries.slice().sort((left, right) => {
+    const leftPriority = CATEGORY_PRIORITY[left.__slashCategory] ?? 99;
+    const rightPriority = CATEGORY_PRIORITY[right.__slashCategory] ?? 99;
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+    return String(left.data.name).localeCompare(String(right.data.name));
+  });
+
+  return {
+    selected: sorted.slice(0, limit),
+    skipped: sorted.slice(limit),
+  };
+}
+
 class SlashCommandHandler {
   constructor(client) {
     this.client = client;
@@ -28,6 +59,8 @@ class SlashCommandHandler {
             const command = require(fullPath);
 
             if ('data' in command && 'execute' in command) {
+              // Category drives registration priority when the 100-command cap is hit.
+              command.__slashCategory = path.relative(slashCommandsPath, dir).split(path.sep)[0];
               this.commands.set(command.data.name, command);
               console.log(`✅ Loaded slash command: ${command.data.name}`);
             } else {
@@ -47,15 +80,26 @@ class SlashCommandHandler {
   }
 
   async registerCommands() {
-    const commands = [];
-    this.commands.forEach((command) => {
-      commands.push(command.data.toJSON());
-    });
+    const limit = resolveCommandLimit();
+    const { selected, skipped } = selectCommandsForRegistration(this.commands, limit);
+
+    if (skipped.length > 0) {
+      console.warn(
+        `⚠️ Discord allows ${limit} global slash commands — ${skipped.length} not registered: ` +
+          skipped.map((command) => `/${command.data.name}`).join(', ')
+      );
+    }
+
+    const commands = selected.map((command) => command.data.toJSON());
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
     try {
-      console.log(`🔄 Started refreshing ${commands.length} application (/) commands.`);
+      console.log(
+        `🔄 Started refreshing ${commands.length} application (/) commands` +
+          (skipped.length > 0 ? ` (${this.commands.size} loaded, capped at ${limit})` : '') +
+          '.'
+      );
 
       // Register commands globally
       const data = await rest.put(Routes.applicationCommands(this.client.user.id), {
@@ -153,3 +197,6 @@ class SlashCommandHandler {
 }
 
 module.exports = SlashCommandHandler;
+module.exports.GLOBAL_SLASH_COMMAND_LIMIT = GLOBAL_SLASH_COMMAND_LIMIT;
+module.exports.resolveCommandLimit = resolveCommandLimit;
+module.exports.selectCommandsForRegistration = selectCommandsForRegistration;

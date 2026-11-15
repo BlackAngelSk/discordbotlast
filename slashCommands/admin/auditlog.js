@@ -86,6 +86,34 @@ module.exports = {
             )
         )
     )
+    .addSubcommand((sub) =>
+      sub
+        .setName('recent')
+        .setDescription('View recent bot audit log entries')
+        .addStringOption((option) =>
+          option
+            .setName('category')
+            .setDescription('Filter by category')
+            .setRequired(false)
+            .addChoices(
+              { name: 'Moderation', value: 'moderation' },
+              { name: 'Configuration', value: 'configuration' },
+              { name: 'Permissions', value: 'permissions' },
+              { name: 'Roles', value: 'role_management' },
+              { name: 'Channels', value: 'channel_management' },
+              { name: 'Economy', value: 'economy' }
+            )
+        )
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName('user')
+        .setDescription('View bot actions performed by a user')
+        .addUserOption((option) =>
+          option.setName('user').setDescription('User to check').setRequired(true)
+        )
+    )
+    .addSubcommand((sub) => sub.setName('stats').setDescription('View bot audit statistics'))
     .setDefaultMemberPermissions(PermissionFlagsBits.ViewAuditLog),
 
   async execute(interaction) {
@@ -97,6 +125,11 @@ module.exports = {
     }
 
     const sub = interaction.options.getSubcommand();
+
+    if (sub === 'recent' || sub === 'user' || sub === 'stats') {
+      return this.handleInternalLog(interaction, sub);
+    }
+
     const limit = interaction.options.getInteger('limit') || (sub === 'view' ? 10 : 50);
     const user = interaction.options.getUser('user');
     const actionKey = interaction.options.getString('action');
@@ -158,5 +191,106 @@ module.exports = {
       files: [file],
       flags: MessageFlags.Ephemeral,
     });
+  },
+
+  /**
+   * Bot-side audit log (the dashboard/bot actions trail), merged in from the old
+   * /auditlogs command so the app stays under Discord's 100-command limit.
+   */
+  async handleInternalLog(interaction, sub) {
+    const auditLog = interaction.client.auditLog;
+
+    if (!auditLog) {
+      return interaction.reply({
+        content: '❌ Bot audit log is not available.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    if (sub === 'stats') {
+      const stats = auditLog.getStats({ guildId: interaction.guild.id });
+
+      const embed = new EmbedBuilder()
+        .setColor(0x0099ff)
+        .setTitle('📊 Bot Audit Statistics')
+        .addFields(
+          { name: 'Total actions', value: String(stats.total), inline: true },
+          {
+            name: 'By category',
+            value:
+              Object.entries(stats.byCategory || {})
+                .map(([category, count]) => `${category}: ${count}`)
+                .join('\n') || 'None',
+            inline: true,
+          }
+        )
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
+
+    if (sub === 'user') {
+      const user = interaction.options.getUser('user');
+      const logs = auditLog.getExecutorHistory(user.id, 10);
+
+      if (logs.length === 0) {
+        return interaction.reply({
+          content: `📭 No bot actions found for ${user.tag}.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(0xff6600)
+        .setTitle(`📋 Bot actions by ${user.tag}`)
+        .setDescription(
+          logs
+            .map(
+              (log) =>
+                `**${log.action}**\nTarget: ${log.target?.tag || 'N/A'}\n<t:${Math.floor(
+                  new Date(log.timestamp).getTime() / 1000
+                )}:R>`
+            )
+            .join('\n\n')
+        )
+        .setThumbnail(user.displayAvatarURL())
+        .setFooter({ text: `Total: ${logs.length} action(s)` })
+        .setTimestamp();
+
+      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    }
+
+    const category = interaction.options.getString('category');
+    const logs = auditLog.getAuditLogs({
+      category: category || undefined,
+      guildId: interaction.guild.id,
+      limit: 10,
+      days: 7,
+    });
+
+    if (logs.length === 0) {
+      return interaction.reply({
+        content: '📭 No bot audit logs found.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0x0099ff)
+      .setTitle('📋 Recent Bot Audit Logs')
+      .setDescription(
+        logs
+          .map(
+            (log) =>
+              `**${log.action}** (${log.severity})\nBy: ${log.executor?.tag || 'Unknown'}\n<t:${Math.floor(
+                new Date(log.timestamp).getTime() / 1000
+              )}:R>`
+          )
+          .join('\n\n')
+      )
+      .setFooter({ text: `Total: ${logs.length} log(s)` })
+      .setTimestamp();
+
+    return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

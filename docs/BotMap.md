@@ -33,7 +33,7 @@
 
 ## 💬 Prefix Commands (`commands/`)
 
-### Admin (28 files) - `commands/admin/`
+### Admin (18 files) - `commands/admin/`
 
 ```
 addcoins.js          add economy currency to users
@@ -190,11 +190,10 @@ stats.js             Bot statistics
 
 ## ⚡ Slash Commands (`slashCommands/`)
 
-### Admin (15 files) - `slashCommands/admin/`
+### Admin (18 files) - `slashCommands/admin/`
 
 ```
-auditlog.js          View audit logs
-auditlogs.js         Audit log viewer
+auditlog.js          Discord + bot audit log viewer (view/export/recent/user/stats)
 botstatus.js         Set bot status
 command-permissions.js Command permission config
 force-update-check.js Check for updates
