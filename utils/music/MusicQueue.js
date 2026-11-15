@@ -27,6 +27,24 @@ function resolveFfmpegBinary() {
   return 'ffmpeg';
 }
 
+// yt-dlp processes we killed ourselves (skip/stop/new track/shutdown). Their exit
+// arrives as `code === null` + signal, which must not be reported as a failure.
+const intentionallyKilled = new WeakSet();
+
+/**
+ * A yt-dlp close event is only a real playback failure when it was not our own
+ * kill, not superseded by a newer track, the player is not already idle and the
+ * queue is not shutting down.
+ */
+function shouldReportYtDlpFailure({ code, killed, stale, playerIdle, shuttingDown }) {
+  if (shuttingDown) return false;
+  if (code === 0) return false;
+  if (killed) return false;
+  if (stale) return false;
+  if (playerIdle) return false;
+  return true;
+}
+
 class MusicQueue {
   constructor(guildId) {
     this.guildId = guildId;
@@ -314,6 +332,7 @@ class MusicQueue {
           }
           if (this.ytdlpProcess) {
             try {
+              intentionallyKilled.add(this.ytdlpProcess);
               this.ytdlpProcess.kill('SIGKILL');
             } catch (_) {}
             this.ytdlpProcess = null;
@@ -349,6 +368,7 @@ class MusicQueue {
       }
       if (this.ytdlpProcess) {
         try {
+          intentionallyKilled.add(this.ytdlpProcess);
           this.ytdlpProcess.kill('SIGKILL');
         } catch (_) {}
         this.ytdlpProcess = null;
@@ -466,6 +486,12 @@ class MusicQueue {
         }
       });
 
+      ffmpegProcess.on('close', (code, signal) => {
+        // Killed on purpose (signal) or a clean exit — nothing to report.
+        if (code === 0 || signal || this.isShuttingDown || playbackFailureHandled) return;
+        console.error(`❌ FFmpeg exited with code ${code}`);
+      });
+
       ytdlpProcess.stderr.on('data', (data) => {
         const stderrChunk = data.toString();
         ytdlpStderr += stderrChunk;
@@ -479,10 +505,23 @@ class MusicQueue {
         console.error('yt-dlp stderr:', stderrChunk);
       });
 
-      ytdlpProcess.on('close', (code) => {
-        if (code !== 0) {
-          handleStreamFailure(ytdlpStderr || `yt-dlp exited with code ${code}`);
-        }
+      ytdlpProcess.on('close', (code, signal) => {
+        const isFailure = shouldReportYtDlpFailure({
+          code,
+          killed: intentionallyKilled.has(ytdlpProcess),
+          stale: this.ytdlpProcess !== ytdlpProcess,
+          playerIdle: this.player.state.status === AudioPlayerStatus.Idle,
+          shuttingDown: this.isShuttingDown,
+        });
+
+        if (!isFailure) return;
+
+        const reason =
+          code === null
+            ? `yt-dlp was killed (${signal || 'unknown signal'})`
+            : ytdlpStderr || `yt-dlp exited with code ${code}`;
+
+        handleStreamFailure(reason);
       });
 
       // Create audio resource from FFmpeg output
@@ -583,6 +622,7 @@ class MusicQueue {
       }
       if (this.ytdlpProcess) {
         try {
+          intentionallyKilled.add(this.ytdlpProcess);
           this.ytdlpProcess.kill('SIGKILL');
         } catch (_) {}
         this.ytdlpProcess = null;
@@ -614,6 +654,7 @@ class MusicQueue {
       }
       if (this.ytdlpProcess) {
         try {
+          intentionallyKilled.add(this.ytdlpProcess);
           this.ytdlpProcess.kill('SIGKILL');
         } catch (_) {}
         this.ytdlpProcess = null;
@@ -680,3 +721,4 @@ class MusicQueue {
 
 module.exports = MusicQueue;
 module.exports.resolveFfmpegBinary = resolveFfmpegBinary;
+module.exports.shouldReportYtDlpFailure = shouldReportYtDlpFailure;
