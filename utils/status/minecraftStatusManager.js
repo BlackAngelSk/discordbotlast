@@ -602,7 +602,12 @@ class MinecraftStatusManager {
       await this.save();
       return this.data.guilds[guildId];
     } catch (error) {
-      console.error('Minecraft status refresh error:', error);
+      // Timeouts/network blips are expected occasionally — log one line, not a stack.
+      if (this.isTransientStatusError(error)) {
+        console.warn(`Minecraft status refresh warning: ${error.message}`);
+      } else {
+        console.error('Minecraft status refresh error:', error);
+      }
 
       const current = this.data.guilds[guildId];
       if (current) {

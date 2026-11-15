@@ -3,10 +3,31 @@ const dns = require('dns').promises;
 
 const MINECRAFT_STATUS_TIMEOUT_MS = Math.max(
   1000,
-  Number(process.env.MINECRAFT_STATUS_TIMEOUT_MS) || 5000
+  Number(process.env.MINECRAFT_STATUS_TIMEOUT_MS) || 8000
 );
-const MINECRAFT_STATUS_TIMEOUT_RETRIES = 2;
+const MINECRAFT_STATUS_ATTEMPTS = Math.max(
+  1,
+  Math.min(4, Number(process.env.MINECRAFT_STATUS_ATTEMPTS) || 2)
+);
+const MINECRAFT_STATUS_CACHE_TTL_MS = Math.max(
+  0,
+  Number(process.env.MINECRAFT_STATUS_CACHE_TTL_MS) || 15000
+);
 const MCSTATUS_API_BASE = 'https://api.mcstatus.io/v2/status';
+
+// Short-lived cache: the dashboard, the monitor tick and manual refreshes all ask
+// for the same server within seconds of each other.
+const statusCache = new Map();
+
+const clearMinecraftStatusCache = () => statusCache.clear();
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isTimeoutError = (error) =>
+  error?.name === 'AbortError' ||
+  error?.name === 'TimeoutError' ||
+  error?.code === 'ABORT_ERR' ||
+  /timed out/i.test(String(error?.message || ''));
 
 const normalizeMinecraftStatusInput = (hostInput, portInput) => {
   const rawHost = String(hostInput || '').trim();
@@ -51,7 +72,7 @@ const normalizeMinecraftStatusInput = (hostInput, portInput) => {
   return { host: normalizedHost, port };
 };
 
-const fetchMinecraftServerStatus = async (host, port) => {
+const lookupMinecraftServerStatus = async (host, port) => {
   const normalizedInput = normalizeMinecraftStatusInput(host, port);
   if (normalizedInput.error) {
     throw new Error(normalizedInput.error);
@@ -60,12 +81,15 @@ const fetchMinecraftServerStatus = async (host, port) => {
   const normalizedHost = normalizedInput.host;
   const normalizedPort = normalizedInput.port;
 
-  const fetchJsonWithTimeout = async (url) => {
+  const fetchJsonWithTimeout = async (
+    url,
+    { timeoutMs = MINECRAFT_STATUS_TIMEOUT_MS, attempts = MINECRAFT_STATUS_ATTEMPTS } = {}
+  ) => {
     let lastError = null;
 
-    for (let attempt = 0; attempt <= MINECRAFT_STATUS_TIMEOUT_RETRIES; attempt += 1) {
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), MINECRAFT_STATUS_TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
         const response = await fetch(url, {
@@ -80,26 +104,24 @@ const fetchMinecraftServerStatus = async (host, port) => {
           throw new Error(`Status lookup failed with HTTP ${response.status}.`);
         }
 
-        return response.json();
+        return await response.json();
       } catch (error) {
         lastError = error;
-        const isTimeout =
-          error?.name === 'AbortError' ||
-          error?.name === 'TimeoutError' ||
-          error?.code === 'ABORT_ERR';
-        if (!isTimeout || attempt >= MINECRAFT_STATUS_TIMEOUT_RETRIES) {
-          if (isTimeout) {
-            throw new Error('Minecraft status lookup timed out.', { cause: error });
-          }
+        const isTimeout = isTimeoutError(error);
+        // Only retry timeouts — an HTTP 4xx/5xx will not get better instantly.
+        if (!isTimeout || attempt >= attempts) break;
 
-          throw error;
-        }
+        await delay(250 * attempt);
       } finally {
         clearTimeout(timeout);
       }
     }
 
-    throw lastError || new Error('Minecraft status lookup timed out.');
+    if (isTimeoutError(lastError)) {
+      throw new Error('Minecraft status lookup timed out.', { cause: lastError });
+    }
+
+    throw lastError || new Error('Minecraft status lookup failed.');
   };
 
   const toMotdText = (motdValue) => {
@@ -201,8 +223,8 @@ const fetchMinecraftServerStatus = async (host, port) => {
   let primaryOfflineStatus = null;
   let lastStatus = null;
 
-  // Run the two primary API lookups in parallel so we don't waste a full timeout
-  // waiting on one before trying the other.
+  // Run the two primary API lookups in parallel. As soon as one confirms the
+  // server is online we return it — no waiting for the other API to time out.
   const primaryLookups = [
     {
       label: 'mcsrvstat',
@@ -224,16 +246,32 @@ const fetchMinecraftServerStatus = async (host, port) => {
     },
   ];
 
-  const primaryResults = await Promise.allSettled(primaryLookups.map((lookup) => lookup.run()));
+  const settledLookups = primaryLookups.map((lookup, index) =>
+    lookup.run().then(
+      (status) => ({ index, status }),
+      (error) => ({ index, error })
+    )
+  );
 
-  for (const [index, result] of primaryResults.entries()) {
-    if (result.status === 'fulfilled') {
-      const status = result.value;
-      if (status.online) {
-        return status;
-      }
+  const firstOnline = await Promise.race([
+    ...settledLookups.map((promise) =>
+      promise.then((entry) => (entry.status?.online ? entry : new Promise(() => {})))
+    ),
+    // Nothing came back online — resolve with null once every lookup settled.
+    Promise.all(settledLookups).then(() => null),
+  ]);
 
-      if (index === 0) {
+  if (firstOnline) {
+    return firstOnline.status;
+  }
+
+  const primaryResults = await Promise.all(settledLookups);
+
+  for (const result of primaryResults) {
+    if (result.status) {
+      const status = result.status;
+
+      if (result.index === 0) {
         // mcsrvstat: loopback IPs are inconclusive, skip storing as primary offline.
         if (!isLoopbackIp(status.ip)) {
           primaryOfflineStatus = status;
@@ -242,7 +280,7 @@ const fetchMinecraftServerStatus = async (host, port) => {
         lastStatus = status;
       }
     } else if (!fallbackError) {
-      fallbackError = result.reason;
+      fallbackError = result.error;
     }
   }
 
@@ -250,7 +288,9 @@ const fetchMinecraftServerStatus = async (host, port) => {
   try {
     const bedrockAddress = port ? requestAddress : `${host}:19132`;
     const payload = await fetchJsonWithTimeout(
-      `${MCSTATUS_API_BASE}/bedrock/${encodeURIComponent(bedrockAddress)}`
+      `${MCSTATUS_API_BASE}/bedrock/${encodeURIComponent(bedrockAddress)}`,
+      // Secondary source: don't spend the full retry budget on it.
+      { timeoutMs: Math.min(MINECRAFT_STATUS_TIMEOUT_MS, 5000), attempts: 1 }
     );
     const status = fromMcstatus(payload, 'bedrock', bedrockAddress);
     if (status.online) {
@@ -276,7 +316,8 @@ const fetchMinecraftServerStatus = async (host, port) => {
         }
 
         const payload = await fetchJsonWithTimeout(
-          `${MCSTATUS_API_BASE}/java/${encodeURIComponent(`${targetHost}:${targetPort}`)}`
+          `${MCSTATUS_API_BASE}/java/${encodeURIComponent(`${targetHost}:${targetPort}`)}`,
+          { timeoutMs: Math.min(MINECRAFT_STATUS_TIMEOUT_MS, 5000), attempts: 1 }
         );
         const status = fromMcstatus(payload, 'java', `${targetHost}:${targetPort}`);
         if (status.online) {
@@ -307,8 +348,42 @@ const fetchMinecraftServerStatus = async (host, port) => {
   throw new Error('Minecraft status lookup failed.');
 };
 
+/**
+ * Cached lookup. Successful *and* offline results are cached for a few seconds so
+ * the dashboard, the monitor and manual refreshes don't hammer the status APIs.
+ * Errors are never cached.
+ */
+const fetchMinecraftServerStatus = async (host, port) => {
+  const cacheKey = `${String(host || '')
+    .trim()
+    .toLowerCase()}|${port ?? ''}`;
+  const cached = statusCache.get(cacheKey);
+
+  if (
+    cached &&
+    MINECRAFT_STATUS_CACHE_TTL_MS > 0 &&
+    Date.now() - cached.at < MINECRAFT_STATUS_CACHE_TTL_MS
+  ) {
+    return cached.status;
+  }
+
+  const status = await lookupMinecraftServerStatus(host, port);
+
+  statusCache.set(cacheKey, { at: Date.now(), status });
+  if (statusCache.size > 500) {
+    // Drop the oldest entry; the map is tiny and only holds live servers.
+    const oldestKey = statusCache.keys().next().value;
+    if (oldestKey !== undefined) statusCache.delete(oldestKey);
+  }
+
+  return status;
+};
+
 module.exports = {
+  MINECRAFT_STATUS_ATTEMPTS,
+  MINECRAFT_STATUS_CACHE_TTL_MS,
   MINECRAFT_STATUS_TIMEOUT_MS,
-  normalizeMinecraftStatusInput,
+  clearMinecraftStatusCache,
   fetchMinecraftServerStatus,
+  normalizeMinecraftStatusInput,
 };
