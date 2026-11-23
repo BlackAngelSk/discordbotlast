@@ -67,8 +67,14 @@ const INTEL_NEWS_URL = 'https://www.intel.com/content/www/us/en/newsroom.html';
 const POLL_INTERVAL = 15 * 60 * 1000;
 const MAX_TRACKED_GAMES = 25;
 const DRIVER_FETCH_TIMEOUT_MS = 30000;
-const PROVIDER_FAIL_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown after persistent failures
-const providerFailCooldowns = new Map(); // module-level: providerKey -> lastFailTimestamp
+// A failing source is retried with exponential backoff instead of on every poll:
+// 15m, 30m, 1h, 2h, 4h, 8h, then every 12h. A provider outage therefore costs a
+// handful of requests per day instead of 96, and logs a handful of lines.
+const PROVIDER_FAIL_BASE_COOLDOWN_MS = 15 * 60 * 1000;
+const PROVIDER_FAIL_MAX_COOLDOWN_MS = 12 * 60 * 60 * 1000;
+const PROVIDER_FAIL_LOG_INTERVAL_MS = 6 * 60 * 60 * 1000; // one reminder per streak per 6h
+const POLL_SUMMARY_INTERVAL_MS = 6 * 60 * 60 * 1000; // heartbeat when nothing is broken
+const providerHealth = new Map(); // sourceKey -> { fails, nextAttemptAt, lastError, lastFailureAt, lastLoggedAt }
 const providerOngoingFetches = new Map(); // module-level: providerKey -> Promise (dedup concurrent calls)
 
 const SPECIAL_TRACKED_SOURCES = {
@@ -485,6 +491,86 @@ function buildSourceKey(game) {
   if (!game) return '';
   if (game.provider === 'steam') return `steam:${game.appId}`;
   return game.sourceId || game.provider || '';
+}
+
+/**
+ * Exponential backoff for a failing source: 15m, 30m, 1h, 2h, 4h, 8h, then 12h.
+ */
+function computeProviderBackoffMs(failCount) {
+  const exponent = Math.max(0, Math.min(6, Number(failCount || 1) - 1));
+  return Math.min(PROVIDER_FAIL_MAX_COOLDOWN_MS, PROVIDER_FAIL_BASE_COOLDOWN_MS * 2 ** exponent);
+}
+
+function formatCooldown(ms) {
+  const minutes = Math.max(1, Math.round(ms / 60000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return `${hours}h`;
+}
+
+/**
+ * True while a source is inside its backoff window — the poll skips it entirely,
+ * so a 503 never turns into a request (or a log line) every 15 minutes.
+ */
+function isProviderCoolingDown(sourceKey) {
+  const health = providerHealth.get(sourceKey);
+  return Boolean(health && health.nextAttemptAt > Date.now());
+}
+
+function markProviderSuccess(sourceKey) {
+  const previous = providerHealth.get(sourceKey);
+  if (!previous) return;
+  providerHealth.delete(sourceKey);
+  if (previous.fails > 0) {
+    console.log(`[${sourceKey}] update fetch recovered after ${previous.fails} failed attempt(s)`);
+  }
+}
+
+/**
+ * Record a failure and log it once per streak (then at most once per 6h).
+ * The returned backoff becomes the next retry time for that source.
+ */
+function markProviderFailure(sourceKey, error) {
+  const now = Date.now();
+  const previous = providerHealth.get(sourceKey) || { fails: 0, lastLoggedAt: 0 };
+  const fails = previous.fails + 1;
+  const backoff = computeProviderBackoffMs(fails);
+  const message = String((error && error.message) || error || 'unknown error').trim();
+  const shouldLog =
+    fails === 1 || now - (previous.lastLoggedAt || 0) >= PROVIDER_FAIL_LOG_INTERVAL_MS;
+
+  providerHealth.set(sourceKey, {
+    fails,
+    lastError: message,
+    lastFailureAt: now,
+    lastLoggedAt: shouldLog ? now : previous.lastLoggedAt || 0,
+    nextAttemptAt: now + backoff,
+  });
+
+  if (!shouldLog) return;
+
+  if (fails === 1) {
+    console.error(
+      `[${sourceKey}] update fetch failed: ${message} — retrying in ${formatCooldown(backoff)}`
+    );
+  } else {
+    console.error(
+      `[${sourceKey}] update fetch still failing (${fails} attempts): ${message} — next retry in ${formatCooldown(backoff)}`
+    );
+  }
+}
+
+function getProviderHealthSnapshot() {
+  const now = Date.now();
+  return [...providerHealth.entries()]
+    .map(([sourceKey, health]) => ({
+      sourceKey,
+      fails: health.fails,
+      lastError: health.lastError,
+      lastFailureAt: health.lastFailureAt ? new Date(health.lastFailureAt).toISOString() : null,
+      retryInMs: Math.max(0, health.nextAttemptAt - now),
+    }))
+    .sort((left, right) => right.fails - left.fails);
 }
 
 function buildArticleKey(article) {
@@ -1375,78 +1461,68 @@ async function fetchWoWUpdates() {
 }
 
 async function fetchPoEUpdates() {
-  try {
-    const xml = await httpsGetText(POE_NEWS_RSS_URL);
-    const items = parseRssFeed(xml).slice(0, 10);
-    const source = SPECIAL_TRACKED_SOURCES.poe;
+  const xml = await httpsGetText(POE_NEWS_RSS_URL);
+  const items = parseRssFeed(xml).slice(0, 10);
+  const source = SPECIAL_TRACKED_SOURCES.poe;
 
-    if (items.length === 0) {
-      throw new Error('Path of Exile news feed returned no items');
-    }
-
-    return items.map((item) => ({
-      key: buildProviderUpdateKey('poe', { url: item.link, title: item.title, date: item.pubDate }),
-      provider: 'poe',
-      providerLabel: source.providerLabel,
-      gameName: source.name,
-      title: truncate(item.title, 256),
-      summary: item.description || `A new ${source.name} news post has been published.`,
-      sections: [],
-      version: null,
-      url: item.link || POE_NEWS_URL,
-      date: item.pubDate || Date.now(),
-      imageUrl: source.imageUrl,
-      tinyImage: source.tinyImage,
-      color: source.color,
-      storeUrl: source.storeUrl,
-    }));
-  } catch (error) {
-    console.error('Error fetching PoE updates:', error.message || error);
-    throw error;
+  if (items.length === 0) {
+    throw new Error('Path of Exile news feed returned no items');
   }
+
+  return items.map((item) => ({
+    key: buildProviderUpdateKey('poe', { url: item.link, title: item.title, date: item.pubDate }),
+    provider: 'poe',
+    providerLabel: source.providerLabel,
+    gameName: source.name,
+    title: truncate(item.title, 256),
+    summary: item.description || `A new ${source.name} news post has been published.`,
+    sections: [],
+    version: null,
+    url: item.link || POE_NEWS_URL,
+    date: item.pubDate || Date.now(),
+    imageUrl: source.imageUrl,
+    tinyImage: source.tinyImage,
+    color: source.color,
+    storeUrl: source.storeUrl,
+  }));
 }
 
 async function fetchFortniteUpdates() {
-  try {
-    const payload = await httpsGetJson(FORTNITE_NEWS_API_URL, {
-      headers: BROWSER_REQUEST_HEADERS,
-    });
-    const source = SPECIAL_TRACKED_SOURCES.fortnite;
-    const br = payload?.data?.br;
-    const motds = Array.isArray(br?.motds) ? br.motds : [];
-    const broadcastDate = br?.date || null;
-    const hash = br?.hash || '';
+  const payload = await httpsGetJson(FORTNITE_NEWS_API_URL, {
+    headers: BROWSER_REQUEST_HEADERS,
+  });
+  const source = SPECIAL_TRACKED_SOURCES.fortnite;
+  const br = payload?.data?.br;
+  const motds = Array.isArray(br?.motds) ? br.motds : [];
+  const broadcastDate = br?.date || null;
+  const hash = br?.hash || '';
 
-    if (motds.length === 0) {
-      throw new Error('Fortnite news feed returned no items');
-    }
-
-    return motds.slice(0, 10).map((motd) => ({
-      key: buildProviderUpdateKey('fortnite', {
-        id: String(motd.id || ''),
-        url: FORTNITE_NEWS_URL,
-        title: motd.title || motd.tabTitle,
-        date: broadcastDate,
-      }),
-      provider: 'fortnite',
-      providerLabel: source.providerLabel,
-      gameName: source.name,
-      title: truncate(sanitizeText(motd.title || motd.tabTitle || 'Fortnite Update'), 256),
-      summary: truncate(sanitizeText(motd.body || ''), 280) || 'Fortnite news has been updated.',
-      sections: [],
-      version: null,
-      url: FORTNITE_NEWS_URL,
-      date: broadcastDate || Date.now(),
-      imageUrl: motd.image || source.imageUrl,
-      tinyImage: source.tinyImage,
-      color: source.color,
-      storeUrl: source.storeUrl,
-      hash,
-    }));
-  } catch (error) {
-    console.error('Error fetching Fortnite updates:', error.message || error);
-    throw error;
+  if (motds.length === 0) {
+    throw new Error('Fortnite news feed returned no items');
   }
+
+  return motds.slice(0, 10).map((motd) => ({
+    key: buildProviderUpdateKey('fortnite', {
+      id: String(motd.id || ''),
+      url: FORTNITE_NEWS_URL,
+      title: motd.title || motd.tabTitle,
+      date: broadcastDate,
+    }),
+    provider: 'fortnite',
+    providerLabel: source.providerLabel,
+    gameName: source.name,
+    title: truncate(sanitizeText(motd.title || motd.tabTitle || 'Fortnite Update'), 256),
+    summary: truncate(sanitizeText(motd.body || ''), 280) || 'Fortnite news has been updated.',
+    sections: [],
+    version: null,
+    url: FORTNITE_NEWS_URL,
+    date: broadcastDate || Date.now(),
+    imageUrl: motd.image || source.imageUrl,
+    tinyImage: source.tinyImage,
+    color: source.color,
+    storeUrl: source.storeUrl,
+    hash,
+  }));
 }
 
 /**
@@ -1541,261 +1617,253 @@ function extractDriverVersion(text) {
  * Fetch latest NVIDIA GPU driver updates from the GeForce news/blog page.
  */
 async function fetchNvidiaUpdates() {
+  let html;
   try {
-    let html;
-    try {
-      html = await httpsGetTextWithRetry(NVIDIA_BLOG_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
-    } catch {
-      // Fallback to NVIDIA drivers page if the blog page times out or returns 5xx
-      html = await httpsGetTextWithRetry(NVIDIA_DRIVERS_URL, { timeout: DRIVER_FETCH_TIMEOUT_MS });
-    }
-    const source = SPECIAL_TRACKED_SOURCES.nvidia;
-
-    // Look for driver-related articles in the blog listing
-    const driverPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gis;
-    const candidates = [];
-    const seen = new Set();
-    let match;
-
-    while ((match = driverPattern.exec(html)) !== null) {
-      const href = decodeEntities(match[1]);
-      const text = sanitizeText(match[2]);
-      const combined = `${href} ${text}`.toLowerCase();
-
-      if (!href || seen.has(href)) continue;
-      if (!/driver|geforce|game\s*ready|hotfix|studio/i.test(combined)) continue;
-      if (/\/zh-tw\//i.test(href)) continue;
-
-      const resolvedUrl = resolveAbsoluteUrl(NVIDIA_BLOG_URL, href);
-      if (!resolvedUrl) continue;
-
-      seen.add(href);
-      candidates.push({
-        url: resolvedUrl,
-        title: text.trim().slice(0, 200),
-        score: 0,
-      });
-    }
-
-    // Also look for version patterns in page text
-    const versionBlocks =
-      html.match(/(?:GeForce|Game Ready|Studio)\s+Driver\s+v?(\d+\.\d+)/gi) || [];
-    const latestVersion = extractDriverVersion(versionBlocks[0]) || null;
-
-    // Prefer article links with driver content
-    let bestCandidate = null;
-    const articleUrl = extractPreferredArticleUrl(html, NVIDIA_BLOG_URL, {
-      hrefPatterns: [/\/geforce\/news\//i, /driver/i, /game-ready/i, /hotfix/i, /studio/i],
-      textPatterns: [/driver/i, /game.ready/i, /hotfix/i, /geforce/i],
-      excludePatterns: [/forum|account|support|privacy|terms|download\/center/i],
+    // nvidia.com sits behind Akamai, which 503s the self-identifying bot UA.
+    // A browser profile gets the normal page (same as the AMD fetcher).
+    html = await httpsGetTextWithRetry(NVIDIA_BLOG_URL, {
+      timeout: DRIVER_FETCH_TIMEOUT_MS,
+      headers: BROWSER_REQUEST_HEADERS,
     });
-
-    if (articleUrl && articleUrl !== NVIDIA_BLOG_URL) {
-      bestCandidate = { url: articleUrl, title: '' };
-    } else if (candidates.length > 0) {
-      bestCandidate = candidates[0];
-    }
-
-    const title =
-      bestCandidate?.title ||
-      (latestVersion
-        ? `NVIDIA GeForce Driver ${latestVersion} Available`
-        : 'NVIDIA GeForce Driver Update');
-    const publishedAt =
-      extractMetaContent(html, 'article:published_time') ||
-      extractMetaContent(html, 'og:updated_time') ||
-      null;
-
-    return [
-      {
-        key: buildProviderUpdateKey('nvidia', {
-          url: bestCandidate?.url || NVIDIA_BLOG_URL,
-          title,
-          date: publishedAt,
-        }),
-        provider: 'nvidia',
-        providerLabel: 'NVIDIA',
-        gameName: source.name,
-        title: truncate(title, 256),
-        summary: latestVersion
-          ? `NVIDIA GeForce Game Ready Driver version ${latestVersion} is now available. Check the release notes for supported GPUs and fixes.`
-          : 'A new NVIDIA GeForce driver update is available. Check the release notes for supported GPUs and fixes.',
-        sections: latestVersion
-          ? [{ title: 'Driver Info', items: [`Version: ${latestVersion}`] }]
-          : [],
-        version: latestVersion,
-        url: bestCandidate?.url || NVIDIA_DRIVERS_URL,
-        date: publishedAt || Date.now(),
-        imageUrl: source.imageUrl,
-        tinyImage: source.tinyImage,
-        color: source.color,
-        storeUrl: NVIDIA_DRIVERS_URL,
-      },
-    ];
-  } catch (error) {
-    console.error('Error fetching NVIDIA driver updates:', error.message || error);
-    throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
+  } catch {
+    // Fallback to NVIDIA drivers page if the blog page times out or returns 5xx
+    html = await httpsGetTextWithRetry(NVIDIA_DRIVERS_URL, {
+      timeout: DRIVER_FETCH_TIMEOUT_MS,
+      headers: BROWSER_REQUEST_HEADERS,
+    });
   }
+  const source = SPECIAL_TRACKED_SOURCES.nvidia;
+
+  // Look for driver-related articles in the blog listing
+  const driverPattern = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gis;
+  const candidates = [];
+  const seen = new Set();
+  let match;
+
+  while ((match = driverPattern.exec(html)) !== null) {
+    const href = decodeEntities(match[1]);
+    const text = sanitizeText(match[2]);
+    const combined = `${href} ${text}`.toLowerCase();
+
+    if (!href || seen.has(href)) continue;
+    if (!/driver|geforce|game\s*ready|hotfix|studio/i.test(combined)) continue;
+    if (/\/zh-tw\//i.test(href)) continue;
+
+    const resolvedUrl = resolveAbsoluteUrl(NVIDIA_BLOG_URL, href);
+    if (!resolvedUrl) continue;
+
+    seen.add(href);
+    candidates.push({
+      url: resolvedUrl,
+      title: text.trim().slice(0, 200),
+      score: 0,
+    });
+  }
+
+  // Also look for version patterns in page text
+  const versionBlocks = html.match(/(?:GeForce|Game Ready|Studio)\s+Driver\s+v?(\d+\.\d+)/gi) || [];
+  const latestVersion = extractDriverVersion(versionBlocks[0]) || null;
+
+  // Prefer article links with driver content
+  let bestCandidate = null;
+  const articleUrl = extractPreferredArticleUrl(html, NVIDIA_BLOG_URL, {
+    hrefPatterns: [/\/geforce\/news\//i, /driver/i, /game-ready/i, /hotfix/i, /studio/i],
+    textPatterns: [/driver/i, /game.ready/i, /hotfix/i, /geforce/i],
+    excludePatterns: [/forum|account|support|privacy|terms|download\/center/i],
+  });
+
+  if (articleUrl && articleUrl !== NVIDIA_BLOG_URL) {
+    bestCandidate = { url: articleUrl, title: '' };
+  } else if (candidates.length > 0) {
+    bestCandidate = candidates[0];
+  }
+
+  const title =
+    bestCandidate?.title ||
+    (latestVersion
+      ? `NVIDIA GeForce Driver ${latestVersion} Available`
+      : 'NVIDIA GeForce Driver Update');
+  const publishedAt =
+    extractMetaContent(html, 'article:published_time') ||
+    extractMetaContent(html, 'og:updated_time') ||
+    null;
+
+  return [
+    {
+      key: buildProviderUpdateKey('nvidia', {
+        url: bestCandidate?.url || NVIDIA_BLOG_URL,
+        title,
+        date: publishedAt,
+      }),
+      provider: 'nvidia',
+      providerLabel: 'NVIDIA',
+      gameName: source.name,
+      title: truncate(title, 256),
+      summary: latestVersion
+        ? `NVIDIA GeForce Game Ready Driver version ${latestVersion} is now available. Check the release notes for supported GPUs and fixes.`
+        : 'A new NVIDIA GeForce driver update is available. Check the release notes for supported GPUs and fixes.',
+      sections: latestVersion
+        ? [{ title: 'Driver Info', items: [`Version: ${latestVersion}`] }]
+        : [],
+      version: latestVersion,
+      url: bestCandidate?.url || NVIDIA_DRIVERS_URL,
+      date: publishedAt || Date.now(),
+      imageUrl: source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
+      storeUrl: NVIDIA_DRIVERS_URL,
+    },
+  ];
 }
 
 /**
  * Fetch latest AMD GPU driver updates from the AMD drivers page.
  */
 async function fetchAmdUpdates() {
+  const source = SPECIAL_TRACKED_SOURCES.amd;
+  let html = null;
+
+  // AMD's release-notes hub is a JS search app and the legacy RN-RAD-WIN.html
+  // landing page 404s, but the driver download page still lists the current
+  // Adrenalin build in its installer links.
   try {
-    const source = SPECIAL_TRACKED_SOURCES.amd;
-    let html = null;
-
-    // AMD's release-notes hub is a JS search app and the legacy RN-RAD-WIN.html
-    // landing page 404s, but the driver download page still lists the current
-    // Adrenalin build in its installer links.
-    try {
-      html = await httpsGetTextWithRetry(AMD_DRIVERS_URL, {
-        timeout: DRIVER_FETCH_TIMEOUT_MS,
-        headers: BROWSER_REQUEST_HEADERS,
-      });
-    } catch (error) {
-      console.error('AMD driver download page unavailable:', error.message || error);
-    }
-
-    if (!html) {
-      html = await httpsGetTextWithRetry(AMD_RELEASE_NOTES_URL, {
-        timeout: DRIVER_FETCH_TIMEOUT_MS,
-        headers: BROWSER_REQUEST_HEADERS,
-      });
-    }
-
-    const filenameMatch = html.match(
-      /adrenalin(?:-edition)?(?:-pro)?-(?:whql-)?(\d{2}\.\d{1,2}\.\d{1,2})/i
-    );
-    const inlineMatch = html.match(/(?:Adrenalin|Radeon)[^<]{0,40}?(\d{2}\.\d{1,2}\.\d{1,2})\b/i);
-    const version = filenameMatch?.[1] || inlineMatch?.[1] || extractDriverVersion(html) || null;
-
-    const changelogUrl = version
-      ? `${AMD_RELEASE_NOTE_PREFIX}${version.replace(/\./g, '-')}.html`
-      : AMD_RELEASE_NOTES_URL;
-
-    const title = version
-      ? `AMD Software: Adrenalin Edition ${version}`
-      : extractMetaContent(html, 'og:title') || 'AMD Radeon Driver Update';
-    const summary = truncate(
-      extractMetaContent(html, 'og:description') ||
-        (version
-          ? `AMD Software: Adrenalin Edition version ${version} is now available. This update includes optimizations, bug fixes, and support for the latest titles.`
-          : 'A new AMD Radeon driver update is available. Check the release notes for supported hardware and fixes.'),
-      280
-    );
-    const publishedAt =
-      extractMetaContent(html, 'article:published_time') ||
-      extractMetaContent(html, 'og:updated_time') ||
-      null;
-
-    return [
-      {
-        key: buildProviderUpdateKey('amd', { url: changelogUrl, title, date: publishedAt }),
-        provider: 'amd',
-        providerLabel: 'AMD',
-        gameName: source.name,
-        title: truncate(title, 256),
-        summary,
-        sections: version
-          ? [
-              {
-                title: 'Driver Info',
-                items: [`Version: ${version}`, 'AMD Software: Adrenalin Edition'],
-              },
-            ]
-          : [],
-        version,
-        url: changelogUrl,
-        date: publishedAt || Date.now(),
-        imageUrl: extractMetaContent(html, 'og:image') || source.imageUrl,
-        tinyImage: source.tinyImage,
-        color: source.color,
-        storeUrl: AMD_DRIVERS_URL,
-      },
-    ];
+    html = await httpsGetTextWithRetry(AMD_DRIVERS_URL, {
+      timeout: DRIVER_FETCH_TIMEOUT_MS,
+      headers: BROWSER_REQUEST_HEADERS,
+    });
   } catch (error) {
-    console.error('Error fetching AMD driver updates:', error.message || error);
-    throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
+    console.error('AMD driver download page unavailable:', error.message || error);
   }
+
+  if (!html) {
+    html = await httpsGetTextWithRetry(AMD_RELEASE_NOTES_URL, {
+      timeout: DRIVER_FETCH_TIMEOUT_MS,
+      headers: BROWSER_REQUEST_HEADERS,
+    });
+  }
+
+  const filenameMatch = html.match(
+    /adrenalin(?:-edition)?(?:-pro)?-(?:whql-)?(\d{2}\.\d{1,2}\.\d{1,2})/i
+  );
+  const inlineMatch = html.match(/(?:Adrenalin|Radeon)[^<]{0,40}?(\d{2}\.\d{1,2}\.\d{1,2})\b/i);
+  const version = filenameMatch?.[1] || inlineMatch?.[1] || extractDriverVersion(html) || null;
+
+  const changelogUrl = version
+    ? `${AMD_RELEASE_NOTE_PREFIX}${version.replace(/\./g, '-')}.html`
+    : AMD_RELEASE_NOTES_URL;
+
+  const title = version
+    ? `AMD Software: Adrenalin Edition ${version}`
+    : extractMetaContent(html, 'og:title') || 'AMD Radeon Driver Update';
+  const summary = truncate(
+    extractMetaContent(html, 'og:description') ||
+      (version
+        ? `AMD Software: Adrenalin Edition version ${version} is now available. This update includes optimizations, bug fixes, and support for the latest titles.`
+        : 'A new AMD Radeon driver update is available. Check the release notes for supported hardware and fixes.'),
+    280
+  );
+  const publishedAt =
+    extractMetaContent(html, 'article:published_time') ||
+    extractMetaContent(html, 'og:updated_time') ||
+    null;
+
+  return [
+    {
+      key: buildProviderUpdateKey('amd', { url: changelogUrl, title, date: publishedAt }),
+      provider: 'amd',
+      providerLabel: 'AMD',
+      gameName: source.name,
+      title: truncate(title, 256),
+      summary,
+      sections: version
+        ? [
+            {
+              title: 'Driver Info',
+              items: [`Version: ${version}`, 'AMD Software: Adrenalin Edition'],
+            },
+          ]
+        : [],
+      version,
+      url: changelogUrl,
+      date: publishedAt || Date.now(),
+      imageUrl: extractMetaContent(html, 'og:image') || source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
+      storeUrl: AMD_DRIVERS_URL,
+    },
+  ];
 }
 
 /**
  * Fetch latest Intel GPU driver updates from the Intel newsroom page.
  */
 async function fetchIntelUpdates() {
+  const source = SPECIAL_TRACKED_SOURCES.intel;
+  let html;
+
+  // The newsroom page carries corporate news, not graphics drivers; the Arc /
+  // Iris Xe download page always lists the current driver build.
   try {
-    const source = SPECIAL_TRACKED_SOURCES.intel;
-    let html = null;
-
-    // The newsroom page carries corporate news, not graphics drivers; the Arc /
-    // Iris Xe download page always lists the current driver build.
-    try {
-      html = await httpsGetText(INTEL_DRIVERS_URL);
-    } catch (error) {
-      console.error('Intel driver download page unavailable:', error.message || error);
-      html = await httpsGetText(INTEL_NEWS_URL);
-    }
-
-    const versionMatches = String(html).match(/\b\d{2,4}\.\d{1,4}\.\d{1,5}\.\d{1,5}\b/g) || [];
-    const version =
-      versionMatches
-        .map((value) => ({
-          value,
-          score: value.split('.').reduce((acc, part) => acc * 10000 + Number(part), 0),
-        }))
-        .sort((left, right) => right.score - left.score)[0]?.value || null;
-
-    const title = version
-      ? `Intel Arc & Iris Xe Graphics Driver ${version}`
-      : extractMetaContent(html, 'og:title') || 'Intel GPU Driver Update';
-    const summary = truncate(
-      extractMetaContent(html, 'description') ||
-        extractMetaContent(html, 'og:description') ||
-        (version
-          ? `Intel Graphics Driver version ${version} is now available with performance optimizations and bug fixes for Intel Arc and Intel Iris Xe GPUs.`
-          : 'A new Intel GPU driver update is available. Check the release notes for supported hardware and game optimizations.'),
-      280
-    );
-    const publishedAt =
-      extractMetaContent(html, 'article:published_time') ||
-      extractMetaContent(html, 'og:updated_time') ||
-      null;
-
-    return [
-      {
-        key: buildProviderUpdateKey('intel', {
-          url: INTEL_DRIVERS_URL,
-          title,
-          date: publishedAt,
-        }),
-        provider: 'intel',
-        providerLabel: 'Intel',
-        gameName: source.name,
-        title: truncate(title, 256),
-        summary,
-        sections: version
-          ? [
-              {
-                title: 'Driver Info',
-                items: [`Version: ${version}`, 'Intel Arc / Intel Iris Xe Graphics'],
-              },
-            ]
-          : [],
-        version,
-        url: INTEL_DRIVERS_URL,
-        date: publishedAt || Date.now(),
-        imageUrl: source.imageUrl,
-        tinyImage: source.tinyImage,
-        color: source.color,
-        storeUrl: INTEL_DRIVERS_URL,
-      },
-    ];
+    html = await httpsGetText(INTEL_DRIVERS_URL);
   } catch (error) {
-    console.error('Error fetching Intel driver updates:', error.message || error);
-    throw error; // Re-throw so circuit breaker in fetchUpdatesForGame can set cooldown
+    console.error('Intel driver download page unavailable:', error.message || error);
+    html = await httpsGetText(INTEL_NEWS_URL);
   }
+
+  const versionMatches = String(html).match(/\b\d{2,4}\.\d{1,4}\.\d{1,5}\.\d{1,5}\b/g) || [];
+  const version =
+    versionMatches
+      .map((value) => ({
+        value,
+        score: value.split('.').reduce((acc, part) => acc * 10000 + Number(part), 0),
+      }))
+      .sort((left, right) => right.score - left.score)[0]?.value || null;
+
+  const title = version
+    ? `Intel Arc & Iris Xe Graphics Driver ${version}`
+    : extractMetaContent(html, 'og:title') || 'Intel GPU Driver Update';
+  const summary = truncate(
+    extractMetaContent(html, 'description') ||
+      extractMetaContent(html, 'og:description') ||
+      (version
+        ? `Intel Graphics Driver version ${version} is now available with performance optimizations and bug fixes for Intel Arc and Intel Iris Xe GPUs.`
+        : 'A new Intel GPU driver update is available. Check the release notes for supported hardware and game optimizations.'),
+    280
+  );
+  const publishedAt =
+    extractMetaContent(html, 'article:published_time') ||
+    extractMetaContent(html, 'og:updated_time') ||
+    null;
+
+  return [
+    {
+      key: buildProviderUpdateKey('intel', {
+        url: INTEL_DRIVERS_URL,
+        title,
+        date: publishedAt,
+      }),
+      provider: 'intel',
+      providerLabel: 'Intel',
+      gameName: source.name,
+      title: truncate(title, 256),
+      summary,
+      sections: version
+        ? [
+            {
+              title: 'Driver Info',
+              items: [`Version: ${version}`, 'Intel Arc / Intel Iris Xe Graphics'],
+            },
+          ]
+        : [],
+      version,
+      url: INTEL_DRIVERS_URL,
+      date: publishedAt || Date.now(),
+      imageUrl: source.imageUrl,
+      tinyImage: source.tinyImage,
+      color: source.color,
+      storeUrl: INTEL_DRIVERS_URL,
+    },
+  ];
 }
 
 /**
@@ -1993,47 +2061,66 @@ class SteamGameUpdatesManager {
 
   /**
    * Fetch updates for any tracked game using the provider lookup table.
+   *
+   * Every source goes through the health tracker: a failure records a backoff
+   * and logs one line, then the source is skipped until the backoff expires.
    */
   async fetchUpdatesForGame(game) {
     if (!game) return [];
 
+    const sourceKey = buildSourceKey(game);
     const fetcher = SPECIAL_PROVIDER_FETCHERS[game.provider];
+
     if (fetcher) {
-      const providerKey = game.provider || game.sourceId;
-      const lastFail = providerFailCooldowns.get(providerKey) || 0;
-      if (lastFail > 0 && Date.now() - lastFail < PROVIDER_FAIL_COOLDOWN_MS) {
-        // Provider is in cooldown due to persistent failures; skip silently
-        return [];
-      }
-
-      // Deduplicate concurrent fetches for the same provider
-      if (providerOngoingFetches.has(providerKey)) {
-        return providerOngoingFetches.get(providerKey);
-      }
-
-      const fetchPromise = (async () => {
-        try {
-          const result = await fetcher();
-          providerFailCooldowns.delete(providerKey);
-          return result;
-        } catch (error) {
-          providerFailCooldowns.set(providerKey, Date.now());
-          throw error;
-        } finally {
-          providerOngoingFetches.delete(providerKey);
-        }
-      })();
-
-      providerOngoingFetches.set(providerKey, fetchPromise);
-      return fetchPromise;
+      return this.runTrackedFetch(sourceKey, fetcher);
     }
 
     // Steam games with known appId in SPECIAL_TRACKED_SOURCES (cs2, dota2, etc.)
     if (game.appId) {
-      return this.fetchNewsForApp(game.appId, game);
+      return this.runTrackedFetch(sourceKey, () => this.fetchNewsForApp(game.appId, game));
     }
 
     return [];
+  }
+
+  /**
+   * Run a provider fetch with failure backoff and concurrent-call dedupe.
+   * Returns [] while the source is cooling down after a failure.
+   */
+  async runTrackedFetch(sourceKey, fetcher) {
+    if (!sourceKey || typeof fetcher !== 'function') return [];
+    if (isProviderCoolingDown(sourceKey)) return [];
+
+    if (providerOngoingFetches.has(sourceKey)) {
+      return providerOngoingFetches.get(sourceKey);
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        const result = await fetcher();
+        markProviderSuccess(sourceKey);
+        return result;
+      } catch (error) {
+        markProviderFailure(sourceKey, error);
+        throw error;
+      } finally {
+        providerOngoingFetches.delete(sourceKey);
+      }
+    })();
+
+    providerOngoingFetches.set(sourceKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  /** Health of every source that failed at least once (for status output). */
+  getProviderHealth() {
+    return getProviderHealthSnapshot();
+  }
+
+  /** Clear all backoff state (manual reset / tests). */
+  resetProviderHealth() {
+    providerHealth.clear();
+    providerOngoingFetches.clear();
   }
 
   async resolveTrackedGames(rawGames) {
@@ -2239,6 +2326,39 @@ class SteamGameUpdatesManager {
     }, 18000);
   }
 
+  /**
+   * Poll output is deliberately quiet: individual failures are logged once by
+   * markProviderFailure, and this summary runs at most once per 6 hours.
+   */
+  logPollSummary(checkedCount, failedSources) {
+    if (checkedCount <= 0) return;
+
+    const now = Date.now();
+    if (now - (this.lastPollSummaryAt || 0) < POLL_SUMMARY_INTERVAL_MS) return;
+    this.lastPollSummaryAt = now;
+
+    const failing = getProviderHealthSnapshot().filter((source) => source.retryInMs > 0);
+    if (failing.length > 0) {
+      const names = failing
+        .slice(0, 5)
+        .map((source) => source.sourceKey)
+        .join(', ');
+      console.log(
+        `Game updates poll: checked ${checkedCount} source(s), ${failing.length} failing (${names}).`
+      );
+      return;
+    }
+
+    if (failedSources && failedSources.size > 0) {
+      console.log(
+        `Game updates poll: checked ${checkedCount} source(s), ${failedSources.size} failed this cycle.`
+      );
+      return;
+    }
+
+    console.log(`Game updates poll: checked ${checkedCount} source(s), all OK.`);
+  }
+
   async poll() {
     if (this.pollInFlight) return;
     this.pollInFlight = true;
@@ -2262,21 +2382,14 @@ class SteamGameUpdatesManager {
         try {
           const articles = await this.fetchUpdatesForGame(game);
           articleCache.set(sourceKey, articles);
-        } catch (error) {
+        } catch {
+          // markProviderFailure already logged this once; keep the poll loop quiet.
           failedSources.add(sourceKey);
-          console.error(
-            `Game update fetch failed for ${game.provider || sourceKey}:`,
-            error.message || error
-          );
           articleCache.set(sourceKey, []);
         }
       }
 
-      if (uniqueGames.size > 0) {
-        console.log(
-          `Game updates poll: checked ${uniqueGames.size} source(s), ${failedSources.size} failed.`
-        );
-      }
+      this.logPollSummary(uniqueGames.size, failedSources);
 
       for (const [guildId, config] of Object.entries(this.data.guilds)) {
         const trackedGames = Array.isArray(config?.trackedGames)
@@ -2351,4 +2464,12 @@ class SteamGameUpdatesManager {
   }
 }
 
-module.exports = new SteamGameUpdatesManager();
+const steamGameUpdatesManager = new SteamGameUpdatesManager();
+// Exposed for tests: backoff math and health tracking internals.
+steamGameUpdatesManager.computeProviderBackoffMs = computeProviderBackoffMs;
+steamGameUpdatesManager.isProviderCoolingDown = isProviderCoolingDown;
+steamGameUpdatesManager.markProviderFailure = markProviderFailure;
+steamGameUpdatesManager.markProviderSuccess = markProviderSuccess;
+steamGameUpdatesManager.getProviderHealthSnapshot = getProviderHealthSnapshot;
+
+module.exports = steamGameUpdatesManager;

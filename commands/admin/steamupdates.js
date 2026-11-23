@@ -66,6 +66,21 @@ module.exports = {
             value: `And ${trackedGames.length - 10} more tracked game sources.`,
           });
         }
+
+        const failingSources = steamGameUpdatesManager.getProviderHealth();
+        if (failingSources.length > 0) {
+          embed.addFields({
+            name: 'Failing sources',
+            value: failingSources
+              .slice(0, 5)
+              .map((source) => {
+                const retryIn = Math.max(1, Math.round(source.retryInMs / 60000));
+                const error = source.lastError ? ` — ${String(source.lastError).slice(0, 80)}` : '';
+                return `• **${source.sourceKey}** — ${source.fails} attempt(s), retry in ${retryIn}m${error}`;
+              })
+              .join('\n'),
+          });
+        }
       }
 
       return message.reply({ embeds: [embed] });
