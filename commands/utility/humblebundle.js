@@ -1,53 +1,144 @@
-const { EmbedBuilder } = require('discord.js');
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags,
+} = require('discord.js');
 const {
   getHumbleBundles,
-  formatRemaining,
-  fitFields,
+  buildBundleCard,
+  paginate,
   BUNDLE_TYPES,
 } = require('../../utils/bundles/humbleBundle');
 
-const MAX_FIELDS = 24;
+const PER_PAGE = 5;
+const COLLECTOR_MS = 5 * 60 * 1000;
 const SOON_MS = 24 * 60 * 60 * 1000;
 
-const TYPE_LABELS = {
-  games: 'Games',
-  books: 'Books & Comics',
-  software: 'Software',
+const TYPE_META = {
+  games: { label: 'Games', emoji: '🎮', color: 0xcc2929 },
+  books: { label: 'Books & Comics', emoji: '📚', color: 0x1f6feb },
+  software: { label: 'Software', emoji: '💻', color: 0x2ea043 },
+  all: { label: 'All bundles', emoji: '🎁', color: 0xcc2929 },
 };
 
-function truncate(value, max) {
-  const text = String(value || '');
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+function typeKey(types) {
+  return types.length === BUNDLE_TYPES.length ? 'all' : types[0] || 'games';
 }
 
-function describeBundle(bundle) {
-  const lines = [];
+function buildNavRow(state, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('hb:page:prev')
+      .setEmoji('◀️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(state.page <= 0),
+    new ButtonBuilder()
+      .setCustomId('hb:page:label')
+      .setLabel(`${state.page + 1} / ${totalPages}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('hb:page:next')
+      .setEmoji('▶️')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(state.page >= totalPages - 1),
+    new ButtonBuilder()
+      .setCustomId('hb:refresh')
+      .setEmoji('🔄')
+      .setLabel('Refresh')
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
 
-  if (bundle.endDate) {
-    const unix = Math.floor(bundle.endDate.getTime() / 1000);
-    lines.push(`⏳ Ends in **${formatRemaining(bundle.remainingMs)}** — <t:${unix}:R>`);
-    lines.push(`<t:${unix}:f>`);
-  } else {
-    lines.push('⏳ No end date announced');
+function buildTypeRow(activeKey) {
+  return new ActionRowBuilder().addComponents(
+    ...BUNDLE_TYPES.map((type) =>
+      new ButtonBuilder()
+        .setCustomId(`hb:type:${type}`)
+        .setLabel(TYPE_META[type].label)
+        .setEmoji(TYPE_META[type].emoji)
+        .setStyle(type === activeKey ? ButtonStyle.Primary : ButtonStyle.Secondary)
+    ),
+    new ButtonBuilder()
+      .setCustomId('hb:type:all')
+      .setLabel('All')
+      .setEmoji('🎁')
+      .setStyle(activeKey === 'all' ? ButtonStyle.Primary : ButtonStyle.Secondary)
+  );
+}
+
+function render(state) {
+  const activeKey = typeKey(state.types);
+  const meta = TYPE_META[activeKey];
+  const bundles = state.result?.bundles || [];
+  const pages = paginate(bundles, PER_PAGE);
+  const totalPages = pages.length;
+
+  state.page = Math.min(Math.max(0, state.page), totalPages - 1);
+
+  const pageItems = pages[state.page] || [];
+  const soon = bundles.filter(
+    (bundle) => typeof bundle.remainingMs === 'number' && bundle.remainingMs <= SOON_MS
+  );
+  const fetchedUnix = state.result
+    ? Math.floor(new Date(state.result.fetchedAt).getTime() / 1000)
+    : null;
+
+  const embed = new EmbedBuilder()
+    .setColor(meta.color)
+    .setAuthor({ name: 'Humble Bundle', iconURL: 'https://www.humblebundle.com/favicon.ico' })
+    .setTitle(`${meta.emoji} ${meta.label}`)
+    .setURL('https://www.humblebundle.com/bundles')
+    .setDescription(
+      `**${bundles.length}** active` +
+        (soon.length > 0 ? ` · ⏰ **${soon.length}** ending <24h` : '')
+    )
+    .setFooter({
+      text: `Page ${state.page + 1} of ${totalPages} · soonest first · cached 30 min · buttons expire in 5 min`,
+    })
+    .setTimestamp(state.result ? new Date(state.result.fetchedAt) : new Date());
+
+  if (pageItems[0]?.image) {
+    embed.setThumbnail(pageItems[0].image);
   }
 
-  if (bundle.headline) {
-    lines.push(`> ${truncate(bundle.headline, 160)}`);
+  if (pageItems.length === 0) {
+    embed.setDescription('📭 No active bundles in this category right now.');
   }
 
-  if (bundle.value) {
-    const amount = Number(bundle.value.amount);
-    lines.push(`💵 ${amount.toLocaleString('en-US')} ${bundle.value.currency} worth of content`);
+  for (let index = 0; index < pageItems.length; index += 1) {
+    embed.addFields(
+      buildBundleCard(pageItems[index], state.page * PER_PAGE + index, { soonMs: SOON_MS })
+    );
   }
 
-  lines.push(`[Open bundle](${bundle.url})`);
+  if (state.result?.failed?.length) {
+    embed.addFields({
+      name: '⚠️ Unavailable',
+      value: state.result.failed
+        .slice(0, 3)
+        .map((entry) => `• ${String(entry).slice(0, 90)}`)
+        .join('\n'),
+    });
+  }
 
-  return truncate(lines.join('\n'), 1024);
+  return {
+    embeds: [embed],
+    components: [buildNavRow(state, totalPages), buildTypeRow(activeKey)],
+  };
+}
+
+async function loadBundles(state, types, force = false) {
+  state.types = types;
+  state.result = await getHumbleBundles({ types, force });
+  return state.result;
 }
 
 module.exports = {
   name: 'humblebundle',
-  description: 'List active Humble Bundles and how long they stay available',
+  description: 'Browse active Humble Bundles with time left, one page at a time',
   usage:
     '!humblebundle [games|books|software|all] [refresh]\n' +
     'Examples: `!humblebundle`, `!humblebundle books`, `!humblebundle all refresh`',
@@ -71,91 +162,85 @@ module.exports = {
       );
     }
 
-    let statusMessage = null;
-    if (refresh) {
-      statusMessage = await message.reply('🔄 Refreshing Humble Bundle data…');
-    }
+    const state = { types, page: 0, result: null };
 
-    let result;
     try {
-      result = await getHumbleBundles({ types, force: refresh });
+      await loadBundles(state, types, refresh);
     } catch (error) {
-      const content = `❌ Could not load Humble Bundles: ${error.message || error}`;
-      return statusMessage ? statusMessage.edit(content) : message.reply(content);
+      return message.reply(`❌ Could not load Humble Bundles: ${error.message || error}`);
     }
 
-    if (result.bundles.length === 0) {
-      const content = '📭 No active Humble Bundles right now.';
-      return statusMessage ? statusMessage.edit(content) : message.reply(content);
-    }
-
-    const soon = result.bundles.filter(
-      (bundle) => typeof bundle.remainingMs === 'number' && bundle.remainingMs <= SOON_MS
-    );
-    const typeLabel = types.map((type) => TYPE_LABELS[type] || type).join(' + ');
-
-    const embed = new EmbedBuilder()
-      .setColor(0xcc2929)
-      .setTitle('🎁 Active Humble Bundles')
-      .setURL('https://www.humblebundle.com/bundles')
-      .setDescription(
-        `**${result.bundles.length}** active ${typeLabel.toLowerCase()} bundle(s)` +
-          (soon.length > 0
-            ? ` — ⏰ **${soon.length}** end${soon.length === 1 ? 's' : ''} within 24 hours`
-            : '') +
-          '\nSorted by the ones ending first.'
-      )
-      .setFooter({
-        text: `Fetched ${new Date(result.fetchedAt).toLocaleString('en-GB')} · cached up to 30 min`,
-      })
-      .setTimestamp(new Date(result.fetchedAt));
-
-    // Discord caps a whole embed at 6000 characters, so the "all" view degrades
-    // into a link instead of failing with a 400.
-    const { fields, remaining } = fitFields(result.bundles, {
-      maxFields: MAX_FIELDS,
-      charBudget: 4700,
-      baseChars:
-        String(embed.data.description || '').length +
-        String(embed.data.title || '').length +
-        String(embed.data.footer?.text || '').length,
-      format: (bundle) => {
-        const endingSoon =
-          typeof bundle.remainingMs === 'number' &&
-          bundle.remainingMs <= SOON_MS &&
-          bundle.remainingMs > 0;
-
-        return {
-          name: `${endingSoon ? '⏰' : '🎁'} ${truncate(bundle.title, 240)}`,
-          value: describeBundle(bundle),
-        };
-      },
+    const reply = await message.reply(render(state));
+    const collector = reply.createMessageComponentCollector({
+      filter: (interaction) => interaction.customId.startsWith('hb:'),
+      time: COLLECTOR_MS,
     });
 
-    if (fields.length > 0) embed.addFields(fields);
+    collector.on('collect', async (interaction) => {
+      if (interaction.user.id !== message.author.id) {
+        return interaction.reply({
+          content: '❌ These buttons belong to whoever ran the command.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
 
-    if (remaining > 0) {
-      embed.addFields({
-        name: 'More bundles',
-        value: `And **${remaining}** more — see <https://www.humblebundle.com/bundles>.`,
-      });
-    }
+      const [, action, value] = interaction.customId.split(':');
 
-    if (result.failed.length > 0) {
-      embed.addFields({
-        name: 'Unavailable',
-        value: truncate(
-          result.failed
-            .slice(0, 5)
-            .map((entry) => `• ${entry}`)
-            .join('\n'),
-          1024
-        ),
-      });
-    }
+      try {
+        if (action === 'page') {
+          if (value === 'prev') state.page -= 1;
+          if (value === 'next') state.page += 1;
 
-    return statusMessage
-      ? statusMessage.edit({ content: null, embeds: [embed] })
-      : message.reply({ embeds: [embed] });
+          return interaction.update(render(state));
+        }
+
+        if (action === 'type') {
+          await interaction.deferUpdate();
+
+          const nextTypes = value === 'all' ? [...BUNDLE_TYPES] : [value];
+          try {
+            await loadBundles(state, nextTypes, false);
+            state.page = 0;
+          } catch (error) {
+            return interaction.followUp({
+              content: `❌ Could not load ${value} bundles: ${error.message || error}`,
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+
+          return interaction.editReply(render(state));
+        }
+
+        if (action === 'refresh') {
+          await interaction.deferUpdate();
+          try {
+            await loadBundles(state, state.types, true);
+            state.page = 0;
+          } catch (error) {
+            return interaction.followUp({
+              content: `❌ Refresh failed: ${error.message || error}`,
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+
+          return interaction.editReply(render(state));
+        }
+      } catch (error) {
+        console.error('[humblebundle] interaction failed:', error.message || error);
+      }
+
+      return undefined;
+    });
+
+    collector.on('end', async () => {
+      const final = render(state);
+      final.components.forEach((row) =>
+        row.components.forEach((button) => button.setDisabled(true))
+      );
+
+      await reply.edit(final).catch(() => {});
+    });
+
+    return reply;
   },
 };

@@ -49,14 +49,16 @@ Not every feature is available in both styles, but most major systems support on
 
 ## Deals and Bundles
 
-| Command                                  | Purpose                                            |
-| ---------------------------------------- | -------------------------------------------------- |
-| `!humblebundle [games\|books\|software]` | Active Humble Bundles, sorted by how soon they end |
-| `!humblebundle all`                      | Every active bundle type at once                   |
-| `!humblebundle refresh`                  | Bypass the 30-minute cache and re-fetch            |
+| Command                                  | Purpose                                                |
+| ---------------------------------------- | ------------------------------------------------------ |
+| `!humblebundle [games\|books\|software]` | Active Humble Bundles, paginated, soonest ending first |
+| `!humblebundle all`                      | Every active bundle type at once                       |
+| `!humblebundle refresh`                  | Bypass the 30-minute cache and re-fetch                |
 
-Aliases: `!humble`, `!hb`, `!bundles`. Each entry shows the exact end date, the
-relative time left, the bundle headline, its listed value and a direct link.
+Aliases: `!humble`, `!hb`, `!bundles`. Five bundles per page with ◀️/▶️ buttons, a
+Games/Books/Software/All switcher and a refresh button; each card shows a
+remaining-time bar, the relative end date, the headline, listed value and a
+direct link.
 
 ## Moderation Commands
 

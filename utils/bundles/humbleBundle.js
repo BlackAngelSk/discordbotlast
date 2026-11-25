@@ -119,6 +119,83 @@ function extractBundleSlugs(html, type = DEFAULT_TYPE) {
   return [...slugs];
 }
 
+function truncate(value, max) {
+  const text = String(value || '');
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/** `▰▰▰▱▱▱▱▱` — how much of the sale window is left. */
+function progressBar(fraction, segments = 8) {
+  const safe = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+
+  // Keep one segment lit while any time is left: a bundle in its last hours on a
+  // two-week sale would otherwise round down to a fully empty bar.
+  const filled = safe > 0 ? Math.max(1, Math.round(safe * segments)) : 0;
+
+  return '█'.repeat(filled) + '░'.repeat(Math.max(0, segments - filled));
+}
+
+/**
+ * Time left as a share of a one-week horizon, so the bar reads "how much longer
+ * is this up" instead of shrinking to nothing on a long-running bundle.
+ */
+function timeFraction(bundle, horizonMs = 7 * 24 * 60 * 60 * 1000) {
+  if (!bundle || typeof bundle.remainingMs !== 'number' || bundle.remainingMs <= 0) return 0;
+
+  return Math.min(1, bundle.remainingMs / horizonMs);
+}
+
+/** Split a list into pages of `perPage` (always returns at least one page). */
+function paginate(items, perPage = 5) {
+  const size = Math.max(1, Math.floor(perPage));
+  const list = Array.isArray(items) ? items : [];
+  const pages = [];
+
+  for (let index = 0; index < list.length; index += size) {
+    pages.push(list.slice(index, index + size));
+  }
+
+  return pages.length > 0 ? pages : [[]];
+}
+
+/**
+ * One embed field for a bundle: index, name, remaining-time bar, headline,
+ * value and a link.
+ */
+function buildBundleCard(bundle, index, { soonMs = 24 * 60 * 60 * 1000 } = {}) {
+  const endingSoon =
+    typeof bundle.remainingMs === 'number' &&
+    bundle.remainingMs > 0 &&
+    bundle.remainingMs <= soonMs;
+
+  const name = `${index + 1}. ${endingSoon ? '⏰ ' : ''}${truncate(bundle.title, 200)}`;
+  const lines = [];
+
+  if (bundle.endDate) {
+    const unix = Math.floor(bundle.endDate.getTime() / 1000);
+    lines.push(
+      `${progressBar(timeFraction(bundle))} **${formatRemaining(bundle.remainingMs)}** left · ends <t:${unix}:d>`
+    );
+  } else {
+    lines.push('████████ **No end date announced**');
+  }
+
+  if (bundle.headline) {
+    lines.push(`*${truncate(bundle.headline, 140)}*`);
+  }
+
+  const meta = [];
+  if (bundle.value) {
+    meta.push(
+      `💵 ${Number(bundle.value.amount).toLocaleString('en-US')} ${bundle.value.currency} worth`
+    );
+  }
+  meta.push(`[Open bundle](${bundle.url})`);
+  lines.push(meta.join(' · '));
+
+  return { name, value: truncate(lines.join('\n'), 1024) };
+}
+
 function formatRemaining(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return 'ended';
 
@@ -313,6 +390,11 @@ module.exports = {
   extractBundlePage,
   extractBundleSlugs,
   formatRemaining,
+  progressBar,
+  timeFraction,
+  paginate,
+  buildBundleCard,
+  truncate,
   normalizeBundle,
   sortBundles,
   getHumbleBundles,

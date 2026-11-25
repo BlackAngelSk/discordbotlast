@@ -202,6 +202,74 @@ test('fitFields respects the field cap and the character budget', () => {
   assert.strictEqual(budgeted.remaining, 40 - budgeted.fields.length);
 });
 
+test('progressBar fills proportionally and keeps a sliver when time is short', () => {
+  assert.strictEqual(hb.progressBar(0.5), '████░░░░');
+  assert.strictEqual(hb.progressBar(1), '████████');
+  assert.strictEqual(hb.progressBar(0), '░░░░░░░░');
+  assert.strictEqual(hb.progressBar(0.02), '█░░░░░░░', 'one segment stays lit');
+  assert.strictEqual(hb.progressBar(2), '████████', 'clamped to full');
+  assert.strictEqual(hb.progressBar(Number.NaN), '░░░░░░░░');
+});
+
+test('timeFraction measures the remaining time against a one-week horizon', () => {
+  assert.ok(Math.abs(hb.timeFraction({ remainingMs: 3.5 * 86400000 }) - 0.5) < 0.01);
+  assert.strictEqual(hb.timeFraction({ remainingMs: 30 * 86400000 }), 1, 'clamped to a full bar');
+  assert.strictEqual(hb.timeFraction({ remainingMs: -1 }), 0);
+  assert.strictEqual(hb.timeFraction({}), 0);
+});
+
+test('paginate splits into pages and always returns one page', () => {
+  const items = Array.from({ length: 12 }, (_, index) => index);
+
+  assert.deepStrictEqual(
+    hb.paginate(items, 5).map((page) => page.length),
+    [5, 5, 2]
+  );
+  assert.deepStrictEqual(hb.paginate([], 5), [[]]);
+  assert.strictEqual(hb.paginate(items, 0)[0].length, 1, 'perPage is clamped to at least 1');
+});
+
+test('buildBundleCard renders bar, headline, value and link', () => {
+  const card = hb.buildBundleCard(
+    {
+      title: 'Resident Evil: Biohazard Unleashed',
+      headline: 'Burst zombie skulls',
+      url: 'https://www.humblebundle.com/games/resident-evil',
+      endDate: new Date(Date.now() + 3 * 86400000),
+      startDate: new Date(Date.now() - 11 * 86400000),
+      remainingMs: 3 * 86400000,
+      value: { amount: 390, currency: 'USD' },
+    },
+    0
+  );
+
+  assert.ok(card.name.startsWith('1. Resident Evil'), card.name);
+  assert.ok(card.value.includes('**3d 0h** left'), card.value);
+  assert.ok(card.value.includes('ends <t:'), card.value);
+  assert.ok(card.value.includes('*Burst zombie skulls*'));
+  assert.ok(card.value.includes('💵 390 USD worth'));
+  assert.ok(card.value.includes('[Open bundle](https://www.humblebundle.com/games/resident-evil)'));
+});
+
+test('buildBundleCard flags bundles ending within 24h and ones without a date', () => {
+  const soon = hb.buildBundleCard(
+    {
+      title: 'Horror Trifectas',
+      url: 'https://x',
+      endDate: new Date(Date.now() + 3600000),
+      remainingMs: 3600000,
+    },
+    4
+  );
+  assert.ok(soon.name.startsWith('5. ⏰ Horror Trifectas'), soon.name);
+
+  const undated = hb.buildBundleCard(
+    { title: 'Evergreen', url: 'https://x', endDate: null, remainingMs: null },
+    0
+  );
+  assert.ok(undated.value.includes('No end date announced'), undated.value);
+});
+
 test('command exposes name, aliases and usage', () => {
   const command = require('../commands/utility/humblebundle');
 
