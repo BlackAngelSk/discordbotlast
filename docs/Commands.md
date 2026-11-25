@@ -47,6 +47,17 @@ Not every feature is available in both styles, but most major systems support on
 | `!poker ...`                                               | Use the multiplayer poker system |
 | `/gamestats [user]`                                        | Review game statistics           |
 
+## Deals and Bundles
+
+| Command                                  | Purpose                                            |
+| ---------------------------------------- | -------------------------------------------------- |
+| `!humblebundle [games\|books\|software]` | Active Humble Bundles, sorted by how soon they end |
+| `!humblebundle all`                      | Every active bundle type at once                   |
+| `!humblebundle refresh`                  | Bypass the 30-minute cache and re-fetch            |
+
+Aliases: `!humble`, `!hb`, `!bundles`. Each entry shows the exact end date, the
+relative time left, the bundle headline, its listed value and a direct link.
+
 ## Moderation Commands
 
 | Command                                              | Purpose                        |
