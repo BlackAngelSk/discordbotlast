@@ -270,6 +270,50 @@ test('buildBundleCard flags bundles ending within 24h and ones without a date', 
   assert.ok(undated.value.includes('No end date announced'), undated.value);
 });
 
+test('buildBundleEmbed renders exactly one bundle per embed', () => {
+  const bundle = {
+    slug: 'alpha',
+    title: 'Alpha Bundle',
+    url: 'https://www.humblebundle.com/games/alpha',
+    type: 'books',
+    headline: 'Read more',
+    image: 'https://hb.imgix.net/alpha.jpg',
+    endDate: new Date(Date.now() + 5 * 3600000),
+    remainingMs: 5 * 3600000,
+    value: { amount: 120, currency: 'USD' },
+  };
+
+  const embed = hb.buildBundleEmbed(bundle, { index: 2 }).data;
+
+  assert.strictEqual(embed.title, '3. ⏰ Alpha Bundle');
+  assert.strictEqual(embed.url, bundle.url);
+  assert.strictEqual(embed.color.toString(16), '1f6feb', 'books colour');
+  assert.strictEqual(embed.thumbnail.url, bundle.image);
+  assert.strictEqual(embed.fields, undefined, 'no fields — one bundle per embed');
+  assert.ok(embed.description.includes('**5h 0m** left'));
+  assert.ok(embed.description.includes('ends <t:'));
+  assert.ok(embed.description.includes('💵 120 USD worth'));
+  assert.ok(embed.description.includes('[Open bundle](https://www.humblebundle.com/games/alpha)'));
+});
+
+test('buildBundleEmbed supports a custom title and skips the thumbnail when missing', () => {
+  const embed = hb.buildBundleEmbed(
+    {
+      title: 'Beta',
+      url: 'https://x',
+      type: 'games',
+      remainingMs: null,
+      endDate: null,
+      image: null,
+    },
+    { titleOverride: '🎁 New games bundle: Beta' }
+  ).data;
+
+  assert.strictEqual(embed.title, '🎁 New games bundle: Beta');
+  assert.strictEqual(embed.thumbnail, undefined);
+  assert.ok(embed.description.includes('No end date announced'));
+});
+
 test('command exposes name, aliases and usage', () => {
   const command = require('../commands/utility/humblebundle');
 

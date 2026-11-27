@@ -8,13 +8,13 @@ const {
 } = require('discord.js');
 const {
   getHumbleBundles,
-  buildBundleCard,
+  buildBundleEmbed,
   paginate,
   BUNDLE_TYPES,
 } = require('../../utils/bundles/humbleBundle');
 const humbleBundleAlerts = require('../../utils/bundles/humbleBundleAlerts');
 
-const PER_PAGE = 5;
+const PER_PAGE = 3; // one embed per bundle, three per message
 const COLLECTOR_MS = 5 * 60 * 1000;
 const SOON_MS = 24 * 60 * 60 * 1000;
 
@@ -121,48 +121,46 @@ function render(state) {
     (bundle) => typeof bundle.remainingMs === 'number' && bundle.remainingMs <= SOON_MS
   );
 
-  const embed = new EmbedBuilder()
-    .setColor(meta.color)
-    .setAuthor({ name: 'Humble Bundle', iconURL: 'https://www.humblebundle.com/favicon.ico' })
-    .setTitle(`${meta.emoji} ${meta.label}`)
-    .setURL('https://www.humblebundle.com/bundles')
-    .setDescription(
-      `**${bundles.length}** active` +
-        (soon.length > 0 ? ` · ⏰ **${soon.length}** ending <24h` : '')
-    )
-    .setFooter({
-      text:
-        `Page ${state.page + 1} of ${totalPages} · soonest first · ` +
-        `${state.force ? 'refreshed now' : 'cached 30 min'} · buttons expire in 5 min`,
-    })
-    .setTimestamp(state.result ? new Date(state.result.fetchedAt) : new Date());
+  const header = [
+    `${meta.emoji} **${meta.label}**`,
+    `**${bundles.length}** active`,
+    soon.length > 0 ? `⏰ **${soon.length}** ending <24h` : null,
+    `page ${state.page + 1}/${totalPages}`,
+    state.force ? 'refreshed now' : 'cached 30 min',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
-  if (pageItems[0]?.image) {
-    embed.setThumbnail(pageItems[0].image);
-  }
+  const embeds = pageItems.map((bundle, index) =>
+    buildBundleEmbed(bundle, { index: state.page * PER_PAGE + index, soonMs: SOON_MS })
+  );
 
-  if (pageItems.length === 0) {
-    embed.setDescription('📭 No active bundles in this category right now.');
-  }
-
-  for (let index = 0; index < pageItems.length; index += 1) {
-    embed.addFields(
-      buildBundleCard(pageItems[index], state.page * PER_PAGE + index, { soonMs: SOON_MS })
+  if (embeds.length === 0) {
+    embeds.push(
+      new EmbedBuilder()
+        .setColor(meta.color)
+        .setDescription('📭 No active bundles in this category right now.')
     );
   }
 
+  embeds[embeds.length - 1].setFooter({
+    text: `Page ${state.page + 1} of ${totalPages} · soonest first · buttons expire in 5 min`,
+  });
+
   if (state.result?.failed?.length) {
-    embed.addFields({
-      name: '⚠️ Unavailable',
-      value: state.result.failed
-        .slice(0, 3)
-        .map((entry) => `• ${String(entry).slice(0, 90)}`)
-        .join('\n'),
-    });
+    embeds.push(
+      new EmbedBuilder().setColor(0xfee75c).setDescription(
+        `⚠️ Unavailable: ${state.result.failed
+          .slice(0, 3)
+          .map((entry) => String(entry).slice(0, 90))
+          .join(' · ')}`
+      )
+    );
   }
 
   return {
-    embeds: [embed],
+    content: header,
+    embeds,
     components: [buildNavRow(state, totalPages), buildTypeRow(activeKey)],
   };
 }

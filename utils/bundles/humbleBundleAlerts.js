@@ -15,7 +15,11 @@ const fs = require('fs').promises;
 const path = require('path');
 const { EmbedBuilder } = require('discord.js');
 const { fetchChannelSafe } = require('../core/discordFetch');
-const { getHumbleBundles, buildBundleCard, BUNDLE_TYPES } = require('./humbleBundle');
+const {
+  getHumbleBundles,
+  buildBundleEmbed: renderBundleEmbed,
+  BUNDLE_TYPES,
+} = require('./humbleBundle');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'humbleBundleAlerts.json');
 const POLL_INTERVAL = 30 * 60 * 1000;
@@ -27,12 +31,6 @@ const TYPE_LABELS = {
   games: 'Games',
   books: 'Books & Comics',
   software: 'Software',
-};
-
-const TYPE_COLORS = {
-  games: 0xcc2929,
-  books: 0x1f6feb,
-  software: 0x2ea043,
 };
 
 function sanitizeTypes(types) {
@@ -290,21 +288,17 @@ class HumbleBundleAlertsManager {
     return { fresh, ended };
   }
 
+  /** One embed for one newly-live bundle. */
   buildBundleEmbed(bundle) {
-    const card = buildBundleCard(bundle, 0);
-    const typeLabel = TYPE_LABELS[bundle.type] || 'Games';
+    const typeLabel = (TYPE_LABELS[bundle.type] || 'Games').toLowerCase();
 
-    const embed = new EmbedBuilder()
-      .setColor(TYPE_COLORS[bundle.type] || TYPE_COLORS.games)
-      .setAuthor({ name: 'Humble Bundle', iconURL: 'https://www.humblebundle.com/favicon.ico' })
-      .setTitle(`🎁 New ${typeLabel.toLowerCase()} bundle: ${bundle.title}`.slice(0, 256))
-      .setURL(bundle.url)
-      .setDescription(card.value)
-      .setTimestamp();
-
-    if (bundle.image) embed.setThumbnail(bundle.image);
-
-    return { embeds: [embed] };
+    return {
+      embeds: [
+        renderBundleEmbed(bundle, {
+          titleOverride: `🎁 New ${typeLabel} bundle: ${bundle.title}`,
+        }),
+      ],
+    };
   }
 
   /** Remove the announcement message we posted for a bundle that has ended. */

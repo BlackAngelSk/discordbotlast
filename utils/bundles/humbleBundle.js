@@ -14,10 +14,13 @@
  */
 'use strict';
 
+const { EmbedBuilder } = require('discord.js');
 const { httpsGetTextWithRetry, BROWSER_REQUEST_HEADERS } = require('../steam/steamUpdateUtils');
 
 const BASE_URL = 'https://www.humblebundle.com';
 const BUNDLE_TYPES = ['games', 'books', 'software'];
+const TYPE_COLORS = { games: 0xcc2929, books: 0x1f6feb, software: 0x2ea043 };
+const TYPE_LABELS = { games: 'Games', books: 'Books & Comics', software: 'Software' };
 const DEFAULT_TYPE = 'games';
 
 const REQUEST_TIMEOUT_MS = 25000;
@@ -197,6 +200,36 @@ function buildBundleCard(bundle, index, { soonMs = 24 * 60 * 60 * 1000 } = {}) {
   lines.push(meta.join(' · '));
 
   return { name, value: truncate(lines.join('\n'), 1024) };
+}
+
+/**
+ * One embed for one bundle — used by the browse command (one embed per bundle)
+ * and by the channel alerts.
+ *
+ * @param {object} bundle
+ * @param {{ index?: number|null, titleOverride?: string|null, soonMs?: number }} [options]
+ */
+function buildBundleEmbed(
+  bundle,
+  { index = null, titleOverride = null, soonMs = 24 * 60 * 60 * 1000 } = {}
+) {
+  const endingSoon =
+    typeof bundle.remainingMs === 'number' &&
+    bundle.remainingMs > 0 &&
+    bundle.remainingMs <= soonMs;
+
+  const heading = `${index === null ? '' : `${index + 1}. `}${endingSoon ? '⏰' : '🎁'} ${bundle.title}`;
+
+  const embed = new EmbedBuilder()
+    .setColor(TYPE_COLORS[bundle.type] || TYPE_COLORS.games)
+    .setTitle(truncate(titleOverride || heading, 256))
+    .setURL(bundle.url)
+    .setDescription(buildBundleCard(bundle, 0, { soonMs }).value)
+    .setTimestamp();
+
+  if (bundle.image) embed.setThumbnail(bundle.image);
+
+  return embed;
 }
 
 function formatRemaining(ms) {
@@ -405,6 +438,9 @@ module.exports = {
   timeFraction,
   paginate,
   buildBundleCard,
+  buildBundleEmbed,
+  TYPE_COLORS,
+  TYPE_LABELS,
   truncate,
   normalizeBundle,
   sortBundles,

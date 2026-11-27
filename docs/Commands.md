@@ -58,10 +58,10 @@ Not every feature is available in both styles, but most major systems support on
 | `!humblebundle status`                   | Show the alert channel, tracked bundles and next expiry |
 | `!humblebundle off`                      | Pause bundle alerts                                     |
 
-Aliases: `!humble`, `!hb`, `!bundles`. Five bundles per page with ◀️/▶️ buttons, a
-Games/Books/Software/All switcher and a refresh button; each card shows a
-remaining-time bar, the relative end date, the headline, listed value and a
-direct link. Admins (Manage Server) get freshly fetched data on every run;
+Aliases: `!humble`, `!hb`, `!bundles`. Three bundles per page with ◀️/▶️ buttons,
+a Games/Books/Software/All switcher and a refresh button. Every bundle gets its
+own embed with its artwork, a remaining-time bar, the end date, the headline,
+listed value and a direct link. Admins (Manage Server) get freshly fetched data on every run;
 everyone else is served the 30-minute cache.
 
 Alerts: `!humblebundle set #deals` points the bot at a channel. It checks every
