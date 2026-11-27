@@ -384,7 +384,7 @@ function getCategoryEmbed(prefix, category, accessContext) {
           },
           {
             name: '🆕 New Utility',
-            value: `\`${prefix}rank [@user]\` - Visual rank card with XP progress\n\`${prefix}achievements [@user]\` - View earned achievement badges\n\`${prefix}confess <message>\` - Post anonymous confession\n\`${prefix}report @user <reason>\` - Report a user to moderators\n\`${prefix}humblebundle [games|books|software]\` - Active Humble Bundles + time left`,
+            value: `\`${prefix}rank [@user]\` - Visual rank card with XP progress\n\`${prefix}achievements [@user]\` - View earned achievement badges\n\`${prefix}confess <message>\` - Post anonymous confession\n\`${prefix}report @user <reason>\` - Report a user to moderators\n\`${prefix}humblebundle [games|books|software]\` - Bundles + time left\n\`${prefix}humblebundle set #channel\` - Auto-post new/ended bundles`,
           },
           {
             name: '🌐 Other',

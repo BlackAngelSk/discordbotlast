@@ -142,6 +142,16 @@ module.exports = {
 
     setTimeout(async () => {
       try {
+        const humbleBundleAlerts = require('../utils/humbleBundleAlerts');
+        await humbleBundleAlerts.init(readyClient);
+        console.log('✅ Humble Bundle alert polling started');
+      } catch (error) {
+        console.error('Error starting Humble Bundle alerts:', error);
+      }
+    }, 21000);
+
+    setTimeout(async () => {
+      try {
         const statChannelsManager = require('../utils/statChannelsManager');
         await statChannelsManager.startUpdater(readyClient);
         console.log('✅ Stat channel updater started');

@@ -49,17 +49,27 @@ Not every feature is available in both styles, but most major systems support on
 
 ## Deals and Bundles
 
-| Command                                  | Purpose                                                |
-| ---------------------------------------- | ------------------------------------------------------ |
-| `!humblebundle [games\|books\|software]` | Active Humble Bundles, paginated, soonest ending first |
-| `!humblebundle all`                      | Every active bundle type at once                       |
-| `!humblebundle refresh`                  | Bypass the 30-minute cache and re-fetch                |
+| Command                                  | Purpose                                                 |
+| ---------------------------------------- | ------------------------------------------------------- |
+| `!humblebundle [games\|books\|software]` | Active Humble Bundles, paginated, soonest ending first  |
+| `!humblebundle all`                      | Every active bundle type at once                        |
+| `!humblebundle refresh`                  | Bypass the 30-minute cache and re-fetch                 |
+| `!humblebundle set #channel [type]`      | Post new/ended bundles in that channel automatically    |
+| `!humblebundle status`                   | Show the alert channel, tracked bundles and next expiry |
+| `!humblebundle off`                      | Pause bundle alerts                                     |
 
 Aliases: `!humble`, `!hb`, `!bundles`. Five bundles per page with ◀️/▶️ buttons, a
 Games/Books/Software/All switcher and a refresh button; each card shows a
 remaining-time bar, the relative end date, the headline, listed value and a
 direct link. Admins (Manage Server) get freshly fetched data on every run;
 everyone else is served the 30-minute cache.
+
+Alerts: `!humblebundle set #deals` points the bot at a channel. It checks every
+30 minutes, posts one embed per new bundle, and deletes that message when the
+bundle ends (falling back to a "bundle ended" notice if it lacks Manage
+Messages or the message is already gone). Existing bundles are seeded silently
+on setup, so enabling it never dumps the whole catalogue into the channel.
+State lives in `data/humbleBundleAlerts.json`.
 
 ## Moderation Commands
 
