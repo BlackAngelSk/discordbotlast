@@ -24,6 +24,9 @@ const REQUEST_TIMEOUT_MS = 25000;
 const LISTING_TTL_MS = 30 * 60 * 1000;
 const DETAIL_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_CONCURRENCY = 4;
+// Even an explicit refresh waits this long, so a double-clicked button or two
+// admins running the command at once cannot hammer humblebundle.com.
+const MIN_FORCE_INTERVAL_MS = 60 * 1000;
 
 const listingCache = new Map(); // type -> { at, slugs }
 const detailCache = new Map(); // slug -> { at, page }
@@ -262,7 +265,11 @@ async function mapWithConcurrency(items, limit, worker) {
 
 async function fetchListing(type, { force = false } = {}) {
   const cached = listingCache.get(type);
-  if (!force && cached && Date.now() - cached.at < LISTING_TTL_MS) {
+  const age = cached ? Date.now() - cached.at : Infinity;
+  const usableCache = Boolean(cached) && age < LISTING_TTL_MS;
+  const forceAllowed = force && age >= MIN_FORCE_INTERVAL_MS;
+
+  if (usableCache && !forceAllowed) {
     return { slugs: cached.slugs, cached: true };
   }
 
@@ -279,7 +286,11 @@ async function fetchListing(type, { force = false } = {}) {
 
 async function fetchDetail(slug, type, { force = false } = {}) {
   const cached = detailCache.get(slug);
-  if (!force && cached && Date.now() - cached.at < DETAIL_TTL_MS) {
+  const age = cached ? Date.now() - cached.at : Infinity;
+  const usableCache = Boolean(cached) && age < DETAIL_TTL_MS;
+  const forceAllowed = force && age >= MIN_FORCE_INTERVAL_MS;
+
+  if (usableCache && !forceAllowed) {
     return cached.page;
   }
 
@@ -398,6 +409,7 @@ module.exports = {
   normalizeBundle,
   sortBundles,
   getHumbleBundles,
+  MIN_FORCE_INTERVAL_MS,
   fitFields,
   clearHumbleCache,
 };

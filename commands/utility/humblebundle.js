@@ -4,6 +4,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  PermissionFlagsBits,
 } = require('discord.js');
 const {
   getHumbleBundles,
@@ -22,6 +23,22 @@ const TYPE_META = {
   software: { label: 'Software', emoji: '💻', color: 0x2ea043 },
   all: { label: 'All bundles', emoji: '🎁', color: 0xcc2929 },
 };
+
+/**
+ * Admins get fresh data every time they run the command; everyone else is served
+ * the cache. An explicit `refresh` argument forces it for anyone.
+ */
+function shouldForceRefresh(message, explicitRefresh = false) {
+  if (explicitRefresh) return true;
+
+  const permissions = message?.member?.permissions;
+  if (!permissions || typeof permissions.has !== 'function') return false;
+
+  return (
+    permissions.has(PermissionFlagsBits.ManageGuild) ||
+    permissions.has(PermissionFlagsBits.Administrator)
+  );
+}
 
 function typeKey(types) {
   return types.length === BUNDLE_TYPES.length ? 'all' : types[0] || 'games';
@@ -96,7 +113,9 @@ function render(state) {
         (soon.length > 0 ? ` · ⏰ **${soon.length}** ending <24h` : '')
     )
     .setFooter({
-      text: `Page ${state.page + 1} of ${totalPages} · soonest first · cached 30 min · buttons expire in 5 min`,
+      text:
+        `Page ${state.page + 1} of ${totalPages} · soonest first · ` +
+        `${state.force ? 'refreshed now' : 'cached 30 min'} · buttons expire in 5 min`,
     })
     .setTimestamp(state.result ? new Date(state.result.fetchedAt) : new Date());
 
@@ -132,6 +151,7 @@ function render(state) {
 
 async function loadBundles(state, types, force = false) {
   state.types = types;
+  state.force = force;
   state.result = await getHumbleBundles({ types, force });
   return state.result;
 }
@@ -144,6 +164,7 @@ module.exports = {
     'Examples: `!humblebundle`, `!humblebundle books`, `!humblebundle all refresh`',
   aliases: ['humble', 'hb', 'bundles'],
   category: 'utility',
+  shouldForceRefresh,
 
   async execute(message, args) {
     const rawArgs = (args || []).map((arg) => String(arg || '').toLowerCase());
@@ -162,15 +183,25 @@ module.exports = {
       );
     }
 
-    const state = { types, page: 0, result: null };
+    const autoRefresh = shouldForceRefresh(message, false);
+    const force = refresh || autoRefresh;
+    const state = { types, page: 0, result: null, force: false, autoRefresh };
 
-    try {
-      await loadBundles(state, types, refresh);
-    } catch (error) {
-      return message.reply(`❌ Could not load Humble Bundles: ${error.message || error}`);
+    let statusMessage = null;
+    if (force) {
+      statusMessage = await message.reply('🔄 Updating Humble Bundle data…');
     }
 
-    const reply = await message.reply(render(state));
+    try {
+      await loadBundles(state, types, force);
+    } catch (error) {
+      const content = `❌ Could not load Humble Bundles: ${error.message || error}`;
+      return statusMessage ? statusMessage.edit(content) : message.reply(content);
+    }
+
+    const reply = statusMessage
+      ? await statusMessage.edit(render(state))
+      : await message.reply(render(state));
     const collector = reply.createMessageComponentCollector({
       filter: (interaction) => interaction.customId.startsWith('hb:'),
       time: COLLECTOR_MS,
@@ -199,7 +230,8 @@ module.exports = {
 
           const nextTypes = value === 'all' ? [...BUNDLE_TYPES] : [value];
           try {
-            await loadBundles(state, nextTypes, false);
+            // Admins keep getting fresh data when they switch category too.
+            await loadBundles(state, nextTypes, state.autoRefresh);
             state.page = 0;
           } catch (error) {
             return interaction.followUp({

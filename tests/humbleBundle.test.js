@@ -279,6 +279,21 @@ test('command exposes name, aliases and usage', () => {
   assert.strictEqual(typeof command.execute, 'function');
 });
 
+test('admins force a refresh, everyone else is served the cache', () => {
+  const command = require('../commands/utility/humblebundle');
+  const admin = { member: { permissions: { has: () => true } } };
+  const member = { member: { permissions: { has: () => false } } };
+
+  assert.strictEqual(command.shouldForceRefresh(admin, false), true);
+  assert.strictEqual(command.shouldForceRefresh(member, false), false);
+  assert.strictEqual(command.shouldForceRefresh({}, false), false, 'no member object');
+  assert.strictEqual(command.shouldForceRefresh(member, true), true, 'explicit refresh');
+});
+
+test('forced refreshes keep a one-minute floor', () => {
+  assert.strictEqual(hb.MIN_FORCE_INTERVAL_MS, 60 * 1000);
+});
+
 test('command rejects an unknown bundle type without fetching', async () => {
   const command = require('../commands/utility/humblebundle');
   let replyText = null;

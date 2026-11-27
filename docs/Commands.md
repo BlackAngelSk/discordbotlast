@@ -58,7 +58,8 @@ Not every feature is available in both styles, but most major systems support on
 Aliases: `!humble`, `!hb`, `!bundles`. Five bundles per page with ◀️/▶️ buttons, a
 Games/Books/Software/All switcher and a refresh button; each card shows a
 remaining-time bar, the relative end date, the headline, listed value and a
-direct link.
+direct link. Admins (Manage Server) get freshly fetched data on every run;
+everyone else is served the 30-minute cache.
 
 ## Moderation Commands
 
