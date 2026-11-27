@@ -314,6 +314,87 @@ test('buildBundleEmbed supports a custom title and skips the thumbnail when miss
   assert.ok(embed.description.includes('No end date announced'));
 });
 
+test('chunkEmbeds packs messages Discord will accept', () => {
+  const embed = (n) => ({ data: { title: `e${n}`, description: 'x'.repeat(200) } });
+
+  const many = Array.from({ length: 25 }, (_, index) => embed(index));
+  assert.deepStrictEqual(
+    hb.chunkEmbeds(many).map((chunk) => chunk.length),
+    [10, 10, 5]
+  );
+
+  const big = Array.from({ length: 12 }, () => ({ data: { description: 'x'.repeat(1400) } }));
+  const chunks = hb.chunkEmbeds(big);
+  assert.ok(chunks.length > 2, 'character budget splits further than the 10-embed cap');
+  for (const chunk of chunks) {
+    const chars = chunk.reduce((total, item) => total + JSON.stringify(item.data).length, 0);
+    assert.ok(chars <= 5500, `chunk used ${chars} chars`);
+  }
+
+  assert.deepStrictEqual(hb.chunkEmbeds([]), [[]]);
+});
+
+test('buildPayloads sends every bundle without pages', () => {
+  const command = require('../commands/utility/humblebundle');
+  const now = Date.now();
+  const bundles = Array.from({ length: 14 }, (_, index) => ({
+    slug: `b${index}`,
+    title: `Bundle ${index}`,
+    url: `https://www.humblebundle.com/games/b${index}`,
+    type: 'games',
+    headline: 'headline',
+    image: null,
+    endDate: new Date(now + (index + 1) * 3600000),
+    remainingMs: (index + 1) * 3600000,
+    value: { amount: 100, currency: 'USD' },
+  }));
+
+  const payloads = command.buildPayloads({
+    types: ['games'],
+    force: false,
+    result: { bundles, fetchedAt: new Date(now).toISOString(), failed: [] },
+  });
+
+  assert.strictEqual(payloads.length, 2, '14 bundles fit in two messages');
+  assert.strictEqual(payloads[0].embeds.length, 10);
+  assert.strictEqual(payloads[1].embeds.length, 4);
+  assert.ok(payloads[0].content.includes('**14** active'));
+  assert.strictEqual(payloads[1].content, undefined, 'header only on the first message');
+
+  // one bundle per embed, labelled with its type
+  assert.strictEqual(payloads[0].embeds[0].data.author.name, '🎮 Game bundle');
+  assert.strictEqual(payloads[0].embeds[0].data.fields, undefined);
+});
+
+test('buildPayloads labels book and software bundles', () => {
+  const command = require('../commands/utility/humblebundle');
+  const base = {
+    url: 'https://x',
+    headline: '',
+    image: null,
+    endDate: new Date(Date.now() + 3600000),
+    remainingMs: 3600000,
+    value: null,
+  };
+
+  const payloads = command.buildPayloads({
+    types: ['games', 'books', 'software'],
+    force: true,
+    result: {
+      bundles: [
+        { ...base, slug: 'g', title: 'G', type: 'games' },
+        { ...base, slug: 'b', title: 'B', type: 'books' },
+        { ...base, slug: 's', title: 'S', type: 'software' },
+      ],
+      fetchedAt: new Date().toISOString(),
+      failed: [],
+    },
+  });
+
+  const labels = payloads[0].embeds.map((embed) => embed.data.author.name);
+  assert.deepStrictEqual(labels, ['🎮 Game bundle', '📚 Book bundle', '💻 Software bundle']);
+});
+
 test('command exposes name, aliases and usage', () => {
   const command = require('../commands/utility/humblebundle');
 

@@ -1,21 +1,12 @@
-const {
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  MessageFlags,
-  PermissionFlagsBits,
-} = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const {
   getHumbleBundles,
   buildBundleEmbed,
-  paginate,
+  chunkEmbeds,
   BUNDLE_TYPES,
 } = require('../../utils/bundles/humbleBundle');
 const humbleBundleAlerts = require('../../utils/bundles/humbleBundleAlerts');
 
-const PER_PAGE = 3; // one embed per bundle, three per message
-const COLLECTOR_MS = 5 * 60 * 1000;
 const SOON_MS = 24 * 60 * 60 * 1000;
 
 const TYPE_META = {
@@ -65,74 +56,20 @@ function typeLabel(types) {
   return types.map((type) => TYPE_LABELS[type] || type).join(' + ');
 }
 
-function buildNavRow(state, totalPages) {
-  return new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setCustomId('hb:page:prev')
-      .setEmoji('◀️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(state.page <= 0),
-    new ButtonBuilder()
-      .setCustomId('hb:page:label')
-      .setLabel(`${state.page + 1} / ${totalPages}`)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId('hb:page:next')
-      .setEmoji('▶️')
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(state.page >= totalPages - 1),
-    new ButtonBuilder()
-      .setCustomId('hb:refresh')
-      .setEmoji('🔄')
-      .setLabel('Refresh')
-      .setStyle(ButtonStyle.Secondary)
-  );
-}
-
-function buildTypeRow(activeKey) {
-  return new ActionRowBuilder().addComponents(
-    ...BUNDLE_TYPES.map((type) =>
-      new ButtonBuilder()
-        .setCustomId(`hb:type:${type}`)
-        .setLabel(TYPE_META[type].label)
-        .setEmoji(TYPE_META[type].emoji)
-        .setStyle(type === activeKey ? ButtonStyle.Primary : ButtonStyle.Secondary)
-    ),
-    new ButtonBuilder()
-      .setCustomId('hb:type:all')
-      .setLabel('All')
-      .setEmoji('🎁')
-      .setStyle(activeKey === 'all' ? ButtonStyle.Primary : ButtonStyle.Secondary)
-  );
-}
-
-function render(state) {
+/**
+ * Every active bundle, one embed each, packed into as few messages as Discord
+ * accepts (10 embeds / ~5500 characters per message). No pagination.
+ */
+function buildPayloads(state) {
   const activeKey = typeKey(state.types);
   const meta = TYPE_META[activeKey];
   const bundles = state.result?.bundles || [];
-  const pages = paginate(bundles, PER_PAGE);
-  const totalPages = pages.length;
-
-  state.page = Math.min(Math.max(0, state.page), totalPages - 1);
-
-  const pageItems = pages[state.page] || [];
   const soon = bundles.filter(
     (bundle) => typeof bundle.remainingMs === 'number' && bundle.remainingMs <= SOON_MS
   );
 
-  const header = [
-    `${meta.emoji} **${meta.label}**`,
-    `**${bundles.length}** active`,
-    soon.length > 0 ? `⏰ **${soon.length}** ending <24h` : null,
-    `page ${state.page + 1}/${totalPages}`,
-    state.force ? 'refreshed now' : 'cached 30 min',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-
-  const embeds = pageItems.map((bundle, index) =>
-    buildBundleEmbed(bundle, { index: state.page * PER_PAGE + index, soonMs: SOON_MS })
+  const embeds = bundles.map((bundle, index) =>
+    buildBundleEmbed(bundle, { index, soonMs: SOON_MS, showType: true })
   );
 
   if (embeds.length === 0) {
@@ -141,11 +78,13 @@ function render(state) {
         .setColor(meta.color)
         .setDescription('📭 No active bundles in this category right now.')
     );
+  } else {
+    embeds[embeds.length - 1].setFooter({
+      text: `${bundles.length} bundle(s) · soonest ending first · updated ${new Date(
+        state.result?.fetchedAt || Date.now()
+      ).toLocaleString('en-GB')}`,
+    });
   }
-
-  embeds[embeds.length - 1].setFooter({
-    text: `Page ${state.page + 1} of ${totalPages} · soonest first · buttons expire in 5 min`,
-  });
 
   if (state.result?.failed?.length) {
     embeds.push(
@@ -158,11 +97,19 @@ function render(state) {
     );
   }
 
-  return {
-    content: header,
-    embeds,
-    components: [buildNavRow(state, totalPages), buildTypeRow(activeKey)],
-  };
+  const header = [
+    `${meta.emoji} **${meta.label}**`,
+    `**${bundles.length}** active`,
+    soon.length > 0 ? `⏰ **${soon.length}** ending <24h` : null,
+    state.force ? 'refreshed now' : 'cached 30 min',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return chunkEmbeds(embeds).map((chunk, index) => ({
+    ...(index === 0 ? { content: header } : {}),
+    embeds: chunk,
+  }));
 }
 
 async function loadBundles(state, types, force = false) {
@@ -285,7 +232,7 @@ async function handleOff(message) {
 
 module.exports = {
   name: 'humblebundle',
-  description: 'Browse active Humble Bundles, or set up automatic new/ended bundle alerts',
+  description: 'List every active Humble Bundle, or set up automatic new/ended bundle alerts',
   usage:
     '!humblebundle [games|books|software|all] [refresh]\n' +
     '!humblebundle set #channel [games|books|software|all]\n' +
@@ -294,6 +241,7 @@ module.exports = {
   aliases: ['humble', 'hb', 'bundles'],
   category: 'utility',
   shouldForceRefresh,
+  buildPayloads,
 
   async execute(message, args) {
     const rawArgs = (args || []).map((arg) => String(arg || '').toLowerCase());
@@ -332,7 +280,7 @@ module.exports = {
 
     const autoRefresh = shouldForceRefresh(message, false);
     const force = refresh || autoRefresh;
-    const state = { types, page: 0, result: null, force: false, autoRefresh };
+    const state = { types, result: null, force: false };
 
     let statusMessage = null;
     if (force) {
@@ -346,80 +294,24 @@ module.exports = {
       return statusMessage ? statusMessage.edit(content) : message.reply(content);
     }
 
-    const reply = statusMessage
-      ? await statusMessage.edit(render(state))
-      : await message.reply(render(state));
-    const collector = reply.createMessageComponentCollector({
-      filter: (interaction) => interaction.customId.startsWith('hb:'),
-      time: COLLECTOR_MS,
-    });
+    const payloads = buildPayloads(state);
+    const sendToChannel =
+      typeof message.channel?.send === 'function'
+        ? (payload) => message.channel.send(payload)
+        : (payload) => message.reply(payload);
 
-    collector.on('collect', async (interaction) => {
-      if (interaction.user.id !== message.author.id) {
-        return interaction.reply({
-          content: '❌ These buttons belong to whoever ran the command.',
-          flags: MessageFlags.Ephemeral,
-        });
+    let first = true;
+    for (const payload of payloads) {
+      if (first) {
+        if (statusMessage) await statusMessage.edit(payload);
+        else await message.reply(payload);
+        first = false;
+        continue;
       }
 
-      const [, action, value] = interaction.customId.split(':');
+      await sendToChannel(payload);
+    }
 
-      try {
-        if (action === 'page') {
-          if (value === 'prev') state.page -= 1;
-          if (value === 'next') state.page += 1;
-
-          return interaction.update(render(state));
-        }
-
-        if (action === 'type') {
-          await interaction.deferUpdate();
-
-          const nextTypes = value === 'all' ? [...BUNDLE_TYPES] : [value];
-          try {
-            // Admins keep getting fresh data when they switch category too.
-            await loadBundles(state, nextTypes, state.autoRefresh);
-            state.page = 0;
-          } catch (error) {
-            return interaction.followUp({
-              content: `❌ Could not load ${value} bundles: ${error.message || error}`,
-              flags: MessageFlags.Ephemeral,
-            });
-          }
-
-          return interaction.editReply(render(state));
-        }
-
-        if (action === 'refresh') {
-          await interaction.deferUpdate();
-          try {
-            await loadBundles(state, state.types, true);
-            state.page = 0;
-          } catch (error) {
-            return interaction.followUp({
-              content: `❌ Refresh failed: ${error.message || error}`,
-              flags: MessageFlags.Ephemeral,
-            });
-          }
-
-          return interaction.editReply(render(state));
-        }
-      } catch (error) {
-        console.error('[humblebundle] interaction failed:', error.message || error);
-      }
-
-      return undefined;
-    });
-
-    collector.on('end', async () => {
-      const final = render(state);
-      final.components.forEach((row) =>
-        row.components.forEach((button) => button.setDisabled(true))
-      );
-
-      await reply.edit(final).catch(() => {});
-    });
-
-    return reply;
+    return payloads.length;
   },
 };

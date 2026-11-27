@@ -21,6 +21,13 @@ const BASE_URL = 'https://www.humblebundle.com';
 const BUNDLE_TYPES = ['games', 'books', 'software'];
 const TYPE_COLORS = { games: 0xcc2929, books: 0x1f6feb, software: 0x2ea043 };
 const TYPE_LABELS = { games: 'Games', books: 'Books & Comics', software: 'Software' };
+// Shown on each embed so a mixed "all" list still says what kind of bundle it is.
+const TYPE_BUNDLE_LABELS = {
+  games: 'Game bundle',
+  books: 'Book bundle',
+  software: 'Software bundle',
+};
+const TYPE_EMOJI = { games: '🎮', books: '📚', software: '💻' };
 const DEFAULT_TYPE = 'games';
 
 const REQUEST_TIMEOUT_MS = 25000;
@@ -211,7 +218,7 @@ function buildBundleCard(bundle, index, { soonMs = 24 * 60 * 60 * 1000 } = {}) {
  */
 function buildBundleEmbed(
   bundle,
-  { index = null, titleOverride = null, soonMs = 24 * 60 * 60 * 1000 } = {}
+  { index = null, titleOverride = null, soonMs = 24 * 60 * 60 * 1000, showType = false } = {}
 ) {
   const endingSoon =
     typeof bundle.remainingMs === 'number' &&
@@ -227,9 +234,41 @@ function buildBundleEmbed(
     .setDescription(buildBundleCard(bundle, 0, { soonMs }).value)
     .setTimestamp();
 
+  if (showType) {
+    const label = TYPE_BUNDLE_LABELS[bundle.type] || TYPE_BUNDLE_LABELS.games;
+    const emoji = TYPE_EMOJI[bundle.type] || TYPE_EMOJI.games;
+    embed.setAuthor({ name: `${emoji} ${label}` });
+  }
+
   if (bundle.image) embed.setThumbnail(bundle.image);
 
   return embed;
+}
+
+/**
+ * Split embeds into messages Discord will accept: at most 10 embeds and about
+ * 5500 characters of embed JSON per message.
+ */
+function chunkEmbeds(embeds, { maxEmbeds = 10, maxChars = 5500 } = {}) {
+  const chunks = [];
+  let current = [];
+  let size = 0;
+
+  for (const embed of embeds) {
+    const cost = JSON.stringify(embed?.data ?? embed).length;
+
+    if (current.length > 0 && (current.length >= maxEmbeds || size + cost > maxChars)) {
+      chunks.push(current);
+      current = [];
+      size = 0;
+    }
+
+    current.push(embed);
+    size += cost;
+  }
+
+  if (current.length > 0) chunks.push(current);
+  return chunks.length > 0 ? chunks : [[]];
 }
 
 function formatRemaining(ms) {
@@ -439,7 +478,9 @@ module.exports = {
   paginate,
   buildBundleCard,
   buildBundleEmbed,
+  chunkEmbeds,
   TYPE_COLORS,
+  TYPE_BUNDLE_LABELS,
   TYPE_LABELS,
   truncate,
   normalizeBundle,
